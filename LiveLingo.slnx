@@ -1,0 +1,5 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/LiveLingo.App/LiveLingo.App.csproj" />
+  </Folder>
+</Solution>
