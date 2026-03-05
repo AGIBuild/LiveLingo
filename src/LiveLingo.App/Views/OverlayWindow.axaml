@@ -1,0 +1,125 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:LiveLingo.App.ViewModels"
+        x:Class="LiveLingo.App.Views.OverlayWindow"
+        x:DataType="vm:OverlayViewModel"
+        SystemDecorations="None"
+        Topmost="True"
+        CanResize="False"
+        ShowInTaskbar="False"
+        Background="Transparent"
+        TransparencyLevelHint="Transparent"
+        Width="600" Height="220"
+        WindowStartupLocation="Manual">
+
+    <Window.Styles>
+        <Style Selector="TextBox.source">
+            <Setter Property="Background" Value="#33FFFFFF"/>
+            <Setter Property="Foreground" Value="#FFFFFFFF"/>
+            <Setter Property="CaretBrush" Value="White"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="Padding" Value="12,8"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="AcceptsReturn" Value="True"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Watermark" Value="Type in your language..."/>
+        </Style>
+        <Style Selector="TextBlock.translation">
+            <Setter Property="Foreground" Value="#CCAADDFF"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Padding" Value="12,6"/>
+        </Style>
+        <Style Selector="TextBlock.status">
+            <Setter Property="Foreground" Value="#88FFFFFF"/>
+            <Setter Property="FontSize" Value="12"/>
+        </Style>
+        <Style Selector="Button.modeToggle">
+            <Setter Property="Background" Value="#33AADDFF"/>
+            <Setter Property="Foreground" Value="#CCAADDFF"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Padding" Value="8,3"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="#44AADDFF"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="MinHeight" Value="0"/>
+        </Style>
+    </Window.Styles>
+
+    <Border CornerRadius="12"
+            Background="#E8181825"
+            BorderBrush="#44AAAAFF"
+            BorderThickness="1"
+            Padding="0"
+            BoxShadow="0 8 32 0 #80000000">
+        <Grid RowDefinitions="Auto,*,Auto,Auto">
+
+            <!-- Drag handle -->
+            <Border Grid.Row="0"
+                    Name="DragHandle"
+                    Background="Transparent"
+                    Cursor="Hand"
+                    Height="28"
+                    CornerRadius="12,12,0,0">
+                <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Orientation="Horizontal" Spacing="4"
+                                Margin="16,0,0,0" VerticalAlignment="Center">
+                        <Ellipse Width="8" Height="8" Fill="#FF5F57"/>
+                        <Ellipse Width="8" Height="8" Fill="#FEBC2E"/>
+                        <Ellipse Width="8" Height="8" Fill="#28C840"/>
+                    </StackPanel>
+                    <TextBlock Grid.Column="1" Text="LiveLingo"
+                               FontSize="11" Foreground="#66FFFFFF"
+                               Margin="0,0,16,0" VerticalAlignment="Center"/>
+                </Grid>
+            </Border>
+
+            <!-- Source input -->
+            <TextBox Grid.Row="1"
+                     Classes="source"
+                     Text="{Binding SourceText, Mode=TwoWay}"
+                     Name="SourceInput"
+                     Margin="16,0,16,0"
+                     MinHeight="60"
+                     MaxHeight="80"/>
+
+            <!-- Translation preview -->
+            <Border Grid.Row="2"
+                    Margin="16,8,16,0"
+                    CornerRadius="8"
+                    Background="#22FFFFFF"
+                    MinHeight="40"
+                    MaxHeight="60"
+                    IsVisible="{Binding TranslatedText,
+                                Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                <TextBlock Classes="translation"
+                           Text="{Binding TranslatedText}"/>
+            </Border>
+
+            <!-- Status bar -->
+            <Grid Grid.Row="3"
+                  Margin="16,8,16,12"
+                  ColumnDefinitions="*,Auto,Auto">
+                <TextBlock Grid.Column="0"
+                           Classes="status"
+                           Text="{Binding StatusText}"
+                           VerticalAlignment="Center"/>
+                <Button Grid.Column="1"
+                        Classes="modeToggle"
+                        Content="{Binding ModeLabel}"
+                        Command="{Binding ToggleModeCommand}"
+                        Margin="0,0,8,0"
+                        ToolTip.Tip="Toggle: Paste Only / Paste &amp; Send"/>
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6"
+                            VerticalAlignment="Center">
+                    <TextBlock Classes="status" Text="Target:"/>
+                    <TextBlock Classes="status" Text="English" FontWeight="SemiBold"
+                               Foreground="#AADDFF"/>
+                </StackPanel>
+            </Grid>
+        </Grid>
+    </Border>
+</Window>
