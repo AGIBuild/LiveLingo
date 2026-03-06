@@ -1,0 +1,22 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="bg3" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#101429"/>
+      <stop offset="100%" stop-color="#1A2341"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="48" fill="url(#bg3)"/>
+
+  <rect x="24" y="40" width="120" height="88" rx="20" fill="#4E9CE2"/>
+  <polygon points="48,128 72,156 84,128" fill="#4E9CE2"/>
+  <rect x="34" y="48" width="100" height="72" rx="14" fill="#6CB8FF" opacity="0.25"/>
+  <path d="M46 82 C56 74, 68 74, 78 82 C88 90, 100 90, 112 82" stroke="#FFFFFF" stroke-width="3" fill="none" opacity="0.85"/>
+  <path d="M46 96 C56 88, 68 88, 78 96 C88 104, 100 104, 112 96" stroke="#FFFFFF" stroke-width="3" fill="none" opacity="0.6"/>
+  <text x="84" y="68" font-size="16" font-weight="700" fill="#FFFFFF" text-anchor="middle" font-family="sans-serif">LIVE</text>
+
+  <rect x="112" y="108" width="120" height="88" rx="20" fill="#28A745" opacity="0.95"/>
+  <polygon points="192,196 168,224 156,196" fill="#28A745" opacity="0.95"/>
+  <text x="172" y="166" font-size="40" font-weight="bold" fill="white" text-anchor="middle" font-family="sans-serif">En</text>
+
+  <path d="M100 90 C122 82 132 98 144 118" stroke="#FFE15A" stroke-width="4" fill="none" stroke-dasharray="6,4" opacity="0.75"/>
+</svg>

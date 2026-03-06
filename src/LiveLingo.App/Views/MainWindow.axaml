@@ -2,7 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="LiveLingo.App.Views.MainWindow"
         Title="LiveLingo"
-        Width="360" Height="200"
+        Width="360" Height="240"
         CanResize="False"
         WindowStartupLocation="CenterScreen">
 
@@ -23,12 +23,13 @@
         </Style>
     </Window.Styles>
 
-    <StackPanel Margin="24" Spacing="16" VerticalAlignment="Center">
-        <TextBlock Classes="title" Text="LiveLingo PoC"/>
+    <StackPanel Margin="24" Spacing="14" VerticalAlignment="Center">
+        <TextBlock Classes="title" Text="LiveLingo"/>
         <TextBlock Classes="hint"
                    Text="Global hotkey registered. Press the shortcut while any app is focused to open the translation overlay."/>
         <Border Classes="badge">
-            <TextBlock Text="⌨  Ctrl + Alt + T"
+            <TextBlock Name="HotkeyDisplay"
+                       Text="⌨  Ctrl + Alt + T"
                        FontSize="16"
                        FontWeight="SemiBold"
                        Foreground="#28A745"
@@ -37,5 +38,8 @@
         <TextBlock Classes="hint"
                    Text="Keep this window open (minimize is OK). The overlay pops up over the active window."
                    HorizontalAlignment="Center"/>
+        <Button Content="⚙ Settings" HorizontalAlignment="Center"
+                Name="SettingsButton" Padding="16,6"
+                Click="OnSettingsClick"/>
     </StackPanel>
 </Window>
