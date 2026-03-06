@@ -1,0 +1,98 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:LiveLingo.App.ViewModels"
+        x:Class="LiveLingo.App.Views.SetupWizardWindow"
+        x:DataType="vm:SetupWizardViewModel"
+        Title="LiveLingo Setup"
+        Width="480" Height="380"
+        CanResize="False"
+        WindowStartupLocation="CenterScreen">
+
+    <Window.Styles>
+        <Style Selector="TextBlock.heading">
+            <Setter Property="FontSize" Value="18"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Margin" Value="0,0,0,8"/>
+        </Style>
+        <Style Selector="TextBlock.desc">
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Foreground" Value="#888"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="0,0,0,16"/>
+        </Style>
+    </Window.Styles>
+
+    <DockPanel Margin="24">
+        <!-- Navigation buttons -->
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal"
+                    HorizontalAlignment="Right" Spacing="8" Margin="0,16,0,0">
+            <Button Content="Back" Command="{Binding GoBackCommand}"
+                    IsEnabled="{Binding CanGoBack}" Padding="16,6"/>
+            <Button Content="Next" Command="{Binding GoNextCommand}"
+                    IsVisible="{Binding !IsLastStep}" Padding="16,6"/>
+            <Button Content="Finish" Command="{Binding FinishCommand}"
+                    IsVisible="{Binding IsLastStep}" Padding="16,6" IsDefault="True"/>
+        </StackPanel>
+
+        <!-- Step indicator -->
+        <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,16">
+            <Border Background="#2228A745" CornerRadius="10" Padding="8,3"
+                    IsVisible="{Binding CurrentStep, Converter={x:Static ObjectConverters.IsNotNull}}">
+                <TextBlock FontSize="11" Foreground="#28A745">
+                    <TextBlock.Text>
+                        <MultiBinding StringFormat="Step {0} of {1}">
+                            <Binding Path="CurrentStep" Converter="{x:Static ObjectConverters.IsNotNull}"
+                                     FallbackValue="1"/>
+                            <Binding Path="TotalSteps"/>
+                        </MultiBinding>
+                    </TextBlock.Text>
+                </TextBlock>
+            </Border>
+        </StackPanel>
+
+        <!-- Step content -->
+        <Grid>
+            <!-- Step 0: Language selection -->
+            <StackPanel IsVisible="{Binding CurrentStep, Converter={x:Static ObjectConverters.IsNotNull}}"
+                        Spacing="8">
+                <TextBlock Classes="heading" Text="Choose Languages"/>
+                <TextBlock Classes="desc"
+                           Text="Select the source language you type in and the target language for translation."/>
+                <Grid ColumnDefinitions="120,*" RowDefinitions="Auto,Auto" RowSpacing="8">
+                    <TextBlock Text="Source:" VerticalAlignment="Center"/>
+                    <TextBox Grid.Column="1" Text="{Binding SourceLanguage}"
+                             Watermark="e.g. zh, ja, ko"/>
+                    <TextBlock Grid.Row="1" Text="Target:" VerticalAlignment="Center"/>
+                    <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding TargetLanguage}"
+                             Watermark="e.g. en, zh, ja"/>
+                </Grid>
+            </StackPanel>
+
+            <!-- Step 1: Model download -->
+            <StackPanel IsVisible="{Binding CurrentStep, Converter={x:Static ObjectConverters.IsNotNull}}"
+                        Spacing="8">
+                <TextBlock Classes="heading" Text="Download Translation Model"/>
+                <TextBlock Classes="desc"
+                           Text="LiveLingo uses local AI models for privacy. Download the translation model now or later."/>
+                <Button Content="Download Model" Command="{Binding DownloadModelCommand}"
+                        IsEnabled="{Binding !IsDownloading}" Padding="16,6"/>
+                <ProgressBar Value="{Binding DownloadProgress}"
+                             Maximum="100" Height="8" Margin="0,8"/>
+                <TextBlock Text="{Binding DownloadStatus}" FontSize="12" Foreground="#888"/>
+            </StackPanel>
+
+            <!-- Step 2: Hotkey -->
+            <StackPanel IsVisible="{Binding CurrentStep, Converter={x:Static ObjectConverters.IsNotNull}}"
+                        Spacing="8">
+                <TextBlock Classes="heading" Text="Set Hotkey"/>
+                <TextBlock Classes="desc"
+                           Text="This keyboard shortcut opens the translation overlay. You can change it later in settings."/>
+                <Grid ColumnDefinitions="120,*">
+                    <TextBlock Text="Hotkey:" VerticalAlignment="Center"/>
+                    <TextBox Grid.Column="1" Text="{Binding OverlayHotkey}"
+                             FontSize="16" FontWeight="SemiBold"/>
+                </Grid>
+            </StackPanel>
+        </Grid>
+    </DockPanel>
+</Window>

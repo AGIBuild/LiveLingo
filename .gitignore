@@ -416,3 +416,12 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+
+# Cursor IDE
+.cursor/
+
+# Code coverage reports
+coverage-report/
+
+# Nuke temp
+.nuke/temp/

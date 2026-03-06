@@ -1,0 +1,127 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:LiveLingo.App.ViewModels"
+        xmlns:ctrl="using:LiveLingo.App.Controls"
+        x:Class="LiveLingo.App.Views.SettingsWindow"
+        x:DataType="vm:SettingsViewModel"
+        Title="LiveLingo Settings"
+        Width="520" Height="480"
+        CanResize="False"
+        WindowStartupLocation="CenterScreen">
+
+    <Window.Styles>
+        <Style Selector="TextBlock.section">
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Margin" Value="0,8,0,4"/>
+        </Style>
+        <Style Selector="TextBlock.label">
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="FontSize" Value="13"/>
+        </Style>
+    </Window.Styles>
+
+    <DockPanel Margin="20">
+        <!-- Bottom buttons -->
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal"
+                    HorizontalAlignment="Right" Spacing="8" Margin="0,16,0,0">
+            <Button Content="Reset" Command="{Binding ResetCommand}"
+                    Padding="16,6" ToolTip.Tip="Restore default settings"/>
+            <Button Content="Cancel" Command="{Binding CancelCommand}"
+                    Padding="16,6"/>
+            <Button Content="Save" Command="{Binding SaveCommand}"
+                    Padding="16,6" IsDefault="True"/>
+        </StackPanel>
+
+        <!-- Tab content -->
+        <TabControl>
+            <!-- General Tab -->
+            <TabItem Header="General">
+                <StackPanel Spacing="12" Margin="0,8">
+                    <TextBlock Classes="section" Text="Hotkeys"/>
+                    <Grid ColumnDefinitions="140,*" RowDefinitions="Auto">
+                        <TextBlock Classes="label" Text="Overlay Toggle:"/>
+                        <ctrl:HotkeyRecorder Grid.Column="1"
+                            Hotkey="{Binding OverlayHotkey, Mode=TwoWay}"
+                            Text="{Binding OverlayHotkey}"
+                            IsReadOnly="False"/>
+                    </Grid>
+
+                    <TextBlock Classes="section" Text="UI"/>
+                    <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto" RowSpacing="8">
+                        <TextBlock Classes="label" Text="Overlay Opacity:"/>
+                        <Slider Grid.Column="1" Minimum="0.3" Maximum="1.0"
+                                Value="{Binding OverlayOpacity}"
+                                TickFrequency="0.05" IsSnapToTickEnabled="True"/>
+                        <TextBlock Grid.Row="1" Classes="label" Text="Injection Mode:"/>
+                        <ComboBox Grid.Row="1" Grid.Column="1"
+                                  SelectedItem="{Binding DefaultInjectionMode}">
+                            <ComboBoxItem Content="PasteAndSend"/>
+                            <ComboBoxItem Content="PasteOnly"/>
+                        </ComboBox>
+                    </Grid>
+                </StackPanel>
+            </TabItem>
+
+            <!-- Translation Tab -->
+            <TabItem Header="Translation">
+                <StackPanel Spacing="12" Margin="0,8">
+                    <TextBlock Classes="section" Text="Default Language Pair"/>
+                    <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto" RowSpacing="8">
+                        <TextBlock Classes="label" Text="Source Language:"/>
+                        <TextBox Grid.Column="1" Text="{Binding DefaultSourceLanguage}"/>
+                        <TextBlock Grid.Row="1" Classes="label" Text="Target Language:"/>
+                        <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding DefaultTargetLanguage}"/>
+                    </Grid>
+                </StackPanel>
+            </TabItem>
+
+            <!-- AI Tab -->
+            <TabItem Header="AI">
+                <StackPanel Spacing="12" Margin="0,8">
+                    <TextBlock Classes="section" Text="Post-Processing"/>
+                    <Grid ColumnDefinitions="140,*" RowDefinitions="Auto">
+                        <TextBlock Classes="label" Text="Default Mode:"/>
+                        <ComboBox Grid.Column="1"
+                                  SelectedItem="{Binding DefaultPostProcessMode}">
+                            <ComboBoxItem Content="Off"/>
+                            <ComboBoxItem Content="Summarize"/>
+                            <ComboBoxItem Content="Optimize"/>
+                            <ComboBoxItem Content="Colloquialize"/>
+                        </ComboBox>
+                    </Grid>
+                </StackPanel>
+            </TabItem>
+
+            <!-- Advanced Tab -->
+            <TabItem Header="Advanced">
+                <StackPanel Spacing="12" Margin="0,8">
+                    <TextBlock Classes="section" Text="Model Storage"/>
+                    <Grid ColumnDefinitions="140,*" RowDefinitions="Auto">
+                        <TextBlock Classes="label" Text="Storage Path:"/>
+                        <TextBox Grid.Column="1" Text="{Binding ModelStoragePath}"
+                                 Watermark="Default"/>
+                    </Grid>
+                    <TextBlock Classes="section" Text="Performance"/>
+                    <Grid ColumnDefinitions="140,*" RowDefinitions="Auto" RowSpacing="8">
+                        <TextBlock Classes="label" Text="Inference Threads:"/>
+                        <NumericUpDown Grid.Column="1" Minimum="0" Maximum="32"
+                                       Value="{Binding InferenceThreads}"/>
+                    </Grid>
+                    <TextBlock Classes="section" Text="Logging"/>
+                    <Grid ColumnDefinitions="140,*" RowDefinitions="Auto">
+                        <TextBlock Classes="label" Text="Log Level:"/>
+                        <ComboBox Grid.Column="1"
+                                  SelectedItem="{Binding LogLevel}">
+                            <ComboBoxItem Content="Verbose"/>
+                            <ComboBoxItem Content="Debug"/>
+                            <ComboBoxItem Content="Information"/>
+                            <ComboBoxItem Content="Warning"/>
+                            <ComboBoxItem Content="Error"/>
+                        </ComboBox>
+                    </Grid>
+                </StackPanel>
+            </TabItem>
+        </TabControl>
+    </DockPanel>
+</Window>

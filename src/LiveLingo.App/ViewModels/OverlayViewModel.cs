@@ -1,9 +1,7 @@
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using LiveLingo.App.Services.Platform.Windows;
+using LiveLingo.App.Platform;
+using LiveLingo.Core.Translation;
 
 namespace LiveLingo.App.ViewModels;
 
@@ -16,7 +14,9 @@ public enum InjectionMode
 public partial class OverlayViewModel : ObservableObject
 {
     private readonly TargetWindowInfo _targetWindow;
-    private CancellationTokenSource? _debounceCts;
+    private readonly ITranslationPipeline _pipeline;
+    private readonly ITextInjector _injector;
+    private CancellationTokenSource? _pipelineCts;
 
     private static InjectionMode _lastMode = InjectionMode.PasteAndSend;
 
@@ -35,42 +35,55 @@ public partial class OverlayViewModel : ObservableObject
     [ObservableProperty]
     private string _modeLabel = string.Empty;
 
-    public IntPtr TargetWindowHandle => _targetWindow.Handle;
-    public IntPtr TargetInputChild => _targetWindow.InputChildHandle;
+    public string TargetLanguage { get; }
+
+    public nint TargetWindowHandle => _targetWindow.Handle;
+    public nint TargetInputChild => _targetWindow.InputChildHandle;
     public bool AutoSend => Mode == InjectionMode.PasteAndSend;
 
     public event Action? RequestClose;
 
-    public OverlayViewModel(TargetWindowInfo targetWindow)
+    public OverlayViewModel(
+        TargetWindowInfo targetWindow,
+        ITranslationPipeline pipeline,
+        ITextInjector injector,
+        string targetLanguage = "en")
     {
         _targetWindow = targetWindow;
+        _pipeline = pipeline;
+        _injector = injector;
+        TargetLanguage = targetLanguage;
         Mode = _lastMode;
         UpdateModeDisplay();
     }
 
     partial void OnSourceTextChanged(string value)
     {
-        _debounceCts?.Cancel();
-        _debounceCts = new CancellationTokenSource();
-        var token = _debounceCts.Token;
-        _ = TranslateWithDebounce(value, token);
+        _pipelineCts?.Cancel();
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            TranslatedText = string.Empty;
+            return;
+        }
+
+        _pipelineCts = new CancellationTokenSource();
+        _ = RunPipelineAsync(value, _pipelineCts.Token);
     }
 
-    private async Task TranslateWithDebounce(string text, CancellationToken ct)
+    private async Task RunPipelineAsync(string text, CancellationToken ct)
     {
         try
         {
-            await Task.Delay(200, ct);
-            if (ct.IsCancellationRequested) return;
-
-            // PoC stub: real implementation calls ONNX Runtime
-            TranslatedText = string.IsNullOrWhiteSpace(text)
-                ? string.Empty
-                : $"[EN] {text}";
+            StatusText = "Translating...";
+            var result = await _pipeline.ProcessAsync(
+                new TranslationRequest(text, null, TargetLanguage, null), ct);
+            TranslatedText = result.Text;
+            StatusText = $"Translated ({result.TranslationDuration.TotalMilliseconds:0}ms) · " +
+                         (AutoSend ? "Ctrl+Enter paste & send" : "Ctrl+Enter paste") +
+                         " · Esc cancel";
         }
-        catch (OperationCanceledException)
-        {
-        }
+        catch (OperationCanceledException) { }
     }
 
     [RelayCommand]
@@ -98,10 +111,15 @@ public partial class OverlayViewModel : ObservableObject
         }
     }
 
+    public async Task InjectAsync()
+    {
+        if (string.IsNullOrWhiteSpace(TranslatedText)) return;
+        await _injector.InjectAsync(_targetWindow, TranslatedText, AutoSend);
+    }
+
     [RelayCommand]
     private void Cancel()
     {
         RequestClose?.Invoke();
-        NativeMethods.SetForegroundWindow(_targetWindow.Handle);
     }
 }

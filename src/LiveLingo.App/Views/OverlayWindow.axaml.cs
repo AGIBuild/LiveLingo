@@ -1,11 +1,10 @@
-using System;
 using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
-using LiveLingo.App.Services.Platform.Windows;
+using LiveLingo.App.Platform.Windows;
 using LiveLingo.App.ViewModels;
 
 namespace LiveLingo.App.Views;
@@ -24,7 +23,6 @@ public partial class OverlayWindow : Window
         DataContext = vm;
         vm.RequestClose += () => Dispatcher.UIThread.Post(Close);
 
-        // Tunnel routing intercepts keys BEFORE the TextBox consumes them
         AddHandler(KeyDownEvent, OnTunnelKeyDown, RoutingStrategies.Tunnel);
 
         var dragHandle = this.FindControl<Border>("DragHandle");
@@ -43,7 +41,7 @@ public partial class OverlayWindow : Window
             e.Handled = true;
             vm.CancelCommand.Execute(null);
         }
-        else if (e.Key == Key.Enter && e.KeyModifiers.HasFlag(KeyModifiers.Control))
+        else if (e.Key == Key.Enter && e.KeyModifiers.HasFlag(Avalonia.Input.KeyModifiers.Control))
         {
             e.Handled = true;
             if (!_isSending)
@@ -93,16 +91,11 @@ public partial class OverlayWindow : Window
             return;
 
         _isSending = true;
-        var textToSend = vm.TranslatedText;
-        var targetHandle = vm.TargetWindowHandle;
-        var inputChild = vm.TargetInputChild;
-        var autoSend = vm.AutoSend;
-
         Hide();
 
-        DispatcherTimer.RunOnce(() =>
+        DispatcherTimer.RunOnce(async () =>
         {
-            TextInjector.InjectText(targetHandle, inputChild, textToSend, autoSend);
+            await vm.InjectAsync();
             Close();
         }, TimeSpan.FromMilliseconds(200));
     }

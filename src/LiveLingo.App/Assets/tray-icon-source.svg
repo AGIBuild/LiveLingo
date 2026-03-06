@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="blueGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#66B5FF"/>
+      <stop offset="100%" stop-color="#3E8FDB"/>
+    </linearGradient>
+    <linearGradient id="greenGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#37C26A"/>
+      <stop offset="100%" stop-color="#249E53"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Left bubble: source -->
+  <rect x="5" y="8" width="30" height="22" rx="6" fill="url(#blueGrad)"/>
+  <polygon points="11,30 16,36 19,30" fill="#3E8FDB"/>
+  <text x="20" y="22" font-size="8.2" font-weight="800" fill="#FFFFFF"
+        text-anchor="middle" font-family="Arial,Segoe UI,sans-serif" letter-spacing="0.4">LIVE</text>
+
+  <!-- Right bubble: target -->
+  <rect x="29" y="26" width="30" height="22" rx="6" fill="url(#greenGrad)"/>
+  <polygon points="50,48 45,54 42,48" fill="#249E53"/>
+  <text x="44" y="41" font-size="10" font-weight="700" fill="#FFFFFF"
+        text-anchor="middle" font-family="Arial,Segoe UI,sans-serif">En</text>
+
+  <!-- Translation flow accent -->
+  <path d="M30 24 C34 20, 38 24, 41 29"
+        stroke="#FFD95A" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+</svg>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat code coverage">
+        <Configuration>
+          <Format>cobertura</Format>
+          <Exclude>[*]LiveLingo.App.Platform.Windows.*,[*]LiveLingo.App.Platform.macOS.*,[*]LiveLingo.App.Views.*,[*]LiveLingo.App.Controls.*,[*]LiveLingo.App.Program,[*]LiveLingo.App.App,[*]LiveLingo.App.Services.Update.VelopackUpdateService,[*]LiveLingo.Core.Engines.MarianOnnxEngine*,[*]LiveLingo.Core.Processing.QwenModelHost,[*]LiveLingo.Core.Processing.QwenTextProcessor,[*]LiveLingo.Core.Processing.SummarizeProcessor,[*]LiveLingo.Core.Processing.OptimizeProcessor,[*]LiveLingo.Core.Processing.ColloquializeProcessor</Exclude>
+          <ExcludeByAttribute>Obsolete,GeneratedCodeAttribute,CompilerGeneratedAttribute</ExcludeByAttribute>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>
