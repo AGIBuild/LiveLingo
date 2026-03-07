@@ -1,10 +1,10 @@
 <Solution>
   <Folder Name="/src/">
-    <Project Path="src/LiveLingo.App/LiveLingo.App.csproj" />
+    <Project Path="src/LiveLingo.Desktop/LiveLingo.Desktop.csproj" />
     <Project Path="src/LiveLingo.Core/LiveLingo.Core.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/LiveLingo.App.Tests/LiveLingo.App.Tests.csproj" />
+    <Project Path="tests/LiveLingo.Desktop.Tests/LiveLingo.Desktop.Tests.csproj" />
     <Project Path="tests/LiveLingo.Core.Tests/LiveLingo.Core.Tests.csproj" />
   </Folder>
 </Solution>

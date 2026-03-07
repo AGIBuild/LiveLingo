@@ -229,13 +229,13 @@ public class ModelManagerTests : IDisposable
     }
 
     [Fact]
-    public async Task EnsureModelAsync_LogsInformation_AfterDownload()
+    public async Task EnsureModelAsync_LogsDebug_AfterDownload()
     {
         var desc = new ModelDescriptor("info-log", "Test", "http://fake/model", 100, ModelType.Translation);
         await _manager.EnsureModelAsync(desc, null, CancellationToken.None);
 
         _logger.Received().Log(
-            LogLevel.Information,
+            LogLevel.Debug,
             Arg.Any<EventId>(),
             Arg.Any<object>(),
             Arg.Any<Exception?>(),
@@ -243,7 +243,7 @@ public class ModelManagerTests : IDisposable
     }
 
     [Fact]
-    public async Task DeleteModelAsync_LogsInformation()
+    public async Task DeleteModelAsync_LogsDebug()
     {
         var desc = new ModelDescriptor("del-log", "Del", "http://fake/model", 100, ModelType.Translation);
         await _manager.EnsureModelAsync(desc, null, CancellationToken.None);
@@ -252,7 +252,7 @@ public class ModelManagerTests : IDisposable
         await _manager.DeleteModelAsync("del-log", CancellationToken.None);
 
         _logger.Received().Log(
-            LogLevel.Information,
+            LogLevel.Debug,
             Arg.Any<EventId>(),
             Arg.Any<object>(),
             Arg.Any<Exception?>(),
@@ -452,7 +452,7 @@ public class ModelManagerTests : IDisposable
     }
 
     [Fact]
-    public async Task MigrateStoragePathAsync_LogsInfoOnSuccess()
+    public async Task MigrateStoragePathAsync_LogsDebugOnSuccess()
     {
         var modelDir = Path.Combine(_tempDir, "log-migrate");
         Directory.CreateDirectory(modelDir);
@@ -465,7 +465,7 @@ public class ModelManagerTests : IDisposable
             await _manager.MigrateStoragePathAsync(newPath);
 
             _logger.Received().Log(
-                LogLevel.Information,
+                LogLevel.Debug,
                 Arg.Any<EventId>(),
                 Arg.Any<object>(),
                 Arg.Any<Exception?>(),
@@ -478,7 +478,7 @@ public class ModelManagerTests : IDisposable
     }
 
     [Fact]
-    public async Task MigrateStoragePathAsync_LogsInfoWhenSourceMissing()
+    public async Task MigrateStoragePathAsync_LogsDebugWhenSourceMissing()
     {
         var nonExistent = Path.Combine(_tempDir, "does_not_exist_src");
         var newPath = Path.Combine(Path.GetTempPath(), $"LiveLingoMissing_{Guid.NewGuid():N}");
@@ -489,7 +489,7 @@ public class ModelManagerTests : IDisposable
         await mgr.MigrateStoragePathAsync(newPath);
 
         logger.Received().Log(
-            LogLevel.Information,
+            LogLevel.Debug,
             Arg.Any<EventId>(),
             Arg.Any<object>(),
             Arg.Any<Exception?>(),

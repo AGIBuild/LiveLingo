@@ -1,0 +1,152 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Styles.Resources>
+        <Color x:Key="BgDeep">#0D0D0F</Color>
+        <Color x:Key="BgSurface">#1C1C1E</Color>
+        <Color x:Key="BgElevated">#2A2A2C</Color>
+        <Color x:Key="BorderSubtle">#3A3A3C</Color>
+        <Color x:Key="FgPrimary">#E5E5E7</Color>
+        <Color x:Key="FgSecondary">#C7C7CC</Color>
+        <Color x:Key="FgTertiary">#98989D</Color>
+        <Color x:Key="FgMuted">#8E8E93</Color>
+        <Color x:Key="Accent">#0A84FF</Color>
+        <Color x:Key="Success">#30D158</Color>
+        <Color x:Key="Danger">#FF453A</Color>
+        <Color x:Key="Warning">#FF9F0A</Color>
+
+        <SolidColorBrush x:Key="BgDeepBrush" Color="{StaticResource BgDeep}"/>
+        <SolidColorBrush x:Key="BgSurfaceBrush" Color="{StaticResource BgSurface}"/>
+        <SolidColorBrush x:Key="BgElevatedBrush" Color="{StaticResource BgElevated}"/>
+        <SolidColorBrush x:Key="BorderSubtleBrush" Color="{StaticResource BorderSubtle}"/>
+        <SolidColorBrush x:Key="FgPrimaryBrush" Color="{StaticResource FgPrimary}"/>
+        <SolidColorBrush x:Key="FgSecondaryBrush" Color="{StaticResource FgSecondary}"/>
+        <SolidColorBrush x:Key="FgTertiaryBrush" Color="{StaticResource FgTertiary}"/>
+        <SolidColorBrush x:Key="FgMutedBrush" Color="{StaticResource FgMuted}"/>
+        <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource Accent}"/>
+        <SolidColorBrush x:Key="SuccessBrush" Color="{StaticResource Success}"/>
+        <SolidColorBrush x:Key="DangerBrush" Color="{StaticResource Danger}"/>
+        <SolidColorBrush x:Key="WarningBrush" Color="{StaticResource Warning}"/>
+    </Styles.Resources>
+
+    <!-- TextBlock variants -->
+    <Style Selector="TextBlock.section">
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{StaticResource FgTertiaryBrush}"/>
+        <Setter Property="Margin" Value="0,14,0,6"/>
+    </Style>
+    <Style Selector="TextBlock.label">
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Foreground" Value="{StaticResource FgSecondaryBrush}"/>
+    </Style>
+    <Style Selector="TextBlock.hint">
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="Foreground" Value="{StaticResource FgMutedBrush}"/>
+        <Setter Property="TextWrapping" Value="Wrap"/>
+        <Setter Property="Margin" Value="0,3,0,0"/>
+    </Style>
+    <Style Selector="TextBlock.heading">
+        <Setter Property="FontSize" Value="20"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{StaticResource FgPrimaryBrush}"/>
+        <Setter Property="Margin" Value="0,0,0,4"/>
+    </Style>
+    <Style Selector="TextBlock.desc">
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Foreground" Value="{StaticResource FgTertiaryBrush}"/>
+        <Setter Property="TextWrapping" Value="Wrap"/>
+        <Setter Property="Margin" Value="0,0,0,20"/>
+    </Style>
+    <Style Selector="TextBlock.title">
+        <Setter Property="FontSize" Value="20"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Foreground" Value="{StaticResource FgPrimaryBrush}"/>
+    </Style>
+
+    <!-- TextBox -->
+    <Style Selector="TextBox.themed">
+        <Setter Property="Background" Value="{StaticResource BgDeepBrush}"/>
+        <Setter Property="Foreground" Value="{StaticResource FgPrimaryBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BgElevatedBrush}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="CaretBrush" Value="{StaticResource AccentBrush}"/>
+    </Style>
+    <Style Selector="TextBox.themed:focus /template/ Border#PART_BorderElement">
+        <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+    </Style>
+
+    <!-- ComboBox -->
+    <Style Selector="ComboBox.themed">
+        <Setter Property="Background" Value="{StaticResource BgDeepBrush}"/>
+        <Setter Property="Foreground" Value="{StaticResource FgPrimaryBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BgElevatedBrush}"/>
+        <Setter Property="CornerRadius" Value="6"/>
+    </Style>
+
+    <!-- NumericUpDown -->
+    <Style Selector="NumericUpDown.themed">
+        <Setter Property="Background" Value="{StaticResource BgDeepBrush}"/>
+        <Setter Property="Foreground" Value="{StaticResource FgPrimaryBrush}"/>
+        <Setter Property="BorderBrush" Value="{StaticResource BgElevatedBrush}"/>
+        <Setter Property="CornerRadius" Value="6"/>
+    </Style>
+
+    <!-- Button variants -->
+    <Style Selector="Button.themed">
+        <Setter Property="Background" Value="{StaticResource BgElevatedBrush}"/>
+        <Setter Property="Foreground" Value="{StaticResource FgPrimaryBrush}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+    <Style Selector="Button.accent">
+        <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
+        <Setter Property="Foreground" Value="#FFFFFF"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+    <Style Selector="Button.danger">
+        <Setter Property="Background" Value="{StaticResource DangerBrush}"/>
+        <Setter Property="Foreground" Value="#FFFFFF"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+    <Style Selector="Button.sm">
+        <Setter Property="Padding" Value="10,4"/>
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="MinWidth" Value="0"/>
+        <Setter Property="MinHeight" Value="0"/>
+    </Style>
+
+    <!-- Separator -->
+    <Style Selector="Separator.themed">
+        <Setter Property="Margin" Value="0,10,0,0"/>
+        <Setter Property="Background" Value="{StaticResource BgSurfaceBrush}"/>
+    </Style>
+
+    <!-- TabItem -->
+    <Style Selector="TabItem.themed">
+        <Setter Property="Foreground" Value="{StaticResource FgTertiaryBrush}"/>
+        <Setter Property="FontSize" Value="13"/>
+    </Style>
+
+    <!-- Slider -->
+    <Style Selector="Slider.themed">
+        <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+    </Style>
+
+    <!-- ProgressBar -->
+    <Style Selector="ProgressBar.themed">
+        <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+        <Setter Property="Background" Value="{StaticResource BgSurfaceBrush}"/>
+        <Setter Property="CornerRadius" Value="3"/>
+        <Setter Property="MinHeight" Value="4"/>
+        <Setter Property="MaxHeight" Value="4"/>
+    </Style>
+
+</Styles>

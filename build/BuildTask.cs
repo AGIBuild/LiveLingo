@@ -43,7 +43,7 @@ class BuildTask : NukeBuild
     AbsolutePath ReleasesDir => RootDirectory / "releases";
     AbsolutePath RunSettingsFile => RootDirectory / "test.runsettings";
 
-    AbsolutePath AppProject => SourceDir / "LiveLingo.App" / "LiveLingo.App.csproj";
+    AbsolutePath AppProject => SourceDir / "LiveLingo.Desktop" / "LiveLingo.Desktop.csproj";
 
     Target Clean => _ => _
         .Before(Restore)
@@ -241,7 +241,7 @@ class BuildTask : NukeBuild
         {
             DotNetToolRestore();
 
-            var mainExe = Runtime.StartsWith("win") ? "LiveLingo.App.exe" : "LiveLingo.App";
+            var mainExe = Runtime.StartsWith("win") ? "LiveLingo.Desktop.exe" : "LiveLingo.Desktop";
 
             var tempDir = RootDirectory / ".nuke" / "temp" / "vpk";
             tempDir.CreateDirectory();
@@ -262,4 +262,83 @@ class BuildTask : NukeBuild
                 $"--outputDir {ReleasesDir}",
                 environmentVariables: vpkEnv);
         });
+
+    Target PackMac => _ => _
+        .DependsOn(Publish)
+        .Requires(() => Runtime.StartsWith("osx"))
+        .Executes(() =>
+        {
+            var macosDir = RootDirectory / "build" / "macos";
+            var appBundle = PublishDir / "LiveLingo.app";
+            var contentsDir = appBundle / "Contents";
+            var macOsDir = contentsDir / "MacOS";
+            var resourcesDir = contentsDir / "Resources";
+
+            appBundle.DeleteDirectory();
+            macOsDir.CreateDirectory();
+            resourcesDir.CreateDirectory();
+
+            var infoPlist = File.ReadAllText(macosDir / "Info.plist");
+            infoPlist = infoPlist.Replace("__VERSION__", Version);
+            File.WriteAllText(contentsDir / "Info.plist", infoPlist);
+
+            File.Copy(macosDir / "entitlements.plist", contentsDir / "entitlements.plist", overwrite: true);
+
+            var publishedFiles = PublishDir / Runtime;
+            foreach (var file in Directory.GetFiles(publishedFiles, "*", SearchOption.AllDirectories))
+            {
+                var relative = Path.GetRelativePath(publishedFiles, file);
+                var dest = macOsDir / relative;
+                Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
+                File.Copy(file, dest, overwrite: true);
+            }
+
+            var mainExe = macOsDir / "LiveLingo.Desktop";
+            if (File.Exists(mainExe))
+                Chmod(mainExe, "755");
+
+            var svgIcon = RootDirectory / "src" / "LiveLingo.Desktop" / "Assets" / "app-icon.svg";
+            if (File.Exists(svgIcon))
+                File.Copy(svgIcon, resourcesDir / "app-icon.svg", overwrite: true);
+
+            ReleasesDir.CreateDirectory();
+
+            var componentPkg = PublishDir / "LiveLingo-component.pkg";
+            RunProcess("pkgbuild",
+                $"--root \"{appBundle}\" " +
+                $"--identifier com.livelingo.app " +
+                $"--version {Version} " +
+                $"--install-location /Applications/LiveLingo.app " +
+                $"\"{componentPkg}\"");
+
+            var finalPkg = ReleasesDir / $"LiveLingo-{Version}-{Runtime}.pkg";
+            RunProcess("productbuild",
+                $"--package \"{componentPkg}\" " +
+                $"\"{finalPkg}\"");
+
+            componentPkg.DeleteFile();
+            Log.Information("macOS PKG created: {Path}", finalPkg);
+        });
+
+    static void Chmod(string path, string mode)
+    {
+        RunProcess("chmod", $"{mode} \"{path}\"");
+    }
+
+    static void RunProcess(string tool, string arguments)
+    {
+        var psi = new System.Diagnostics.ProcessStartInfo(tool, arguments)
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false
+        };
+        using var proc = System.Diagnostics.Process.Start(psi)!;
+        proc.WaitForExit();
+        if (proc.ExitCode != 0)
+        {
+            var stderr = proc.StandardError.ReadToEnd();
+            throw new Exception($"{tool} failed (exit {proc.ExitCode}): {stderr}");
+        }
+    }
 }

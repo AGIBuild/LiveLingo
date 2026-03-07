@@ -1,0 +1,146 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:LiveLingo.Desktop.ViewModels"
+        x:Class="LiveLingo.Desktop.Views.SetupWizardWindow"
+        x:DataType="vm:SetupWizardViewModel"
+        Title="LiveLingo Setup"
+        Width="480" Height="380"
+        CanResize="False"
+        WindowStartupLocation="CenterScreen"
+        TransparencyLevelHint="AcrylicBlur"
+        Background="Transparent"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaChromeHints="NoChrome"
+        ExtendClientAreaTitleBarHeightHint="-1">
+
+    <Window.Styles>
+        <Style Selector="ProgressBar.wizard">
+            <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+            <Setter Property="Background" Value="{StaticResource BgSurfaceBrush}"/>
+            <Setter Property="CornerRadius" Value="3"/>
+            <Setter Property="MinHeight" Value="6"/>
+            <Setter Property="MaxHeight" Value="6"/>
+        </Style>
+    </Window.Styles>
+
+    <Panel>
+        <ExperimentalAcrylicBorder IsHitTestVisible="False">
+            <ExperimentalAcrylicBorder.Material>
+                <ExperimentalAcrylicMaterial
+                    BackgroundSource="Digger"
+                    TintColor="{StaticResource BgDeep}"
+                    TintOpacity="0.92"
+                    MaterialOpacity="0.92"/>
+            </ExperimentalAcrylicBorder.Material>
+        </ExperimentalAcrylicBorder>
+
+        <Border IsHitTestVisible="False"
+                BorderBrush="#10FFFFFF" BorderThickness="1"
+                CornerRadius="8"/>
+
+        <DockPanel Margin="32,40,32,24">
+            <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal"
+                        HorizontalAlignment="Right" Spacing="8" Margin="0,20,0,0">
+                <Button Content="Back" Command="{Binding GoBackCommand}"
+                        IsEnabled="{Binding CanGoBack}" Padding="20,8" Classes="themed"/>
+                <Button Content="Next" Command="{Binding GoNextCommand}"
+                        IsVisible="{Binding !IsLastStep}" Padding="20,8" Classes="themed"/>
+                <Button Content="Finish" Command="{Binding FinishCommand}"
+                        IsVisible="{Binding IsLastStep}" Padding="20,8"
+                        IsDefault="True" Classes="accent"/>
+            </StackPanel>
+
+            <Border DockPanel.Dock="Top" Background="#150A84FF" CornerRadius="10"
+                    Padding="10,4" HorizontalAlignment="Left" Margin="0,0,0,20">
+                <TextBlock FontSize="11" Foreground="{StaticResource AccentBrush}">
+                    <TextBlock.Text>
+                        <MultiBinding StringFormat="Step {0} of {1}">
+                            <Binding Path="DisplayStep"/>
+                            <Binding Path="TotalSteps"/>
+                        </MultiBinding>
+                    </TextBlock.Text>
+                </TextBlock>
+            </Border>
+
+            <Grid>
+                <!-- Step 0: Languages -->
+                <StackPanel IsVisible="{Binding IsStep0}" Spacing="8">
+                    <TextBlock Classes="heading" Text="Choose Languages"/>
+                    <TextBlock Classes="desc"
+                               Text="Select the source language you type in and the target language for translation."/>
+                    <Grid ColumnDefinitions="100,*" RowDefinitions="Auto,Auto" RowSpacing="12">
+                        <TextBlock Classes="label" Text="Source:"/>
+                        <TextBox Grid.Column="1" Classes="themed"
+                                 Text="{Binding SourceLanguage}"
+                                 Watermark="e.g. zh, ja, ko"/>
+                        <TextBlock Grid.Row="1" Classes="label" Text="Target:"/>
+                        <TextBox Grid.Row="1" Grid.Column="1" Classes="themed"
+                                 Text="{Binding TargetLanguage}"
+                                 Watermark="e.g. en, zh, ja"/>
+                    </Grid>
+                </StackPanel>
+
+                <!-- Step 1: Hotkey -->
+                <StackPanel IsVisible="{Binding IsStep1}" Spacing="8">
+                    <TextBlock Classes="heading" Text="Set Hotkey"/>
+                    <TextBlock Classes="desc"
+                               Text="This keyboard shortcut opens the translation overlay. You can change it later in settings."/>
+                    <Grid ColumnDefinitions="100,*">
+                        <TextBlock Classes="label" Text="Hotkey:"/>
+                        <TextBox Grid.Column="1" Classes="themed"
+                                 Text="{Binding OverlayHotkey}"
+                                 FontSize="16" FontWeight="SemiBold"/>
+                    </Grid>
+                </StackPanel>
+
+                <!-- Step 2: Model Download -->
+                <StackPanel IsVisible="{Binding IsStep2}" Spacing="8">
+                    <TextBlock Classes="heading" Text="Download AI Model"/>
+                    <TextBlock Classes="desc"
+                               Text="LiveLingo requires an AI model for translation. This is a one-time download (~1 GB)."/>
+
+                    <Border Padding="16,14" CornerRadius="8"
+                            Background="{StaticResource BgSurfaceBrush}">
+                        <StackPanel Spacing="10">
+                            <Grid ColumnDefinitions="*,Auto">
+                                <StackPanel>
+                                    <TextBlock Text="Qwen2.5-1.5B-Instruct" FontSize="14"
+                                               FontWeight="SemiBold"
+                                               Foreground="{StaticResource FgPrimaryBrush}"/>
+                                    <TextBlock Text="Translation &amp; Post-processing · ~1 GB"
+                                               FontSize="11"
+                                               Foreground="{StaticResource FgTertiaryBrush}"
+                                               Margin="0,2,0,0"/>
+                                </StackPanel>
+                                <Button Grid.Column="1" Content="Download" Classes="accent"
+                                        Padding="16,8" VerticalAlignment="Center"
+                                        Command="{Binding DownloadModelCommand}"
+                                        IsVisible="{Binding !IsModelInstalled}"/>
+                                <TextBlock Grid.Column="1" Text="✓ Ready" FontSize="13"
+                                           Foreground="{StaticResource SuccessBrush}"
+                                           FontWeight="SemiBold"
+                                           VerticalAlignment="Center"
+                                           IsVisible="{Binding IsModelInstalled}"/>
+                            </Grid>
+
+                            <ProgressBar Classes="wizard" Minimum="0" Maximum="100"
+                                         Value="{Binding DownloadProgress}"
+                                         IsVisible="{Binding IsDownloading}"/>
+
+                            <Grid ColumnDefinitions="*,Auto"
+                                  IsVisible="{Binding DownloadStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                <TextBlock Text="{Binding DownloadStatus}" FontSize="11"
+                                           Foreground="{StaticResource FgTertiaryBrush}"/>
+                                <Button Grid.Column="1" Content="Cancel" Padding="8,3"
+                                        FontSize="11" MinWidth="0" MinHeight="0"
+                                        Classes="themed"
+                                        Command="{Binding CancelDownloadCommand}"
+                                        IsVisible="{Binding IsDownloading}"/>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Grid>
+        </DockPanel>
+    </Panel>
+</Window>
