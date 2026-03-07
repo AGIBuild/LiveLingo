@@ -265,25 +265,28 @@ public class SettingsViewModelTests
     [Fact]
     public async Task SaveCommand_MigratesModelPath_WhenChanged()
     {
+        var oldPath = Path.Combine(Path.GetTempPath(), "old-models");
+        var newPath = Path.Combine(Path.GetTempPath(), "new-models");
         var svc = CreateSettings(new UserSettings
         {
-            Advanced = new AdvancedSettings { ModelStoragePath = @"C:\old" }
+            Advanced = new AdvancedSettings { ModelStoragePath = oldPath }
         });
         var modelManager = Substitute.For<IModelManager>();
         var vm = new SettingsViewModel(svc, modelManager);
 
-        vm.ModelStoragePath = @"D:\new";
+        vm.ModelStoragePath = newPath;
         await vm.SaveCommand.ExecuteAsync(null);
 
-        await modelManager.Received(1).MigrateStoragePathAsync(@"D:\new", Arg.Any<CancellationToken>());
+        await modelManager.Received(1).MigrateStoragePathAsync(newPath, Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public async Task SaveCommand_SkipsMigration_WhenPathUnchanged()
     {
+        var samePath = Path.Combine(Path.GetTempPath(), "same-models");
         var svc = CreateSettings(new UserSettings
         {
-            Advanced = new AdvancedSettings { ModelStoragePath = @"C:\same" }
+            Advanced = new AdvancedSettings { ModelStoragePath = samePath }
         });
         var modelManager = Substitute.For<IModelManager>();
         var vm = new SettingsViewModel(svc, modelManager);
@@ -296,14 +299,15 @@ public class SettingsViewModelTests
     [Fact]
     public async Task SaveCommand_SkipsMigration_WhenPathFormatOnlyDiffers()
     {
+        var basePath = Path.Combine(Path.GetTempPath(), "models");
         var svc = CreateSettings(new UserSettings
         {
-            Advanced = new AdvancedSettings { ModelStoragePath = @"C:\models" }
+            Advanced = new AdvancedSettings { ModelStoragePath = basePath }
         });
         var modelManager = Substitute.For<IModelManager>();
         var vm = new SettingsViewModel(svc, modelManager);
-        vm.OverlayHotkey = "Ctrl+Alt+Y"; // make dirty
-        vm.ModelStoragePath = @"C:\models\";
+        vm.OverlayHotkey = "Ctrl+Alt+Y";
+        vm.ModelStoragePath = basePath + Path.DirectorySeparatorChar;
 
         await vm.SaveCommand.ExecuteAsync(null);
 
@@ -325,16 +329,18 @@ public class SettingsViewModelTests
     [Fact]
     public async Task SaveCommand_SetsMigrationError_OnFailure()
     {
+        var oldPath = Path.Combine(Path.GetTempPath(), "old-models");
+        var newPath = Path.Combine(Path.GetTempPath(), "new-models");
         var svc = CreateSettings(new UserSettings
         {
-            Advanced = new AdvancedSettings { ModelStoragePath = @"C:\old" }
+            Advanced = new AdvancedSettings { ModelStoragePath = oldPath }
         });
         var modelManager = Substitute.For<IModelManager>();
         modelManager.MigrateStoragePathAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(Task.FromException(new IOException("Access denied")));
         var vm = new SettingsViewModel(svc, modelManager);
 
-        vm.ModelStoragePath = @"D:\new";
+        vm.ModelStoragePath = newPath;
         await vm.SaveCommand.ExecuteAsync(null);
 
         Assert.Contains("Access denied", vm.MigrationError);
@@ -344,14 +350,16 @@ public class SettingsViewModelTests
     [Fact]
     public async Task SaveCommand_ClearsMigrationError_OnSuccess()
     {
+        var oldPath = Path.Combine(Path.GetTempPath(), "old-models");
+        var newPath = Path.Combine(Path.GetTempPath(), "new-models");
         var svc = CreateSettings(new UserSettings
         {
-            Advanced = new AdvancedSettings { ModelStoragePath = @"C:\old" }
+            Advanced = new AdvancedSettings { ModelStoragePath = oldPath }
         });
         var modelManager = Substitute.For<IModelManager>();
         var vm = new SettingsViewModel(svc, modelManager);
 
-        vm.ModelStoragePath = @"D:\new";
+        vm.ModelStoragePath = newPath;
         await vm.SaveCommand.ExecuteAsync(null);
 
         Assert.Null(vm.MigrationError);
