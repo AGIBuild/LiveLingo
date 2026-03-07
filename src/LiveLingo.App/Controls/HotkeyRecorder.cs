@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 
 namespace LiveLingo.App.Controls;
 
@@ -17,14 +18,42 @@ public class HotkeyRecorder : TextBox
 
     private bool _recording;
 
+    static HotkeyRecorder()
+    {
+        HotkeyProperty.Changed.AddClassHandler<HotkeyRecorder>((r, _) =>
+        {
+            if (!r._recording)
+                r.Text = r.Hotkey;
+        });
+    }
+
+    public HotkeyRecorder()
+    {
+        IsReadOnly = true;
+        Cursor = new Avalonia.Input.Cursor(StandardCursorType.Hand);
+        Text = Hotkey;
+    }
+
     protected override void OnGotFocus(GotFocusEventArgs e)
     {
         base.OnGotFocus(e);
-        _recording = true;
-        Text = "Press key combination...";
+        if (!_recording)
+            Text = Hotkey;
     }
 
-    protected override void OnLostFocus(Avalonia.Interactivity.RoutedEventArgs e)
+    protected override void OnPointerPressed(PointerPressedEventArgs e)
+    {
+        base.OnPointerPressed(e);
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+            return;
+
+        Focus();
+        _recording = true;
+        Text = "Press key combination...";
+        e.Handled = true;
+    }
+
+    protected override void OnLostFocus(RoutedEventArgs e)
     {
         base.OnLostFocus(e);
         _recording = false;
@@ -33,9 +62,16 @@ public class HotkeyRecorder : TextBox
 
     protected override void OnKeyDown(KeyEventArgs e)
     {
-        if (!_recording) { base.OnKeyDown(e); return; }
+        if (!_recording) return;
 
         e.Handled = true;
+
+        if (e.Key == Key.Escape)
+        {
+            _recording = false;
+            Text = Hotkey;
+            return;
+        }
 
         if (IsModifierKey(e.Key)) return;
 
@@ -44,6 +80,8 @@ public class HotkeyRecorder : TextBox
         if (e.KeyModifiers.HasFlag(KeyModifiers.Alt)) parts.Add("Alt");
         if (e.KeyModifiers.HasFlag(KeyModifiers.Shift)) parts.Add("Shift");
         if (e.KeyModifiers.HasFlag(KeyModifiers.Meta)) parts.Add("Win");
+
+        if (parts.Count == 0) return;
 
         parts.Add(e.Key.ToString());
 

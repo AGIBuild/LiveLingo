@@ -1,0 +1,79 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (e.g., v1.2.3)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Resolve tag and version
+        id: meta
+        shell: pwsh
+        run: |
+          if ('${{ github.event_name }}' -eq 'push') {
+            $tag = '${{ github.ref_name }}'
+          } else {
+            $tag = '${{ inputs.tag }}'
+          }
+          $version = $tag -replace '^v', ''
+          "tag=$tag"         | Out-File -Append $env:GITHUB_OUTPUT
+          "version=$version" | Out-File -Append $env:GITHUB_OUTPUT
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.meta.outputs.tag }}
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: ${{ runner.os }}-nuget-
+
+      - name: Restore tools
+        run: dotnet tool restore
+
+      - name: Publish
+        shell: pwsh
+        run: |
+          dotnet publish src/LiveLingo.App/LiveLingo.App.csproj `
+            -c Release `
+            -r win-x64 `
+            --self-contained `
+            -o publish/win-x64 `
+            --nologo
+
+      - name: Pack (Velopack)
+        shell: pwsh
+        env:
+          DOTNET_ROLL_FORWARD: LatestMajor
+        run: |
+          dotnet vpk pack `
+            --packId LiveLingo `
+            --packVersion ${{ steps.meta.outputs.version }} `
+            --packDir publish/win-x64 `
+            --mainExe LiveLingo.App.exe `
+            --outputDir releases
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: LiveLingo ${{ steps.meta.outputs.tag }}
+          files: releases/*
+          generate_release_notes: true

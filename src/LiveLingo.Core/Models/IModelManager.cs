@@ -10,4 +10,6 @@ public interface IModelManager
     IReadOnlyList<InstalledModel> ListInstalled();
     Task DeleteModelAsync(string modelId, CancellationToken ct = default);
     long GetTotalDiskUsage();
+    string GetModelDirectory(string modelId);
+    Task MigrateStoragePathAsync(string newPath, CancellationToken ct = default);
 }

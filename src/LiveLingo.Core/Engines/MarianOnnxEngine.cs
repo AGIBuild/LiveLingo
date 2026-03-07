@@ -12,10 +12,23 @@ public sealed class MarianOnnxEngine : ITranslationEngine
     private readonly ConcurrentDictionary<string, ModelSession> _sessions = new();
     private readonly SemaphoreSlim _loadLock = new(1, 1);
 
+    public IReadOnlyList<LanguageInfo> SupportedLanguages { get; }
+
     public MarianOnnxEngine(IModelManager modelManager, ILogger<MarianOnnxEngine> logger)
     {
         _modelManager = modelManager;
         _logger = logger;
+        SupportedLanguages = ModelRegistry.TranslationModels
+            .SelectMany(m =>
+            {
+                var parts = m.Id.Replace("opus-mt-", "").Split('-');
+                return parts.Length == 2
+                    ? [parts[0], parts[1]]
+                    : Array.Empty<string>();
+            })
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Select(code => new LanguageInfo(code, code))
+            .ToList();
     }
 
     public async Task<string> TranslateAsync(

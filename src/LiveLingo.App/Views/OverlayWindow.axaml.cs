@@ -3,6 +3,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Media;
 using Avalonia.Threading;
 using LiveLingo.App.Platform.Windows;
 using LiveLingo.App.ViewModels;
@@ -21,15 +22,17 @@ public partial class OverlayWindow : Window
     public OverlayWindow(OverlayViewModel vm) : this()
     {
         DataContext = vm;
-        vm.RequestClose += () => Dispatcher.UIThread.Post(Close);
+        vm.RequestClose += () => Dispatcher.UIThread.Post(() => FadeOutAndClose());
 
         AddHandler(KeyDownEvent, OnTunnelKeyDown, RoutingStrategies.Tunnel);
 
         var dragHandle = this.FindControl<Border>("DragHandle");
         if (dragHandle is not null)
-        {
             dragHandle.PointerPressed += OnDragHandlePointerPressed;
-        }
+
+        var langLink = this.FindControl<Avalonia.Controls.TextBlock>("TargetLangLink");
+        if (langLink is not null)
+            langLink.PointerPressed += (_, _) => vm.ToggleLanguagePickerCommand.Execute(null);
     }
 
     private void OnTunnelKeyDown(object? sender, KeyEventArgs e)
@@ -59,6 +62,12 @@ public partial class OverlayWindow : Window
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
             ForceActivateWindows();
+        }
+
+        var rootPanel = this.FindControl<Panel>("RootPanel");
+        if (rootPanel is not null)
+        {
+            DispatcherTimer.RunOnce(() => rootPanel.Opacity = 1, TimeSpan.FromMilliseconds(30));
         }
 
         DispatcherTimer.RunOnce(FocusSourceInput, TimeSpan.FromMilliseconds(150));
@@ -100,6 +109,19 @@ public partial class OverlayWindow : Window
         }, TimeSpan.FromMilliseconds(200));
     }
 
+    private void FadeOutAndClose()
+    {
+        var rootPanel = this.FindControl<Panel>("RootPanel");
+        if (rootPanel is null)
+        {
+            Close();
+            return;
+        }
+
+        rootPanel.Opacity = 0;
+        DispatcherTimer.RunOnce(Close, TimeSpan.FromMilliseconds(160));
+    }
+
     private void OnDragHandlePointerPressed(object? sender, PointerPressedEventArgs e)
     {
         if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
@@ -107,6 +129,22 @@ public partial class OverlayWindow : Window
             BeginMoveDrag(e);
         }
     }
+
+    public void SetBackgroundOpacity(double opacity)
+    {
+        var border = this.FindControl<ExperimentalAcrylicBorder>("AcrylicBg");
+        if (border is null) return;
+
+        border.Material = new ExperimentalAcrylicMaterial
+        {
+            BackgroundSource = AcrylicBackgroundSource.Digger,
+            TintColor = Color.Parse("#0D0D0F"),
+            TintOpacity = opacity,
+            MaterialOpacity = opacity
+        };
+    }
+
+    private void CloseButton_Click(object? sender, RoutedEventArgs e) => FadeOutAndClose();
 
     private void FocusSourceInput()
     {

@@ -1,5 +1,6 @@
 using LLama;
 using LLama.Common;
+using LLama.Native;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -15,6 +16,7 @@ public sealed class QwenModelHost : IDisposable
     private readonly Timer _idleTimer;
     private LLamaWeights? _weights;
     private volatile ModelLoadState _state = ModelLoadState.Unloaded;
+    private static int _logConfigured;
 
     private const int IdleTimeoutMs = 300_000; // 5 minutes
 
@@ -27,6 +29,9 @@ public sealed class QwenModelHost : IDisposable
         _options = options.Value;
         _logger = logger;
         _idleTimer = new Timer(OnIdleTimeout, null, Timeout.Infinite, Timeout.Infinite);
+
+        if (Interlocked.Exchange(ref _logConfigured, 1) == 0)
+            NativeLogConfig.llama_log_set(logger);
     }
 
     public async Task<LLamaWeights> GetWeightsAsync(CancellationToken ct)
@@ -43,12 +48,25 @@ public sealed class QwenModelHost : IDisposable
                 return _weights;
 
             SetState(ModelLoadState.Loading);
-            ModelPath = Path.Combine(_options.ModelStoragePath, "qwen25-1.5b", "model.gguf");
+            var modelDir = Path.Combine(_options.ModelStoragePath, "qwen25-1.5b");
+            ModelPath = Directory.Exists(modelDir)
+                ? Directory.GetFiles(modelDir, "*.gguf").FirstOrDefault() ?? ""
+                : "";
+
+            if (string.IsNullOrEmpty(ModelPath) || !File.Exists(ModelPath))
+                throw new FileNotFoundException(
+                    "Qwen model not found. Please download it from Settings → Models tab.",
+                    ModelPath ?? "qwen25-1.5b/*.gguf");
+
+            var threads = _options.InferenceThreads > 0
+                ? _options.InferenceThreads
+                : Math.Max(2, Environment.ProcessorCount / 2);
+
             var parameters = new ModelParams(ModelPath)
             {
                 ContextSize = 2048,
                 GpuLayerCount = 0,
-                Threads = Math.Max(2, Environment.ProcessorCount / 2)
+                Threads = threads
             };
 
             _weights = await LLamaWeights.LoadFromFileAsync(parameters, ct, null);

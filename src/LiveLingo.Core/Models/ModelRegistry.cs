@@ -5,22 +5,22 @@ public static class ModelRegistry
     public static readonly ModelDescriptor MarianZhEn = new(
         "opus-mt-zh-en",
         "MarianMT Chinese→English",
-        "https://huggingface.co/Helsinki-NLP/opus-mt-zh-en/resolve/main/",
-        31_457_280,
+        "https://huggingface.co/Helsinki-NLP/opus-mt-zh-en/resolve/main/pytorch_model.bin",
+        312_500_000,
         ModelType.Translation);
 
     public static readonly ModelDescriptor MarianEnZh = new(
         "opus-mt-en-zh",
         "MarianMT English→Chinese",
-        "https://huggingface.co/Helsinki-NLP/opus-mt-en-zh/resolve/main/",
-        31_457_280,
+        "https://huggingface.co/Helsinki-NLP/opus-mt-en-zh/resolve/main/pytorch_model.bin",
+        312_500_000,
         ModelType.Translation);
 
     public static readonly ModelDescriptor MarianJaEn = new(
         "opus-mt-ja-en",
         "MarianMT Japanese→English",
-        "https://huggingface.co/Helsinki-NLP/opus-mt-ja-en/resolve/main/",
-        31_457_280,
+        "https://huggingface.co/Helsinki-NLP/opus-mt-ja-en/resolve/main/pytorch_model.bin",
+        312_500_000,
         ModelType.Translation);
 
     public static readonly ModelDescriptor FastTextLid = new(
@@ -41,7 +41,7 @@ public static class ModelRegistry
         [MarianZhEn, MarianEnZh, MarianJaEn];
 
     public static IReadOnlyList<ModelDescriptor> RequiredModels { get; } =
-        [MarianZhEn, FastTextLid];
+        [Qwen25_15B];
 
     public static IReadOnlyList<ModelDescriptor> AllModels { get; } =
         [MarianZhEn, MarianEnZh, MarianJaEn, FastTextLid, Qwen25_15B];

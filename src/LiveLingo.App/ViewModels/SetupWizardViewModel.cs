@@ -8,7 +8,8 @@ namespace LiveLingo.App.ViewModels;
 public partial class SetupWizardViewModel : ObservableObject
 {
     private readonly ISettingsService _settings;
-    private readonly IModelManager _modelManager;
+    private readonly IModelManager? _modelManager;
+    private CancellationTokenSource? _downloadCts;
 
     [ObservableProperty] private int _currentStep;
     [ObservableProperty] private string _sourceLanguage = "zh";
@@ -16,27 +17,45 @@ public partial class SetupWizardViewModel : ObservableObject
     [ObservableProperty] private string _overlayHotkey = "Ctrl+Alt+T";
     [ObservableProperty] private bool _isDownloading;
     [ObservableProperty] private double _downloadProgress;
-    [ObservableProperty] private string _downloadStatus = string.Empty;
-    [ObservableProperty] private bool _isCompleted;
+    [ObservableProperty] private string? _downloadStatus;
+    [ObservableProperty] private bool _isModelInstalled;
 
-    public int TotalSteps => 3;
-    public bool CanGoBack => CurrentStep > 0;
+    public int TotalSteps { get; }
+    public int StartStep { get; }
+    public int DisplayStep => CurrentStep + 1;
+    public bool CanGoBack => CurrentStep > StartStep;
     public bool CanGoNext => CurrentStep < TotalSteps - 1;
     public bool IsLastStep => CurrentStep == TotalSteps - 1;
+    public bool IsStep0 => CurrentStep == 0;
+    public bool IsStep1 => CurrentStep == 1;
+    public bool IsStep2 => CurrentStep == 2;
 
     public event Action? RequestClose;
 
-    public SetupWizardViewModel(ISettingsService settings, IModelManager modelManager)
+    public SetupWizardViewModel(ISettingsService settings, IModelManager? modelManager = null, int startStep = 0)
     {
         _settings = settings;
         _modelManager = modelManager;
+        TotalSteps = 3;
+        StartStep = startStep;
+        _currentStep = startStep;
+
+        if (_modelManager is not null)
+        {
+            var installed = _modelManager.ListInstalled();
+            _isModelInstalled = installed.Any(m => m.Id == ModelRegistry.Qwen25_15B.Id);
+        }
     }
 
     partial void OnCurrentStepChanged(int value)
     {
+        OnPropertyChanged(nameof(DisplayStep));
         OnPropertyChanged(nameof(CanGoBack));
         OnPropertyChanged(nameof(CanGoNext));
         OnPropertyChanged(nameof(IsLastStep));
+        OnPropertyChanged(nameof(IsStep0));
+        OnPropertyChanged(nameof(IsStep1));
+        OnPropertyChanged(nameof(IsStep2));
     }
 
     [RelayCommand]
@@ -52,38 +71,30 @@ public partial class SetupWizardViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private async Task DownloadModel(CancellationToken ct)
+    private async Task DownloadModelAsync()
     {
-        if (IsDownloading) return;
+        if (_modelManager is null || IsDownloading || IsModelInstalled) return;
 
         IsDownloading = true;
-        DownloadStatus = "Finding model...";
+        DownloadProgress = 0;
+        DownloadStatus = "Downloading…";
+        _downloadCts = new CancellationTokenSource();
+
+        var progress = new Progress<ModelDownloadProgress>(p =>
+        {
+            DownloadProgress = p.Percentage;
+            DownloadStatus = $"Downloading… {p.Percentage:F0}%";
+        });
 
         try
         {
-            var descriptor = ModelRegistry.AllModels
-                .FirstOrDefault(m => m.Type == ModelType.Translation);
-
-            if (descriptor is null)
-            {
-                DownloadStatus = "No translation model available";
-                return;
-            }
-
-            var progress = new Progress<ModelDownloadProgress>(p =>
-            {
-                DownloadProgress = p.TotalBytes > 0
-                    ? (double)p.BytesDownloaded / p.TotalBytes * 100
-                    : 0;
-                DownloadStatus = $"Downloading... {DownloadProgress:F0}%";
-            });
-
-            await _modelManager.EnsureModelAsync(descriptor, progress, ct);
-            DownloadStatus = "Model ready";
+            await _modelManager.EnsureModelAsync(ModelRegistry.Qwen25_15B, progress, _downloadCts.Token);
+            IsModelInstalled = true;
+            DownloadStatus = "Download complete ✓";
         }
         catch (OperationCanceledException)
         {
-            DownloadStatus = "Download cancelled";
+            DownloadStatus = "Cancelled";
         }
         catch (Exception ex)
         {
@@ -92,7 +103,15 @@ public partial class SetupWizardViewModel : ObservableObject
         finally
         {
             IsDownloading = false;
+            _downloadCts?.Dispose();
+            _downloadCts = null;
         }
+    }
+
+    [RelayCommand]
+    private void CancelDownload()
+    {
+        _downloadCts?.Cancel();
     }
 
     [RelayCommand]
@@ -109,7 +128,6 @@ public partial class SetupWizardViewModel : ObservableObject
             }
         });
 
-        IsCompleted = true;
         RequestClose?.Invoke();
     }
 }

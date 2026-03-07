@@ -24,9 +24,8 @@ public static class ServiceCollectionExtensions
         services.AddHttpClient<ModelManager>();
         services.AddSingleton<IModelManager>(sp => sp.GetRequiredService<ModelManager>());
 
-        services.AddSingleton<ITranslationEngine, StubTranslationEngine>();
-
         services.AddSingleton<QwenModelHost>();
+        services.AddSingleton<ITranslationEngine, LlamaTranslationEngine>();
         services.AddSingleton<ITextProcessor, SummarizeProcessor>();
         services.AddSingleton<ITextProcessor, OptimizeProcessor>();
         services.AddSingleton<ITextProcessor, ColloquializeProcessor>();

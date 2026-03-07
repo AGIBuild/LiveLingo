@@ -48,7 +48,10 @@ public sealed class ModelManager : IModelManager
             Directory.CreateDirectory(modelDir);
             ValidateDiskSpace(modelDir, descriptor.SizeBytes);
 
-            var partPath = manifestPath + ".part";
+            var fileName = GetFileNameFromUrl(descriptor.DownloadUrl);
+            var finalPath = Path.Combine(modelDir, fileName);
+            var partPath = finalPath + ".part";
+
             long existingBytes = 0;
             if (File.Exists(partPath))
                 existingBytes = new FileInfo(partPath).Length;
@@ -78,19 +81,24 @@ public sealed class ModelManager : IModelManager
             }
 
             fileStream.Close();
+            File.Move(partPath, finalPath, overwrite: true);
 
             var manifest = ModelManifest.FromDescriptor(descriptor);
             await File.WriteAllTextAsync(manifestPath, manifest.ToJson(), ct);
 
-            if (File.Exists(partPath))
-                File.Delete(partPath);
-
-            _logger.LogInformation("Model {Id} downloaded successfully", descriptor.Id);
+            _logger.LogInformation("Model {Id} downloaded to {Path}", descriptor.Id, finalPath);
         }
         finally
         {
             _inflight.TryRemove(descriptor.Id, out _);
         }
+    }
+
+    private static string GetFileNameFromUrl(string url)
+    {
+        var uri = new Uri(url);
+        var name = Path.GetFileName(uri.AbsolutePath);
+        return string.IsNullOrEmpty(name) ? "model.bin" : name;
     }
 
     public IReadOnlyList<InstalledModel> ListInstalled()
@@ -143,6 +151,59 @@ public sealed class ModelManager : IModelManager
 
     public string GetModelDirectory(string modelId) =>
         Path.Combine(_options.ModelStoragePath, modelId);
+
+    public async Task MigrateStoragePathAsync(string newPath, CancellationToken ct = default)
+    {
+        var oldPath = _options.ModelStoragePath;
+        if (string.Equals(oldPath, newPath, StringComparison.OrdinalIgnoreCase))
+            return;
+
+        if (!Directory.Exists(oldPath))
+        {
+            _options.ModelStoragePath = newPath;
+            _logger.LogInformation("Storage path changed to {Path} (no files to migrate)", newPath);
+            return;
+        }
+
+        Directory.CreateDirectory(newPath);
+
+        await Task.Run(() =>
+        {
+            foreach (var dir in Directory.GetDirectories(oldPath))
+            {
+                ct.ThrowIfCancellationRequested();
+                var dirName = Path.GetFileName(dir);
+                var destDir = Path.Combine(newPath, dirName);
+
+                if (Directory.Exists(destDir))
+                    Directory.Delete(destDir, true);
+
+                try
+                {
+                    Directory.Move(dir, destDir);
+                }
+                catch (IOException)
+                {
+                    CopyDirectoryRecursive(dir, destDir);
+                    Directory.Delete(dir, true);
+                }
+
+                _logger.LogDebug("Migrated model directory {Dir}", dirName);
+            }
+        }, ct);
+
+        _options.ModelStoragePath = newPath;
+        _logger.LogInformation("Storage path migrated from {Old} to {New}", oldPath, newPath);
+    }
+
+    private static void CopyDirectoryRecursive(string source, string destination)
+    {
+        Directory.CreateDirectory(destination);
+        foreach (var file in Directory.GetFiles(source))
+            File.Copy(file, Path.Combine(destination, Path.GetFileName(file)), true);
+        foreach (var dir in Directory.GetDirectories(source))
+            CopyDirectoryRecursive(dir, Path.Combine(destination, Path.GetFileName(dir)));
+    }
 
     private void ValidateDiskSpace(string path, long requiredBytes)
     {

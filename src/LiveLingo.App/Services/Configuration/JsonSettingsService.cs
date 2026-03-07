@@ -56,7 +56,9 @@ public sealed class JsonSettingsService : ISettingsService
                 Directory.CreateDirectory(dir);
 
             var json = JsonSerializer.Serialize(_current, JsonOptions);
-            await File.WriteAllTextAsync(_filePath, json, ct);
+            var tempPath = $"{_filePath}.tmp";
+            await File.WriteAllTextAsync(tempPath, json, ct);
+            File.Move(tempPath, _filePath, true);
         }
         finally
         {

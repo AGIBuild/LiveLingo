@@ -190,4 +190,211 @@ public class TranslationPipelineTests
 
         Assert.Equal("translated", result.Text);
     }
+
+    [Fact]
+    public async Task ProcessAsync_IgnoresUnmatchedProcessor_WhenOtherProcessorsExist()
+    {
+        var optimizer = Substitute.For<ITextProcessor>();
+        optimizer.Name.Returns("optimize");
+
+        _engine.TranslateAsync("x", "zh", "en", Arg.Any<CancellationToken>())
+            .Returns("translated");
+
+        var pipeline = new TranslationPipeline(
+            _detector, _engine, new[] { optimizer }, _logger);
+
+        var result = await pipeline.ProcessAsync(
+            new TranslationRequest("x", "zh", "en",
+                new ProcessingOptions(Summarize: true)), CancellationToken.None);
+
+        Assert.Equal("translated", result.Text);
+        Assert.NotNull(result.PostProcessingDuration);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_CancellationBetweenDetectionAndTranslation()
+    {
+        using var cts = new CancellationTokenSource();
+        _detector.DetectAsync("test", Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                cts.Cancel();
+                return new DetectionResult("zh", 0.9f);
+            });
+
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            () => _pipeline.ProcessAsync(
+                new TranslationRequest("test", null, "en", null), cts.Token));
+    }
+
+    [Fact]
+    public async Task ProcessAsync_CancellationDuringPostProcessing()
+    {
+        using var cts = new CancellationTokenSource();
+        var processor = Substitute.For<ITextProcessor>();
+        processor.Name.Returns("summarize");
+        processor.ProcessAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                cts.Cancel();
+                callInfo.ArgAt<CancellationToken>(2).ThrowIfCancellationRequested();
+                return "result";
+            });
+
+        _engine.TranslateAsync("src", "zh", "en", Arg.Any<CancellationToken>())
+            .Returns("translated");
+
+        var pipeline = new TranslationPipeline(
+            _detector, _engine, new[] { processor }, _logger);
+
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            () => pipeline.ProcessAsync(
+                new TranslationRequest("src", "zh", "en",
+                    new ProcessingOptions(Summarize: true)), cts.Token));
+    }
+
+    [Fact]
+    public async Task ProcessAsync_PostProcessingDuration_IsSeparateFromTranslation()
+    {
+        var processor = Substitute.For<ITextProcessor>();
+        processor.Name.Returns("optimize");
+        processor.ProcessAsync("translated", "en", Arg.Any<CancellationToken>())
+            .Returns(async _ =>
+            {
+                await Task.Delay(50);
+                return "optimized";
+            });
+
+        _engine.TranslateAsync("src", "zh", "en", Arg.Any<CancellationToken>())
+            .Returns(async _ =>
+            {
+                await Task.Delay(50);
+                return "translated";
+            });
+
+        var pipeline = new TranslationPipeline(
+            _detector, _engine, new[] { processor }, _logger);
+
+        var result = await pipeline.ProcessAsync(
+            new TranslationRequest("src", "zh", "en",
+                new ProcessingOptions(Optimize: true)), CancellationToken.None);
+
+        Assert.NotNull(result.PostProcessingDuration);
+        Assert.True(result.PostProcessingDuration!.Value.TotalMilliseconds >= 40);
+        Assert.True(result.TranslationDuration.TotalMilliseconds >= 40);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_DetectedLanguage_IsLoggedAndReturned()
+    {
+        _detector.DetectAsync("Test", Arg.Any<CancellationToken>())
+            .Returns(new DetectionResult("zh", 0.95f));
+        _engine.TranslateAsync("Test", "zh", "en", Arg.Any<CancellationToken>())
+            .Returns("Translated");
+
+        var result = await _pipeline.ProcessAsync(
+            new TranslationRequest("Test", null, "en", null), CancellationToken.None);
+
+        Assert.Equal("zh", result.DetectedSourceLanguage);
+        Assert.Equal("Translated", result.RawTranslation);
+        _logger.Received().Log(
+            LogLevel.Debug,
+            Arg.Any<EventId>(),
+            Arg.Any<object>(),
+            Arg.Any<Exception?>(),
+            Arg.Any<Func<object, Exception?, string>>());
+    }
+
+    [Fact]
+    public async Task ProcessAsync_OptimizeWithNoProcessor_DoesNotThrow()
+    {
+        _engine.TranslateAsync("test", "zh", "en", Arg.Any<CancellationToken>())
+            .Returns("translated");
+
+        var result = await _pipeline.ProcessAsync(
+            new TranslationRequest("test", "zh", "en",
+                new ProcessingOptions(Optimize: true)), CancellationToken.None);
+
+        Assert.Equal("translated", result.Text);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_ColloquializeWithNoProcessor_DoesNotThrow()
+    {
+        _engine.TranslateAsync("test", "zh", "en", Arg.Any<CancellationToken>())
+            .Returns("translated");
+
+        var result = await _pipeline.ProcessAsync(
+            new TranslationRequest("test", "zh", "en",
+                new ProcessingOptions(Colloquialize: true)), CancellationToken.None);
+
+        Assert.Equal("translated", result.Text);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_CancellationAfterTranslation_BeforePostProcessing()
+    {
+        using var cts = new CancellationTokenSource();
+        _engine.TranslateAsync("src", "zh", "en", Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                cts.Cancel();
+                return "translated";
+            });
+
+        var processor = Substitute.For<ITextProcessor>();
+        processor.Name.Returns("summarize");
+
+        var pipeline = new TranslationPipeline(
+            _detector, _engine, [processor], _logger);
+
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            () => pipeline.ProcessAsync(
+                new TranslationRequest("src", "zh", "en",
+                    new ProcessingOptions(Summarize: true)), cts.Token));
+    }
+
+    [Fact]
+    public async Task ProcessAsync_CancellationAfterTranslation_WithoutPostProcessing()
+    {
+        using var cts = new CancellationTokenSource();
+        _engine.TranslateAsync("src", "zh", "en", Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                cts.Cancel();
+                return "translated";
+            });
+
+        await Assert.ThrowsAsync<OperationCanceledException>(
+            () => _pipeline.ProcessAsync(
+                new TranslationRequest("src", "zh", "en", null), cts.Token));
+    }
+
+    [Fact]
+    public async Task ProcessAsync_PostProcessDuration_ExcludesTranslationTime()
+    {
+        var processor = Substitute.For<ITextProcessor>();
+        processor.Name.Returns("optimize");
+        processor.ProcessAsync("translated", "en", Arg.Any<CancellationToken>())
+            .Returns("optimized");
+
+        _engine.TranslateAsync("src", "zh", "en", Arg.Any<CancellationToken>())
+            .Returns(async _ =>
+            {
+                await Task.Delay(200);
+                return "translated";
+            });
+
+        var pipeline = new TranslationPipeline(
+            _detector, _engine, [processor], _logger);
+
+        var result = await pipeline.ProcessAsync(
+            new TranslationRequest("src", "zh", "en",
+                new ProcessingOptions(Optimize: true)), CancellationToken.None);
+
+        Assert.NotNull(result.PostProcessingDuration);
+        Assert.True(result.TranslationDuration.TotalMilliseconds >= 150);
+        Assert.True(result.PostProcessingDuration!.Value.TotalMilliseconds < 150,
+            $"Post-processing took {result.PostProcessingDuration.Value.TotalMilliseconds}ms, expected < 150ms");
+    }
 }

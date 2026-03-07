@@ -7,4 +7,6 @@ public class CoreOptions
         "LiveLingo", "models");
 
     public string DefaultTargetLanguage { get; set; } = "en";
+
+    public int InferenceThreads { get; set; }
 }
