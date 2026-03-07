@@ -48,27 +48,9 @@ jobs:
       - name: Restore tools
         run: dotnet tool restore
 
-      - name: Publish
+      - name: Test + Build + Pack
         shell: pwsh
-        run: |
-          dotnet publish src/LiveLingo.App/LiveLingo.App.csproj `
-            -c Release `
-            -r win-x64 `
-            --self-contained `
-            -o publish/win-x64 `
-            --nologo
-
-      - name: Pack (Velopack)
-        shell: pwsh
-        env:
-          DOTNET_ROLL_FORWARD: LatestMajor
-        run: |
-          dotnet vpk pack `
-            --packId LiveLingo `
-            --packVersion ${{ steps.meta.outputs.version }} `
-            --packDir publish/win-x64 `
-            --mainExe LiveLingo.App.exe `
-            --outputDir releases
+        run: ./build.ps1 Pack --Version ${{ steps.meta.outputs.version }}
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

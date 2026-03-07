@@ -10,7 +10,6 @@ on:
 
 permissions:
   contents: write
-  actions: write
 
 jobs:
   tag:
@@ -20,6 +19,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          token: ${{ secrets.GH_TOKEN }}
 
       - name: Determine version
         id: version
@@ -46,8 +46,3 @@ jobs:
         run: |
           git tag ${{ steps.version.outputs.tag }}
           git push origin ${{ steps.version.outputs.tag }}
-
-      - name: Trigger release workflow
-        run: gh workflow run release.yml -f tag=${{ steps.version.outputs.tag }}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
