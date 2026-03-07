@@ -16,9 +16,8 @@ public class ModelRegistryTests
     [Fact]
     public void RequiredModels_ContainsMinimum()
     {
-        Assert.Equal(2, ModelRegistry.RequiredModels.Count);
-        Assert.Contains(ModelRegistry.MarianZhEn, ModelRegistry.RequiredModels);
-        Assert.Contains(ModelRegistry.FastTextLid, ModelRegistry.RequiredModels);
+        Assert.NotEmpty(ModelRegistry.RequiredModels);
+        Assert.Contains(ModelRegistry.Qwen25_15B, ModelRegistry.RequiredModels);
     }
 
     [Fact]
@@ -82,5 +81,32 @@ public class ModelRegistryTests
         {
             Assert.True(model.SizeBytes > 0);
         }
+    }
+
+    [Fact]
+    public void AllModels_HaveNonEmptyIds()
+    {
+        foreach (var model in ModelRegistry.AllModels)
+            Assert.False(string.IsNullOrEmpty(model.Id), $"Model {model.DisplayName} has empty ID");
+    }
+
+    [Fact]
+    public void AllModels_HaveNonEmptyDisplayNames()
+    {
+        foreach (var model in ModelRegistry.AllModels)
+            Assert.False(string.IsNullOrEmpty(model.DisplayName), $"Model {model.Id} has empty DisplayName");
+    }
+
+    [Theory]
+    [InlineData("opus-mt-zh-en", "MarianMT Chinese\u2192English")]
+    [InlineData("opus-mt-en-zh", "MarianMT English\u2192Chinese")]
+    [InlineData("opus-mt-ja-en", "MarianMT Japanese\u2192English")]
+    [InlineData("lid.176.ftz", "FastText Language Detection")]
+    [InlineData("qwen25-1.5b", "Qwen2.5-1.5B-Instruct (GGUF Q4_K_M)")]
+    public void Model_HasExpectedIdAndDisplayName(string expectedId, string expectedName)
+    {
+        var model = ModelRegistry.AllModels.FirstOrDefault(m => m.Id == expectedId);
+        Assert.NotNull(model);
+        Assert.Equal(expectedName, model.DisplayName);
     }
 }

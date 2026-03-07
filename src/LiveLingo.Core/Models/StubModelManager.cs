@@ -12,4 +12,6 @@ public sealed class StubModelManager : IModelManager
     public IReadOnlyList<InstalledModel> ListInstalled() => [];
     public Task DeleteModelAsync(string modelId, CancellationToken ct) => Task.CompletedTask;
     public long GetTotalDiskUsage() => 0;
+    public string GetModelDirectory(string modelId) => Path.Combine(Path.GetTempPath(), modelId);
+    public Task MigrateStoragePathAsync(string newPath, CancellationToken ct) => Task.CompletedTask;
 }

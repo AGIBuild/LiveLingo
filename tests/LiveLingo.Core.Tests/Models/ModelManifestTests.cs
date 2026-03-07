@@ -46,9 +46,32 @@ public class ModelManifestTests
     }
 
     [Fact]
+    public void ToJson_IsIndented()
+    {
+        var m = new ModelManifest("m1", "X", 100, ModelType.Translation, DateTime.UtcNow);
+        var json = m.ToJson();
+        Assert.Contains("\n", json);
+        Assert.Contains("  ", json);
+    }
+
+    [Fact]
     public void FromJson_ReturnsNull_ForInvalidJson()
     {
         var result = ModelManifest.FromJson("not json");
         Assert.Null(result);
+    }
+
+    [Fact]
+    public void FromJson_ReturnsNull_ForMalformedJson()
+    {
+        var result = ModelManifest.FromJson("{invalid}");
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void FromJson_CatchesJsonException_DoesNotThrow()
+    {
+        var ex = Record.Exception(() => ModelManifest.FromJson("[broken"));
+        Assert.Null(ex);
     }
 }

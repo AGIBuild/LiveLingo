@@ -33,6 +33,7 @@ public record UISettings
 {
     public double OverlayOpacity { get; init; } = 0.95;
     public string DefaultInjectionMode { get; init; } = "PasteAndSend";
+    public string Language { get; init; } = "en-US";
     public OverlayPosition? LastOverlayPosition { get; init; }
 }
 

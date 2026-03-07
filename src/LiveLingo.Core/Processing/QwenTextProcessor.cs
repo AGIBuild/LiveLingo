@@ -26,14 +26,13 @@ public abstract class QwenTextProcessor : ITextProcessor
         try
         {
             var weights = await _host.GetWeightsAsync(ct);
-            var contextParams = new ModelParams(_host.ModelPath) { ContextSize = 2048 };
-            using var context = weights.CreateContext(contextParams);
+            var modelParams = new ModelParams(_host.ModelPath) { ContextSize = 2048 };
+            var executor = new StatelessExecutor(weights, modelParams);
 
-            var executor = new InstructExecutor(context);
             var inferenceParams = new InferenceParams
             {
                 MaxTokens = 512,
-                AntiPrompts = ["</s>", "\n\n"],
+                AntiPrompts = ["</s>", "\n\n", "<|im_end|>"],
                 SamplingPipeline = new DefaultSamplingPipeline
                 {
                     Temperature = 0.3f,

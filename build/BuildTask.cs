@@ -1,9 +1,15 @@
+using System;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
+using System.IO;
+using System.Linq;
+using System.Text.Json;
+using System.Text.RegularExpressions;
+using System.Xml.Linq;
 using Nuke.Common;
 using Nuke.Common.IO;
 using Nuke.Common.ProjectModel;
 using Nuke.Common.Tools.DotNet;
+using Serilog;
 using static Nuke.Common.Tools.DotNet.DotNetTasks;
 
 class BuildTask : NukeBuild
@@ -21,6 +27,15 @@ class BuildTask : NukeBuild
 
     [Parameter("Package version in semver2 format")]
     readonly string Version = "0.1.0";
+
+    [Parameter("Minimum line coverage percentage")]
+    readonly int CoverageThreshold = 96;
+
+    [Parameter("Minimum branch coverage percentage")]
+    readonly int BranchThreshold = 92;
+
+    [Parameter("Minimum mutation score percentage")]
+    readonly int MutationThreshold = 80;
 
     AbsolutePath SourceDir => RootDirectory / "src";
     AbsolutePath TestsDir => RootDirectory / "tests";
@@ -62,6 +77,8 @@ class BuildTask : NukeBuild
         .DependsOn(Build)
         .Executes(() =>
         {
+            TestsDir.GlobDirectories("**/TestResults").DeleteDirectories();
+
             DotNetTest(_ => _
                 .SetProjectFile(Solution)
                 .SetConfiguration(Configuration)
@@ -69,6 +86,83 @@ class BuildTask : NukeBuild
                 .SetSettingsFile(RunSettingsFile)
                 .SetDataCollector("XPlat Code Coverage")
                 .SetNoLogo(true));
+
+            var reports = TestsDir.GlobFiles("**/TestResults/**/coverage.cobertura.xml");
+            Assert.NotEmpty(reports, "No coverage reports found");
+
+            var lineCoverage = new Dictionary<string, (int Valid, int Covered)>();
+            var branchCoverage = new Dictionary<string, (int Valid, int Covered)>();
+
+            foreach (var report in reports)
+            {
+                var doc = XDocument.Load(report);
+                foreach (var cls in doc.Descendants("class"))
+                {
+                    var name = cls.Attribute("name")?.Value;
+                    if (name is null) continue;
+
+                    var lines = cls.Descendants("line").ToList();
+                    if (lines.Count == 0) continue;
+
+                    var linesValid = lines.Count;
+                    var linesCovered = lines.Count(l => int.Parse(l.Attribute("hits")!.Value) > 0);
+
+                    if (lineCoverage.TryGetValue(name, out var existLine))
+                        lineCoverage[name] = (existLine.Valid, Math.Max(existLine.Covered, linesCovered));
+                    else
+                        lineCoverage[name] = (linesValid, linesCovered);
+
+                    var branchLines = lines.Where(l => l.Attribute("branch")?.Value == "True").ToList();
+                    int bValid = 0, bCovered = 0;
+                    foreach (var bl in branchLines)
+                    {
+                        var cc = bl.Attribute("condition-coverage")?.Value;
+                        if (cc is null) continue;
+                        var m = Regex.Match(cc, @"\((\d+)/(\d+)\)");
+                        if (!m.Success) continue;
+                        bCovered += int.Parse(m.Groups[1].Value);
+                        bValid += int.Parse(m.Groups[2].Value);
+                    }
+
+                    if (bValid > 0)
+                    {
+                        if (branchCoverage.TryGetValue(name, out var existBranch))
+                            branchCoverage[name] = (existBranch.Valid, Math.Max(existBranch.Covered, bCovered));
+                        else
+                            branchCoverage[name] = (bValid, bCovered);
+                    }
+                }
+            }
+
+            var totalLines = lineCoverage.Values.Sum(c => c.Valid);
+            var coveredLines = lineCoverage.Values.Sum(c => c.Covered);
+            var linePct = totalLines > 0 ? coveredLines * 100.0 / totalLines : 0;
+
+            var totalBranches = branchCoverage.Values.Sum(c => c.Valid);
+            var coveredBranches = branchCoverage.Values.Sum(c => c.Covered);
+            var branchPct = totalBranches > 0 ? coveredBranches * 100.0 / totalBranches : 0;
+
+            Log.Information("Line coverage:   {Pct:F1}% ({Covered}/{Total})", linePct, coveredLines, totalLines);
+            Log.Information("Branch coverage: {Pct:F1}% ({Covered}/{Total})", branchPct, coveredBranches, totalBranches);
+
+            Assert.True(linePct >= CoverageThreshold,
+                $"Line coverage {linePct:F1}% is below threshold {CoverageThreshold}%");
+            Assert.True(branchPct >= BranchThreshold,
+                $"Branch coverage {branchPct:F1}% is below threshold {BranchThreshold}%");
+
+            var mutationScore = RunMutationTesting();
+            Log.Information("Mutation score:  {Score:F1}% (threshold {Threshold}%)", mutationScore, MutationThreshold);
+
+            Assert.True(mutationScore >= MutationThreshold,
+                $"Mutation score {mutationScore:F1}% is below threshold {MutationThreshold}%");
+        });
+
+    Target Mutate => _ => _
+        .DependsOn(Build)
+        .Executes(() =>
+        {
+            var score = RunMutationTesting();
+            Log.Information("Mutation score:  {Score:F1}% (threshold {Threshold}%)", score, MutationThreshold);
         });
 
     Target Run => _ => _
@@ -93,6 +187,53 @@ class BuildTask : NukeBuild
                 .SetOutput(PublishDir / Runtime)
                 .SetNoLogo(true));
         });
+
+    // App project skipped: Stryker cannot instrument Avalonia projects (source generator incompatibility)
+    double RunMutationTesting()
+    {
+        DotNetToolRestore();
+
+        var coreTestDir = TestsDir / "LiveLingo.Core.Tests";
+
+        DotNet(
+            $"stryker " +
+            $"--project LiveLingo.Core.csproj " +
+            $"--break-at {MutationThreshold} " +
+            $"--reporter progress --reporter json " +
+            $"--mutate \"!**/Engines/MarianOnnxEngine*\" " +
+            $"--mutate \"!**/Processing/QwenModelHost.cs\" " +
+            $"--mutate \"!**/Processing/QwenTextProcessor.cs\" " +
+            $"--mutate \"!**/Processing/SummarizeProcessor.cs\" " +
+            $"--mutate \"!**/Processing/OptimizeProcessor.cs\" " +
+            $"--mutate \"!**/Processing/ColloquializeProcessor.cs\" " +
+            $"--mutate \"!**/ServiceCollectionExtensions.cs\"",
+            workingDirectory: coreTestDir);
+
+        var reportFile = coreTestDir.GlobFiles("**/StrykerOutput/**/mutation-report.json")
+            .OrderByDescending(f => File.GetLastWriteTime(f))
+            .FirstOrDefault();
+
+        if (reportFile is null) return 0;
+
+        using var json = JsonDocument.Parse(File.ReadAllText(reportFile));
+        int killed = 0, survived = 0, timeout = 0, noCoverage = 0;
+
+        foreach (var file in json.RootElement.GetProperty("files").EnumerateObject())
+        foreach (var mutant in file.Value.GetProperty("mutants").EnumerateArray())
+        {
+            switch (mutant.GetProperty("status").GetString())
+            {
+                case "Killed": killed++; break;
+                case "Survived": survived++; break;
+                case "Timeout": timeout++; break;
+                case "NoCoverage": noCoverage++; break;
+            }
+        }
+
+        var detected = killed + timeout;
+        var total = detected + survived + noCoverage;
+        return total > 0 ? detected * 100.0 / total : 0;
+    }
 
     Target Pack => _ => _
         .DependsOn(Publish)

@@ -24,8 +24,9 @@
     "ExecutableTarget": {
       "type": "string",
       "enum": [
+        "Build",
         "Clean",
-        "Compile",
+        "Mutate",
         "Pack",
         "Publish",
         "Restore",
@@ -104,6 +105,11 @@
   "allOf": [
     {
       "properties": {
+        "BranchThreshold": {
+          "type": "integer",
+          "description": "Minimum branch coverage percentage",
+          "format": "int32"
+        },
         "Configuration": {
           "type": "string",
           "description": "Configuration to build - Default is 'Debug' (local) or 'Release' (server)",
@@ -111,6 +117,16 @@
             "Debug",
             "Release"
           ]
+        },
+        "CoverageThreshold": {
+          "type": "integer",
+          "description": "Minimum line coverage percentage",
+          "format": "int32"
+        },
+        "MutationThreshold": {
+          "type": "integer",
+          "description": "Minimum mutation score percentage",
+          "format": "int32"
         },
         "Runtime": {
           "type": "string",

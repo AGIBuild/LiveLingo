@@ -32,6 +32,21 @@ public class StubTranslationEngineTests
         Assert.True(_engine.SupportsLanguagePair(src, tgt));
     }
 
+    [Theory]
+    [InlineData("en", "English")]
+    [InlineData("zh", "中文")]
+    [InlineData("ja", "日本語")]
+    public void SupportedLanguages_ContainsLanguage(string code, string displayName)
+    {
+        Assert.Contains(_engine.SupportedLanguages, l => l.Code == code && l.DisplayName == displayName);
+    }
+
+    [Fact]
+    public void SupportedLanguages_HasExpectedCount()
+    {
+        Assert.Equal(3, _engine.SupportedLanguages.Count);
+    }
+
     [Fact]
     public void Dispose_DoesNotThrow()
     {

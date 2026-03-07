@@ -1,0 +1,53 @@
+name: Create Tag
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version (e.g., 1.2.3). Leave empty to auto-increment patch.'
+        required: false
+        type: string
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine version
+        id: version
+        run: |
+          INPUT="${{ inputs.version }}"
+          if [ -z "$INPUT" ]; then
+            LATEST=$(git tag -l 'v*' --sort=-v:refname | head -n1)
+            if [ -z "$LATEST" ]; then
+              VERSION="0.1.0"
+            else
+              VER=${LATEST#v}
+              IFS='.' read -r MAJOR MINOR PATCH <<< "$VER"
+              PATCH=$((PATCH + 1))
+              VERSION="$MAJOR.$MINOR.$PATCH"
+            fi
+          else
+            VERSION="$INPUT"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+          echo "Resolved version: $VERSION (tag: v$VERSION)"
+
+      - name: Create and push tag
+        run: |
+          git tag ${{ steps.version.outputs.tag }}
+          git push origin ${{ steps.version.outputs.tag }}
+
+      - name: Trigger release workflow
+        run: gh workflow run release.yml -f tag=${{ steps.version.outputs.tag }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
