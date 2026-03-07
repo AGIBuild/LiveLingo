@@ -1,0 +1,49 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="LiveLingo.Desktop.Views.NotificationToast"
+        SystemDecorations="None"
+        Topmost="True"
+        CanResize="False"
+        ShowInTaskbar="False"
+        Background="Transparent"
+        TransparencyLevelHint="AcrylicBlur"
+        Width="340" Height="90"
+        WindowStartupLocation="Manual">
+
+    <Panel>
+        <ExperimentalAcrylicBorder CornerRadius="10" IsHitTestVisible="False">
+            <ExperimentalAcrylicBorder.Material>
+                <ExperimentalAcrylicMaterial
+                    BackgroundSource="Digger"
+                    TintColor="{StaticResource BgDeep}"
+                    TintOpacity="0.94"
+                    MaterialOpacity="0.94"/>
+            </ExperimentalAcrylicBorder.Material>
+        </ExperimentalAcrylicBorder>
+
+        <Border CornerRadius="10" IsHitTestVisible="False"
+                BorderBrush="#18FFFFFF" BorderThickness="1"/>
+
+        <Grid Margin="16,12" ColumnDefinitions="Auto,*,Auto">
+            <TextBlock Grid.Column="0" Text="⚠" FontSize="22"
+                       VerticalAlignment="Center" Margin="0,0,12,0"
+                       Foreground="{StaticResource WarningBrush}"/>
+
+            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="3">
+                <TextBlock Text="LiveLingo" FontSize="13" FontWeight="SemiBold"
+                           Foreground="{StaticResource FgPrimaryBrush}"/>
+                <TextBlock Name="MessageText" FontSize="12"
+                           Foreground="{StaticResource FgSecondaryBrush}"
+                           TextWrapping="Wrap" MaxLines="2"/>
+            </StackPanel>
+
+            <Button Grid.Column="2" Content="Configure"
+                    Name="ConfigureButton"
+                    Click="OnConfigure"
+                    VerticalAlignment="Center"
+                    Padding="12,6" FontSize="12"
+                    Classes="accent"
+                    MinWidth="0" MinHeight="0"/>
+        </Grid>
+    </Panel>
+</Window>

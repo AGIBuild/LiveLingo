@@ -91,7 +91,7 @@ public sealed class MarianOnnxEngine : ITranslationEngine
             var modelPath = Path.Combine(modelDir, "model.onnx");
             var options = new SessionOptions { InterOpNumThreads = 2, IntraOpNumThreads = 2 };
             _session = new InferenceSession(modelPath, options);
-            _logger.LogInformation("Loaded ONNX model from {Path}", modelPath);
+            _logger.LogDebug("Loaded ONNX model from {Path}", modelPath);
         }
 
         public string Translate(string text, CancellationToken ct)

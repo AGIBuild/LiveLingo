@@ -31,7 +31,7 @@ public sealed class QwenModelHost : IDisposable
         _idleTimer = new Timer(OnIdleTimeout, null, Timeout.Infinite, Timeout.Infinite);
 
         if (Interlocked.Exchange(ref _logConfigured, 1) == 0)
-            NativeLogConfig.llama_log_set(logger);
+            NativeLogConfig.llama_log_set((level, msg) => { });
     }
 
     public async Task<LLamaWeights> GetWeightsAsync(CancellationToken ct)
@@ -71,7 +71,7 @@ public sealed class QwenModelHost : IDisposable
 
             _weights = await LLamaWeights.LoadFromFileAsync(parameters, ct, null);
             SetState(ModelLoadState.Loaded);
-            _logger.LogInformation("Qwen model loaded successfully");
+            _logger.LogDebug("Qwen model loaded successfully");
             return _weights;
         }
         catch
@@ -95,7 +95,7 @@ public sealed class QwenModelHost : IDisposable
             _weights?.Dispose();
             _weights = null;
             SetState(ModelLoadState.Unloaded);
-            _logger.LogInformation("Qwen model unloaded (idle timeout)");
+            _logger.LogDebug("Qwen model unloaded (idle timeout)");
         }
         finally
         {

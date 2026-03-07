@@ -1,0 +1,259 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:LiveLingo.Desktop.ViewModels"
+        xmlns:ctrl="using:LiveLingo.Desktop.Controls"
+        x:Class="LiveLingo.Desktop.Views.SettingsWindow"
+        x:DataType="vm:SettingsViewModel"
+        Title="LiveLingo Settings"
+        Width="540" Height="520"
+        CanResize="False"
+        WindowStartupLocation="CenterScreen"
+        TransparencyLevelHint="AcrylicBlur"
+        Background="Transparent"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaChromeHints="NoChrome"
+        ExtendClientAreaTitleBarHeightHint="-1">
+
+    <Panel>
+        <ExperimentalAcrylicBorder Name="AcrylicBg" IsHitTestVisible="False">
+            <ExperimentalAcrylicBorder.Material>
+                <ExperimentalAcrylicMaterial
+                    BackgroundSource="Digger"
+                    TintColor="{StaticResource BgDeep}"
+                    TintOpacity="0.92"
+                    MaterialOpacity="0.92"/>
+            </ExperimentalAcrylicBorder.Material>
+        </ExperimentalAcrylicBorder>
+
+        <Border IsHitTestVisible="False"
+                BorderBrush="#10FFFFFF" BorderThickness="1"
+                CornerRadius="8"/>
+
+        <DockPanel Margin="24,36,24,20">
+            <TextBlock DockPanel.Dock="Top" Name="TitleText" Text="Settings"
+                       FontSize="18" FontWeight="SemiBold"
+                       Foreground="{StaticResource FgPrimaryBrush}" Margin="0,0,0,14"/>
+
+            <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal"
+                        HorizontalAlignment="Right" Spacing="8" Margin="0,14,0,0">
+                <Button Name="ResetBtn" Content="Reset Defaults" Command="{Binding ResetCommand}"
+                        Padding="14,7" Classes="themed"/>
+                <Button Name="CancelBtn" Content="Cancel" Command="{Binding CancelCommand}"
+                        Padding="14,7" Classes="themed"/>
+                <Button Name="SaveBtn" Content="Save" Command="{Binding SaveCommand}"
+                        Padding="14,7" IsDefault="True" Classes="accent"/>
+            </StackPanel>
+
+            <TabControl>
+                <!-- General -->
+                <TabItem Name="TabGeneral" Header="General" Classes="themed">
+                    <ScrollViewer>
+                        <StackPanel Spacing="2" Margin="0,4">
+                            <TextBlock Classes="section" Text="Hotkeys"/>
+                            <Grid ColumnDefinitions="130,*">
+                                <TextBlock Classes="label" Text="Overlay Toggle:"/>
+                                <ctrl:HotkeyRecorder Grid.Column="1"
+                                    Hotkey="{Binding OverlayHotkey, Mode=TwoWay}"/>
+                            </Grid>
+                            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,3,0,0">
+                                <TextBlock Classes="hint" Text="Click the field, then press a key combo"/>
+                                <Button Content="Check Permissions…" Classes="themed sm"
+                                        Command="{Binding CheckPermissionsCommand}"
+                                        IsVisible="{Binding ShowPermissionSection}"
+                                        Padding="8,3" VerticalAlignment="Center"/>
+                            </StackPanel>
+
+                            <Separator Classes="themed"/>
+                            <TextBlock Classes="section" Text="Overlay"/>
+                            <Grid ColumnDefinitions="130,*" RowDefinitions="Auto,Auto" RowSpacing="10">
+                                <TextBlock Classes="label" Text="Opacity:"/>
+                                <Grid Grid.Column="1" ColumnDefinitions="*,36">
+                                    <Slider Classes="themed" Minimum="0.3" Maximum="1.0"
+                                            Value="{Binding OverlayOpacity}"
+                                            TickFrequency="0.05" IsSnapToTickEnabled="True"/>
+                                    <TextBlock Grid.Column="1" VerticalAlignment="Center"
+                                               HorizontalAlignment="Right" FontSize="11"
+                                               Foreground="{StaticResource FgTertiaryBrush}">
+                                        <TextBlock.Text>
+                                            <Binding Path="OverlayOpacity" StringFormat="{}{0:P0}"/>
+                                        </TextBlock.Text>
+                                    </TextBlock>
+                                </Grid>
+                                <TextBlock Grid.Row="1" Classes="label" Text="Injection Mode:"/>
+                                <ComboBox Grid.Row="1" Grid.Column="1" MinWidth="160"
+                                          Classes="themed"
+                                          ItemsSource="{Binding InjectionModes}"
+                                          SelectedItem="{Binding DefaultInjectionMode}"/>
+                            </Grid>
+                            <Separator Classes="themed"/>
+                            <TextBlock Classes="section" Text="Language"/>
+                            <Grid ColumnDefinitions="130,*">
+                                <TextBlock Classes="label" Text="UI Language:"/>
+                                <ComboBox Grid.Column="1" MinWidth="160"
+                                          Classes="themed"
+                                          ItemsSource="{Binding UILanguages}"
+                                          SelectedItem="{Binding SelectedUILanguage}"/>
+                            </Grid>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+
+                <!-- Translation -->
+                <TabItem Name="TabTranslation" Header="Translation" Classes="themed">
+                    <ScrollViewer>
+                        <StackPanel Spacing="2" Margin="0,4">
+                            <TextBlock Classes="section" Text="Default Language Pair"/>
+                            <Grid ColumnDefinitions="130,*" RowDefinitions="Auto,Auto" RowSpacing="10">
+                                <TextBlock Classes="label" Text="Source Language:"/>
+                                <ComboBox Grid.Column="1" MinWidth="200"
+                                          Classes="themed"
+                                          ItemsSource="{Binding AvailableLanguages}"
+                                          SelectedItem="{Binding SelectedSourceLanguage}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding DisplayName}"/>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                                <TextBlock Grid.Row="1" Classes="label" Text="Target Language:"/>
+                                <ComboBox Grid.Row="1" Grid.Column="1" MinWidth="200"
+                                          Classes="themed"
+                                          ItemsSource="{Binding AvailableLanguages}"
+                                          SelectedItem="{Binding SelectedTargetLanguage}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding DisplayName}"/>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </Grid>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+
+                <!-- Models -->
+                <TabItem Name="TabModels" Header="Models" Classes="themed">
+                    <ScrollViewer>
+                        <ItemsControl ItemsSource="{Binding Models}" Margin="0,4">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:ModelItemViewModel">
+                                    <Border Margin="0,0,0,6" Padding="12,10"
+                                            CornerRadius="8" Background="{StaticResource BgSurfaceBrush}">
+                                        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto">
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <Border Background="#200A84FF" CornerRadius="4" Padding="6,2">
+                                                    <TextBlock Text="{Binding TypeLabel}"
+                                                               FontSize="10" Foreground="{StaticResource AccentBrush}"/>
+                                                </Border>
+                                                <TextBlock Text="{Binding DisplayName}"
+                                                           Foreground="#FFFFFF" FontSize="13"
+                                                           VerticalAlignment="Center"/>
+                                            </StackPanel>
+
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                                                <Button Classes="accent sm"
+                                                        Content="Download"
+                                                        Command="{Binding DownloadCommand}"
+                                                        IsVisible="{Binding !IsInstalled}"/>
+                                                <Button Classes="themed sm"
+                                                        Content="Cancel"
+                                                        Command="{Binding CancelDownloadCommand}"
+                                                        IsVisible="{Binding IsDownloading}"/>
+                                                <TextBlock Text="✓ Installed" FontSize="11"
+                                                           Foreground="{StaticResource SuccessBrush}"
+                                                           VerticalAlignment="Center"
+                                                           IsVisible="{Binding IsInstalled}"/>
+                                                <Button Classes="danger sm"
+                                                        Content="Delete"
+                                                        Command="{Binding DeleteCommand}"
+                                                        IsVisible="{Binding IsInstalled}"/>
+                                            </StackPanel>
+
+                                            <StackPanel Grid.Row="1" Grid.ColumnSpan="2"
+                                                        Orientation="Horizontal" Spacing="12"
+                                                        Margin="0,4,0,0">
+                                                <TextBlock Text="{Binding SizeText}"
+                                                           FontSize="11" Foreground="{StaticResource FgTertiaryBrush}"/>
+                                                <TextBlock Text="{Binding ErrorMessage}"
+                                                           FontSize="11" Foreground="{StaticResource DangerBrush}"
+                                                           IsVisible="{Binding ErrorMessage,
+                                                               Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                                            </StackPanel>
+
+                                            <ProgressBar Grid.Row="2" Grid.ColumnSpan="2"
+                                                         Classes="themed"
+                                                         Margin="0,6,0,0"
+                                                         Minimum="0" Maximum="100"
+                                                         Value="{Binding DownloadProgress}"
+                                                         IsVisible="{Binding IsDownloading}"/>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </TabItem>
+
+                <!-- Advanced -->
+                <TabItem Name="TabAdvanced" Header="Advanced" Classes="themed">
+                    <ScrollViewer>
+                        <StackPanel Spacing="2" Margin="0,4">
+                            <TextBlock Classes="section" Text="Model Storage"/>
+                            <Grid ColumnDefinitions="130,*,Auto">
+                                <TextBlock Classes="label" Text="Storage Path:"/>
+                                <TextBox Grid.Column="1" Classes="themed"
+                                         Text="{Binding ModelStoragePath}"
+                                         Watermark="Default (AppData)"/>
+                                <Button Grid.Column="2" Content="Browse…"
+                                        Click="BrowseModelPath_Click"
+                                        Margin="6,0,0,0" Padding="10,6"
+                                        Classes="themed sm"/>
+                            </Grid>
+                            <TextBlock FontSize="11" Foreground="{StaticResource DangerBrush}"
+                                       Text="{Binding MigrationError}"
+                                       IsVisible="{Binding MigrationError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                       Margin="0,3,0,0"/>
+                            <Separator Classes="themed"/>
+                            <TextBlock Classes="section" Text="Performance"/>
+                            <Grid ColumnDefinitions="130,*">
+                                <TextBlock Classes="label" Text="Inference Threads:"/>
+                                <NumericUpDown Grid.Column="1" Minimum="0" Maximum="32"
+                                               Classes="themed"
+                                               Value="{Binding InferenceThreads}"
+                                               MinWidth="100" HorizontalAlignment="Left"/>
+                            </Grid>
+                            <TextBlock Classes="hint" Text="0 = auto-detect (recommended)"/>
+                            <Separator Classes="themed"/>
+                            <TextBlock Classes="section" Text="Logging"/>
+                            <Grid ColumnDefinitions="130,*">
+                                <TextBlock Classes="label" Text="Log Level:"/>
+                                <ComboBox Grid.Column="1" MinWidth="160"
+                                          Classes="themed"
+                                          ItemsSource="{Binding LogLevels}"
+                                          SelectedItem="{Binding LogLevel}"/>
+                            </Grid>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+
+                <!-- AI -->
+                <TabItem Name="TabAI" Header="AI" Classes="themed">
+                    <ScrollViewer>
+                        <StackPanel Spacing="2" Margin="0,4">
+                            <TextBlock Classes="section" Text="Post-Processing"/>
+                            <Grid ColumnDefinitions="130,*">
+                                <TextBlock Classes="label" Text="Default Mode:"/>
+                                <ComboBox Grid.Column="1" MinWidth="160"
+                                          Classes="themed"
+                                          ItemsSource="{Binding PostProcessModes}"
+                                          SelectedItem="{Binding DefaultPostProcessMode}"/>
+                            </Grid>
+                            <TextBlock Classes="hint"
+                                       Text="Summarize · Optimize · Colloquialize"/>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+            </TabControl>
+        </DockPanel>
+    </Panel>
+</Window>

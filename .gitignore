@@ -425,3 +425,4 @@ coverage-report/
 
 # Nuke temp
 .nuke/temp/
+.DS_Store

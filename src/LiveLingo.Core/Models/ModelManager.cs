@@ -86,7 +86,7 @@ public sealed class ModelManager : IModelManager
             var manifest = ModelManifest.FromDescriptor(descriptor);
             await File.WriteAllTextAsync(manifestPath, manifest.ToJson(), ct);
 
-            _logger.LogInformation("Model {Id} downloaded to {Path}", descriptor.Id, finalPath);
+            _logger.LogDebug("Model {Id} downloaded to {Path}", descriptor.Id, finalPath);
         }
         finally
         {
@@ -135,7 +135,7 @@ public sealed class ModelManager : IModelManager
         if (Directory.Exists(modelDir))
         {
             await Task.Run(() => Directory.Delete(modelDir, true), ct);
-            _logger.LogInformation("Model {Id} deleted", modelId);
+            _logger.LogDebug("Model {Id} deleted", modelId);
         }
     }
 
@@ -161,7 +161,7 @@ public sealed class ModelManager : IModelManager
         if (!Directory.Exists(oldPath))
         {
             _options.ModelStoragePath = newPath;
-            _logger.LogInformation("Storage path changed to {Path} (no files to migrate)", newPath);
+            _logger.LogDebug("Storage path changed to {Path} (no files to migrate)", newPath);
             return;
         }
 
@@ -193,7 +193,7 @@ public sealed class ModelManager : IModelManager
         }, ct);
 
         _options.ModelStoragePath = newPath;
-        _logger.LogInformation("Storage path migrated from {Old} to {New}", oldPath, newPath);
+        _logger.LogDebug("Storage path migrated from {Old} to {New}", oldPath, newPath);
     }
 
     private static void CopyDirectoryRecursive(string source, string destination)

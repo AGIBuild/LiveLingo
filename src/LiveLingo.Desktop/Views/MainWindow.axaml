@@ -1,0 +1,59 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="LiveLingo.Desktop.Views.MainWindow"
+        Title="LiveLingo"
+        Width="380" Height="260"
+        CanResize="False"
+        WindowStartupLocation="CenterScreen"
+        TransparencyLevelHint="AcrylicBlur"
+        Background="Transparent"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaChromeHints="NoChrome"
+        ExtendClientAreaTitleBarHeightHint="-1">
+
+    <Window.Styles>
+        <Style Selector="Border.badge">
+            <Setter Property="Background" Value="#2230D158"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="14,8"/>
+        </Style>
+    </Window.Styles>
+
+    <Panel>
+        <ExperimentalAcrylicBorder IsHitTestVisible="False">
+            <ExperimentalAcrylicBorder.Material>
+                <ExperimentalAcrylicMaterial
+                    BackgroundSource="Digger"
+                    TintColor="{StaticResource BgDeep}"
+                    TintOpacity="0.92"
+                    MaterialOpacity="0.92"/>
+            </ExperimentalAcrylicBorder.Material>
+        </ExperimentalAcrylicBorder>
+
+        <Border IsHitTestVisible="False"
+                BorderBrush="#10FFFFFF" BorderThickness="1"
+                CornerRadius="8"/>
+
+        <StackPanel Margin="28,40,28,24" Spacing="14" VerticalAlignment="Center">
+            <TextBlock Classes="title" Text="LiveLingo" HorizontalAlignment="Center"/>
+            <TextBlock Classes="hint" FontSize="13"
+                       Text="Global hotkey registered. Press the shortcut while any app is focused to open the translation overlay."
+                       TextAlignment="Center"/>
+            <Border Classes="badge" HorizontalAlignment="Center">
+                <TextBlock Name="HotkeyDisplay"
+                           Text="⌨  Ctrl + Alt + T"
+                           FontSize="16"
+                           FontWeight="SemiBold"
+                           Foreground="{StaticResource SuccessBrush}"
+                           HorizontalAlignment="Center"/>
+            </Border>
+            <TextBlock Classes="hint" FontSize="12"
+                       Text="The overlay pops up over the active window."
+                       HorizontalAlignment="Center" TextAlignment="Center"/>
+            <Button Content="⚙ Settings" HorizontalAlignment="Center"
+                    Name="SettingsButton" Padding="20,8"
+                    Classes="themed"
+                    Click="OnSettingsClick"/>
+        </StackPanel>
+    </Panel>
+</Window>
