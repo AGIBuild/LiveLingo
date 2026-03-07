@@ -1,3 +1,5 @@
+#pragma warning disable CA1416
+
 using LiveLingo.Desktop.Platform;
 using LiveLingo.Desktop.Platform.macOS;
 
@@ -5,6 +7,8 @@ namespace LiveLingo.Desktop.Tests.Platform;
 
 public class MacNativeMethodsTests
 {
+    private static bool SkipIfNotMac() => !OperatingSystem.IsMacOS();
+
     #region MapKeyToCGKeyCode
 
     [Theory]
@@ -36,6 +40,7 @@ public class MacNativeMethodsTests
     [InlineData("M", 0x2E)]
     public void MapKeyToCGKeyCode_Letters(string key, ushort expected)
     {
+        if (SkipIfNotMac()) return;
         Assert.Equal(expected, MacNativeMethods.MapKeyToCGKeyCode(key));
     }
 
@@ -52,6 +57,7 @@ public class MacNativeMethodsTests
     [InlineData("9", 0x19)]
     public void MapKeyToCGKeyCode_Digits(string key, ushort expected)
     {
+        if (SkipIfNotMac()) return;
         Assert.Equal(expected, MacNativeMethods.MapKeyToCGKeyCode(key));
     }
 
@@ -64,6 +70,7 @@ public class MacNativeMethodsTests
     [InlineData("ESC", 0x35)]
     public void MapKeyToCGKeyCode_SpecialKeys(string key, ushort expected)
     {
+        if (SkipIfNotMac()) return;
         Assert.Equal(expected, MacNativeMethods.MapKeyToCGKeyCode(key));
     }
 
@@ -82,12 +89,14 @@ public class MacNativeMethodsTests
     [InlineData("F12", 0x6F)]
     public void MapKeyToCGKeyCode_FunctionKeys(string key, ushort expected)
     {
+        if (SkipIfNotMac()) return;
         Assert.Equal(expected, MacNativeMethods.MapKeyToCGKeyCode(key));
     }
 
     [Fact]
     public void MapKeyToCGKeyCode_CaseInsensitive()
     {
+        if (SkipIfNotMac()) return;
         Assert.Equal(MacNativeMethods.MapKeyToCGKeyCode("T"), MacNativeMethods.MapKeyToCGKeyCode("t"));
         Assert.Equal(MacNativeMethods.MapKeyToCGKeyCode("SPACE"), MacNativeMethods.MapKeyToCGKeyCode("space"));
     }
@@ -98,6 +107,7 @@ public class MacNativeMethodsTests
     [InlineData("F20")]
     public void MapKeyToCGKeyCode_UnknownReturns0xFFFF(string key)
     {
+        if (SkipIfNotMac()) return;
         Assert.Equal((ushort)0xFFFF, MacNativeMethods.MapKeyToCGKeyCode(key));
     }
 
@@ -108,12 +118,14 @@ public class MacNativeMethodsTests
     [Fact]
     public void CGEventFlagsToModifiers_None()
     {
+        if (SkipIfNotMac()) return;
         Assert.Equal(KeyModifiers.None, MacNativeMethods.CGEventFlagsToModifiers(0));
     }
 
     [Fact]
     public void CGEventFlagsToModifiers_Control()
     {
+        if (SkipIfNotMac()) return;
         var mods = MacNativeMethods.CGEventFlagsToModifiers(MacNativeMethods.kCGEventFlagMaskControl);
         Assert.Equal(KeyModifiers.Ctrl, mods);
     }
@@ -121,6 +133,7 @@ public class MacNativeMethodsTests
     [Fact]
     public void CGEventFlagsToModifiers_Alt()
     {
+        if (SkipIfNotMac()) return;
         var mods = MacNativeMethods.CGEventFlagsToModifiers(MacNativeMethods.kCGEventFlagMaskAlternate);
         Assert.Equal(KeyModifiers.Alt, mods);
     }
@@ -128,6 +141,7 @@ public class MacNativeMethodsTests
     [Fact]
     public void CGEventFlagsToModifiers_Shift()
     {
+        if (SkipIfNotMac()) return;
         var mods = MacNativeMethods.CGEventFlagsToModifiers(MacNativeMethods.kCGEventFlagMaskShift);
         Assert.Equal(KeyModifiers.Shift, mods);
     }
@@ -135,6 +149,7 @@ public class MacNativeMethodsTests
     [Fact]
     public void CGEventFlagsToModifiers_Command()
     {
+        if (SkipIfNotMac()) return;
         var mods = MacNativeMethods.CGEventFlagsToModifiers(MacNativeMethods.kCGEventFlagMaskCommand);
         Assert.Equal(KeyModifiers.Meta, mods);
     }
@@ -142,6 +157,7 @@ public class MacNativeMethodsTests
     [Fact]
     public void CGEventFlagsToModifiers_CtrlAlt()
     {
+        if (SkipIfNotMac()) return;
         var flags = MacNativeMethods.kCGEventFlagMaskControl | MacNativeMethods.kCGEventFlagMaskAlternate;
         var mods = MacNativeMethods.CGEventFlagsToModifiers(flags);
         Assert.Equal(KeyModifiers.Ctrl | KeyModifiers.Alt, mods);
@@ -150,6 +166,7 @@ public class MacNativeMethodsTests
     [Fact]
     public void CGEventFlagsToModifiers_AllModifiers()
     {
+        if (SkipIfNotMac()) return;
         var flags = MacNativeMethods.kCGEventFlagMaskControl
                   | MacNativeMethods.kCGEventFlagMaskAlternate
                   | MacNativeMethods.kCGEventFlagMaskShift
@@ -161,7 +178,7 @@ public class MacNativeMethodsTests
     [Fact]
     public void CGEventFlagsToModifiers_IgnoresUnrelatedBits()
     {
-        // CapsLock (0x10000) and NumPad (0x200000) should be ignored
+        if (SkipIfNotMac()) return;
         ulong flags = 0x00010000 | 0x00200000 | MacNativeMethods.kCGEventFlagMaskControl;
         var mods = MacNativeMethods.CGEventFlagsToModifiers(flags);
         Assert.Equal(KeyModifiers.Ctrl, mods);
@@ -178,6 +195,7 @@ public class MacNativeMethodsTests
     public void HotkeyParser_ProducesValidMacBinding(
         string input, KeyModifiers expectedMods, string expectedKey, ushort expectedKeyCode)
     {
+        if (SkipIfNotMac()) return;
         var binding = HotkeyParser.Parse("test", input);
         Assert.Equal(expectedMods, binding.Modifiers);
         Assert.Equal(expectedKey, binding.Key);
