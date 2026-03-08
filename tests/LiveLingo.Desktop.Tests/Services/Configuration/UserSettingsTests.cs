@@ -1,4 +1,5 @@
 using LiveLingo.Desktop.Services.Configuration;
+using UserSettings = LiveLingo.Desktop.Services.Configuration.SettingsModel;
 
 namespace LiveLingo.Desktop.Tests.Services.Configuration;
 
@@ -8,9 +9,11 @@ public class UserSettingsTests
     public void Defaults_AreReasonable()
     {
         var s = new UserSettings();
+        Assert.Equal(UserSettings.CurrentSchemaVersion, s.SchemaVersion);
         Assert.Equal("Ctrl+Alt+T", s.Hotkeys.OverlayToggle);
         Assert.Equal("zh", s.Translation.DefaultSourceLanguage);
         Assert.Equal("en", s.Translation.DefaultTargetLanguage);
+        Assert.Null(s.Translation.ActiveTranslationModelId);
         Assert.Single(s.Translation.LanguagePairs);
         Assert.Equal("Off", s.Processing.DefaultMode);
         Assert.Equal(0.95, s.UI.OverlayOpacity);
@@ -28,7 +31,8 @@ public class UserSettingsTests
     {
         var a = new LanguagePair("zh", "en");
         var b = new LanguagePair("zh", "en");
-        Assert.Equal(a, b);
+        Assert.Equal(a.Source, b.Source);
+        Assert.Equal(a.Target, b.Target);
     }
 
     [Fact]
@@ -36,7 +40,8 @@ public class UserSettingsTests
     {
         var a = new OverlayPosition(100, 200);
         var b = new OverlayPosition(100, 200);
-        Assert.Equal(a, b);
+        Assert.Equal(a.X, b.X);
+        Assert.Equal(a.Y, b.Y);
     }
 
     [Fact]
@@ -49,6 +54,7 @@ public class UserSettingsTests
             {
                 DefaultSourceLanguage = "ja",
                 DefaultTargetLanguage = "zh",
+                ActiveTranslationModelId = "opus-mt-ja-en",
                 LanguagePairs = [new("ja", "zh"), new("en", "zh")]
             },
             Processing = new ProcessingSettings { DefaultMode = "Summarize" },
@@ -67,6 +73,7 @@ public class UserSettingsTests
         };
 
         Assert.Equal("Ctrl+Shift+L", s.Hotkeys.OverlayToggle);
+        Assert.Equal("opus-mt-ja-en", s.Translation.ActiveTranslationModelId);
         Assert.Equal(2, s.Translation.LanguagePairs.Count);
         Assert.Equal("Summarize", s.Processing.DefaultMode);
         Assert.Equal(0.8, s.UI.OverlayOpacity);

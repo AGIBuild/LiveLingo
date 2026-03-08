@@ -14,6 +14,7 @@
     <PackageReference Include="Microsoft.Extensions.Http" Version="11.0.0-preview.1.26104.118" />
     <PackageReference Include="Microsoft.Extensions.Options" Version="11.0.0-preview.1.26104.118" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="11.0.0-preview.1.26104.118" />
+    <PackageReference Include="Microsoft.ML.Tokenizers" Version="2.0.0-preview.1.25125.4" />
     <PackageReference Include="Microsoft.ML.OnnxRuntime" Version="1.24.3" />
   </ItemGroup>
 </Project>

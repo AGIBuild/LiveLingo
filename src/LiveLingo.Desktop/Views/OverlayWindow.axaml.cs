@@ -12,7 +12,11 @@ namespace LiveLingo.Desktop.Views;
 
 public partial class OverlayWindow : Window
 {
-    private bool _isSending;
+    private bool _isResizingFromCorner;
+    private Point _resizeStartPoint;
+    private double _resizeStartWidth;
+    private double _resizeStartHeight;
+    private readonly CancellationTokenSource _lifetimeCts = new();
 
     public OverlayWindow()
     {
@@ -22,46 +26,28 @@ public partial class OverlayWindow : Window
     public OverlayWindow(OverlayViewModel vm) : this()
     {
         DataContext = vm;
-        vm.RequestClose += () => Dispatcher.UIThread.Post(() => FadeOutAndClose());
-
         AddHandler(KeyDownEvent, OnTunnelKeyDown, RoutingStrategies.Tunnel);
 
         var dragHandle = this.FindControl<Border>("DragHandle");
         if (dragHandle is not null)
             dragHandle.PointerPressed += OnDragHandlePointerPressed;
 
-        var langLink = this.FindControl<Avalonia.Controls.TextBlock>("TargetLangLink");
+        var langLink = this.FindControl<Control>("TargetLangLink");
         if (langLink is not null)
             langLink.PointerPressed += (_, _) => vm.ToggleLanguagePickerCommand.Execute(null);
 
-        AttachResizeGrips();
+        AttachResizeHandle();
     }
 
-    private void AttachResizeGrips()
+    private void AttachResizeHandle()
     {
-        (string name, WindowEdge edge)[] grips =
-        [
-            ("ResizeN",  WindowEdge.North),
-            ("ResizeS",  WindowEdge.South),
-            ("ResizeW",  WindowEdge.West),
-            ("ResizeE",  WindowEdge.East),
-            ("ResizeNW", WindowEdge.NorthWest),
-            ("ResizeNE", WindowEdge.NorthEast),
-            ("ResizeSW", WindowEdge.SouthWest),
-            ("ResizeSE", WindowEdge.SouthEast),
-        ];
+        var handle = this.FindControl<Control>("ResizeSE");
+        if (handle is null) return;
 
-        foreach (var (name, edge) in grips)
-        {
-            var el = this.FindControl<Control>(name);
-            if (el is null) continue;
-            var e2 = edge;
-            el.PointerPressed += (_, args) =>
-            {
-                if (args.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
-                    BeginResizeDrag(e2, args);
-            };
-        }
+        handle.PointerPressed += OnResizeHandlePressed;
+        handle.PointerMoved += OnResizeHandleMoved;
+        handle.PointerReleased += OnResizeHandleReleased;
+        handle.PointerCaptureLost += (_, _) => EndResizeInteraction();
     }
 
     private void OnTunnelKeyDown(object? sender, KeyEventArgs e)
@@ -76,8 +62,8 @@ public partial class OverlayWindow : Window
         else if (e.Key == Key.Enter && e.KeyModifiers.HasFlag(Avalonia.Input.KeyModifiers.Control))
         {
             e.Handled = true;
-            if (!_isSending)
-                PerformSend(vm);
+            if (!vm.IsSending)
+                _ = vm.SendAsync(_lifetimeCts.Token);
         }
     }
 
@@ -123,19 +109,21 @@ public partial class OverlayWindow : Window
             NativeMethods.AttachThreadInput(currentThreadId, foregroundThreadId, false);
     }
 
-    private void PerformSend(OverlayViewModel vm)
+    public void PrepareForShutdown()
     {
-        if (string.IsNullOrWhiteSpace(vm.TranslatedText))
-            return;
+        _lifetimeCts.Cancel();
+    }
 
-        _isSending = true;
-        Hide();
+    protected override void OnClosing(WindowClosingEventArgs e)
+    {
+        PrepareForShutdown();
+        base.OnClosing(e);
+    }
 
-        DispatcherTimer.RunOnce(async () =>
-        {
-            await vm.InjectAsync();
-            Close();
-        }, TimeSpan.FromMilliseconds(200));
+    protected override void OnClosed(EventArgs e)
+    {
+        _lifetimeCts.Dispose();
+        base.OnClosed(e);
     }
 
     private void FadeOutAndClose()
@@ -151,12 +139,21 @@ public partial class OverlayWindow : Window
         DispatcherTimer.RunOnce(Close, TimeSpan.FromMilliseconds(160));
     }
 
+    public void RequestCloseAnimated() => FadeOutAndClose();
+
     private void OnDragHandlePointerPressed(object? sender, PointerPressedEventArgs e)
     {
         if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
         {
             BeginMoveDrag(e);
         }
+    }
+
+    public void ApplyAutoSizingDefaults()
+    {
+        SizeToContent = SizeToContent.Height;
+        MaxHeight = 600;
+        Width = Math.Max(MinWidth, 600);
     }
 
     public void SetBackgroundOpacity(double opacity)
@@ -194,8 +191,8 @@ public partial class OverlayWindow : Window
 
     private void SendButton_Click(object? sender, RoutedEventArgs e)
     {
-        if (DataContext is OverlayViewModel vm && !_isSending)
-            PerformSend(vm);
+        if (DataContext is OverlayViewModel vm && !vm.IsSending)
+            _ = vm.SendAsync(_lifetimeCts.Token);
     }
 
     private void FocusSourceInput()
@@ -205,5 +202,57 @@ public partial class OverlayWindow : Window
 
         input.Focus();
         input.CaretIndex = input.Text?.Length ?? 0;
+    }
+
+    private void OnResizeHandlePressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed || sender is not Control handle)
+            return;
+
+        if (SizeToContent != SizeToContent.Manual)
+        {
+            SizeToContent = SizeToContent.Manual;
+            MaxHeight = 900;
+            var currentBoundsHeight = Bounds.Height > 0
+                ? Bounds.Height
+                : (double.IsNaN(Height) ? MinHeight : Height);
+            var currentBoundsWidth = Bounds.Width > 0
+                ? Bounds.Width
+                : (double.IsNaN(Width) ? MinWidth : Width);
+            Width = Math.Max(MinWidth, currentBoundsWidth);
+            Height = Math.Clamp(currentBoundsHeight, MinHeight, MaxHeight);
+        }
+
+        _isResizingFromCorner = true;
+        _resizeStartPoint = e.GetPosition(this);
+        _resizeStartWidth = Width;
+        _resizeStartHeight = Height;
+        e.Pointer.Capture(handle);
+        e.Handled = true;
+    }
+
+    private void OnResizeHandleMoved(object? sender, PointerEventArgs e)
+    {
+        if (!_isResizingFromCorner)
+            return;
+
+        var current = e.GetPosition(this);
+        var deltaX = current.X - _resizeStartPoint.X;
+        var deltaY = current.Y - _resizeStartPoint.Y;
+        Width = Math.Max(MinWidth, _resizeStartWidth + deltaX);
+        Height = Math.Clamp(_resizeStartHeight + deltaY, MinHeight, MaxHeight);
+        e.Handled = true;
+    }
+
+    private void OnResizeHandleReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        e.Pointer.Capture(null);
+        EndResizeInteraction();
+        e.Handled = true;
+    }
+
+    private void EndResizeInteraction()
+    {
+        _isResizingFromCorner = false;
     }
 }

@@ -30,6 +30,8 @@
         "Pack",
         "PackMac",
         "PackMsi",
+        "ProbeTranslation",
+        "ProbeTranslationAll",
         "Publish",
         "Restore",
         "Run",
@@ -125,10 +127,30 @@
           "description": "Minimum line coverage percentage",
           "format": "int32"
         },
+        "EnableTranslationProbe": {
+          "type": "boolean",
+          "description": "Enable translation regression probe target"
+        },
         "MutationThreshold": {
           "type": "integer",
           "description": "Minimum mutation score percentage",
           "format": "int32"
+        },
+        "ProbeCases": {
+          "type": "string",
+          "description": "Batch probe cases: source=>expected;source=>expected"
+        },
+        "ProbeExpectedContains": {
+          "type": "string",
+          "description": "Expected substring in translation result"
+        },
+        "ProbeModelPath": {
+          "type": "string",
+          "description": "Model path used by translation probe"
+        },
+        "ProbeSourceText": {
+          "type": "string",
+          "description": "Source text used by translation probe"
         },
         "Runtime": {
           "type": "string",

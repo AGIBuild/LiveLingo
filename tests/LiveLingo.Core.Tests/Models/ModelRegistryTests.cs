@@ -14,10 +14,18 @@ public class ModelRegistryTests
     }
 
     [Fact]
-    public void RequiredModels_ContainsMinimum()
+    public void RequiredModels_ContainsFastTextAndDefaultMarianPair()
     {
         Assert.NotEmpty(ModelRegistry.RequiredModels);
-        Assert.Contains(ModelRegistry.Qwen25_15B, ModelRegistry.RequiredModels);
+        Assert.Contains(ModelRegistry.FastTextLid, ModelRegistry.RequiredModels);
+        Assert.Contains(ModelRegistry.MarianZhEn, ModelRegistry.RequiredModels);
+        Assert.DoesNotContain(ModelRegistry.Qwen25_15B, ModelRegistry.RequiredModels);
+    }
+
+    [Fact]
+    public void OptionalModels_ContainsQwen()
+    {
+        Assert.Contains(ModelRegistry.Qwen25_15B, ModelRegistry.OptionalModels);
     }
 
     [Fact]
@@ -51,6 +59,19 @@ public class ModelRegistryTests
     public void FindTranslationModel_ReturnsNull_WhenNotFound(string src, string tgt)
     {
         Assert.Null(ModelRegistry.FindTranslationModel(src, tgt));
+    }
+
+    [Fact]
+    public void TranslationModels_UseMultiAssetOnnxLayout()
+    {
+        foreach (var model in ModelRegistry.TranslationModels)
+        {
+            Assert.NotEmpty(model.Assets);
+            Assert.Contains(model.Assets, a => a.RelativePath == "onnx/encoder_model.onnx");
+            Assert.Contains(model.Assets, a => a.RelativePath == "onnx/decoder_model_merged.onnx");
+            Assert.Contains(model.Assets, a => a.RelativePath == "source.spm");
+            Assert.Contains(model.Assets, a => a.RelativePath == "target.spm");
+        }
     }
 
     [Fact]

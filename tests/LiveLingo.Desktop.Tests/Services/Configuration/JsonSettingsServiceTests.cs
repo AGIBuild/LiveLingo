@@ -27,14 +27,15 @@ public class JsonSettingsServiceTests : IDisposable
     public async Task SaveAndLoad_Roundtrip()
     {
         var svc = new JsonSettingsService(_settingsPath);
-        svc.Update(s => s);
-        svc.Update(s => s);
-        await Task.Delay(100, TestContext.Current.CancellationToken);
+        await svc.LoadAsync(TestContext.Current.CancellationToken);
+        var replacement = svc.CloneCurrent();
+        replacement.Hotkeys.OverlayToggle = "Alt+X";
+        svc.Replace(replacement);
 
         var svc2 = new JsonSettingsService(_settingsPath);
         await svc2.LoadAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal(svc.Current.Hotkeys.OverlayToggle, svc2.Current.Hotkeys.OverlayToggle);
+        Assert.Equal("Alt+X", svc2.Current.Hotkeys.OverlayToggle);
     }
 
     [Fact]
@@ -49,15 +50,16 @@ public class JsonSettingsServiceTests : IDisposable
     }
 
     [Fact]
-    public void Update_RaisesSettingsChanged()
+    public void Replace_RaisesSettingsChanged()
     {
+        var initial = new SettingsModel();
         var svc = new JsonSettingsService(_settingsPath);
-        UserSettings? received = null;
-        svc.SettingsChanged += s => received = s;
+        var raised = false;
+        svc.SettingsChanged += () => raised = true;
 
-        svc.Update(s => s);
+        svc.Replace(initial);
 
-        Assert.NotNull(received);
+        Assert.True(raised);
     }
 
     [Fact]
@@ -86,16 +88,18 @@ public class JsonSettingsServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task Current_PersistsAfterUpdate()
+    public async Task Current_PersistsAfterReplace()
     {
         var svc = new JsonSettingsService(_settingsPath);
-        svc.Update(s => s);
-        await Task.Delay(100, TestContext.Current.CancellationToken);
+        await svc.LoadAsync(TestContext.Current.CancellationToken);
+        var replacement = svc.CloneCurrent();
+        replacement.Translation.DefaultSourceLanguage = "ja";
+        svc.Replace(replacement);
 
         var svc2 = new JsonSettingsService(_settingsPath);
         await svc2.LoadAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal("zh", svc2.Current.Translation.DefaultSourceLanguage);
+        Assert.Equal("ja", svc2.Current.Translation.DefaultSourceLanguage);
     }
 
     [Fact]
@@ -113,6 +117,7 @@ public class JsonSettingsServiceTests : IDisposable
     {
         var json = """
         {
+            "schemaVersion": 2,
             "hotkeys": { "overlayToggle": "Alt+X" },
             "translation": { "defaultSourceLanguage": "ja" }
         }
@@ -127,16 +132,117 @@ public class JsonSettingsServiceTests : IDisposable
     }
 
     [Fact]
-    public void Update_ReplacesCurrent()
+    public async Task LoadAsync_ResetsDefaults_WhenSchemaVersionMissing()
+    {
+        var json = """
+        {
+            "hotkeys": { "overlayToggle": "Alt+X" },
+            "translation": { "defaultSourceLanguage": "ja" }
+        }
+        """;
+        await File.WriteAllTextAsync(_settingsPath, json, TestContext.Current.CancellationToken);
+
+        var svc = new JsonSettingsService(_settingsPath);
+        await svc.LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(SettingsModel.CurrentSchemaVersion, svc.Current.SchemaVersion);
+        Assert.Equal("Ctrl+Alt+T", svc.Current.Hotkeys.OverlayToggle);
+        Assert.Equal("zh", svc.Current.Translation.DefaultSourceLanguage);
+
+        var persisted = await File.ReadAllTextAsync(_settingsPath, TestContext.Current.CancellationToken);
+        Assert.Contains("\"schemaVersion\": 2", persisted);
+    }
+
+    [Fact]
+    public void Replace_ReplacesCurrent()
     {
         var svc = new JsonSettingsService(_settingsPath);
+        var replacement = new SettingsModel();
+        replacement.Hotkeys.OverlayToggle = "Alt+Z";
 
-        svc.Update(s => s with
-        {
-            Hotkeys = s.Hotkeys with { OverlayToggle = "Alt+Z" }
-        });
+        svc.Replace(replacement);
 
         Assert.Equal("Alt+Z", svc.Current.Hotkeys.OverlayToggle);
+    }
+
+    [Fact]
+    public async Task CloneCurrent_Isolation_Works()
+    {
+        var svc = new JsonSettingsService(_settingsPath);
+        await svc.LoadAsync(TestContext.Current.CancellationToken);
+
+        var clone = svc.CloneCurrent();
+        clone.UI.OverlayOpacity = 0.5;
+
+        Assert.NotEqual(clone.UI.OverlayOpacity, svc.Current.UI.OverlayOpacity);
+    }
+
+    [Fact]
+    public void Replace_RejectsNull()
+    {
+        var svc = new JsonSettingsService(_settingsPath);
+        Assert.Throws<ArgumentNullException>(() => svc.Replace(null!));
+    }
+
+    [Fact]
+    public async Task Replace_IsThreadSafe_UnderConcurrency()
+    {
+        var svc = new JsonSettingsService(_settingsPath);
+        await svc.LoadAsync(TestContext.Current.CancellationToken);
+
+        var tasks = Enumerable.Range(0, 16).Select(async i =>
+        {
+            await Task.Yield();
+            var next = svc.CloneCurrent();
+            next.Advanced.InferenceThreads = i;
+            svc.Replace(next);
+        });
+        await Task.WhenAll(tasks);
+
+        var svc2 = new JsonSettingsService(_settingsPath);
+        await svc2.LoadAsync(TestContext.Current.CancellationToken);
+        Assert.InRange(svc2.Current.Advanced.InferenceThreads, 0, 15);
+    }
+
+    [Fact]
+    public void Replace_DoesNotDeadlock_OnBlockingSyncContext()
+    {
+        var svc = new JsonSettingsService(_settingsPath);
+        var finished = false;
+        var ex = default(Exception);
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                SynchronizationContext.SetSynchronizationContext(new BlockingSynchronizationContext());
+                var model = new SettingsModel();
+                model.Translation.ActiveTranslationModelId = "opus-mt-zh-en";
+                svc.Replace(model);
+                finished = true;
+            }
+            catch (Exception e)
+            {
+                ex = e;
+            }
+        })
+        {
+            IsBackground = true
+        };
+
+        thread.Start();
+        var joined = thread.Join(TimeSpan.FromSeconds(2));
+
+        Assert.True(joined, "Replace should not block UI-like synchronization context.");
+        Assert.Null(ex);
+        Assert.True(finished);
+    }
+
+    private sealed class BlockingSynchronizationContext : SynchronizationContext
+    {
+        public override void Post(SendOrPostCallback d, object? state)
+        {
+            // Intentionally drop queued continuations to simulate UI deadlock conditions.
+        }
     }
 
     [Fact]

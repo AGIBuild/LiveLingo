@@ -1,10 +1,14 @@
 using LiveLingo.Desktop.Platform;
+using LiveLingo.Desktop.Messaging;
 using LiveLingo.Desktop.Services.Configuration;
 using LiveLingo.Desktop.Services.Localization;
 using LiveLingo.Desktop.ViewModels;
+using CommunityToolkit.Mvvm.Messaging;
 using LiveLingo.Core.Engines;
+using LiveLingo.Core.Models;
 using LiveLingo.Core.Translation;
 using NSubstitute;
+using UserSettings = LiveLingo.Desktop.Services.Configuration.SettingsModel;
 
 namespace LiveLingo.Desktop.Tests.ViewModels;
 
@@ -27,6 +31,17 @@ public class OverlayViewModelTests
     }
 
     private OverlayViewModel CreateVm() => new(_target, _pipeline, _injector, _engine, clipboard: _clipboard, localizationService: _loc);
+
+    private static ISettingsService CreateMutableSettingsService(UserSettings? initial = null)
+    {
+        var current = initial ?? new UserSettings();
+        var svc = Substitute.For<ISettingsService>();
+        svc.Current.Returns(_ => current);
+        svc.CloneCurrent().Returns(_ => current.DeepClone());
+        svc.When(x => x.Replace(Arg.Any<UserSettings>()))
+            .Do(ci => current = ci.Arg<UserSettings>().DeepClone());
+        return svc;
+    }
 
     [Fact]
     public void Constructor_SetsDefaultValues()
@@ -91,15 +106,18 @@ public class OverlayViewModelTests
     }
 
     [Fact]
-    public void Cancel_RaisesRequestClose()
+    public void CancelCommand_SendsCloseMessage()
     {
-        var vm = CreateVm();
-        bool closed = false;
-        vm.RequestClose += () => closed = true;
+        var messenger = new WeakReferenceMessenger();
+        var recipient = new object();
+        AppUiRequestKind? receivedKind = null;
+        messenger.Register<object, AppUiRequestMessage>(recipient, (_, message) =>
+            receivedKind = message.Value.Kind);
+        var vm = new OverlayViewModel(_target, _pipeline, _injector, _engine, localizationService: _loc, messenger: messenger);
 
         vm.CancelCommand.Execute(null);
 
-        Assert.True(closed);
+        Assert.Equal(AppUiRequestKind.CloseOverlay, receivedKind);
     }
 
     [Fact]
@@ -200,6 +218,43 @@ public class OverlayViewModelTests
     }
 
     [Fact]
+    public void Constructor_WithSettings_ShowsCurrentModelLabel()
+    {
+        var settings = new UserSettings
+        {
+            Translation = new TranslationSettings
+            {
+                DefaultSourceLanguage = "zh",
+                DefaultTargetLanguage = "en"
+            }
+        };
+        var vm = new OverlayViewModel(_target, _pipeline, _injector, _engine, settings, localizationService: _loc);
+
+        Assert.Contains("MarianMT", vm.ActiveModelLabel);
+    }
+
+    [Fact]
+    public void ApplySettings_WithTranslationActiveModel_UpdatesLanguagePair()
+    {
+        var initial = new UserSettings
+        {
+            Translation = new TranslationSettings
+            {
+                DefaultSourceLanguage = "zh",
+                DefaultTargetLanguage = "en"
+            }
+        };
+        var vm = new OverlayViewModel(_target, _pipeline, _injector, _engine, initial, localizationService: _loc);
+        var updated = initial.DeepClone();
+        updated.Translation.ActiveTranslationModelId = "opus-mt-en-zh";
+
+        vm.ApplySettings(updated);
+
+        Assert.Equal("zh", vm.TargetLanguage);
+        Assert.Equal("en", vm.SelectedSourceLanguage?.Code);
+    }
+
+    [Fact]
     public async Task RunPipelineAsync_SetsTranslatedTextAndStatus()
     {
         _pipeline.ProcessAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
@@ -216,7 +271,6 @@ public class OverlayViewModelTests
     [Fact]
     public async Task RunPipelineAsync_CancelsPrevious_WhenSourceTextChangesRapidly()
     {
-        var slowTcs = new TaskCompletionSource<TranslationResult>();
         _pipeline.ProcessAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
             .Returns(callInfo =>
             {
@@ -236,7 +290,8 @@ public class OverlayViewModelTests
             .Returns(new TranslationResult("Latest", "zh", "Latest", TimeSpan.Zero, null));
 
         vm.SourceText = "second";
-        await Task.Delay(600, TestContext.Current.CancellationToken);
+        for (var i = 0; i < 25 && !string.Equals(vm.TranslatedText, "Latest", StringComparison.Ordinal); i++)
+            await Task.Delay(100, TestContext.Current.CancellationToken);
 
         Assert.Equal("Latest", vm.TranslatedText);
     }
@@ -327,7 +382,8 @@ public class OverlayViewModelTests
 
         var vm = CreateVm();
         vm.SourceText = "test";
-        await Task.Delay(600, TestContext.Current.CancellationToken);
+        for (var i = 0; i < 25 && !vm.StatusText.Contains("Something broke", StringComparison.Ordinal); i++)
+            await Task.Delay(100, TestContext.Current.CancellationToken);
 
         Assert.Contains("Something broke", vm.StatusText);
         Assert.StartsWith("Error:", vm.StatusText);
@@ -415,9 +471,11 @@ public class OverlayViewModelTests
         var vm = new OverlayViewModel(_target, pipeline, _injector, engine, settings, localizationService: _loc);
 
         vm.SourceText = "你好世界";
-        await Task.Delay(700, TestContext.Current.CancellationToken);
+        const string expected = "SUMMARY([zh→en] 你好世界)";
+        for (var i = 0; i < 25 && !string.Equals(vm.TranslatedText, expected, StringComparison.Ordinal); i++)
+            await Task.Delay(100, TestContext.Current.CancellationToken);
 
-        Assert.Equal("SUMMARY([zh→en] 你好世界)", vm.TranslatedText);
+        Assert.Equal(expected, vm.TranslatedText);
         Assert.Contains("post", vm.StatusText);
     }
 
@@ -489,6 +547,62 @@ public class OverlayViewModelTests
         await _pipeline.Received().ProcessAsync(
             Arg.Is<TranslationRequest>(r => r.PostProcessing != null && r.PostProcessing.Summarize),
             Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Constructor_WithQwenSelected_UsesPostProcessingEvenWhenDefaultModeOff()
+    {
+        var settings = new UserSettings
+        {
+            Translation = new TranslationSettings
+            {
+                DefaultSourceLanguage = "zh",
+                DefaultTargetLanguage = "en",
+                ActiveTranslationModelId = ModelRegistry.Qwen25_15B.Id
+            },
+            Processing = new ProcessingSettings { DefaultMode = "Off" }
+        };
+
+        _pipeline.ProcessAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+            .Returns(new TranslationResult("Result", "zh", "Result", TimeSpan.FromMilliseconds(10), TimeSpan.FromMilliseconds(5)));
+
+        var vm = new OverlayViewModel(_target, _pipeline, _injector, _engine, settings, localizationService: _loc);
+        vm.SourceText = "你好世界";
+        await Task.Delay(600, TestContext.Current.CancellationToken);
+
+        await _pipeline.Received().ProcessAsync(
+            Arg.Is<TranslationRequest>(r => r.PostProcessing != null && r.PostProcessing.Optimize),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Constructor_WithSettings_SkipsPostProcessing_WhenQwenMissing()
+    {
+        var settings = new UserSettings
+        {
+            Processing = new ProcessingSettings { DefaultMode = "Summarize" }
+        };
+        var modelManager = Substitute.For<IModelManager>();
+        modelManager.ListInstalled().Returns([]);
+
+        _pipeline.ProcessAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+            .Returns(new TranslationResult("Result", "zh", "Result", TimeSpan.FromMilliseconds(10), null));
+
+        var vm = new OverlayViewModel(
+            _target,
+            _pipeline,
+            _injector,
+            _engine,
+            settings,
+            localizationService: _loc,
+            modelManager: modelManager);
+        vm.SourceText = "你好世界";
+        await Task.Delay(600, TestContext.Current.CancellationToken);
+
+        await _pipeline.Received().ProcessAsync(
+            Arg.Is<TranslationRequest>(r => r.PostProcessing == null),
+            Arg.Any<CancellationToken>());
+        Assert.Contains("Model not downloaded", vm.StatusText);
     }
 
     [Fact]
@@ -902,8 +1016,7 @@ public class OverlayViewModelTests
     [Fact]
     public void PersistIfChanged_TargetLanguageChanged_CallsUpdate()
     {
-        var settingsService = Substitute.For<ISettingsService>();
-        settingsService.Current.Returns(new UserSettings());
+        var settingsService = CreateMutableSettingsService();
         var settings = new UserSettings
         {
             Translation = new TranslationSettings { DefaultTargetLanguage = "en" }
@@ -914,14 +1027,13 @@ public class OverlayViewModelTests
         vm.SelectedTargetLanguage = _engine.SupportedLanguages.First(l => l.Code == "zh");
         vm.PersistIfChanged();
 
-        settingsService.Received(1).Update(Arg.Any<Func<UserSettings, UserSettings>>());
+        settingsService.Received(1).Replace(Arg.Any<UserSettings>());
     }
 
     [Fact]
     public void PersistIfChanged_NoChange_DoesNotCallUpdate()
     {
-        var settingsService = Substitute.For<ISettingsService>();
-        settingsService.Current.Returns(new UserSettings());
+        var settingsService = CreateMutableSettingsService();
         var settings = new UserSettings
         {
             Translation = new TranslationSettings { DefaultTargetLanguage = "en" }
@@ -931,14 +1043,13 @@ public class OverlayViewModelTests
 
         vm.PersistIfChanged();
 
-        settingsService.DidNotReceive().Update(Arg.Any<Func<UserSettings, UserSettings>>());
+        settingsService.DidNotReceive().Replace(Arg.Any<UserSettings>());
     }
 
     [Fact]
     public void PersistIfChanged_ModeChanged_CallsUpdate()
     {
-        var settingsService = Substitute.For<ISettingsService>();
-        settingsService.Current.Returns(new UserSettings());
+        var settingsService = CreateMutableSettingsService();
         var settings = new UserSettings
         {
             UI = new UISettings { DefaultInjectionMode = "PasteAndSend" }
@@ -949,14 +1060,13 @@ public class OverlayViewModelTests
         vm.ToggleModeCommand.Execute(null);
         vm.PersistIfChanged();
 
-        settingsService.Received(1).Update(Arg.Any<Func<UserSettings, UserSettings>>());
+        settingsService.Received(1).Replace(Arg.Any<UserSettings>());
     }
 
     [Fact]
     public void Cancel_DoesNotPersistDirectly_DeferredToCloseEvent()
     {
-        var settingsService = Substitute.For<ISettingsService>();
-        settingsService.Current.Returns(new UserSettings());
+        var settingsService = CreateMutableSettingsService();
         var settings = new UserSettings
         {
             Translation = new TranslationSettings { DefaultTargetLanguage = "en" }
@@ -967,10 +1077,10 @@ public class OverlayViewModelTests
         vm.SelectedTargetLanguage = _engine.SupportedLanguages.First(l => l.Code == "ja");
         vm.CancelCommand.Execute(null);
 
-        settingsService.DidNotReceive().Update(Arg.Any<Func<UserSettings, UserSettings>>());
+        settingsService.DidNotReceive().Replace(Arg.Any<UserSettings>());
 
         vm.PersistIfChanged();
-        settingsService.Received(1).Update(Arg.Any<Func<UserSettings, UserSettings>>());
+        settingsService.Received(1).Replace(Arg.Any<UserSettings>());
     }
 
     [Fact]
@@ -990,15 +1100,18 @@ public class OverlayViewModelTests
     // --- D2: Settings entry tests ---
 
     [Fact]
-    public void OpenSettingsCommand_RaisesRequestOpenSettings()
+    public void OpenSettingsCommand_SendsOpenSettingsMessage()
     {
-        var vm = CreateVm();
-        bool raised = false;
-        vm.RequestOpenSettings += () => raised = true;
+        var messenger = new WeakReferenceMessenger();
+        var recipient = new object();
+        AppUiRequestKind? receivedKind = null;
+        messenger.Register<object, AppUiRequestMessage>(recipient, (_, message) =>
+            receivedKind = message.Value.Kind);
+        var vm = new OverlayViewModel(_target, _pipeline, _injector, _engine, localizationService: _loc, messenger: messenger);
 
         vm.OpenSettingsCommand.Execute(null);
 
-        Assert.True(raised);
+        Assert.Equal(AppUiRequestKind.OpenSettings, receivedKind);
     }
 
     [Fact]

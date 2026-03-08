@@ -17,26 +17,30 @@ internal sealed class Win32TextInjector : ITextInjector
 
     public Task InjectAsync(TargetWindowInfo target, string text, bool autoSend, CancellationToken ct)
     {
-        return Task.Run(() => InjectText(target.Handle, target.InputChildHandle, text, autoSend), ct);
+        return Task.Run(() => InjectText(target.Handle, target.InputChildHandle, text, autoSend, ct), ct);
     }
 
-    private void InjectText(nint mainWindow, nint inputChild, string text, bool autoSend)
+    private void InjectText(nint mainWindow, nint inputChild, string text, bool autoSend, CancellationToken ct)
     {
+        ct.ThrowIfCancellationRequested();
         ReleaseAllModifiers();
-        Thread.Sleep(80);
+        WaitWithCancellation(80, ct);
 
+        ct.ThrowIfCancellationRequested();
         Win32ClipboardService.SetClipboardText(text);
-        Thread.Sleep(50);
+        WaitWithCancellation(50, ct);
 
+        ct.ThrowIfCancellationRequested();
         ForceForeground(mainWindow);
-        Thread.Sleep(500);
+        WaitWithCancellation(500, ct);
 
+        ct.ThrowIfCancellationRequested();
         var r = SimulateKeyCombo(VK_CONTROL, VK_V);
         if (r > 0)
         {
             if (autoSend)
             {
-                Thread.Sleep(200);
+                WaitWithCancellation(200, ct);
                 SimulateKey(VK_RETURN);
             }
             return;
@@ -48,18 +52,32 @@ internal sealed class Win32TextInjector : ITextInjector
 
         foreach (var ch in text)
         {
+            ct.ThrowIfCancellationRequested();
             PostMessageW(target, WM_CHAR, (IntPtr)ch, IntPtr.Zero);
-            Thread.Sleep(5);
+            WaitWithCancellation(5, ct);
         }
 
         if (autoSend)
         {
-            Thread.Sleep(200);
+            WaitWithCancellation(200, ct);
             var lDown = MakeKeyLParam(1, VK_RETURN_SCAN, false, false);
             var lUp = MakeKeyLParam(1, VK_RETURN_SCAN, true, true);
             PostMessageW(target, (uint)WM_KEYDOWN, (IntPtr)VK_RETURN, (IntPtr)lDown);
-            Thread.Sleep(30);
+            WaitWithCancellation(30, ct);
             PostMessageW(target, WM_KEYUP, (IntPtr)VK_RETURN, (IntPtr)lUp);
+        }
+    }
+
+    private static void WaitWithCancellation(int milliseconds, CancellationToken ct)
+    {
+        const int slice = 20;
+        var remaining = milliseconds;
+        while (remaining > 0)
+        {
+            ct.ThrowIfCancellationRequested();
+            var current = Math.Min(slice, remaining);
+            Thread.Sleep(current);
+            remaining -= current;
         }
     }
 

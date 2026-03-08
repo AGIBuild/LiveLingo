@@ -1,9 +1,12 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using CommunityToolkit.Mvvm.Messaging;
+using LiveLingo.Desktop.Messaging;
 using LiveLingo.Desktop.Platform;
 using LiveLingo.Desktop.Services.Configuration;
 using LiveLingo.Desktop.Services.Localization;
 using LiveLingo.Core.Engines;
+using LiveLingo.Core.Models;
 using LiveLingo.Core.Processing;
 using LiveLingo.Core.Translation;
 using Microsoft.Extensions.Logging;
@@ -26,9 +29,13 @@ public partial class OverlayViewModel : ObservableObject
     private readonly ILocalizationService? _loc;
     private readonly ISettingsService? _settingsService;
     private readonly ILogger<OverlayViewModel>? _logger;
+    private readonly IModelManager? _modelManager;
+    private readonly IMessenger _messenger;
     private readonly IReadOnlyList<LanguageInfo> _availableLanguages;
     private CancellationTokenSource? _pipelineCts;
-    private readonly string _postProcessMode;
+    private string _postProcessMode;
+    private string? _activeModelId;
+    private bool _isApplyingRuntimeSettings;
     private string? _sourceLanguage;
     private int _currentLangIndex;
     private readonly string? _initialSourceLanguage;
@@ -47,6 +54,9 @@ public partial class OverlayViewModel : ObservableObject
     [ObservableProperty] private bool _isLanguagePickerOpen;
     [ObservableProperty] private int _sourceTextLength;
     [ObservableProperty] private LanguageInfo? _selectedSourceLanguage;
+    [ObservableProperty] private string _activeModelLabel = string.Empty;
+    [ObservableProperty] private string _activeModelTooltip = string.Empty;
+    [ObservableProperty] private bool _isSending;
 
     public string CopyLabel => L("overlay.copy");
     public string CopiedLabel => L("overlay.copied");
@@ -58,19 +68,18 @@ public partial class OverlayViewModel : ObservableObject
     public nint TargetInputChild => _targetWindow.InputChildHandle;
     public bool AutoSend => Mode == InjectionMode.PasteAndSend;
 
-    public event Action? RequestClose;
-    public event Action? RequestOpenSettings;
-
     public OverlayViewModel(
         TargetWindowInfo targetWindow,
         ITranslationPipeline pipeline,
         ITextInjector injector,
         ITranslationEngine engine,
-        UserSettings settings,
+        SettingsModel settings,
         IClipboardService? clipboard = null,
         ILocalizationService? localizationService = null,
         ISettingsService? settingsService = null,
-        ILogger<OverlayViewModel>? logger = null)
+        ILogger<OverlayViewModel>? logger = null,
+        IModelManager? modelManager = null,
+        IMessenger? messenger = null)
     {
         _targetWindow = targetWindow;
         _pipeline = pipeline;
@@ -80,11 +89,21 @@ public partial class OverlayViewModel : ObservableObject
         _loc = localizationService;
         _settingsService = settingsService;
         _logger = logger;
+        _modelManager = modelManager;
+        _messenger = messenger ?? WeakReferenceMessenger.Default;
         _availableLanguages = engine.SupportedLanguages;
+        _activeModelId = settings.Translation.ActiveTranslationModelId;
         _sourceLanguage = string.IsNullOrWhiteSpace(settings.Translation.DefaultSourceLanguage)
             ? null
             : settings.Translation.DefaultSourceLanguage;
-        _targetLanguage = NormalizeTargetLanguage(settings.Translation.DefaultTargetLanguage);
+        var configuredTarget = settings.Translation.DefaultTargetLanguage;
+        if (TryResolveTranslationPairFromModelId(_activeModelId, out var activeSource, out var activeTarget))
+        {
+            _sourceLanguage = activeSource;
+            configuredTarget = activeTarget;
+        }
+
+        _targetLanguage = NormalizeTargetLanguage(configuredTarget);
         _currentLangIndex = FindLanguageIndex(_targetLanguage);
         SelectedTargetLanguage = _availableLanguages.Count > 0 ? _availableLanguages[_currentLangIndex] : null;
         SelectedSourceLanguage = _availableLanguages.FirstOrDefault(l =>
@@ -100,6 +119,12 @@ public partial class OverlayViewModel : ObservableObject
         _initialMode = Mode;
 
         UpdateModeDisplay();
+        UpdateActiveModelDisplay();
+        _messenger.Register<OverlayViewModel, SettingsChangedMessage>(this, static (recipient, _) =>
+        {
+            if (recipient._settingsService is not null)
+                recipient.ApplySettings(recipient._settingsService.Current);
+        });
     }
 
     public OverlayViewModel(
@@ -110,7 +135,8 @@ public partial class OverlayViewModel : ObservableObject
         string targetLanguage = "en",
         IClipboardService? clipboard = null,
         ILocalizationService? localizationService = null,
-        ILogger<OverlayViewModel>? logger = null)
+        ILogger<OverlayViewModel>? logger = null,
+        IMessenger? messenger = null)
     {
         _targetWindow = targetWindow;
         _pipeline = pipeline;
@@ -119,8 +145,11 @@ public partial class OverlayViewModel : ObservableObject
         _clipboard = clipboard;
         _loc = localizationService;
         _logger = logger;
+        _modelManager = null;
+        _messenger = messenger ?? WeakReferenceMessenger.Default;
         _availableLanguages = engine.SupportedLanguages;
         _targetLanguage = NormalizeTargetLanguage(targetLanguage);
+        _activeModelId = ModelRegistry.FindTranslationModel(_sourceLanguage ?? "zh", _targetLanguage)?.Id;
         _currentLangIndex = FindLanguageIndex(_targetLanguage);
         SelectedTargetLanguage = _availableLanguages.Count > 0 ? _availableLanguages[_currentLangIndex] : null;
         _postProcessMode = "Off";
@@ -129,6 +158,12 @@ public partial class OverlayViewModel : ObservableObject
         _initialTargetLanguage = _targetLanguage;
         _initialMode = Mode;
         UpdateModeDisplay();
+        UpdateActiveModelDisplay();
+        _messenger.Register<OverlayViewModel, SettingsChangedMessage>(this, static (recipient, _) =>
+        {
+            if (recipient._settingsService is not null)
+                recipient.ApplySettings(recipient._settingsService.Current);
+        });
     }
 
     partial void OnSelectedTargetLanguageChanged(LanguageInfo? value)
@@ -136,6 +171,11 @@ public partial class OverlayViewModel : ObservableObject
         if (value is null) return;
         TargetLanguage = value.Code;
         _currentLangIndex = FindLanguageIndex(value.Code);
+
+        UpdateActiveModelDisplay();
+
+        if (_isApplyingRuntimeSettings)
+            return;
 
         if (!string.IsNullOrWhiteSpace(SourceText))
         {
@@ -218,20 +258,34 @@ public partial class OverlayViewModel : ObservableObject
                 return;
             }
 
-            var postProcessing = _postProcessMode switch
+            var effectivePostProcessMode = ResolveEffectivePostProcessMode();
+            var postProcessing = effectivePostProcessMode switch
             {
                 "Summarize" => new ProcessingOptions(Summarize: true),
                 "Optimize" => new ProcessingOptions(Optimize: true),
                 "Colloquialize" => new ProcessingOptions(Colloquialize: true),
                 _ => null
             };
+            var postProcessingSkippedForMissingModel = false;
+
+            if (postProcessing is not null && !IsQwenModelInstalled())
+            {
+                StatusText = L("overlay.error.modelNotDownloaded");
+                _logger?.LogWarning(
+                    "Post-processing model {ModelId} is not installed; running translation-only path",
+                    ModelRegistry.Qwen25_15B.Id);
+                postProcessing = null;
+                postProcessingSkippedForMissingModel = true;
+            }
 
             var result = await _pipeline.ProcessAsync(
                 new TranslationRequest(text, _sourceLanguage, TargetLanguage, postProcessing), ct);
             TranslatedText = result.Text;
 
             var timing = $"{result.TranslationDuration.TotalMilliseconds:0}ms";
-            StatusText = result.PostProcessingDuration is { } pp
+            StatusText = postProcessingSkippedForMissingModel
+                ? L("overlay.error.modelNotDownloaded")
+                : result.PostProcessingDuration is { } pp
                 ? L("overlay.translatedWithPost", timing, $"{pp.TotalMilliseconds:0}ms")
                 : L("overlay.translated", timing);
         }
@@ -303,6 +357,34 @@ public partial class OverlayViewModel : ObservableObject
         await _injector.InjectAsync(_targetWindow, TranslatedText, AutoSend);
     }
 
+    public async Task InjectAsync(CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(TranslatedText)) return;
+        await _injector.InjectAsync(_targetWindow, TranslatedText, AutoSend, ct);
+    }
+
+    public async Task SendAsync(CancellationToken ct = default)
+    {
+        if (IsSending || string.IsNullOrWhiteSpace(TranslatedText))
+            return;
+
+        try
+        {
+            IsSending = true;
+            await InjectAsync(ct);
+            if (!ct.IsCancellationRequested)
+                _messenger.Send(new AppUiRequestMessage(new AppUiRequest(this, AppUiRequestKind.CloseOverlay)));
+        }
+        catch (OperationCanceledException)
+        {
+            // Expected on window/app shutdown.
+        }
+        finally
+        {
+            IsSending = false;
+        }
+    }
+
     [RelayCommand]
     private async Task CopyTranslationAsync()
     {
@@ -340,12 +422,70 @@ public partial class OverlayViewModel : ObservableObject
             _pipelineCts = new CancellationTokenSource();
             _ = DebounceAndTranslateAsync(SourceText, _pipelineCts.Token);
         }
+
+        UpdateActiveModelDisplay();
     }
 
     [RelayCommand]
     private void OpenSettings()
     {
-        RequestOpenSettings?.Invoke();
+        _messenger.Send(new AppUiRequestMessage(new AppUiRequest(this, AppUiRequestKind.OpenSettings)));
+    }
+
+    public void ApplySettings(SettingsModel settings)
+    {
+        var previousSource = _sourceLanguage;
+        var previousTarget = TargetLanguage;
+        var previousPostProcessMode = _postProcessMode;
+        var previousActiveModelId = _activeModelId;
+        var previousMode = Mode;
+
+        _isApplyingRuntimeSettings = true;
+        try
+        {
+            _activeModelId = settings.Translation.ActiveTranslationModelId;
+            var configuredSource = settings.Translation.DefaultSourceLanguage;
+            var configuredTarget = settings.Translation.DefaultTargetLanguage;
+
+            if (TryResolveTranslationPairFromModelId(_activeModelId, out var activeSource, out var activeTarget))
+            {
+                configuredSource = activeSource;
+                configuredTarget = activeTarget;
+            }
+
+            _sourceLanguage = string.IsNullOrWhiteSpace(configuredSource) ? null : configuredSource;
+            SelectedSourceLanguage = _availableLanguages.FirstOrDefault(l =>
+                string.Equals(l.Code, _sourceLanguage, StringComparison.OrdinalIgnoreCase));
+
+            var normalizedTarget = NormalizeTargetLanguage(configuredTarget);
+            TargetLanguage = normalizedTarget;
+            _currentLangIndex = FindLanguageIndex(normalizedTarget);
+            SelectedTargetLanguage = _availableLanguages.Count > 0 ? _availableLanguages[_currentLangIndex] : null;
+
+            _postProcessMode = settings.Processing.DefaultMode;
+            Mode = settings.UI.DefaultInjectionMode == "PasteOnly"
+                ? InjectionMode.PasteOnly
+                : InjectionMode.PasteAndSend;
+            UpdateModeDisplay();
+            UpdateActiveModelDisplay();
+        }
+        finally
+        {
+            _isApplyingRuntimeSettings = false;
+        }
+
+        var translationConfigChanged = !string.Equals(previousSource, _sourceLanguage, StringComparison.OrdinalIgnoreCase) ||
+                                       !string.Equals(previousTarget, TargetLanguage, StringComparison.OrdinalIgnoreCase);
+        var postProcessChanged = !string.Equals(previousPostProcessMode, _postProcessMode, StringComparison.OrdinalIgnoreCase);
+        var activeModelChanged = !string.Equals(previousActiveModelId, _activeModelId, StringComparison.OrdinalIgnoreCase);
+        var modeChanged = previousMode != Mode;
+
+        if ((translationConfigChanged || postProcessChanged || activeModelChanged || modeChanged) && !string.IsNullOrWhiteSpace(SourceText))
+        {
+            _pipelineCts?.Cancel();
+            _pipelineCts = new CancellationTokenSource();
+            _ = DebounceAndTranslateAsync(SourceText, _pipelineCts.Token);
+        }
     }
 
     public void PersistIfChanged()
@@ -358,23 +498,109 @@ public partial class OverlayViewModel : ObservableObject
 
         if (!sourceChanged && !targetChanged && !modeChanged) return;
 
-        _settingsService.Update(s => s with
-        {
-            Translation = s.Translation with
-            {
-                DefaultSourceLanguage = _sourceLanguage ?? s.Translation.DefaultSourceLanguage,
-                DefaultTargetLanguage = TargetLanguage
-            },
-            UI = s.UI with
-            {
-                DefaultInjectionMode = Mode.ToString()
-            }
-        });
+        var next = _settingsService.CloneCurrent();
+        next.Translation.DefaultSourceLanguage = _sourceLanguage ?? next.Translation.DefaultSourceLanguage;
+        next.Translation.DefaultTargetLanguage = TargetLanguage;
+        next.Translation.ActiveTranslationModelId = ResolvePersistedActiveModelId(
+            _sourceLanguage ?? next.Translation.DefaultSourceLanguage,
+            TargetLanguage);
+        next.UI.DefaultInjectionMode = Mode.ToString();
+        _settingsService.Replace(next);
     }
 
     [RelayCommand]
     private void Cancel()
     {
-        RequestClose?.Invoke();
+        _messenger.Send(new AppUiRequestMessage(new AppUiRequest(this, AppUiRequestKind.CloseOverlay)));
+    }
+
+    private bool IsQwenModelInstalled()
+    {
+        if (_modelManager is null)
+            return true;
+
+        return _modelManager.ListInstalled()
+            .Any(m => string.Equals(m.Id, ModelRegistry.Qwen25_15B.Id, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private void UpdateActiveModelDisplay()
+    {
+        var source = _sourceLanguage ?? string.Empty;
+        var translationModel = ResolveActiveTranslationModel(source, TargetLanguage);
+        var translationLabel = translationModel?.DisplayName ?? $"Translation: {(string.IsNullOrWhiteSpace(source) ? "auto" : source)}→{TargetLanguage}";
+        var translationId = translationModel?.Id ?? $"pair:{(string.IsNullOrWhiteSpace(source) ? "auto" : source)}-{TargetLanguage}";
+
+        var selectedPostModel = ResolveSelectedPostProcessingModel();
+        if (selectedPostModel is not null || !string.Equals(_postProcessMode, "Off", StringComparison.OrdinalIgnoreCase))
+        {
+            var postLabelBase = selectedPostModel?.DisplayName ?? ModelRegistry.Qwen25_15B.DisplayName;
+            var postModelId = selectedPostModel?.Id ?? ModelRegistry.Qwen25_15B.Id;
+            var postLabel = IsQwenModelInstalled()
+                ? postLabelBase
+                : $"{postLabelBase} (not installed)";
+            ActiveModelLabel = $"{translationLabel} + {postLabel}";
+            ActiveModelTooltip = $"{translationId} + {postModelId}";
+            return;
+        }
+
+        ActiveModelLabel = translationLabel;
+        ActiveModelTooltip = translationId;
+    }
+
+    private string ResolveEffectivePostProcessMode()
+    {
+        var selectedPostModel = ResolveSelectedPostProcessingModel();
+        if (selectedPostModel is not null && string.Equals(_postProcessMode, "Off", StringComparison.OrdinalIgnoreCase))
+            return "Optimize";
+        return _postProcessMode;
+    }
+
+    private ModelDescriptor? ResolveSelectedPostProcessingModel()
+    {
+        if (string.IsNullOrWhiteSpace(_activeModelId))
+            return null;
+
+        return ModelRegistry.AllModels.FirstOrDefault(m =>
+            m.Type == ModelType.PostProcessing &&
+            string.Equals(m.Id, _activeModelId, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private ModelDescriptor? ResolveActiveTranslationModel(string source, string target)
+    {
+        if (TryResolveTranslationPairFromModelId(_activeModelId, out var pairSource, out var pairTarget))
+            return ModelRegistry.FindTranslationModel(pairSource, pairTarget);
+
+        return ModelRegistry.FindTranslationModel(source, target);
+    }
+
+    private string? ResolvePersistedActiveModelId(string sourceLanguage, string targetLanguage)
+    {
+        if (TryResolveTranslationPairFromModelId(_activeModelId, out _, out _))
+            return ModelRegistry.FindTranslationModel(sourceLanguage, targetLanguage)?.Id ?? _activeModelId;
+
+        if (!string.IsNullOrWhiteSpace(_activeModelId))
+            return _activeModelId;
+
+        return ModelRegistry.FindTranslationModel(sourceLanguage, targetLanguage)?.Id;
+    }
+
+    private static bool TryResolveTranslationPairFromModelId(string? modelId, out string source, out string target)
+    {
+        source = string.Empty;
+        target = string.Empty;
+        if (string.IsNullOrWhiteSpace(modelId))
+            return false;
+
+        if (!modelId.StartsWith("opus-mt-", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var pair = modelId["opus-mt-".Length..];
+        var parts = pair.Split('-', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (parts.Length != 2)
+            return false;
+
+        source = parts[0];
+        target = parts[1];
+        return true;
     }
 }

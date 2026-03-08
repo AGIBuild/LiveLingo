@@ -452,6 +452,29 @@ public class ModelManagerTests : IDisposable
     }
 
     [Fact]
+    public async Task EnsureModelAsync_DownloadsAllAssets_WhenDescriptorProvidesAssets()
+    {
+        var desc = new ModelDescriptor("asset-test", "Asset Test", "http://fake/fallback.bin", 300, ModelType.Translation)
+        {
+            Assets =
+            [
+                new ModelAsset("onnx/encoder_model.onnx", "http://fake/encoder.onnx", 100),
+                new ModelAsset("onnx/decoder_model_merged.onnx", "http://fake/decoder.onnx", 100),
+                new ModelAsset("source.spm", "http://fake/source.spm", 50),
+                new ModelAsset("target.spm", "http://fake/target.spm", 50),
+            ]
+        };
+
+        await _manager.EnsureModelAsync(desc, null, CancellationToken.None);
+
+        var modelDir = Path.Combine(_tempDir, "asset-test");
+        Assert.True(File.Exists(Path.Combine(modelDir, "onnx", "encoder_model.onnx")));
+        Assert.True(File.Exists(Path.Combine(modelDir, "onnx", "decoder_model_merged.onnx")));
+        Assert.True(File.Exists(Path.Combine(modelDir, "source.spm")));
+        Assert.True(File.Exists(Path.Combine(modelDir, "target.spm")));
+    }
+
+    [Fact]
     public async Task MigrateStoragePathAsync_LogsDebugOnSuccess()
     {
         var modelDir = Path.Combine(_tempDir, "log-migrate");

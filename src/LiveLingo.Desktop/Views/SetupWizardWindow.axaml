@@ -26,6 +26,8 @@
         <Border IsHitTestVisible="False"
                 BorderBrush="#15FFFFFF" BorderThickness="1"
                 CornerRadius="8"/>
+        <Border Name="DragHandle" Height="30" Background="Transparent"
+                VerticalAlignment="Top" Cursor="Hand"/>
 
         <DockPanel Margin="32,40,32,24">
             <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal"
@@ -59,13 +61,27 @@
                                Text="Select the source language you type in and the target language for translation."/>
                     <Grid ColumnDefinitions="100,*" RowDefinitions="Auto,Auto" RowSpacing="12">
                         <TextBlock Classes="label" Text="Source:"/>
-                        <TextBox Grid.Column="1" Classes="themed"
-                                 Text="{Binding SourceLanguage}"
-                                 PlaceholderText="e.g. zh, ja, ko"/>
+                        <ComboBox Grid.Column="1" MinWidth="220"
+                                  Classes="themed"
+                                  ItemsSource="{Binding AvailableLanguages}"
+                                  SelectedItem="{Binding SelectedSourceLanguage}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding DisplayName}"/>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
                         <TextBlock Grid.Row="1" Classes="label" Text="Target:"/>
-                        <TextBox Grid.Row="1" Grid.Column="1" Classes="themed"
-                                 Text="{Binding TargetLanguage}"
-                                 PlaceholderText="e.g. en, zh, ja"/>
+                        <ComboBox Grid.Row="1" Grid.Column="1" MinWidth="220"
+                                  Classes="themed"
+                                  ItemsSource="{Binding AvailableLanguages}"
+                                  SelectedItem="{Binding SelectedTargetLanguage}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding DisplayName}"/>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
                     </Grid>
                 </StackPanel>
 
@@ -84,19 +100,19 @@
 
                 <!-- Step 2: Model Download -->
                 <StackPanel IsVisible="{Binding IsStep2}" Spacing="8">
-                    <TextBlock Classes="heading" Text="Download AI Model"/>
+                    <TextBlock Classes="heading" Text="Download Required Models"/>
                     <TextBlock Classes="desc"
-                               Text="LiveLingo requires an AI model for translation. This is a one-time download (~1 GB)."/>
+                               Text="LiveLingo requires baseline translation models (language detection + default Marian pair). This is a one-time download."/>
 
                     <Border Padding="16,14" CornerRadius="8"
                             Background="{StaticResource BgSurfaceBrush}">
                         <StackPanel Spacing="10">
                             <Grid ColumnDefinitions="*,Auto">
                                 <StackPanel>
-                                    <TextBlock Text="Qwen2.5-1.5B-Instruct" FontSize="14"
+                                    <TextBlock Text="FastText + MarianMT" FontSize="14"
                                                FontWeight="SemiBold"
                                                Foreground="{StaticResource FgPrimaryBrush}"/>
-                                    <TextBlock Text="Translation &amp; Post-processing · ~1 GB"
+                                    <TextBlock Text="Baseline translation models (required)"
                                                FontSize="11"
                                                Foreground="{StaticResource FgTertiaryBrush}"
                                                Margin="0,2,0,0"/>

@@ -12,7 +12,7 @@
         TransparencyLevelHint="Transparent"
         Width="600"
         SizeToContent="Height"
-        MinWidth="320" MinHeight="220" MaxHeight="600"
+        MinWidth="320" MinHeight="260" MaxHeight="600"
         WindowStartupLocation="Manual">
 
     <Window.Resources>
@@ -55,6 +55,10 @@
             <Setter Property="Foreground" Value="{DynamicResource OvFgTertiaryBrush}"/>
             <Setter Property="FontSize" Value="11"/>
         </Style>
+        <Style Selector="TextBlock.modelStatus">
+            <Setter Property="Foreground" Value="{DynamicResource OvFgMutedBrush}"/>
+            <Setter Property="FontSize" Value="10"/>
+        </Style>
         <Style Selector="Button.sendBtn">
             <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
             <Setter Property="Foreground" Value="#FFFFFF"/>
@@ -72,12 +76,12 @@
         <Style Selector="Button.iconBtn">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Padding" Value="4,2"/>
+            <Setter Property="Padding" Value="7,4"/>
             <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="MinWidth" Value="0"/>
-            <Setter Property="MinHeight" Value="0"/>
+            <Setter Property="MinWidth" Value="28"/>
+            <Setter Property="MinHeight" Value="28"/>
             <Setter Property="Foreground" Value="{DynamicResource OvFgSecondaryBrush}"/>
-            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="FontSize" Value="17"/>
         </Style>
         <Style Selector="Popup Button:pointerover /template/ ContentPresenter">
             <Setter Property="Background" Value="{StaticResource BgElevatedBrush}"/>
@@ -94,6 +98,21 @@
             <Setter Property="Foreground" Value="{DynamicResource OvFgSecondaryBrush}"/>
             <Setter Property="FontSize" Value="12"/>
         </Style>
+        <Style Selector="Border#ResizeSE:pointerover">
+            <Setter Property="Opacity" Value="1"/>
+        </Style>
+        <Style Selector="Border#ResizeSE:pressed">
+            <Setter Property="Opacity" Value="0.85"/>
+        </Style>
+        <Style Selector="Border#TargetLangLink:pointerover">
+            <Setter Property="Background" Value="#1AFFFFFF"/>
+        </Style>
+        <Style Selector="Border#TargetLangLink:pressed">
+            <Setter Property="Background" Value="#26FFFFFF"/>
+        </Style>
+        <Style Selector="Border#SourceLangBadge:pointerover">
+            <Setter Property="Background" Value="#12FFFFFF"/>
+        </Style>
     </Window.Styles>
 
     <Panel Name="RootPanel" Opacity="0">
@@ -108,7 +127,7 @@
                 BorderBrush="#15FFFFFF" BorderThickness="1"/>
 
         <Border CornerRadius="12" Padding="0">
-            <Grid RowDefinitions="Auto,*,Auto">
+            <Grid RowDefinitions="Auto,Auto,*,Auto">
 
                 <!-- Title bar -->
                 <Border Grid.Row="0" Name="DragHandle"
@@ -119,7 +138,7 @@
                                    FontSize="11" Foreground="{DynamicResource OvFgTertiaryBrush}"
                                    Margin="0,0,4,0" VerticalAlignment="Center"/>
                         <Button Grid.Column="2" Classes="iconBtn"
-                                Content="⚙" FontSize="15"
+                                Content="⚙" FontSize="17"
                                 Command="{Binding OpenSettingsCommand}"
                                 ToolTip.Tip="Settings"
                                 Margin="0,0,2,0" VerticalAlignment="Center"/>
@@ -133,15 +152,27 @@
                     </Grid>
                 </Border>
 
-                <Grid Grid.Row="1" RowDefinitions="Auto,Auto,*">
+                <!-- Loading indicator -->
+                <ProgressBar Grid.Row="1" IsIndeterminate="True"
+                             IsVisible="{Binding IsTranslating}"
+                             Height="2" Margin="14,4,14,0"
+                             Foreground="{StaticResource AccentBrush}"
+                             Background="{StaticResource BgSurfaceBrush}"/>
+
+                <Grid Grid.Row="2"
+                      RowDefinitions="120,*"
+                      RowSpacing="8"
+                      Margin="14,8,14,0"
+                      MinHeight="0"
+                      ClipToBounds="True">
                     <!-- Source input -->
-                    <Grid Grid.Row="0" Margin="14,0,14,0" MinHeight="64">
+                    <Grid Grid.Row="0" Height="120">
                         <TextBox Classes="source"
                                  Text="{Binding SourceText, Mode=TwoWay}"
                                  PlaceholderText="{Binding SourceHint}"
                                  Name="SourceInput"
-                                 MinHeight="64"
-                                 MaxHeight="220"/>
+                                 Height="120"
+                                 VerticalAlignment="Stretch"/>
                         <TextBlock Text="{Binding SourceTextLength}"
                                    FontSize="10" Foreground="{DynamicResource OvFgMutedBrush}"
                                    HorizontalAlignment="Right"
@@ -150,21 +181,14 @@
                                    IsHitTestVisible="False"/>
                     </Grid>
 
-                    <!-- Loading indicator -->
-                    <ProgressBar Grid.Row="1" IsIndeterminate="True"
-                                 IsVisible="{Binding IsTranslating}"
-                                 Height="2" Margin="14,4,14,0"
-                                 Foreground="{StaticResource AccentBrush}"
-                                 Background="{StaticResource BgSurfaceBrush}"/>
-
                     <!-- Translation result -->
-                    <Border Grid.Row="2" Margin="14,8,14,0" Name="TranslationBorder"
+                    <Border Grid.Row="1" Name="TranslationBorder"
                             CornerRadius="8" Background="{DynamicResource OvPanelBrush}"
-                            MinHeight="40"
-                            IsVisible="{Binding TranslatedText,
-                                        Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                            MinHeight="120"
+                            VerticalAlignment="Stretch">
                         <Grid ColumnDefinitions="*,Auto">
                             <ScrollViewer Grid.Column="0"
+                                          VerticalAlignment="Stretch"
                                           HorizontalScrollBarVisibility="Disabled"
                                           VerticalScrollBarVisibility="Auto">
                                 <SelectableTextBlock Classes="translation"
@@ -172,7 +196,9 @@
                             </ScrollViewer>
                             <StackPanel Grid.Column="1" VerticalAlignment="Top" Margin="0,4,4,0">
                                 <Button Classes="copyBtn"
-                                        Command="{Binding CopyTranslationCommand}">
+                                        Command="{Binding CopyTranslationCommand}"
+                                        IsEnabled="{Binding TranslatedText,
+                                                    Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                                     <Panel>
                                         <TextBlock Text="{Binding CopyLabel}"
                                                    IsVisible="{Binding !ShowCopiedFeedback}"/>
@@ -187,27 +213,44 @@
                 </Grid>
 
                 <!-- Bottom bar -->
-                <Grid Grid.Row="2" Margin="14,8,14,12" MinHeight="30"
+                <Grid Grid.Row="3" Margin="14,8,14,12" MinHeight="30"
                       ColumnDefinitions="Auto,*,Auto,Auto">
-                    <TextBlock Grid.Column="0" Classes="status"
-                               Text="{Binding StatusText}" VerticalAlignment="Center"/>
+                    <StackPanel Grid.Column="0" Spacing="1" VerticalAlignment="Center">
+                        <TextBlock Classes="modelStatus"
+                                   Text="{Binding ActiveModelLabel}"
+                                   ToolTip.Tip="{Binding ActiveModelTooltip}"/>
+                        <TextBlock Classes="status"
+                                   Text="{Binding StatusText}"/>
+                    </StackPanel>
 
                     <Panel Grid.Column="2" VerticalAlignment="Center" Margin="0,0,8,0">
                         <StackPanel Orientation="Horizontal" Spacing="4">
-                            <TextBlock Text="{Binding SelectedSourceLanguage.Code, FallbackValue='auto'}"
-                                       Foreground="{DynamicResource OvFgMutedBrush}" FontSize="11"
-                                       VerticalAlignment="Center"
-                                       ToolTip.Tip="Source language"/>
+                            <Border Name="SourceLangBadge"
+                                    Padding="6,2"
+                                    CornerRadius="4"
+                                    Background="Transparent"
+                                    VerticalAlignment="Center">
+                                <TextBlock Text="{Binding SelectedSourceLanguage.Code, FallbackValue='auto'}"
+                                           Foreground="{DynamicResource OvFgMutedBrush}" FontSize="12"
+                                           VerticalAlignment="Center"
+                                           ToolTip.Tip="Source language"/>
+                            </Border>
                             <TextBlock Text="→" Foreground="{DynamicResource OvFgTertiaryBrush}"
-                                       FontSize="11" VerticalAlignment="Center"/>
-                            <TextBlock Name="TargetLangLink"
-                                       Text="{Binding SelectedTargetLanguage.Code, FallbackValue='--'}"
-                                       Foreground="{StaticResource AccentBrush}" FontSize="11"
-                                       Cursor="Hand" VerticalAlignment="Center"
-                                       TextDecorations="Underline"
-                                       ToolTip.Tip="Target language"/>
+                                       FontSize="12" VerticalAlignment="Center"/>
+                            <Border Name="TargetLangLink"
+                                    Padding="6,2"
+                                    CornerRadius="4"
+                                    Background="Transparent"
+                                    Cursor="Hand"
+                                    VerticalAlignment="Center"
+                                    ToolTip.Tip="Target language">
+                                <TextBlock Text="{Binding SelectedTargetLanguage.Code, FallbackValue='--'}"
+                                           Foreground="{StaticResource AccentBrush}" FontSize="12"
+                                           TextDecorations="Underline"
+                                           VerticalAlignment="Center"/>
+                            </Border>
                             <Button Classes="iconBtn"
-                                    Content="⇄" FontSize="15"
+                                    Content="⇄" FontSize="17"
                                     Command="{Binding SwapLanguagesCommand}"
                                     ToolTip.Tip="Swap source ↔ target language"
                                     VerticalAlignment="Center"/>
@@ -263,18 +306,45 @@
             </Grid>
         </Border>
 
-        <!-- Resize grips (invisible edges + visible corner handle) -->
-        <Border Name="ResizeN" Height="4" VerticalAlignment="Top" Background="Transparent" Cursor="SizeNorthSouth"/>
-        <Border Name="ResizeS" Height="4" VerticalAlignment="Bottom" Background="Transparent" Cursor="SizeNorthSouth"/>
-        <Border Name="ResizeW" Width="4" HorizontalAlignment="Left" Background="Transparent" Cursor="SizeWestEast"/>
-        <Border Name="ResizeE" Width="4" HorizontalAlignment="Right" Background="Transparent" Cursor="SizeWestEast"/>
-        <Border Name="ResizeNW" Width="8" Height="8" VerticalAlignment="Top" HorizontalAlignment="Left" Background="Transparent" Cursor="TopLeftCorner"/>
-        <Border Name="ResizeNE" Width="8" Height="8" VerticalAlignment="Top" HorizontalAlignment="Right" Background="Transparent" Cursor="TopRightCorner"/>
-        <Border Name="ResizeSW" Width="8" Height="8" VerticalAlignment="Bottom" HorizontalAlignment="Left" Background="Transparent" Cursor="BottomLeftCorner"/>
-        <Panel Name="ResizeSE" Width="16" Height="16" VerticalAlignment="Bottom" HorizontalAlignment="Right" Cursor="BottomRightCorner">
-            <TextBlock Text="⌟" FontSize="14" Foreground="{DynamicResource OvFgMutedBrush}"
-                       HorizontalAlignment="Center" VerticalAlignment="Center"
-                       IsHitTestVisible="False"/>
-        </Panel>
+        <Border Name="ResizeSE"
+                Width="24"
+                Height="24"
+                Margin="0,0,2,2"
+                Background="Transparent"
+                CornerRadius="0,0,10,0"
+                Opacity="0.72"
+                VerticalAlignment="Bottom"
+                HorizontalAlignment="Right"
+                Cursor="BottomRightCorner">
+            <Border.Transitions>
+                <Transitions>
+                    <DoubleTransition Property="Opacity" Duration="0:0:0.12"/>
+                </Transitions>
+            </Border.Transitions>
+            <Grid Width="12"
+                  Height="12"
+                  Margin="0,0,3,3"
+                  HorizontalAlignment="Right"
+                  VerticalAlignment="Bottom"
+                  IsHitTestVisible="False">
+                <Border Width="4"
+                        Height="1"
+                        Margin="0,0,0,8"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Bottom"
+                        Background="{DynamicResource OvFgMutedBrush}"/>
+                <Border Width="8"
+                        Height="1"
+                        Margin="0,0,0,4"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Bottom"
+                        Background="{DynamicResource OvFgMutedBrush}"/>
+                <Border Width="12"
+                        Height="1"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Bottom"
+                        Background="{DynamicResource OvFgMutedBrush}"/>
+            </Grid>
+        </Border>
     </Panel>
 </Window>

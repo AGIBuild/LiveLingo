@@ -1,6 +1,9 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using CommunityToolkit.Mvvm.Messaging;
+using LiveLingo.Desktop.Messaging;
 using LiveLingo.Desktop.Services.Configuration;
+using LiveLingo.Core.Engines;
 using LiveLingo.Core.Models;
 
 namespace LiveLingo.Desktop.ViewModels;
@@ -9,6 +12,7 @@ public partial class SetupWizardViewModel : ObservableObject
 {
     private readonly ISettingsService _settings;
     private readonly IModelManager? _modelManager;
+    private readonly IMessenger _messenger;
     private CancellationTokenSource? _downloadCts;
 
     [ObservableProperty] private int _currentStep;
@@ -19,6 +23,8 @@ public partial class SetupWizardViewModel : ObservableObject
     [ObservableProperty] private double _downloadProgress;
     [ObservableProperty] private string? _downloadStatus;
     [ObservableProperty] private bool _isModelInstalled;
+    [ObservableProperty] private LanguageInfo? _selectedSourceLanguage;
+    [ObservableProperty] private LanguageInfo? _selectedTargetLanguage;
 
     public int TotalSteps { get; }
     public int StartStep { get; }
@@ -29,22 +35,55 @@ public partial class SetupWizardViewModel : ObservableObject
     public bool IsStep0 => CurrentStep == 0;
     public bool IsStep1 => CurrentStep == 1;
     public bool IsStep2 => CurrentStep == 2;
+    public IReadOnlyList<LanguageInfo> AvailableLanguages { get; }
 
-    public event Action? RequestClose;
-
-    public SetupWizardViewModel(ISettingsService settings, IModelManager? modelManager = null, int startStep = 0)
+    public SetupWizardViewModel(
+        ISettingsService settings,
+        IModelManager? modelManager = null,
+        int startStep = 0,
+        IMessenger? messenger = null)
     {
         _settings = settings;
         _modelManager = modelManager;
+        _messenger = messenger ?? WeakReferenceMessenger.Default;
         TotalSteps = 3;
         StartStep = startStep;
         _currentStep = startStep;
+        AvailableLanguages =
+        [
+            new("zh", "Chinese (中文)"),
+            new("en", "English"),
+            new("ja", "Japanese (日本語)"),
+            new("ko", "Korean (한국어)"),
+            new("fr", "French"),
+            new("de", "German"),
+            new("es", "Spanish"),
+            new("ru", "Russian"),
+            new("ar", "Arabic"),
+            new("pt", "Portuguese"),
+        ];
+        SelectedSourceLanguage = AvailableLanguages.FirstOrDefault(l =>
+            string.Equals(l.Code, SourceLanguage, StringComparison.OrdinalIgnoreCase)) ?? AvailableLanguages[0];
+        SelectedTargetLanguage = AvailableLanguages.FirstOrDefault(l =>
+            string.Equals(l.Code, TargetLanguage, StringComparison.OrdinalIgnoreCase)) ?? AvailableLanguages[1];
 
-        if (_modelManager is not null)
-        {
-            var installed = _modelManager.ListInstalled();
-            _isModelInstalled = installed.Any(m => m.Id == ModelRegistry.Qwen25_15B.Id);
-        }
+        RefreshModelInstalledState();
+    }
+
+    partial void OnSourceLanguageChanged(string value) => RefreshModelInstalledState();
+    partial void OnTargetLanguageChanged(string value) => RefreshModelInstalledState();
+    partial void OnSelectedSourceLanguageChanged(LanguageInfo? value)
+    {
+        if (value is null) return;
+        if (!string.Equals(SourceLanguage, value.Code, StringComparison.OrdinalIgnoreCase))
+            SourceLanguage = value.Code;
+    }
+
+    partial void OnSelectedTargetLanguageChanged(LanguageInfo? value)
+    {
+        if (value is null) return;
+        if (!string.Equals(TargetLanguage, value.Code, StringComparison.OrdinalIgnoreCase))
+            TargetLanguage = value.Code;
     }
 
     partial void OnCurrentStepChanged(int value)
@@ -80,15 +119,22 @@ public partial class SetupWizardViewModel : ObservableObject
         DownloadStatus = "Downloading…";
         _downloadCts = new CancellationTokenSource();
 
-        var progress = new Progress<ModelDownloadProgress>(p =>
-        {
-            DownloadProgress = p.Percentage;
-            DownloadStatus = $"Downloading… {p.Percentage:F0}%";
-        });
-
         try
         {
-            await _modelManager.EnsureModelAsync(ModelRegistry.Qwen25_15B, progress, _downloadCts.Token);
+            var requiredModels = GetRequiredModelsForCurrentPair();
+            for (var index = 0; index < requiredModels.Count; index++)
+            {
+                var descriptor = requiredModels[index];
+                var modelIndex = index;
+                var progress = new Progress<ModelDownloadProgress>(p =>
+                {
+                    var overall = ((modelIndex + (p.Percentage / 100.0)) / requiredModels.Count) * 100.0;
+                    DownloadProgress = overall;
+                    DownloadStatus = $"Downloading {descriptor.DisplayName}… {overall:F0}%";
+                });
+                await _modelManager.EnsureModelAsync(descriptor, progress, _downloadCts.Token);
+            }
+
             IsModelInstalled = true;
             DownloadStatus = "Download complete ✓";
         }
@@ -117,17 +163,35 @@ public partial class SetupWizardViewModel : ObservableObject
     [RelayCommand]
     private void Finish()
     {
-        _settings.Update(s => s with
-        {
-            Hotkeys = s.Hotkeys with { OverlayToggle = OverlayHotkey },
-            Translation = s.Translation with
-            {
-                DefaultSourceLanguage = SourceLanguage,
-                DefaultTargetLanguage = TargetLanguage,
-                LanguagePairs = [new LanguagePair(SourceLanguage, TargetLanguage)]
-            }
-        });
+        var workingCopy = _settings.CloneCurrent();
+        workingCopy.Hotkeys.OverlayToggle = OverlayHotkey;
+        workingCopy.Translation.DefaultSourceLanguage = SourceLanguage;
+        workingCopy.Translation.DefaultTargetLanguage = TargetLanguage;
+        workingCopy.Translation.ActiveTranslationModelId =
+            ModelRegistry.FindTranslationModel(SourceLanguage, TargetLanguage)?.Id;
+        workingCopy.Translation.LanguagePairs = [new LanguagePair(SourceLanguage, TargetLanguage)];
 
-        RequestClose?.Invoke();
+        _settings.Replace(workingCopy);
+        _messenger.Send(new SettingsChangedMessage());
+        _messenger.Send(new AppUiRequestMessage(new AppUiRequest(this, AppUiRequestKind.CloseSetupWizard)));
+    }
+
+    private IReadOnlyList<ModelDescriptor> GetRequiredModelsForCurrentPair() =>
+        ModelRegistry.GetRequiredModelsForLanguagePair(SourceLanguage, TargetLanguage);
+
+    private void RefreshModelInstalledState()
+    {
+        if (_modelManager is null)
+        {
+            IsModelInstalled = false;
+            return;
+        }
+
+        var installedIds = _modelManager.ListInstalled()
+            .Select(m => m.Id)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        IsModelInstalled = GetRequiredModelsForCurrentPair()
+            .All(model => installedIds.Contains(model.Id));
     }
 }
