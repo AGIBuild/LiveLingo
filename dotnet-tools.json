@@ -15,6 +15,13 @@
         "dotnet-stryker"
       ],
       "rollForward": false
+    },
+    "wix": {
+      "version": "6.0.2",
+      "commands": [
+        "wix"
+      ],
+      "rollForward": false
     }
   }
 }

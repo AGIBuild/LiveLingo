@@ -22,9 +22,6 @@ class Program
 
         VelopackApp.Build().Run();
 
-        if (OperatingSystem.IsMacOS())
-            SetMacAgentMode();
-
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
     }
 
@@ -33,15 +30,4 @@ class Program
             .UsePlatformDetect()
             .WithInterFont()
             .LogToTrace();
-
-    [System.Runtime.Versioning.SupportedOSPlatform("macos")]
-    private static void SetMacAgentMode()
-    {
-        var nsApp = Platform.macOS.MacNativeMethods.objc_getClass("NSApplication");
-        var shared = Platform.macOS.MacNativeMethods.objc_msgSend(
-            nsApp, Platform.macOS.MacNativeMethods.sel_registerName("sharedApplication"));
-        // NSApplicationActivationPolicyAccessory = 1 → hides Dock icon, menu-bar only
-        Platform.macOS.MacNativeMethods.objc_msgSend(
-            shared, Platform.macOS.MacNativeMethods.sel_registerName("setActivationPolicy:"), (IntPtr)1);
-    }
 }

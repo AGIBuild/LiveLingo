@@ -1,0 +1,39 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+
+  <?define ProductName = "LiveLingo" ?>
+  <?define Manufacturer = "LiveLingo" ?>
+  <?define UpgradeCode = "6A3F8E2B-1C4D-4F5A-9B7E-D8E2F1A3C5B9" ?>
+
+  <Package Id="$(ProductName).Desktop"
+           Name="$(ProductName)"
+           Manufacturer="$(Manufacturer)"
+           Version="$(Version)"
+           UpgradeCode="$(UpgradeCode)"
+           Scope="perMachine">
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of $(ProductName) is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <StandardDirectory Id="ProgramFiles6432Folder">
+      <Directory Id="INSTALLFOLDER" Name="$(ProductName)">
+        <Files Include="$(PublishDir)\**" />
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Shortcut Id="StartMenuShortcut"
+                Name="$(ProductName)"
+                Target="[INSTALLFOLDER]LiveLingo.Desktop.exe"
+                WorkingDirectory="INSTALLFOLDER" />
+    </StandardDirectory>
+
+    <StandardDirectory Id="DesktopFolder">
+      <Shortcut Id="DesktopShortcut"
+                Name="$(ProductName)"
+                Target="[INSTALLFOLDER]LiveLingo.Desktop.exe"
+                WorkingDirectory="INSTALLFOLDER" />
+    </StandardDirectory>
+
+  </Package>
+
+</Wix>

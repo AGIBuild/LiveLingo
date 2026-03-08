@@ -45,6 +45,9 @@ public partial class App : Application
 
     public override async void OnFrameworkInitializationCompleted()
     {
+        if (OperatingSystem.IsMacOS())
+            SetMacActivationPolicyAccessory();
+
         var settingsService = new JsonSettingsService();
         await settingsService.LoadAsync();
         var userSettings = settingsService.Current;
@@ -837,5 +840,15 @@ public partial class App : Application
         return Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "LiveLingo");
+    }
+
+    [System.Runtime.Versioning.SupportedOSPlatform("macos")]
+    private static void SetMacActivationPolicyAccessory()
+    {
+        var nsApp = MacNativeMethods.objc_getClass("NSApplication");
+        var shared = MacNativeMethods.objc_msgSend(
+            nsApp, MacNativeMethods.sel_registerName("sharedApplication"));
+        MacNativeMethods.objc_msgSend(
+            shared, MacNativeMethods.sel_registerName("setActivationPolicy:"), (IntPtr)1);
     }
 }
