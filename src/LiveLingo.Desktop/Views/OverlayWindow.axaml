@@ -8,14 +8,23 @@
         CanResize="False"
         ShowInTaskbar="False"
         Background="Transparent"
-        TransparencyLevelHint="AcrylicBlur"
+        TransparencyLevelHint="Transparent"
         Width="600" SizeToContent="Height" MaxHeight="500"
         WindowStartupLocation="Manual">
 
+    <Window.Resources>
+        <SolidColorBrush x:Key="OvFrameBrush" Color="#D91C1C1E"/>
+        <SolidColorBrush x:Key="OvPanelBrush" Color="#1C1C1E"/>
+        <SolidColorBrush x:Key="OvFgPrimaryBrush" Color="#E5E5E7"/>
+        <SolidColorBrush x:Key="OvFgSecondaryBrush" Color="#C7C7CC"/>
+        <SolidColorBrush x:Key="OvFgTertiaryBrush" Color="#AEAEB2"/>
+        <SolidColorBrush x:Key="OvFgMutedBrush" Color="#A1A1A6"/>
+    </Window.Resources>
+
     <Window.Styles>
         <Style Selector="TextBox.source">
-            <Setter Property="Background" Value="{StaticResource BgDeepBrush}"/>
-            <Setter Property="Foreground" Value="{StaticResource FgPrimaryBrush}"/>
+            <Setter Property="Background" Value="{DynamicResource OvPanelBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource OvFgPrimaryBrush}"/>
             <Setter Property="CaretBrush" Value="{StaticResource AccentBrush}"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="FontSize" Value="15"/>
@@ -25,38 +34,35 @@
             <Setter Property="TextWrapping" Value="Wrap"/>
             <Setter Property="Watermark" Value=""/>
         </Style>
+        <Style Selector="TextBox.source:pointerover /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="{DynamicResource OvPanelBrush}"/>
+        </Style>
+        <Style Selector="TextBox.source:focus /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="{DynamicResource OvPanelBrush}"/>
+        </Style>
         <Style Selector="SelectableTextBlock.translation">
-            <Setter Property="Foreground" Value="{StaticResource FgSecondaryBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource OvFgSecondaryBrush}"/>
             <Setter Property="FontSize" Value="14"/>
             <Setter Property="TextWrapping" Value="Wrap"/>
             <Setter Property="Padding" Value="12,6"/>
         </Style>
         <Style Selector="TextBlock.status">
-            <Setter Property="Foreground" Value="{StaticResource FgTertiaryBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource OvFgTertiaryBrush}"/>
             <Setter Property="FontSize" Value="11"/>
         </Style>
-        <Style Selector="Button.modeToggle">
-            <Setter Property="Background" Value="{StaticResource BgElevatedBrush}"/>
-            <Setter Property="Foreground" Value="{StaticResource FgSecondaryBrush}"/>
-            <Setter Property="FontSize" Value="11"/>
-            <Setter Property="Padding" Value="8,3"/>
-            <Setter Property="CornerRadius" Value="4"/>
+        <Style Selector="Button.sendBtn">
+            <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
+            <Setter Property="Foreground" Value="#FFFFFF"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Padding" Value="12,4"/>
+            <Setter Property="CornerRadius" Value="6"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="MinWidth" Value="0"/>
             <Setter Property="MinHeight" Value="0"/>
         </Style>
-        <Style Selector="Border.kbd">
-            <Setter Property="Background" Value="{StaticResource BgElevatedBrush}"/>
-            <Setter Property="CornerRadius" Value="3"/>
-            <Setter Property="Padding" Value="4,1"/>
-            <Setter Property="BorderBrush" Value="{StaticResource BorderSubtleBrush}"/>
-            <Setter Property="BorderThickness" Value="1"/>
-        </Style>
-        <Style Selector="Border.kbd TextBlock">
-            <Setter Property="Foreground" Value="{StaticResource FgMutedBrush}"/>
-            <Setter Property="FontSize" Value="10"/>
-            <Setter Property="FontFamily" Value="Consolas, Menlo, monospace"/>
+        <Style Selector="Button.sendBtn:disabled">
+            <Setter Property="Opacity" Value="0.4"/>
         </Style>
         <Style Selector="Button.iconBtn">
             <Setter Property="Background" Value="Transparent"/>
@@ -65,8 +71,8 @@
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="MinWidth" Value="0"/>
             <Setter Property="MinHeight" Value="0"/>
-            <Setter Property="Foreground" Value="{StaticResource FgMutedBrush}"/>
-            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Foreground" Value="{DynamicResource OvFgSecondaryBrush}"/>
+            <Setter Property="FontSize" Value="15"/>
         </Style>
         <Style Selector="Popup Button:pointerover /template/ ContentPresenter">
             <Setter Property="Background" Value="{StaticResource BgElevatedBrush}"/>
@@ -80,8 +86,8 @@
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="MinWidth" Value="0"/>
             <Setter Property="MinHeight" Value="0"/>
-            <Setter Property="Foreground" Value="{StaticResource FgMutedBrush}"/>
-            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Foreground" Value="{DynamicResource OvFgSecondaryBrush}"/>
+            <Setter Property="FontSize" Value="12"/>
         </Style>
     </Window.Styles>
 
@@ -92,18 +98,9 @@
             </Transitions>
         </Panel.Transitions>
 
-        <ExperimentalAcrylicBorder Name="AcrylicBg" CornerRadius="12" IsHitTestVisible="False">
-            <ExperimentalAcrylicBorder.Material>
-                <ExperimentalAcrylicMaterial
-                    BackgroundSource="Digger"
-                    TintColor="{StaticResource BgDeep}"
-                    TintOpacity="0.92"
-                    MaterialOpacity="0.92"/>
-            </ExperimentalAcrylicBorder.Material>
-        </ExperimentalAcrylicBorder>
-
+        <Border Name="AcrylicBg" CornerRadius="12" IsHitTestVisible="False" Background="{DynamicResource OvFrameBrush}"/>
         <Border CornerRadius="12" IsHitTestVisible="False"
-                BorderBrush="#10FFFFFF" BorderThickness="1"/>
+                BorderBrush="#15FFFFFF" BorderThickness="1"/>
 
         <Border CornerRadius="12" Padding="0">
             <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
@@ -114,16 +111,16 @@
                         Height="28" CornerRadius="12,12,0,0">
                     <Grid ColumnDefinitions="*,Auto,Auto,Auto">
                         <TextBlock Grid.Column="1" Text="LiveLingo"
-                                   FontSize="11" Foreground="{StaticResource FgMutedBrush}"
+                                   FontSize="11" Foreground="{DynamicResource OvFgTertiaryBrush}"
                                    Margin="0,0,4,0" VerticalAlignment="Center"/>
                         <Button Grid.Column="2" Classes="iconBtn"
-                                Content="⚙" FontSize="13"
+                                Content="⚙" FontSize="15"
                                 Command="{Binding OpenSettingsCommand}"
                                 ToolTip.Tip="Settings"
                                 Margin="0,0,2,0" VerticalAlignment="Center"/>
                         <Button Grid.Column="3" Content="✕"
                                 Click="CloseButton_Click"
-                                FontSize="12" Foreground="{StaticResource FgSecondaryBrush}"
+                                FontSize="14" Foreground="{DynamicResource OvFgSecondaryBrush}"
                                 Background="Transparent" BorderThickness="0"
                                 Padding="6,2" Margin="0,0,8,0"
                                 VerticalAlignment="Center" Cursor="Hand"
@@ -139,7 +136,7 @@
                              Name="SourceInput"
                              MinHeight="60" MaxHeight="120"/>
                     <TextBlock Text="{Binding SourceTextLength}"
-                               FontSize="10" Foreground="#48FFFFFF"
+                               FontSize="10" Foreground="{DynamicResource OvFgMutedBrush}"
                                HorizontalAlignment="Right"
                                VerticalAlignment="Bottom"
                                Margin="0,0,10,6"
@@ -154,8 +151,8 @@
                              Background="{StaticResource BgSurfaceBrush}"/>
 
                 <!-- Translation result -->
-                <Border Grid.Row="3" Margin="14,8,14,0"
-                        CornerRadius="8" Background="{StaticResource BgSurfaceBrush}"
+                <Border Grid.Row="3" Margin="14,8,14,0" Name="TranslationBorder"
+                        CornerRadius="8" Background="{DynamicResource OvPanelBrush}"
                         MinHeight="40"
                         IsVisible="{Binding TranslatedText,
                                     Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
@@ -183,39 +180,29 @@
 
                 <!-- Bottom bar -->
                 <Grid Grid.Row="4" Margin="14,8,14,12"
-                      ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto">
+                      ColumnDefinitions="Auto,*,Auto,Auto">
                     <TextBlock Grid.Column="0" Classes="status"
                                Text="{Binding StatusText}" VerticalAlignment="Center"/>
 
-                    <StackPanel Grid.Column="1" Orientation="Horizontal"
-                                Spacing="6" HorizontalAlignment="Right"
-                                VerticalAlignment="Center" Margin="8,0">
-                        <Border Classes="kbd"><TextBlock Text="Ctrl+Enter"/></Border>
-                        <Border Classes="kbd"><TextBlock Text="Esc"/></Border>
-                    </StackPanel>
-
-                    <Button Grid.Column="2" Classes="iconBtn"
-                            Content="⇄" FontSize="16"
-                            Command="{Binding SwapLanguagesCommand}"
-                            ToolTip.Tip="Swap source ↔ target language"
-                            Margin="0,0,4,0"/>
-
-                    <Button Grid.Column="3" Classes="modeToggle"
-                            Content="{Binding ModeLabel}"
-                            Command="{Binding ToggleModeCommand}"
-                            ToolTip.Tip="Toggle: Paste Only / Paste &amp; Send"
-                            Margin="0,0,4,0"/>
-
-                    <Panel Grid.Column="4" VerticalAlignment="Center">
-                        <StackPanel Orientation="Horizontal" Spacing="2">
-                            <TextBlock Text="→" Foreground="{StaticResource FgMutedBrush}"
-                                       FontSize="12" VerticalAlignment="Center"/>
+                    <Panel Grid.Column="2" VerticalAlignment="Center" Margin="0,0,8,0">
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                            <TextBlock Text="{Binding SelectedSourceLanguage.Code, FallbackValue='auto'}"
+                                       Foreground="{DynamicResource OvFgMutedBrush}" FontSize="11"
+                                       VerticalAlignment="Center"
+                                       ToolTip.Tip="Source language"/>
+                            <TextBlock Text="→" Foreground="{DynamicResource OvFgTertiaryBrush}"
+                                       FontSize="11" VerticalAlignment="Center"/>
                             <TextBlock Name="TargetLangLink"
                                        Text="{Binding SelectedTargetLanguage.Code, FallbackValue='--'}"
-                                       Foreground="{StaticResource AccentBrush}" FontSize="12"
+                                       Foreground="{StaticResource AccentBrush}" FontSize="11"
                                        Cursor="Hand" VerticalAlignment="Center"
                                        TextDecorations="Underline"
                                        ToolTip.Tip="Target language"/>
+                            <Button Classes="iconBtn"
+                                    Content="⇄" FontSize="15"
+                                    Command="{Binding SwapLanguagesCommand}"
+                                    ToolTip.Tip="Swap source ↔ target language"
+                                    VerticalAlignment="Center"/>
                         </StackPanel>
 
                         <Popup Name="LangPopup"
@@ -257,11 +244,13 @@
                         </Popup>
                     </Panel>
 
-                    <TextBlock Grid.Column="5"
-                               Text="{Binding SelectedSourceLanguage.Code, FallbackValue='auto'}"
-                               Foreground="#636366" FontSize="10"
-                               VerticalAlignment="Center" Margin="6,0,0,0"
-                               ToolTip.Tip="Source language (auto-detected or configured)"/>
+                    <Button Grid.Column="3" Classes="sendBtn"
+                            Name="SendButton"
+                            Content="Send ▶"
+                            Click="SendButton_Click"
+                            IsEnabled="{Binding TranslatedText,
+                                        Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                            ToolTip.Tip="Send translation (Ctrl+Enter)"/>
                 </Grid>
             </Grid>
         </Border>

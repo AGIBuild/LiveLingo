@@ -220,14 +220,16 @@ public partial class App : Application
         var vm = new SettingsViewModel(settingsService, modelManager, engine);
         PropertyChangedEventHandler? handler = (_, e) =>
         {
-            if (e.PropertyName == nameof(SettingsViewModel.OverlayOpacity) &&
-                _activeOverlay is { IsVisible: true })
+            if (e.PropertyName == nameof(SettingsViewModel.OverlayOpacity))
             {
-                _activeOverlay.SetBackgroundOpacity(vm.OverlayOpacity);
+                if (_activeOverlay is { IsVisible: true })
+                    _activeOverlay.SetBackgroundOpacity(vm.OverlayOpacity);
+                _settingsWindow?.SetBackgroundOpacity(vm.OverlayOpacity);
             }
         };
         vm.PropertyChanged += handler;
         _settingsWindow = new SettingsWindow(vm, loc);
+        _settingsWindow.SetBackgroundOpacity(vm.OverlayOpacity);
         _settingsWindow.Closed += (_, _) =>
         {
             vm.PropertyChanged -= handler;

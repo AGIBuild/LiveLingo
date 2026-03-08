@@ -11,18 +11,9 @@
         WindowStartupLocation="Manual">
 
     <Panel>
-        <ExperimentalAcrylicBorder CornerRadius="10" IsHitTestVisible="False">
-            <ExperimentalAcrylicBorder.Material>
-                <ExperimentalAcrylicMaterial
-                    BackgroundSource="Digger"
-                    TintColor="{StaticResource BgDeep}"
-                    TintOpacity="0.94"
-                    MaterialOpacity="0.94"/>
-            </ExperimentalAcrylicBorder.Material>
-        </ExperimentalAcrylicBorder>
-
+        <Border CornerRadius="10" IsHitTestVisible="False" Background="#D91C1C1E"/>
         <Border CornerRadius="10" IsHitTestVisible="False"
-                BorderBrush="#18FFFFFF" BorderThickness="1"/>
+                BorderBrush="#15FFFFFF" BorderThickness="1"/>
 
         <Grid Margin="16,12" ColumnDefinitions="Auto,*,Auto">
             <TextBlock Grid.Column="0" Text="⚠" FontSize="22"

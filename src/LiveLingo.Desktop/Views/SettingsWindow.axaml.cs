@@ -1,4 +1,3 @@
-using System.ComponentModel;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Media;
@@ -10,8 +9,6 @@ namespace LiveLingo.Desktop.Views;
 
 public partial class SettingsWindow : Window
 {
-    private PropertyChangedEventHandler? _propertyChangedHandler;
-
     public SettingsWindow() => InitializeComponent();
 
     public SettingsWindow(SettingsViewModel vm, ILocalizationService? loc = null)
@@ -21,18 +18,9 @@ public partial class SettingsWindow : Window
         if (loc is not null) ApplyLocalization(loc);
         vm.RequestClose += () => Close();
         vm.RequestShowPermissionCheck += ShowPermissionDialog;
-        _propertyChangedHandler = (_, e) =>
-        {
-            if (e.PropertyName == nameof(SettingsViewModel.OverlayOpacity))
-                SetBackgroundOpacity(vm.OverlayOpacity);
-        };
-        vm.PropertyChanged += _propertyChangedHandler;
-        SetBackgroundOpacity(vm.OverlayOpacity);
         Closed += (_, _) =>
         {
             vm.RequestShowPermissionCheck -= ShowPermissionDialog;
-            if (_propertyChangedHandler is not null)
-                vm.PropertyChanged -= _propertyChangedHandler;
         };
     }
 
@@ -236,18 +224,14 @@ public partial class SettingsWindow : Window
         if (this.FindControl<TabItem>(name) is { } tab) tab.Header = text;
     }
 
-    private void SetBackgroundOpacity(double opacity)
+    public void SetBackgroundOpacity(double opacity)
     {
-        var border = this.FindControl<ExperimentalAcrylicBorder>("AcrylicBg");
+        var border = this.FindControl<Border>("BgBorder");
         if (border is null) return;
 
-        border.Material = new ExperimentalAcrylicMaterial
-        {
-            BackgroundSource = AcrylicBackgroundSource.Digger,
-            TintColor = Color.Parse("#0D0D0F"),
-            TintOpacity = opacity,
-            MaterialOpacity = opacity
-        };
+        var baseColor = Color.Parse("#1C1C1E");
+        var alpha = (byte)(opacity * 255);
+        border.Background = new SolidColorBrush(Color.FromArgb(alpha, baseColor.R, baseColor.G, baseColor.B));
     }
 
     public async void BrowseModelPath_Click(object? sender, RoutedEventArgs e)
