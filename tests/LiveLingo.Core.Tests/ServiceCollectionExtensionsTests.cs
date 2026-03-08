@@ -63,6 +63,17 @@ public class ServiceCollectionExtensionsTests
     }
 
     [Fact]
+    public void AddLiveLingoCore_UsesMarianAsTranslationEngine()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddLiveLingoCore();
+        var sp = services.BuildServiceProvider();
+
+        Assert.IsType<MarianOnnxEngine>(sp.GetService<ITranslationEngine>());
+    }
+
+    [Fact]
     public void AddLiveLingoCore_PipelineIsSingleton()
     {
         var services = new ServiceCollection();

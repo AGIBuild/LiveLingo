@@ -2,10 +2,11 @@ namespace LiveLingo.Desktop.Services.Configuration;
 
 public interface ISettingsService
 {
-    UserSettings Current { get; }
+    SettingsModel Current { get; }
+    SettingsModel CloneCurrent();
+    void Replace(SettingsModel model);
     bool SettingsFileExists();
     Task LoadAsync(CancellationToken ct = default);
     Task SaveAsync(CancellationToken ct = default);
-    void Update(Func<UserSettings, UserSettings> mutator);
-    event Action<UserSettings>? SettingsChanged;
+    event Action? SettingsChanged;
 }

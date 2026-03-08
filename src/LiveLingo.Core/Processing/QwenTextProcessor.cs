@@ -29,16 +29,7 @@ public abstract class QwenTextProcessor : ITextProcessor
             var modelParams = new ModelParams(_host.ModelPath) { ContextSize = 2048 };
             var executor = new StatelessExecutor(weights, modelParams);
 
-            var inferenceParams = new InferenceParams
-            {
-                MaxTokens = 512,
-                AntiPrompts = ["</s>", "\n\n", "<|im_end|>"],
-                SamplingPipeline = new DefaultSamplingPipeline
-                {
-                    Temperature = 0.3f,
-                    TopP = 0.9f,
-                }
-            };
+            var inferenceParams = CreateInferenceParams();
 
             var prompt = $"<|im_start|>system\n{SystemPrompt}<|im_end|>\n<|im_start|>user\n{text}<|im_end|>\n<|im_start|>assistant\n";
 
@@ -66,6 +57,22 @@ public abstract class QwenTextProcessor : ITextProcessor
             _logger.LogError(ex, "{Processor} failed, falling back to original text", Name);
             return text;
         }
+    }
+
+    protected virtual InferenceParams CreateInferenceParams()
+    {
+        return new InferenceParams
+        {
+            MaxTokens = 512,
+            // Keep stop tokens model-specific; do not stop on blank lines,
+            // otherwise multi-paragraph content is truncated.
+            AntiPrompts = ["</s>", "<|im_end|>"],
+            SamplingPipeline = new DefaultSamplingPipeline
+            {
+                Temperature = 0.3f,
+                TopP = 0.9f,
+            }
+        };
     }
 
     public void Dispose() { }

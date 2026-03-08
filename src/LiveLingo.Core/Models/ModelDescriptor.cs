@@ -5,7 +5,15 @@ public record ModelDescriptor(
     string DisplayName,
     string DownloadUrl,
     long SizeBytes,
-    ModelType Type);
+    ModelType Type)
+{
+    public IReadOnlyList<ModelAsset> Assets { get; init; } = [];
+}
+
+public record ModelAsset(
+    string RelativePath,
+    string DownloadUrl,
+    long SizeBytes);
 
 public enum ModelType
 {

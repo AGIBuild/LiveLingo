@@ -25,12 +25,14 @@ internal sealed class MacTextInjector : ITextInjector
         await _clipboard.SetTextAsync(text, ct);
         await Task.Delay(80, ct);
 
+        ct.ThrowIfCancellationRequested();
         PostKeystroke(kVK_V, kCGEventFlagMaskCommand);
         Log.Debug("Posted Cmd+V");
 
         if (autoSend)
         {
             await Task.Delay(300, ct);
+            ct.ThrowIfCancellationRequested();
             PostKeystroke(kVK_Return, flags: 0);
             Log.Debug("Posted Return (send)");
         }

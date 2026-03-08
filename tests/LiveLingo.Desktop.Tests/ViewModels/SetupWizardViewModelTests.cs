@@ -1,19 +1,28 @@
 using LiveLingo.Desktop.Services.Configuration;
+using LiveLingo.Desktop.Messaging;
 using LiveLingo.Desktop.ViewModels;
+using CommunityToolkit.Mvvm.Messaging;
 using LiveLingo.Core.Models;
 using NSubstitute;
+using UserSettings = LiveLingo.Desktop.Services.Configuration.SettingsModel;
 
 namespace LiveLingo.Desktop.Tests.ViewModels;
 
 public class SetupWizardViewModelTests
 {
-    private static (SetupWizardViewModel vm, ISettingsService settings, IModelManager models) Create(int startStep = 0)
+    private static (SetupWizardViewModel vm, ISettingsService settings, IModelManager models) Create(
+        int startStep = 0,
+        IMessenger? messenger = null)
     {
+        var current = new UserSettings();
         var settings = Substitute.For<ISettingsService>();
-        settings.Current.Returns(new UserSettings());
+        settings.Current.Returns(_ => current);
+        settings.CloneCurrent().Returns(_ => current.DeepClone());
+        settings.When(x => x.Replace(Arg.Any<UserSettings>()))
+            .Do(ci => current = ci.Arg<UserSettings>().DeepClone());
         var models = Substitute.For<IModelManager>();
         models.ListInstalled().Returns([]);
-        var vm = new SetupWizardViewModel(settings, models, startStep);
+        var vm = new SetupWizardViewModel(settings, models, startStep, messenger);
         return (vm, settings, models);
     }
 
@@ -127,19 +136,22 @@ public class SetupWizardViewModelTests
 
         vm.FinishCommand.Execute(null);
 
-        settings.Received(1).Update(Arg.Any<Func<UserSettings, UserSettings>>());
+        settings.Received(1).Replace(Arg.Any<UserSettings>());
     }
 
     [Fact]
-    public void FinishCommand_RaisesRequestClose()
+    public void FinishCommand_SendsCloseMessage()
     {
-        var (vm, _, _) = Create();
-        bool closed = false;
-        vm.RequestClose += () => closed = true;
+        var messenger = new WeakReferenceMessenger();
+        var recipient = new object();
+        AppUiRequestKind? receivedKind = null;
+        messenger.Register<object, AppUiRequestMessage>(recipient, (_, message) =>
+            receivedKind = message.Value.Kind);
+        var (vm, _, _) = Create(messenger: messenger);
 
         vm.FinishCommand.Execute(null);
 
-        Assert.True(closed);
+        Assert.Equal(AppUiRequestKind.CloseSetupWizard, receivedKind);
     }
 
     [Fact]
@@ -181,18 +193,10 @@ public class SetupWizardViewModelTests
         vm.TargetLanguage = "zh";
         vm.OverlayHotkey = "Alt+Space";
 
-        UserSettings? saved = null;
-        settings.When(s => s.Update(Arg.Any<Func<UserSettings, UserSettings>>()))
-            .Do(c =>
-            {
-                var mutator = c.ArgAt<Func<UserSettings, UserSettings>>(0);
-                saved = mutator(new UserSettings());
-            });
-
         vm.FinishCommand.Execute(null);
+        var saved = settings.Current;
 
-        Assert.NotNull(saved);
-        Assert.Equal("Alt+Space", saved!.Hotkeys.OverlayToggle);
+        Assert.Equal("Alt+Space", saved.Hotkeys.OverlayToggle);
         Assert.Equal("ja", saved.Translation.DefaultSourceLanguage);
         Assert.Equal("zh", saved.Translation.DefaultTargetLanguage);
         Assert.Contains(saved.Translation.LanguagePairs, p => p.Source == "ja" && p.Target == "zh");
@@ -232,10 +236,15 @@ public class SetupWizardViewModelTests
     public async Task DownloadModelAsync_SkipsWhenAlreadyInstalled()
     {
         var (vm, _, models) = Create();
-        var installed = new InstalledModel(ModelRegistry.Qwen25_15B.Id, "Qwen", "/path", 100, ModelType.PostProcessing, DateTime.UtcNow);
-        models.ListInstalled().Returns([installed]);
+        var installed = ModelRegistry.GetRequiredModelsForLanguagePair("zh", "en")
+            .Select(m => new InstalledModel(m.Id, m.DisplayName, "/path", m.SizeBytes, m.Type, DateTime.UtcNow))
+            .ToArray();
+        models.ListInstalled().Returns(installed);
 
-        var vm2 = new SetupWizardViewModel(Substitute.For<ISettingsService>(), models);
+        var stubSettings = Substitute.For<ISettingsService>();
+        stubSettings.Current.Returns(new UserSettings());
+        stubSettings.CloneCurrent().Returns(new UserSettings());
+        var vm2 = new SetupWizardViewModel(stubSettings, models);
         Assert.True(vm2.IsModelInstalled);
 
         await vm2.DownloadModelCommand.ExecuteAsync(null);

@@ -1,8 +1,11 @@
 using LiveLingo.Desktop.Services.Configuration;
+using LiveLingo.Desktop.Messaging;
 using LiveLingo.Desktop.ViewModels;
+using CommunityToolkit.Mvvm.Messaging;
 using LiveLingo.Core.Engines;
 using LiveLingo.Core.Models;
 using NSubstitute;
+using UserSettings = LiveLingo.Desktop.Services.Configuration.SettingsModel;
 
 namespace LiveLingo.Desktop.Tests.ViewModels;
 
@@ -10,8 +13,12 @@ public class SettingsViewModelTests
 {
     private ISettingsService CreateSettings(UserSettings? initial = null)
     {
+        var state = initial ?? new UserSettings();
         var svc = Substitute.For<ISettingsService>();
-        svc.Current.Returns(initial ?? new UserSettings());
+        svc.Current.Returns(_ => state);
+        svc.CloneCurrent().Returns(_ => state.DeepClone());
+        svc.When(x => x.Replace(Arg.Any<UserSettings>()))
+            .Do(ci => state = ci.Arg<UserSettings>().DeepClone());
         return svc;
     }
 
@@ -26,8 +33,8 @@ public class SettingsViewModelTests
         var svc = CreateSettings(settings);
         var vm = new SettingsViewModel(svc);
 
-        Assert.Equal("Alt+X", vm.OverlayHotkey);
-        Assert.Equal("ja", vm.DefaultSourceLanguage);
+        Assert.Equal("Alt+X", vm.WorkingCopy.Hotkeys.OverlayToggle);
+        Assert.Equal("ja", vm.WorkingCopy.Translation.DefaultSourceLanguage);
         Assert.False(vm.IsDirty);
     }
 
@@ -37,28 +44,28 @@ public class SettingsViewModelTests
         var vm = new SettingsViewModel(CreateSettings());
         Assert.False(vm.IsDirty);
 
-        vm.OverlayHotkey = "Ctrl+Z";
+        vm.WorkingCopy.Hotkeys.OverlayToggle = "Ctrl+Z";
 
         Assert.True(vm.IsDirty);
     }
 
     [Fact]
-    public async Task SaveCommand_CallsUpdate()
+    public async Task SaveCommand_CallsReplace()
     {
         var svc = CreateSettings();
         var vm = new SettingsViewModel(svc);
-        vm.OverlayHotkey = "Ctrl+Z";
+        vm.WorkingCopy.Hotkeys.OverlayToggle = "Ctrl+Z";
 
         await vm.SaveCommand.ExecuteAsync(null);
 
-        svc.Received(1).Update(Arg.Any<Func<UserSettings, UserSettings>>());
+        svc.Received(1).Replace(Arg.Any<UserSettings>());
     }
 
     [Fact]
     public async Task SaveCommand_ClearsDirty()
     {
         var vm = new SettingsViewModel(CreateSettings());
-        vm.OverlayHotkey = "Ctrl+Z";
+        vm.WorkingCopy.Hotkeys.OverlayToggle = "Ctrl+Z";
         Assert.True(vm.IsDirty);
 
         await vm.SaveCommand.ExecuteAsync(null);
@@ -67,15 +74,23 @@ public class SettingsViewModelTests
     }
 
     [Fact]
-    public async Task SaveCommand_RaisesRequestClose()
+    public async Task SaveCommand_SendsCloseMessage()
     {
-        var vm = new SettingsViewModel(CreateSettings());
-        bool closed = false;
-        vm.RequestClose += () => closed = true;
+        var messenger = new WeakReferenceMessenger();
+        var recipient = new object();
+        AppUiRequestKind? receivedKind = null;
+        var settingsChanged = false;
+        messenger.Register<object, AppUiRequestMessage>(recipient, (_, message) =>
+            receivedKind = message.Value.Kind);
+        messenger.Register<object, SettingsChangedMessage>(recipient, (_, _) =>
+            settingsChanged = true);
+        var vm = new SettingsViewModel(CreateSettings(), messenger: messenger);
+        vm.WorkingCopy.Hotkeys.OverlayToggle = "Ctrl+Shift+K";
 
         await vm.SaveCommand.ExecuteAsync(null);
 
-        Assert.True(closed);
+        Assert.True(settingsChanged);
+        Assert.Equal(AppUiRequestKind.CloseSettings, receivedKind);
     }
 
     [Fact]
@@ -86,11 +101,11 @@ public class SettingsViewModelTests
             Hotkeys = new HotkeySettings { OverlayToggle = "Alt+X" }
         };
         var vm = new SettingsViewModel(CreateSettings(settings));
-        vm.OverlayHotkey = "Ctrl+Z";
+        vm.WorkingCopy.Hotkeys.OverlayToggle = "Ctrl+Z";
 
         vm.ResetCommand.Execute(null);
 
-        Assert.Equal("Ctrl+Alt+T", vm.OverlayHotkey);
+        Assert.Equal("Ctrl+Alt+T", vm.WorkingCopy.Hotkeys.OverlayToggle);
     }
 
     [Fact]
@@ -102,23 +117,26 @@ public class SettingsViewModelTests
         };
         var svc = CreateSettings(settings);
         var vm = new SettingsViewModel(svc);
-        vm.OverlayHotkey = "Ctrl+Z";
+        vm.WorkingCopy.Hotkeys.OverlayToggle = "Ctrl+Z";
 
         vm.CancelCommand.Execute(null);
 
-        Assert.Equal("Alt+X", vm.OverlayHotkey);
+        Assert.Equal("Alt+X", vm.WorkingCopy.Hotkeys.OverlayToggle);
     }
 
     [Fact]
-    public void CancelCommand_RaisesRequestClose()
+    public void CancelCommand_SendsCloseMessage()
     {
-        var vm = new SettingsViewModel(CreateSettings());
-        bool closed = false;
-        vm.RequestClose += () => closed = true;
+        var messenger = new WeakReferenceMessenger();
+        var recipient = new object();
+        AppUiRequestKind? receivedKind = null;
+        messenger.Register<object, AppUiRequestMessage>(recipient, (_, message) =>
+            receivedKind = message.Value.Kind);
+        var vm = new SettingsViewModel(CreateSettings(), messenger: messenger);
 
         vm.CancelCommand.Execute(null);
 
-        Assert.True(closed);
+        Assert.Equal(AppUiRequestKind.CloseSettings, receivedKind);
     }
 
     [Fact]
@@ -147,14 +165,14 @@ public class SettingsViewModelTests
 
         var vm = new SettingsViewModel(CreateSettings(settings));
 
-        Assert.Equal("ja", vm.DefaultSourceLanguage);
-        Assert.Equal("zh", vm.DefaultTargetLanguage);
-        Assert.Equal("Summarize", vm.DefaultPostProcessMode);
-        Assert.Equal("PasteOnly", vm.DefaultInjectionMode);
-        Assert.Equal(0.8, vm.OverlayOpacity);
-        Assert.Equal(@"C:\models", vm.ModelStoragePath);
-        Assert.Equal(4, vm.InferenceThreads);
-        Assert.Equal("Debug", vm.LogLevel);
+        Assert.Equal("ja", vm.WorkingCopy.Translation.DefaultSourceLanguage);
+        Assert.Equal("zh", vm.WorkingCopy.Translation.DefaultTargetLanguage);
+        Assert.Equal("Summarize", vm.WorkingCopy.Processing.DefaultMode);
+        Assert.Equal("PasteOnly", vm.WorkingCopy.UI.DefaultInjectionMode);
+        Assert.Equal(0.8, vm.WorkingCopy.UI.OverlayOpacity);
+        Assert.Equal(@"C:\models", vm.WorkingCopy.Advanced.ModelStoragePath);
+        Assert.Equal(4, vm.WorkingCopy.Advanced.InferenceThreads);
+        Assert.Equal("Debug", vm.WorkingCopy.Advanced.LogLevel);
     }
 
     [Fact]
@@ -163,28 +181,20 @@ public class SettingsViewModelTests
         var svc = CreateSettings();
         var vm = new SettingsViewModel(svc);
 
-        vm.OverlayHotkey = "Alt+X";
-        vm.DefaultSourceLanguage = "ja";
-        vm.DefaultTargetLanguage = "zh";
-        vm.DefaultPostProcessMode = "Optimize";
-        vm.DefaultInjectionMode = "PasteOnly";
-        vm.OverlayOpacity = 0.7;
-        vm.ModelStoragePath = @"D:\ai";
-        vm.InferenceThreads = 8;
-        vm.LogLevel = "Warning";
-
-        UserSettings? saved = null;
-        svc.When(s => s.Update(Arg.Any<Func<UserSettings, UserSettings>>()))
-            .Do(c =>
-            {
-                var mutator = c.ArgAt<Func<UserSettings, UserSettings>>(0);
-                saved = mutator(new UserSettings());
-            });
+        vm.WorkingCopy.Hotkeys.OverlayToggle = "Alt+X";
+        vm.WorkingCopy.Translation.DefaultSourceLanguage = "ja";
+        vm.WorkingCopy.Translation.DefaultTargetLanguage = "zh";
+        vm.WorkingCopy.Processing.DefaultMode = "Optimize";
+        vm.WorkingCopy.UI.DefaultInjectionMode = "PasteOnly";
+        vm.WorkingCopy.UI.OverlayOpacity = 0.7;
+        vm.WorkingCopy.Advanced.ModelStoragePath = @"D:\ai";
+        vm.WorkingCopy.Advanced.InferenceThreads = 8;
+        vm.WorkingCopy.Advanced.LogLevel = "Warning";
 
         await vm.SaveCommand.ExecuteAsync(null);
+        var saved = svc.Current;
 
-        Assert.NotNull(saved);
-        Assert.Equal("Alt+X", saved!.Hotkeys.OverlayToggle);
+        Assert.Equal("Alt+X", saved.Hotkeys.OverlayToggle);
         Assert.Equal("ja", saved.Translation.DefaultSourceLanguage);
         Assert.Equal("zh", saved.Translation.DefaultTargetLanguage);
         Assert.Equal("Optimize", saved.Processing.DefaultMode);
@@ -209,11 +219,11 @@ public class SettingsViewModelTests
         vm.ResetCommand.Execute(null);
 
         var defaults = new UserSettings();
-        Assert.Equal(defaults.Hotkeys.OverlayToggle, vm.OverlayHotkey);
-        Assert.Equal(defaults.Translation.DefaultSourceLanguage, vm.DefaultSourceLanguage);
-        Assert.Equal(defaults.Translation.DefaultTargetLanguage, vm.DefaultTargetLanguage);
-        Assert.Equal(defaults.Advanced.InferenceThreads, vm.InferenceThreads);
-        Assert.Equal(defaults.Advanced.LogLevel, vm.LogLevel);
+        Assert.Equal(defaults.Hotkeys.OverlayToggle, vm.WorkingCopy.Hotkeys.OverlayToggle);
+        Assert.Equal(defaults.Translation.DefaultSourceLanguage, vm.WorkingCopy.Translation.DefaultSourceLanguage);
+        Assert.Equal(defaults.Translation.DefaultTargetLanguage, vm.WorkingCopy.Translation.DefaultTargetLanguage);
+        Assert.Equal(defaults.Advanced.InferenceThreads, vm.WorkingCopy.Advanced.InferenceThreads);
+        Assert.Equal(defaults.Advanced.LogLevel, vm.WorkingCopy.Advanced.LogLevel);
     }
 
     [Fact]
@@ -228,23 +238,23 @@ public class SettingsViewModelTests
         var svc = CreateSettings(settings);
         var vm = new SettingsViewModel(svc);
 
-        vm.OverlayHotkey = "Ctrl+Z";
-        vm.DefaultSourceLanguage = "ko";
-        vm.InferenceThreads = 2;
+        vm.WorkingCopy.Hotkeys.OverlayToggle = "Ctrl+Z";
+        vm.WorkingCopy.Translation.DefaultSourceLanguage = "ko";
+        vm.WorkingCopy.Advanced.InferenceThreads = 2;
 
         vm.CancelCommand.Execute(null);
 
-        Assert.Equal("Alt+X", vm.OverlayHotkey);
-        Assert.Equal("ja", vm.DefaultSourceLanguage);
-        Assert.Equal(8, vm.InferenceThreads);
+        Assert.Equal("Alt+X", vm.WorkingCopy.Hotkeys.OverlayToggle);
+        Assert.Equal("ja", vm.WorkingCopy.Translation.DefaultSourceLanguage);
+        Assert.Equal(8, vm.WorkingCopy.Advanced.InferenceThreads);
     }
 
     [Theory]
-    [InlineData(nameof(SettingsViewModel.DefaultSourceLanguage))]
-    [InlineData(nameof(SettingsViewModel.DefaultTargetLanguage))]
-    [InlineData(nameof(SettingsViewModel.OverlayOpacity))]
-    [InlineData(nameof(SettingsViewModel.InferenceThreads))]
-    [InlineData(nameof(SettingsViewModel.LogLevel))]
+    [InlineData("DefaultSourceLanguage")]
+    [InlineData("DefaultTargetLanguage")]
+    [InlineData("OverlayOpacity")]
+    [InlineData("InferenceThreads")]
+    [InlineData("LogLevel")]
     public void AnyPropertyChange_SetsDirty(string propertyName)
     {
         var vm = new SettingsViewModel(CreateSettings());
@@ -252,11 +262,11 @@ public class SettingsViewModelTests
 
         switch (propertyName)
         {
-            case nameof(SettingsViewModel.DefaultSourceLanguage): vm.DefaultSourceLanguage = "ja"; break;
-            case nameof(SettingsViewModel.DefaultTargetLanguage): vm.DefaultTargetLanguage = "zh"; break;
-            case nameof(SettingsViewModel.OverlayOpacity): vm.OverlayOpacity = 0.5; break;
-            case nameof(SettingsViewModel.InferenceThreads): vm.InferenceThreads = 4; break;
-            case nameof(SettingsViewModel.LogLevel): vm.LogLevel = "Debug"; break;
+            case "DefaultSourceLanguage": vm.WorkingCopy.Translation.DefaultSourceLanguage = "ja"; break;
+            case "DefaultTargetLanguage": vm.WorkingCopy.Translation.DefaultTargetLanguage = "zh"; break;
+            case "OverlayOpacity": vm.WorkingCopy.UI.OverlayOpacity = 0.5; break;
+            case "InferenceThreads": vm.WorkingCopy.Advanced.InferenceThreads = 4; break;
+            case "LogLevel": vm.WorkingCopy.Advanced.LogLevel = "Debug"; break;
         }
 
         Assert.True(vm.IsDirty);
@@ -274,7 +284,7 @@ public class SettingsViewModelTests
         var modelManager = Substitute.For<IModelManager>();
         var vm = new SettingsViewModel(svc, modelManager);
 
-        vm.ModelStoragePath = newPath;
+        vm.WorkingCopy.Advanced.ModelStoragePath = newPath;
         await vm.SaveCommand.ExecuteAsync(null);
 
         await modelManager.Received(1).MigrateStoragePathAsync(newPath, Arg.Any<CancellationToken>());
@@ -306,8 +316,8 @@ public class SettingsViewModelTests
         });
         var modelManager = Substitute.For<IModelManager>();
         var vm = new SettingsViewModel(svc, modelManager);
-        vm.OverlayHotkey = "Ctrl+Alt+Y";
-        vm.ModelStoragePath = basePath + Path.DirectorySeparatorChar;
+        vm.WorkingCopy.Hotkeys.OverlayToggle = "Ctrl+Alt+Y";
+        vm.WorkingCopy.Advanced.ModelStoragePath = basePath + Path.DirectorySeparatorChar;
 
         await vm.SaveCommand.ExecuteAsync(null);
 
@@ -327,6 +337,79 @@ public class SettingsViewModelTests
     }
 
     [Fact]
+    public void Constructor_WithInstalledCustomTranslationModel_IncludesInActiveModelList()
+    {
+        var modelManager = Substitute.For<IModelManager>();
+        modelManager.ListInstalled().Returns([
+            new InstalledModel(
+                "opus-mt-ko-en",
+                "MarianMT Korean→English",
+                "/tmp/models/opus-mt-ko-en",
+                100,
+                ModelType.Translation,
+                DateTime.UtcNow)
+        ]);
+
+        var vm = new SettingsViewModel(CreateSettings(), modelManager, new StubTranslationEngine());
+
+        Assert.Contains(vm.AvailableTranslationModels, m => m.Id == "opus-mt-ko-en");
+    }
+
+    [Fact]
+    public void RefreshTranslationModelsCommand_RefreshesInstalledTranslationModelList()
+    {
+        var installed = new List<InstalledModel>();
+        var modelManager = Substitute.For<IModelManager>();
+        modelManager.ListInstalled().Returns(_ => installed);
+
+        var vm = new SettingsViewModel(CreateSettings(), modelManager, new StubTranslationEngine());
+        Assert.DoesNotContain(vm.AvailableTranslationModels, m => m.Id == "opus-mt-pt-en");
+
+        installed.Add(new InstalledModel(
+            "opus-mt-pt-en",
+            "MarianMT Portuguese→English",
+            "/tmp/models/opus-mt-pt-en",
+            100,
+            ModelType.Translation,
+            DateTime.UtcNow));
+        vm.RefreshTranslationModelsCommand.Execute(null);
+
+        Assert.Contains(vm.AvailableTranslationModels, m => m.Id == "opus-mt-pt-en");
+    }
+
+    [Fact]
+    public void Constructor_IncludesQwenInActiveModelList()
+    {
+        var vm = new SettingsViewModel(CreateSettings(), Substitute.For<IModelManager>(), new StubTranslationEngine());
+
+        Assert.Contains(vm.AvailableTranslationModels, m =>
+            string.Equals(m.Id, ModelRegistry.Qwen25_15B.Id, StringComparison.OrdinalIgnoreCase) &&
+            m.Type == ModelType.PostProcessing);
+    }
+
+    [Fact]
+    public async Task SaveCommand_WhenSelectingQwen_PersistsModelIdWithoutChangingLanguagePair()
+    {
+        var svc = CreateSettings(new UserSettings
+        {
+            Translation = new TranslationSettings
+            {
+                DefaultSourceLanguage = "zh",
+                DefaultTargetLanguage = "en"
+            }
+        });
+        var vm = new SettingsViewModel(svc, Substitute.For<IModelManager>(), new StubTranslationEngine());
+        vm.WorkingCopy.Translation.ActiveTranslationModelId = ModelRegistry.Qwen25_15B.Id;
+
+        await vm.SaveCommand.ExecuteAsync(null);
+        var saved = svc.Current;
+
+        Assert.Equal("zh", saved.Translation.DefaultSourceLanguage);
+        Assert.Equal("en", saved.Translation.DefaultTargetLanguage);
+        Assert.Equal(ModelRegistry.Qwen25_15B.Id, saved.Translation.ActiveTranslationModelId);
+    }
+
+    [Fact]
     public async Task SaveCommand_SetsMigrationError_OnFailure()
     {
         var oldPath = Path.Combine(Path.GetTempPath(), "old-models");
@@ -340,11 +423,11 @@ public class SettingsViewModelTests
             .Returns(Task.FromException(new IOException("Access denied")));
         var vm = new SettingsViewModel(svc, modelManager);
 
-        vm.ModelStoragePath = newPath;
+        vm.WorkingCopy.Advanced.ModelStoragePath = newPath;
         await vm.SaveCommand.ExecuteAsync(null);
 
         Assert.Contains("Access denied", vm.MigrationError);
-        svc.DidNotReceive().Update(Arg.Any<Func<UserSettings, UserSettings>>());
+        svc.DidNotReceive().Replace(Arg.Any<UserSettings>());
     }
 
     [Fact]
@@ -359,7 +442,7 @@ public class SettingsViewModelTests
         var modelManager = Substitute.For<IModelManager>();
         var vm = new SettingsViewModel(svc, modelManager);
 
-        vm.ModelStoragePath = newPath;
+        vm.WorkingCopy.Advanced.ModelStoragePath = newPath;
         await vm.SaveCommand.ExecuteAsync(null);
 
         Assert.Null(vm.MigrationError);
@@ -384,7 +467,7 @@ public class SettingsViewModelTests
     }
 
     [Fact]
-    public void SelectedSourceLanguage_LoadedFromSettings()
+    public void SourceLanguage_LoadedFromSettings()
     {
         var engine = new StubTranslationEngine();
         var settings = new UserSettings
@@ -393,12 +476,11 @@ public class SettingsViewModelTests
         };
         var vm = new SettingsViewModel(CreateSettings(settings), engine);
 
-        Assert.NotNull(vm.SelectedSourceLanguage);
-        Assert.Equal("zh", vm.SelectedSourceLanguage!.Code);
+        Assert.Equal("zh", vm.WorkingCopy.Translation.DefaultSourceLanguage);
     }
 
     [Fact]
-    public void SelectedTargetLanguage_LoadedFromSettings()
+    public void TargetLanguage_LoadedFromSettings()
     {
         var engine = new StubTranslationEngine();
         var settings = new UserSettings
@@ -407,8 +489,7 @@ public class SettingsViewModelTests
         };
         var vm = new SettingsViewModel(CreateSettings(settings), engine);
 
-        Assert.NotNull(vm.SelectedTargetLanguage);
-        Assert.Equal("en", vm.SelectedTargetLanguage!.Code);
+        Assert.Equal("en", vm.WorkingCopy.Translation.DefaultTargetLanguage);
     }
 
     [Fact]
@@ -418,21 +499,50 @@ public class SettingsViewModelTests
         var svc = CreateSettings();
         var vm = new SettingsViewModel(svc, engine);
 
-        vm.SelectedSourceLanguage = engine.SupportedLanguages.First(l => l.Code == "ja");
-        vm.SelectedTargetLanguage = engine.SupportedLanguages.First(l => l.Code == "zh");
-
-        UserSettings? saved = null;
-        svc.When(s => s.Update(Arg.Any<Func<UserSettings, UserSettings>>()))
-            .Do(c =>
-            {
-                var mutator = c.ArgAt<Func<UserSettings, UserSettings>>(0);
-                saved = mutator(new UserSettings());
-            });
+        vm.WorkingCopy.Translation.DefaultSourceLanguage = "ja";
+        vm.WorkingCopy.Translation.DefaultTargetLanguage = "zh";
 
         await vm.SaveCommand.ExecuteAsync(null);
+        var saved = svc.Current;
 
-        Assert.NotNull(saved);
-        Assert.Equal("ja", saved!.Translation.DefaultSourceLanguage);
+        Assert.Equal("ja", saved.Translation.DefaultSourceLanguage);
+        Assert.Equal("zh", saved.Translation.DefaultTargetLanguage);
+    }
+
+    [Fact]
+    public void Constructor_PrefersActiveTranslationModel_WhenConfigured()
+    {
+        var engine = new StubTranslationEngine();
+        var settings = new UserSettings
+        {
+            Translation = new TranslationSettings
+            {
+                DefaultSourceLanguage = "zh",
+                DefaultTargetLanguage = "en",
+                ActiveTranslationModelId = "opus-mt-en-zh"
+            }
+        };
+
+        var vm = new SettingsViewModel(CreateSettings(settings), engine);
+
+        Assert.Equal("opus-mt-en-zh", vm.WorkingCopy.Translation.ActiveTranslationModelId);
+        Assert.Equal("en", vm.WorkingCopy.Translation.DefaultSourceLanguage);
+        Assert.Equal("zh", vm.WorkingCopy.Translation.DefaultTargetLanguage);
+    }
+
+    [Fact]
+    public async Task SaveCommand_PersistsSelectedTranslationModel()
+    {
+        var engine = new StubTranslationEngine();
+        var svc = CreateSettings();
+        var vm = new SettingsViewModel(svc, engine);
+        vm.WorkingCopy.Translation.ActiveTranslationModelId = "opus-mt-en-zh";
+
+        await vm.SaveCommand.ExecuteAsync(null);
+        var saved = svc.Current;
+
+        Assert.Equal("opus-mt-en-zh", saved.Translation.ActiveTranslationModelId);
+        Assert.Equal("en", saved.Translation.DefaultSourceLanguage);
         Assert.Equal("zh", saved.Translation.DefaultTargetLanguage);
     }
 
@@ -440,7 +550,7 @@ public class SettingsViewModelTests
     public void SelectedUILanguage_DefaultsToEnglish()
     {
         var vm = new SettingsViewModel(CreateSettings());
-        Assert.Equal("en-US", vm.SelectedUILanguage.Code);
+        Assert.Equal("en-US", vm.WorkingCopy.UI.Language);
     }
 
     [Fact]
@@ -451,7 +561,7 @@ public class SettingsViewModelTests
             UI = new UISettings { Language = "zh-CN" }
         };
         var vm = new SettingsViewModel(CreateSettings(settings));
-        Assert.Equal("zh-CN", vm.SelectedUILanguage.Code);
+        Assert.Equal("zh-CN", vm.WorkingCopy.UI.Language);
     }
 
     [Fact]
@@ -460,20 +570,12 @@ public class SettingsViewModelTests
         var svc = CreateSettings();
         var vm = new SettingsViewModel(svc);
 
-        vm.SelectedUILanguage = SettingsViewModel.UILanguages.First(l => l.Code == "zh-CN");
-
-        UserSettings? saved = null;
-        svc.When(s => s.Update(Arg.Any<Func<UserSettings, UserSettings>>()))
-            .Do(c =>
-            {
-                var mutator = c.ArgAt<Func<UserSettings, UserSettings>>(0);
-                saved = mutator(new UserSettings());
-            });
+        vm.WorkingCopy.UI.Language = "zh-CN";
 
         await vm.SaveCommand.ExecuteAsync(null);
+        var saved = svc.Current;
 
-        Assert.NotNull(saved);
-        Assert.Equal("zh-CN", saved!.UI.Language);
+        Assert.Equal("zh-CN", saved.UI.Language);
     }
 
     [Fact]
@@ -488,13 +590,16 @@ public class SettingsViewModelTests
     public void CheckPermissionsCommand_RaisesEvent()
     {
         var svc = CreateSettings();
-        var vm = new SettingsViewModel(svc);
-        var fired = false;
-        vm.RequestShowPermissionCheck += () => fired = true;
+        var messenger = new WeakReferenceMessenger();
+        var recipient = new object();
+        AppUiRequestKind? receivedKind = null;
+        messenger.Register<object, AppUiRequestMessage>(recipient, (_, message) =>
+            receivedKind = message.Value.Kind);
+        var vm = new SettingsViewModel(svc, messenger: messenger);
 
         vm.CheckPermissionsCommand.Execute(null);
 
-        Assert.True(fired);
+        Assert.Equal(AppUiRequestKind.ShowSettingsPermissionDialog, receivedKind);
     }
 
     [Fact]
@@ -515,6 +620,6 @@ public class SettingsViewModelTests
         var svc = CreateSettings(settings);
         var vm = new SettingsViewModel(svc);
 
-        Assert.Equal("en-US", vm.SelectedUILanguage.Code);
+        Assert.Equal("en-US", vm.WorkingCopy.UI.Language);
     }
 }

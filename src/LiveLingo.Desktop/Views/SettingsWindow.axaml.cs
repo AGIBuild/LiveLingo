@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
@@ -9,19 +10,31 @@ namespace LiveLingo.Desktop.Views;
 
 public partial class SettingsWindow : Window
 {
-    public SettingsWindow() => InitializeComponent();
+    public SettingsWindow()
+    {
+        InitializeComponent();
+        HookDragHandle();
+    }
 
     public SettingsWindow(SettingsViewModel vm, ILocalizationService? loc = null)
     {
         DataContext = vm;
         InitializeComponent();
+        HookDragHandle();
         if (loc is not null) ApplyLocalization(loc);
-        vm.RequestClose += () => Close();
-        vm.RequestShowPermissionCheck += ShowPermissionDialog;
-        Closed += (_, _) =>
-        {
-            vm.RequestShowPermissionCheck -= ShowPermissionDialog;
-        };
+    }
+
+    private void HookDragHandle()
+    {
+        var dragHandle = this.FindControl<Border>("DragHandle");
+        if (dragHandle is not null)
+            dragHandle.PointerPressed += OnDragHandlePointerPressed;
+    }
+
+    private void OnDragHandlePointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+            BeginMoveDrag(e);
     }
 
     private void ShowPermissionDialog()
@@ -116,6 +129,8 @@ public partial class SettingsWindow : Window
         dialog.Content = root;
         dialog.ShowDialog(this);
     }
+
+    public void RequestShowPermissionDialog() => ShowPermissionDialog();
 
     private static Border BuildPermissionRow(
         string label, bool granted,
@@ -243,6 +258,7 @@ public partial class SettingsWindow : Window
         });
 
         if (folders.Count > 0 && DataContext is SettingsViewModel vm)
-            vm.ModelStoragePath = folders[0].Path.LocalPath;
+            vm.WorkingCopy.Advanced.ModelStoragePath = folders[0].Path.LocalPath;
     }
+
 }

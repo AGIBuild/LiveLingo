@@ -28,7 +28,22 @@ public sealed class ModelManager : IModelManager
 
         if (File.Exists(manifestPath))
         {
-            _logger.LogDebug("Model {Id} already installed at {Path}", descriptor.Id, modelDir);
+            var missingAssets = GetExpectedAssets(descriptor)
+                .Where(asset => !File.Exists(Path.Combine(modelDir, NormalizeRelativePath(asset.RelativePath))))
+                .ToArray();
+            if (missingAssets.Length == 0)
+            {
+                _logger.LogDebug("Model {Id} already installed at {Path}", descriptor.Id, modelDir);
+                return;
+            }
+
+            _logger.LogInformation(
+                "Model {Id} is installed but missing {MissingCount} assets. Repairing installation.",
+                descriptor.Id,
+                missingAssets.Length);
+
+            await _inflight.GetOrAdd(descriptor.Id, _ =>
+                DownloadMissingAssetsAsync(descriptor, modelDir, manifestPath, missingAssets, progress, ct));
             return;
         }
 
@@ -48,50 +63,133 @@ public sealed class ModelManager : IModelManager
             Directory.CreateDirectory(modelDir);
             ValidateDiskSpace(modelDir, descriptor.SizeBytes);
 
-            var fileName = GetFileNameFromUrl(descriptor.DownloadUrl);
-            var finalPath = Path.Combine(modelDir, fileName);
-            var partPath = finalPath + ".part";
+            var assets = GetExpectedAssets(descriptor);
 
-            long existingBytes = 0;
-            if (File.Exists(partPath))
-                existingBytes = new FileInfo(partPath).Length;
+            var totalBytes = assets.Sum(a => a.SizeBytes > 0 ? a.SizeBytes : 0);
+            if (totalBytes <= 0)
+                totalBytes = descriptor.SizeBytes;
 
-            using var request = new HttpRequestMessage(HttpMethod.Get, descriptor.DownloadUrl);
-            if (existingBytes > 0)
-                request.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(existingBytes, null);
-
-            using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
-            response.EnsureSuccessStatusCode();
-
-            var totalBytes = descriptor.SizeBytes;
-            var downloaded = existingBytes;
-
-            await using var httpStream = await response.Content.ReadAsStreamAsync(ct);
-            await using var fileStream = new FileStream(partPath,
-                existingBytes > 0 ? FileMode.Append : FileMode.Create,
-                FileAccess.Write, FileShare.None);
-
-            var buffer = new byte[81920];
-            int bytesRead;
-            while ((bytesRead = await httpStream.ReadAsync(buffer, ct)) > 0)
+            long downloadedBytes = 0;
+            foreach (var asset in assets)
             {
-                await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), ct);
-                downloaded += bytesRead;
-                progress?.Report(new ModelDownloadProgress(descriptor.Id, downloaded, totalBytes));
+                downloadedBytes += await DownloadAssetAsync(
+                    descriptor.Id,
+                    modelDir,
+                    asset,
+                    downloadedBytes,
+                    totalBytes,
+                    progress,
+                    ct);
             }
-
-            fileStream.Close();
-            File.Move(partPath, finalPath, overwrite: true);
 
             var manifest = ModelManifest.FromDescriptor(descriptor);
             await File.WriteAllTextAsync(manifestPath, manifest.ToJson(), ct);
 
-            _logger.LogDebug("Model {Id} downloaded to {Path}", descriptor.Id, finalPath);
+            _logger.LogDebug("Model {Id} downloaded to {Path}", descriptor.Id, modelDir);
         }
         finally
         {
             _inflight.TryRemove(descriptor.Id, out _);
         }
+    }
+
+    private async Task DownloadMissingAssetsAsync(
+        ModelDescriptor descriptor,
+        string modelDir,
+        string manifestPath,
+        IReadOnlyList<ModelAsset> missingAssets,
+        IProgress<ModelDownloadProgress>? progress,
+        CancellationToken ct)
+    {
+        try
+        {
+            Directory.CreateDirectory(modelDir);
+            var expectedBytes = missingAssets.Sum(a => a.SizeBytes > 0 ? a.SizeBytes : 0);
+            if (expectedBytes > 0)
+                ValidateDiskSpace(modelDir, expectedBytes);
+
+            long downloadedBytes = 0;
+            var totalBytes = expectedBytes > 0 ? expectedBytes : descriptor.SizeBytes;
+            foreach (var asset in missingAssets)
+            {
+                downloadedBytes += await DownloadAssetAsync(
+                    descriptor.Id,
+                    modelDir,
+                    asset,
+                    downloadedBytes,
+                    totalBytes,
+                    progress,
+                    ct);
+            }
+
+            var manifest = ModelManifest.FromDescriptor(descriptor);
+            await File.WriteAllTextAsync(manifestPath, manifest.ToJson(), ct);
+            _logger.LogDebug("Model {Id} assets repaired at {Path}", descriptor.Id, modelDir);
+        }
+        finally
+        {
+            _inflight.TryRemove(descriptor.Id, out _);
+        }
+    }
+
+    private async Task<long> DownloadAssetAsync(
+        string modelId,
+        string modelDir,
+        ModelAsset asset,
+        long downloadedBeforeAsset,
+        long totalBytes,
+        IProgress<ModelDownloadProgress>? progress,
+        CancellationToken ct)
+    {
+        var relativePath = NormalizeRelativePath(asset.RelativePath);
+        var finalPath = Path.Combine(modelDir, relativePath);
+        var parent = Path.GetDirectoryName(finalPath);
+        if (!string.IsNullOrEmpty(parent))
+            Directory.CreateDirectory(parent);
+
+        if (File.Exists(finalPath))
+        {
+            var existingFileSize = new FileInfo(finalPath).Length;
+            progress?.Report(new ModelDownloadProgress(modelId, downloadedBeforeAsset + existingFileSize, totalBytes));
+            return existingFileSize;
+        }
+
+        var partPath = finalPath + ".part";
+        var existingPartBytes = File.Exists(partPath) ? new FileInfo(partPath).Length : 0;
+
+        using var request = new HttpRequestMessage(HttpMethod.Get, asset.DownloadUrl);
+        if (existingPartBytes > 0)
+            request.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(existingPartBytes, null);
+
+        using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+        response.EnsureSuccessStatusCode();
+
+        if (existingPartBytes > 0 && response.StatusCode == System.Net.HttpStatusCode.OK)
+        {
+            File.Delete(partPath);
+            existingPartBytes = 0;
+        }
+
+        await using var httpStream = await response.Content.ReadAsStreamAsync(ct);
+        await using var fileStream = new FileStream(
+            partPath,
+            existingPartBytes > 0 ? FileMode.Append : FileMode.Create,
+            FileAccess.Write,
+            FileShare.None);
+
+        long downloadedForAsset = existingPartBytes;
+        var buffer = new byte[81920];
+        int bytesRead;
+        while ((bytesRead = await httpStream.ReadAsync(buffer, ct)) > 0)
+        {
+            await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), ct);
+            downloadedForAsset += bytesRead;
+            progress?.Report(new ModelDownloadProgress(modelId, downloadedBeforeAsset + downloadedForAsset, totalBytes));
+        }
+
+        await fileStream.FlushAsync(ct);
+        File.Move(partPath, finalPath, overwrite: true);
+        return downloadedForAsset;
     }
 
     private static string GetFileNameFromUrl(string url)
@@ -100,6 +198,14 @@ public sealed class ModelManager : IModelManager
         var name = Path.GetFileName(uri.AbsolutePath);
         return string.IsNullOrEmpty(name) ? "model.bin" : name;
     }
+
+    private static IReadOnlyList<ModelAsset> GetExpectedAssets(ModelDescriptor descriptor) =>
+        descriptor.Assets.Count > 0
+            ? descriptor.Assets
+            : [new ModelAsset(GetFileNameFromUrl(descriptor.DownloadUrl), descriptor.DownloadUrl, descriptor.SizeBytes)];
+
+    private static string NormalizeRelativePath(string relativePath) =>
+        relativePath.Replace('\\', Path.DirectorySeparatorChar);
 
     public IReadOnlyList<InstalledModel> ListInstalled()
     {

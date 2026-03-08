@@ -20,10 +20,11 @@
                 BorderBrush="#15FFFFFF" BorderThickness="1"
                 CornerRadius="8"/>
 
-        <DockPanel Margin="24,36,24,20">
+        <DockPanel Margin="24,24,24,20">
             <TextBlock DockPanel.Dock="Top" Name="TitleText" Text="Settings"
                        FontSize="18" FontWeight="SemiBold"
-                       Foreground="{StaticResource FgPrimaryBrush}" Margin="0,0,0,14"/>
+                       Foreground="{StaticResource FgPrimaryBrush}"
+                       Margin="0,0,0,14"/>
 
             <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal"
                         HorizontalAlignment="Right" Spacing="8" Margin="0,14,0,0">
@@ -44,7 +45,7 @@
                             <Grid ColumnDefinitions="130,*">
                                 <TextBlock Classes="label" Text="Overlay Toggle:"/>
                                 <ctrl:HotkeyRecorder Grid.Column="1"
-                                    Hotkey="{Binding OverlayHotkey, Mode=TwoWay}"/>
+                                    Hotkey="{Binding WorkingCopy.Hotkeys.OverlayToggle, Mode=TwoWay}"/>
                             </Grid>
                             <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,3,0,0">
                                 <TextBlock Classes="hint" Text="Click the field, then press a key combo"/>
@@ -60,13 +61,13 @@
                                 <TextBlock Classes="label" Text="Opacity:"/>
                                 <Grid Grid.Column="1" ColumnDefinitions="*,36">
                                     <Slider Classes="themed" Minimum="0.1" Maximum="1.0"
-                                            Value="{Binding OverlayOpacity}"
+                                            Value="{Binding WorkingCopy.UI.OverlayOpacity}"
                                             TickFrequency="0.05" IsSnapToTickEnabled="True"/>
                                     <TextBlock Grid.Column="1" VerticalAlignment="Center"
                                                HorizontalAlignment="Right" FontSize="11"
                                                Foreground="{StaticResource FgTertiaryBrush}">
                                         <TextBlock.Text>
-                                            <Binding Path="OverlayOpacity" StringFormat="{}{0:P0}"/>
+                                            <Binding Path="WorkingCopy.UI.OverlayOpacity" StringFormat="{}{0:P0}"/>
                                         </TextBlock.Text>
                                     </TextBlock>
                                 </Grid>
@@ -74,7 +75,7 @@
                                 <ComboBox Grid.Row="1" Grid.Column="1" MinWidth="160"
                                           Classes="themed"
                                           ItemsSource="{Binding InjectionModes}"
-                                          SelectedItem="{Binding DefaultInjectionMode}"/>
+                                          SelectedItem="{Binding WorkingCopy.UI.DefaultInjectionMode}"/>
                             </Grid>
                             <Separator Classes="themed"/>
                             <TextBlock Classes="section" Text="Language"/>
@@ -83,7 +84,8 @@
                                 <ComboBox Grid.Column="1" MinWidth="160"
                                           Classes="themed"
                                           ItemsSource="{Binding UILanguages}"
-                                          SelectedItem="{Binding SelectedUILanguage}"/>
+                                          SelectedValueBinding="{Binding Code}"
+                                          SelectedValue="{Binding WorkingCopy.UI.Language}"/>
                             </Grid>
                         </StackPanel>
                     </ScrollViewer>
@@ -94,12 +96,13 @@
                     <ScrollViewer>
                         <StackPanel Spacing="2" Margin="0,4">
                             <TextBlock Classes="section" Text="Default Language Pair"/>
-                            <Grid ColumnDefinitions="130,*" RowDefinitions="Auto,Auto" RowSpacing="10">
+                            <Grid ColumnDefinitions="130,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="10">
                                 <TextBlock Classes="label" Text="Source Language:"/>
                                 <ComboBox Grid.Column="1" MinWidth="200"
                                           Classes="themed"
                                           ItemsSource="{Binding AvailableLanguages}"
-                                          SelectedItem="{Binding SelectedSourceLanguage}">
+                                          SelectedValueBinding="{Binding Code}"
+                                          SelectedValue="{Binding WorkingCopy.Translation.DefaultSourceLanguage}">
                                     <ComboBox.ItemTemplate>
                                         <DataTemplate>
                                             <TextBlock Text="{Binding DisplayName}"/>
@@ -110,13 +113,37 @@
                                 <ComboBox Grid.Row="1" Grid.Column="1" MinWidth="200"
                                           Classes="themed"
                                           ItemsSource="{Binding AvailableLanguages}"
-                                          SelectedItem="{Binding SelectedTargetLanguage}">
+                                          SelectedValueBinding="{Binding Code}"
+                                          SelectedValue="{Binding WorkingCopy.Translation.DefaultTargetLanguage}">
                                     <ComboBox.ItemTemplate>
                                         <DataTemplate>
                                             <TextBlock Text="{Binding DisplayName}"/>
                                         </DataTemplate>
                                     </ComboBox.ItemTemplate>
                                 </ComboBox>
+                                <TextBlock Grid.Row="2" Classes="label" Text="Active Model:"/>
+                                <Grid Grid.Row="2" Grid.Column="1" ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                                    <ComboBox MinWidth="260"
+                                              Classes="themed"
+                                              ItemsSource="{Binding AvailableTranslationModels}"
+                                              SelectedValueBinding="{Binding Id}"
+                                              SelectedValue="{Binding WorkingCopy.Translation.ActiveTranslationModelId}">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:TranslationModelOption">
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <TextBlock Text="{Binding DisplayName}"/>
+                                                    <TextBlock Text="{Binding PairLabel}" Foreground="{StaticResource FgTertiaryBrush}"/>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                    <Button Grid.Column="1"
+                                            Content="↻"
+                                            Classes="themed sm"
+                                            Command="{Binding RefreshTranslationModelsCommand}"
+                                            ToolTip.Tip="Refresh translation models"
+                                            Padding="10,6"/>
+                                </Grid>
                             </Grid>
                         </StackPanel>
                     </ScrollViewer>
@@ -193,7 +220,7 @@
                             <Grid ColumnDefinitions="130,*,Auto">
                                 <TextBlock Classes="label" Text="Storage Path:"/>
                                 <TextBox Grid.Column="1" Classes="themed"
-                                         Text="{Binding ModelStoragePath}"
+                                         Text="{Binding WorkingCopy.Advanced.ModelStoragePath}"
                                          PlaceholderText="Default (AppData)"/>
                                 <Button Grid.Column="2" Content="Browse…"
                                         Click="BrowseModelPath_Click"
@@ -210,7 +237,7 @@
                                 <TextBlock Classes="label" Text="Inference Threads:"/>
                                 <NumericUpDown Grid.Column="1" Minimum="0" Maximum="32"
                                                Classes="themed"
-                                               Value="{Binding InferenceThreads}"
+                                               Value="{Binding WorkingCopy.Advanced.InferenceThreads}"
                                                MinWidth="100" HorizontalAlignment="Left"/>
                             </Grid>
                             <TextBlock Classes="hint" Text="0 = auto-detect (recommended)"/>
@@ -221,7 +248,7 @@
                                 <ComboBox Grid.Column="1" MinWidth="160"
                                           Classes="themed"
                                           ItemsSource="{Binding LogLevels}"
-                                          SelectedItem="{Binding LogLevel}"/>
+                                          SelectedItem="{Binding WorkingCopy.Advanced.LogLevel}"/>
                             </Grid>
                         </StackPanel>
                     </ScrollViewer>
@@ -237,7 +264,7 @@
                                 <ComboBox Grid.Column="1" MinWidth="160"
                                           Classes="themed"
                                           ItemsSource="{Binding PostProcessModes}"
-                                          SelectedItem="{Binding DefaultPostProcessMode}"/>
+                                          SelectedItem="{Binding WorkingCopy.Processing.DefaultMode}"/>
                             </Grid>
                             <TextBlock Classes="hint"
                                        Text="Summarize · Optimize · Colloquialize"/>
@@ -246,5 +273,13 @@
                 </TabItem>
             </TabControl>
         </DockPanel>
+
+        <Border Name="DragHandle"
+                Height="38"
+                Margin="8,8,8,0"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Top"
+                Background="Transparent"
+                Cursor="Hand"/>
     </Panel>
 </Window>

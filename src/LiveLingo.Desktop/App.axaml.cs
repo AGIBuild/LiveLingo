@@ -6,6 +6,8 @@ using Avalonia.Markup.Xaml;
 using Avalonia.Media;
 using Avalonia.Platform;
 using Avalonia.Threading;
+using CommunityToolkit.Mvvm.Messaging;
+using LiveLingo.Desktop.Messaging;
 using LiveLingo.Desktop.Platform;
 using LiveLingo.Desktop.Platform.Windows;
 using LiveLingo.Desktop.Platform.macOS;
@@ -37,6 +39,7 @@ public partial class App : Application
     private Timer? _updateCheckTimer;
     private IUpdateService? _updateService;
     private bool _accessibilityWarned;
+    private IMessenger? _messenger;
 
     public override void Initialize()
     {
@@ -80,6 +83,7 @@ public partial class App : Application
             opts.InferenceThreads = userSettings.Advanced.InferenceThreads;
         });
         services.AddSingleton<ISettingsService>(settingsService);
+        services.AddSingleton<IMessenger>(_ => WeakReferenceMessenger.Default);
 
         services.AddSingleton<ILocalizationService>(sp =>
         {
@@ -94,6 +98,9 @@ public partial class App : Application
             services.AddSingleton<IPlatformServices, MacPlatformServices>();
 
         _serviceProvider = services.BuildServiceProvider();
+        _messenger = _serviceProvider.GetRequiredService<IMessenger>();
+        _messenger.Register<App, AppUiRequestMessage>(this, static (recipient, message) =>
+            Dispatcher.UIThread.Post(() => recipient.HandleAppUiRequest(message)));
 
         var updateUrl = settingsService.Current.Update.UpdateUrl;
         if (!string.IsNullOrEmpty(updateUrl))
@@ -124,8 +131,13 @@ public partial class App : Application
                     Dispatcher.UIThread.Post(() => ShowOverlay(platform, settingsService));
                 };
 
-                settingsService.SettingsChanged += newSettings =>
-                    Dispatcher.UIThread.Post(() => ApplyRuntimeSettings(platform, newSettings));
+                settingsService.SettingsChanged += () =>
+                    Dispatcher.UIThread.Post(() =>
+                    {
+                        var latest = settingsService.Current;
+                        ApplyRuntimeSettings(platform, latest);
+                        BroadcastSettingsChanged();
+                    });
             }
             _ = RunStartupHealthChecksAsync(settingsService);
         }
@@ -176,6 +188,13 @@ public partial class App : Application
         quitItem.Click += (_, _) => Dispatcher.UIThread.Post(() =>
         {
             Log.Information("Application shutting down from tray menu.");
+            _activeOverlay?.PrepareForShutdown();
+            _activeOverlay?.Close();
+            _activeOverlay = null;
+            _settingsWindow?.Close();
+            _settingsWindow = null;
+            _wizardWindow?.Close();
+            _wizardWindow = null;
             Log.CloseAndFlush();
             _trayIcon?.Dispose();
             _trayIcon = null;
@@ -217,22 +236,36 @@ public partial class App : Application
         var modelManager = _serviceProvider!.GetRequiredService<IModelManager>();
         var engine = _serviceProvider!.GetRequiredService<ITranslationEngine>();
         var loc = _serviceProvider!.GetRequiredService<ILocalizationService>();
-        var vm = new SettingsViewModel(settingsService, modelManager, engine);
-        PropertyChangedEventHandler? handler = (_, e) =>
+        var vm = new SettingsViewModel(settingsService, modelManager, engine, messenger: _messenger);
+        var subscribedUi = vm.WorkingCopy.UI;
+        PropertyChangedEventHandler? uiHandler = (_, e) =>
         {
-            if (e.PropertyName == nameof(SettingsViewModel.OverlayOpacity))
-            {
-                if (_activeOverlay is { IsVisible: true })
-                    _activeOverlay.SetBackgroundOpacity(vm.OverlayOpacity);
-                _settingsWindow?.SetBackgroundOpacity(vm.OverlayOpacity);
-            }
+            if (e.PropertyName != nameof(UISettings.OverlayOpacity))
+                return;
+            if (_activeOverlay is { IsVisible: true })
+                _activeOverlay.SetBackgroundOpacity(vm.WorkingCopy.UI.OverlayOpacity);
+            _settingsWindow?.SetBackgroundOpacity(vm.WorkingCopy.UI.OverlayOpacity);
         };
-        vm.PropertyChanged += handler;
+        PropertyChangedEventHandler? vmHandler = (_, e) =>
+        {
+            if (e.PropertyName != nameof(SettingsViewModel.WorkingCopy))
+                return;
+
+            subscribedUi.PropertyChanged -= uiHandler;
+            subscribedUi = vm.WorkingCopy.UI;
+            subscribedUi.PropertyChanged += uiHandler;
+            if (_activeOverlay is { IsVisible: true })
+                _activeOverlay.SetBackgroundOpacity(vm.WorkingCopy.UI.OverlayOpacity);
+            _settingsWindow?.SetBackgroundOpacity(vm.WorkingCopy.UI.OverlayOpacity);
+        };
+        subscribedUi.PropertyChanged += uiHandler;
+        vm.PropertyChanged += vmHandler;
         _settingsWindow = new SettingsWindow(vm, loc);
-        _settingsWindow.SetBackgroundOpacity(vm.OverlayOpacity);
+        _settingsWindow.SetBackgroundOpacity(vm.WorkingCopy.UI.OverlayOpacity);
         _settingsWindow.Closed += (_, _) =>
         {
-            vm.PropertyChanged -= handler;
+            subscribedUi.PropertyChanged -= uiHandler;
+            vm.PropertyChanged -= vmHandler;
             _settingsWindow = null;
         };
         _settingsWindow.Show();
@@ -454,7 +487,7 @@ public partial class App : Application
         dialog.Show();
     }
 
-    private bool RegisterHotkey(IPlatformServices platform, UserSettings settings)
+    private bool RegisterHotkey(IPlatformServices platform, SettingsModel settings)
     {
         var gesture = settings.Hotkeys.OverlayToggle;
         Log.Information("Registering hotkey: {Gesture}", gesture);
@@ -524,7 +557,7 @@ public partial class App : Application
             });
     }
 
-    private bool ReloadHotkey(IPlatformServices platform, UserSettings settings)
+    private bool ReloadHotkey(IPlatformServices platform, SettingsModel settings)
     {
         if (_currentHotkeyId is not null)
             platform.Hotkey.Unregister(_currentHotkeyId);
@@ -532,7 +565,7 @@ public partial class App : Application
         return RegisterHotkey(platform, settings);
     }
 
-    private void ApplyRuntimeSettings(IPlatformServices platform, UserSettings settings)
+    private void ApplyRuntimeSettings(IPlatformServices platform, SettingsModel settings)
     {
         try
         {
@@ -553,8 +586,8 @@ public partial class App : Application
                 });
             }
 
-            if (_activeOverlay is { IsVisible: true })
-                _activeOverlay.SetBackgroundOpacity(settings.UI.OverlayOpacity);
+            if (_activeOverlay is { IsVisible: true } overlay)
+                overlay.SetBackgroundOpacity(settings.UI.OverlayOpacity);
 
             var loc = _serviceProvider!.GetRequiredService<ILocalizationService>();
             if (!string.Equals(loc.CurrentCulture.Name, settings.UI.Language, StringComparison.OrdinalIgnoreCase))
@@ -568,6 +601,40 @@ public partial class App : Application
         catch (Exception ex)
         {
             Log.Error(ex, "ApplyRuntimeSettings failed");
+        }
+    }
+
+    private void BroadcastSettingsChanged()
+    {
+        _messenger?.Send(new SettingsChangedMessage());
+    }
+
+    private void HandleAppUiRequest(AppUiRequestMessage message)
+    {
+        var request = message.Value;
+        switch (request.Kind)
+        {
+            case AppUiRequestKind.OpenSettings:
+                ShowSettings();
+                break;
+            case AppUiRequestKind.CloseOverlay:
+                if (_activeOverlay is not null && ReferenceEquals(_activeOverlay.DataContext, request.Sender))
+                    _activeOverlay.RequestCloseAnimated();
+                break;
+            case AppUiRequestKind.CloseSettings:
+                if (_settingsWindow is not null && ReferenceEquals(_settingsWindow.DataContext, request.Sender))
+                    _settingsWindow.Close();
+                break;
+            case AppUiRequestKind.ShowSettingsPermissionDialog:
+                if (_settingsWindow is not null && ReferenceEquals(_settingsWindow.DataContext, request.Sender))
+                    _settingsWindow.RequestShowPermissionDialog();
+                break;
+            case AppUiRequestKind.CloseSetupWizard:
+                if (_wizardWindow is not null && ReferenceEquals(_wizardWindow.DataContext, request.Sender))
+                    _wizardWindow.Close();
+                break;
+            default:
+                break;
         }
     }
 
@@ -595,7 +662,7 @@ public partial class App : Application
         }
 
         var modelManager = _serviceProvider!.GetRequiredService<IModelManager>();
-        if (!IsRequiredModelReady(modelManager))
+        if (!IsRequiredModelReady(modelManager, settingsService.Current))
         {
             Log.Warning("Required model not ready, showing setup wizard instead of overlay");
             _ = ShowSetupWizardAsync(settingsService, modelManager, startStep: 2);
@@ -632,13 +699,24 @@ public partial class App : Application
         var loc = _serviceProvider!.GetRequiredService<ILocalizationService>();
         var overlayLogger = _serviceProvider!.GetRequiredService<ILogger<OverlayViewModel>>();
         var clipboard = platform.Clipboard;
-        var vm = new OverlayViewModel(target, pipeline, platform.TextInjector, engine, settingsService.Current, clipboard, loc, settingsService, overlayLogger);
-        vm.RequestOpenSettings += () => Dispatcher.UIThread.Post(ShowSettings);
+        var vm = new OverlayViewModel(
+            target,
+            pipeline,
+            platform.TextInjector,
+            engine,
+            settingsService.Current,
+            clipboard,
+            loc,
+            settingsService,
+            overlayLogger,
+            modelManager,
+            _messenger);
         _activeOverlay = new OverlayWindow(vm);
+        var uiSettings = settingsService.Current.UI;
+        _activeOverlay.ApplyAutoSizingDefaults();
 
         PositionOverlay(_activeOverlay, target);
 
-        var uiSettings = settingsService.Current.UI;
         _activeOverlay.SetBackgroundOpacity(uiSettings.OverlayOpacity);
         _activeOverlay.Closed += (_, _) =>
         {
@@ -657,10 +735,13 @@ public partial class App : Application
         }, TimeSpan.FromMilliseconds(50));
     }
 
-    private static bool IsRequiredModelReady(IModelManager modelManager)
+    private static bool IsRequiredModelReady(IModelManager modelManager, SettingsModel settings)
     {
         var installed = modelManager.ListInstalled();
-        return ModelRegistry.RequiredModels.All(
+        var requiredModels = ModelRegistry.GetRequiredModelsForLanguagePair(
+            settings.Translation.DefaultSourceLanguage,
+            settings.Translation.DefaultTargetLanguage);
+        return requiredModels.All(
             req => installed.Any(m => m.Id == req.Id));
     }
 
@@ -674,7 +755,7 @@ public partial class App : Application
             return;
         }
 
-        var wizardVm = new SetupWizardViewModel(settingsService, modelManager, startStep);
+        var wizardVm = new SetupWizardViewModel(settingsService, modelManager, startStep, _messenger);
         _wizardWindow = new SetupWizardWindow(wizardVm);
         var done = new TaskCompletionSource();
         _wizardWindow.Closed += (_, _) =>
@@ -795,7 +876,7 @@ public partial class App : Application
         var loc = _serviceProvider!.GetRequiredService<ILocalizationService>();
         var issues = new List<string>();
         var modelManager = _serviceProvider!.GetRequiredService<IModelManager>();
-        if (!IsRequiredModelReady(modelManager))
+        if (!IsRequiredModelReady(modelManager, settingsService.Current))
             issues.Add(loc.T("toast.modelNotDownloaded"));
 
         if (issues.Count == 0) return;
@@ -807,7 +888,7 @@ public partial class App : Application
             toast.ConfigureRequested += () =>
             {
                 _ = ShowSetupWizardAsync(settingsService, modelManager,
-                    startStep: issues.Contains("AI model not downloaded") ? 2 : 0);
+                    startStep: 2);
             };
             toast.Show();
         });

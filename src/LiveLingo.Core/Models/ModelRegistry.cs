@@ -5,23 +5,59 @@ public static class ModelRegistry
     public static readonly ModelDescriptor MarianZhEn = new(
         "opus-mt-zh-en",
         "MarianMT Chinese→English",
-        "https://huggingface.co/Helsinki-NLP/opus-mt-zh-en/resolve/main/pytorch_model.bin",
-        312_500_000,
-        ModelType.Translation);
+        "https://huggingface.co/Xenova/opus-mt-zh-en/resolve/main/onnx/encoder_model.onnx",
+        447_388_663,
+        ModelType.Translation)
+    {
+        Assets =
+        [
+            new("onnx/encoder_model.onnx", "https://huggingface.co/Xenova/opus-mt-zh-en/resolve/main/onnx/encoder_model.onnx", 209_938_220),
+            new("onnx/decoder_model_merged.onnx", "https://huggingface.co/Xenova/opus-mt-zh-en/resolve/main/onnx/decoder_model_merged.onnx", 235_839_236),
+            new("source.spm", "https://huggingface.co/Xenova/opus-mt-zh-en/resolve/main/source.spm", 804_677),
+            new("target.spm", "https://huggingface.co/Xenova/opus-mt-zh-en/resolve/main/target.spm", 806_530),
+            new("vocab.json", "https://huggingface.co/Xenova/opus-mt-zh-en/resolve/main/vocab.json", 1_617_902),
+            new("config.json", "https://huggingface.co/Xenova/opus-mt-zh-en/resolve/main/config.json", 0),
+            new("generation_config.json", "https://huggingface.co/Xenova/opus-mt-zh-en/resolve/main/generation_config.json", 0),
+        ]
+    };
 
     public static readonly ModelDescriptor MarianEnZh = new(
         "opus-mt-en-zh",
         "MarianMT English→Chinese",
-        "https://huggingface.co/Helsinki-NLP/opus-mt-en-zh/resolve/main/pytorch_model.bin",
-        312_500_000,
-        ModelType.Translation);
+        "https://huggingface.co/Xenova/opus-mt-en-zh/resolve/main/onnx/encoder_model.onnx",
+        447_388_663,
+        ModelType.Translation)
+    {
+        Assets =
+        [
+            new("onnx/encoder_model.onnx", "https://huggingface.co/Xenova/opus-mt-en-zh/resolve/main/onnx/encoder_model.onnx", 209_938_220),
+            new("onnx/decoder_model_merged.onnx", "https://huggingface.co/Xenova/opus-mt-en-zh/resolve/main/onnx/decoder_model_merged.onnx", 235_839_236),
+            new("source.spm", "https://huggingface.co/Xenova/opus-mt-en-zh/resolve/main/source.spm", 804_677),
+            new("target.spm", "https://huggingface.co/Xenova/opus-mt-en-zh/resolve/main/target.spm", 806_530),
+            new("vocab.json", "https://huggingface.co/Xenova/opus-mt-en-zh/resolve/main/vocab.json", 1_617_902),
+            new("config.json", "https://huggingface.co/Xenova/opus-mt-en-zh/resolve/main/config.json", 0),
+            new("generation_config.json", "https://huggingface.co/Xenova/opus-mt-en-zh/resolve/main/generation_config.json", 0),
+        ]
+    };
 
     public static readonly ModelDescriptor MarianJaEn = new(
         "opus-mt-ja-en",
         "MarianMT Japanese→English",
-        "https://huggingface.co/Helsinki-NLP/opus-mt-ja-en/resolve/main/pytorch_model.bin",
-        312_500_000,
-        ModelType.Translation);
+        "https://huggingface.co/Xenova/opus-mt-ja-en/resolve/main/onnx/encoder_model.onnx",
+        447_388_663,
+        ModelType.Translation)
+    {
+        Assets =
+        [
+            new("onnx/encoder_model.onnx", "https://huggingface.co/Xenova/opus-mt-ja-en/resolve/main/onnx/encoder_model.onnx", 209_938_220),
+            new("onnx/decoder_model_merged.onnx", "https://huggingface.co/Xenova/opus-mt-ja-en/resolve/main/onnx/decoder_model_merged.onnx", 235_839_236),
+            new("source.spm", "https://huggingface.co/Xenova/opus-mt-ja-en/resolve/main/source.spm", 804_677),
+            new("target.spm", "https://huggingface.co/Xenova/opus-mt-ja-en/resolve/main/target.spm", 806_530),
+            new("vocab.json", "https://huggingface.co/Xenova/opus-mt-ja-en/resolve/main/vocab.json", 1_617_902),
+            new("config.json", "https://huggingface.co/Xenova/opus-mt-ja-en/resolve/main/config.json", 0),
+            new("generation_config.json", "https://huggingface.co/Xenova/opus-mt-ja-en/resolve/main/generation_config.json", 0),
+        ]
+    };
 
     public static readonly ModelDescriptor FastTextLid = new(
         "lid.176.ftz",
@@ -41,6 +77,9 @@ public static class ModelRegistry
         [MarianZhEn, MarianEnZh, MarianJaEn];
 
     public static IReadOnlyList<ModelDescriptor> RequiredModels { get; } =
+        [FastTextLid, MarianZhEn];
+
+    public static IReadOnlyList<ModelDescriptor> OptionalModels { get; } =
         [Qwen25_15B];
 
     public static IReadOnlyList<ModelDescriptor> AllModels { get; } =
@@ -50,5 +89,15 @@ public static class ModelRegistry
     {
         var id = $"opus-mt-{sourceLanguage}-{targetLanguage}";
         return TranslationModels.FirstOrDefault(m => m.Id == id);
+    }
+
+    public static IReadOnlyList<ModelDescriptor> GetRequiredModelsForLanguagePair(
+        string? sourceLanguage,
+        string? targetLanguage)
+    {
+        var src = string.IsNullOrWhiteSpace(sourceLanguage) ? "zh" : sourceLanguage;
+        var tgt = string.IsNullOrWhiteSpace(targetLanguage) ? "en" : targetLanguage;
+        var translationModel = FindTranslationModel(src, tgt) ?? MarianZhEn;
+        return [FastTextLid, translationModel];
     }
 }

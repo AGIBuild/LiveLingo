@@ -8,20 +8,22 @@ using LiveLingo.Core.Engines;
 using LiveLingo.Core.Models;
 using LiveLingo.Core.Translation;
 using NSubstitute;
+using UserSettings = LiveLingo.Desktop.Services.Configuration.SettingsModel;
 
 namespace LiveLingo.Desktop.Tests.SmokeTests;
 
 public class AppStartupSmokeTests
 {
-    private static IModelManager CreateModelManager(bool qwenInstalled = false)
+    private static IModelManager CreateModelManager(bool requiredModelsInstalled = false)
     {
         var mm = Substitute.For<IModelManager>();
-        if (qwenInstalled)
+        if (requiredModelsInstalled)
         {
-            var installed = new InstalledModel(
-                ModelRegistry.Qwen25_15B.Id, "Qwen", "/path", 100,
-                ModelType.PostProcessing, DateTime.UtcNow);
-            mm.ListInstalled().Returns([installed]);
+            var installed = ModelRegistry.GetRequiredModelsForLanguagePair("zh", "en")
+                .Select(m => new InstalledModel(
+                    m.Id, m.DisplayName, "/path", m.SizeBytes, m.Type, DateTime.UtcNow))
+                .ToArray();
+            mm.ListInstalled().Returns(installed);
         }
         else
         {
@@ -83,12 +85,12 @@ public class AppStartupSmokeTests
     }
 
     [AvaloniaFact]
-    public void SetupWizard_ShowsModelInstalled_WhenQwenPresent()
+    public void SetupWizard_ShowsModelInstalled_WhenRequiredModelsPresent()
     {
         var settingsService = Substitute.For<ISettingsService>();
         settingsService.Current.Returns(new UserSettings());
 
-        var vm = new SetupWizardViewModel(settingsService, CreateModelManager(qwenInstalled: true));
+        var vm = new SetupWizardViewModel(settingsService, CreateModelManager(requiredModelsInstalled: true));
 
         Assert.True(vm.IsModelInstalled);
     }
@@ -181,7 +183,7 @@ public class AppStartupSmokeTests
     [Fact]
     public void HealthCheck_DetectsModelMissing()
     {
-        var mm = CreateModelManager(qwenInstalled: false);
+        var mm = CreateModelManager(requiredModelsInstalled: false);
         var installed = mm.ListInstalled();
         var allReady = ModelRegistry.RequiredModels.All(
             req => installed.Any(m => m.Id == req.Id));
@@ -192,7 +194,7 @@ public class AppStartupSmokeTests
     [Fact]
     public void HealthCheck_PassesWhenModelInstalled()
     {
-        var mm = CreateModelManager(qwenInstalled: true);
+        var mm = CreateModelManager(requiredModelsInstalled: true);
         var installed = mm.ListInstalled();
         var allReady = ModelRegistry.RequiredModels.All(
             req => installed.Any(m => m.Id == req.Id));
