@@ -50,7 +50,7 @@ public partial class SettingsWindow : Window
             CanResize = false,
             Background = bgSurface,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            SystemDecorations = SystemDecorations.Full
+            WindowDecorations = WindowDecorations.Full
         };
 
         var root = new StackPanel { Margin = new Avalonia.Thickness(24, 20), Spacing = 16 };

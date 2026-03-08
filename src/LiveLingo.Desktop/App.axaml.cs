@@ -261,7 +261,7 @@ public partial class App : Application
             CanResize = false,
             Background = bgSurface,
             WindowStartupLocation = WindowStartupLocation.CenterScreen,
-            SystemDecorations = SystemDecorations.Full
+            WindowDecorations = WindowDecorations.Full
         };
 
         var root = new StackPanel

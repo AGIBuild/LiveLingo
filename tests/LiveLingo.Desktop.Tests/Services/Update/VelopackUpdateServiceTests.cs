@@ -14,7 +14,7 @@ public class UpdateServiceContractTests
         _sut.IsUpdateAvailable.Returns(true);
         _sut.AvailableVersion.Returns("1.2.0");
 
-        var result = await _sut.CheckForUpdateAsync();
+        var result = await _sut.CheckForUpdateAsync(TestContext.Current.CancellationToken);
 
         Assert.True(result);
         Assert.True(_sut.IsUpdateAvailable);
@@ -28,7 +28,7 @@ public class UpdateServiceContractTests
         _sut.IsUpdateAvailable.Returns(false);
         _sut.AvailableVersion.Returns((string?)null);
 
-        var result = await _sut.CheckForUpdateAsync();
+        var result = await _sut.CheckForUpdateAsync(TestContext.Current.CancellationToken);
 
         Assert.False(result);
         Assert.False(_sut.IsUpdateAvailable);
@@ -41,7 +41,7 @@ public class UpdateServiceContractTests
         var progressValues = new List<int>();
         var progress = new Progress<int>(v => progressValues.Add(v));
 
-        await _sut.DownloadAndApplyAsync(progress);
+        await _sut.DownloadAndApplyAsync(progress, TestContext.Current.CancellationToken);
 
         await _sut.Received(1).DownloadAndApplyAsync(progress, Arg.Any<CancellationToken>());
     }

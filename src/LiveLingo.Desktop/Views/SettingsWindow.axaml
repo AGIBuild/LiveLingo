@@ -10,9 +10,7 @@
         WindowStartupLocation="CenterScreen"
         TransparencyLevelHint="AcrylicBlur"
         Background="Transparent"
-        ExtendClientAreaToDecorationsHint="True"
-        ExtendClientAreaChromeHints="NoChrome"
-        ExtendClientAreaTitleBarHeightHint="-1">
+        WindowDecorations="None">
 
     <Panel>
         <Border Name="BgBorder" IsHitTestVisible="False"
@@ -196,7 +194,7 @@
                                 <TextBlock Classes="label" Text="Storage Path:"/>
                                 <TextBox Grid.Column="1" Classes="themed"
                                          Text="{Binding ModelStoragePath}"
-                                         Watermark="Default (AppData)"/>
+                                         PlaceholderText="Default (AppData)"/>
                                 <Button Grid.Column="2" Content="Browse…"
                                         Click="BrowseModelPath_Click"
                                         Margin="6,0,0,0" Padding="10,6"
