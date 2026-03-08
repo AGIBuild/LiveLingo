@@ -15,18 +15,11 @@
         ExtendClientAreaTitleBarHeightHint="-1">
 
     <Panel>
-        <ExperimentalAcrylicBorder Name="AcrylicBg" IsHitTestVisible="False">
-            <ExperimentalAcrylicBorder.Material>
-                <ExperimentalAcrylicMaterial
-                    BackgroundSource="Digger"
-                    TintColor="{StaticResource BgDeep}"
-                    TintOpacity="0.92"
-                    MaterialOpacity="0.92"/>
-            </ExperimentalAcrylicBorder.Material>
-        </ExperimentalAcrylicBorder>
+        <Border Name="BgBorder" IsHitTestVisible="False"
+                Background="#D91C1C1E" CornerRadius="8"/>
 
         <Border IsHitTestVisible="False"
-                BorderBrush="#10FFFFFF" BorderThickness="1"
+                BorderBrush="#15FFFFFF" BorderThickness="1"
                 CornerRadius="8"/>
 
         <DockPanel Margin="24,36,24,20">
@@ -68,7 +61,7 @@
                             <Grid ColumnDefinitions="130,*" RowDefinitions="Auto,Auto" RowSpacing="10">
                                 <TextBlock Classes="label" Text="Opacity:"/>
                                 <Grid Grid.Column="1" ColumnDefinitions="*,36">
-                                    <Slider Classes="themed" Minimum="0.3" Maximum="1.0"
+                                    <Slider Classes="themed" Minimum="0.1" Maximum="1.0"
                                             Value="{Binding OverlayOpacity}"
                                             TickFrequency="0.05" IsSnapToTickEnabled="True"/>
                                     <TextBlock Grid.Column="1" VerticalAlignment="Center"

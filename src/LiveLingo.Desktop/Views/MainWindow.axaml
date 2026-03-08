@@ -20,18 +20,9 @@
     </Window.Styles>
 
     <Panel>
-        <ExperimentalAcrylicBorder IsHitTestVisible="False">
-            <ExperimentalAcrylicBorder.Material>
-                <ExperimentalAcrylicMaterial
-                    BackgroundSource="Digger"
-                    TintColor="{StaticResource BgDeep}"
-                    TintOpacity="0.92"
-                    MaterialOpacity="0.92"/>
-            </ExperimentalAcrylicBorder.Material>
-        </ExperimentalAcrylicBorder>
-
+        <Border IsHitTestVisible="False" Background="#D91C1C1E" CornerRadius="8"/>
         <Border IsHitTestVisible="False"
-                BorderBrush="#10FFFFFF" BorderThickness="1"
+                BorderBrush="#15FFFFFF" BorderThickness="1"
                 CornerRadius="8"/>
 
         <StackPanel Margin="28,40,28,24" Spacing="14" VerticalAlignment="Center">

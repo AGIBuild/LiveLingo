@@ -132,19 +132,42 @@ public partial class OverlayWindow : Window
 
     public void SetBackgroundOpacity(double opacity)
     {
-        var border = this.FindControl<ExperimentalAcrylicBorder>("AcrylicBg");
-        if (border is null) return;
+        var frameAlpha = (byte)(opacity * 255);
+        var panelAlpha = (byte)(Math.Max(opacity, 0.55) * 255);
 
-        border.Material = new ExperimentalAcrylicMaterial
-        {
-            BackgroundSource = AcrylicBackgroundSource.Digger,
-            TintColor = Color.Parse("#0D0D0F"),
-            TintOpacity = opacity,
-            MaterialOpacity = opacity
-        };
+        // t: 0 at min opacity (0.1), 1 at max opacity (1.0)
+        var t = Math.Clamp((opacity - 0.1) / 0.9, 0, 1);
+
+        Resources["OvFrameBrush"] = MakeBrush(frameAlpha, 0x1C, 0x1C, 0x1E);
+        Resources["OvPanelBrush"] = MakeBrush(panelAlpha, 0x1C, 0x1C, 0x1E);
+
+        Resources["OvFgPrimaryBrush"]   = new SolidColorBrush(Lerp(0xFF, 0xFF, 0xFF, 0xE5, 0xE5, 0xE7, t));
+        Resources["OvFgSecondaryBrush"] = new SolidColorBrush(Lerp(0xF0, 0xF0, 0xF2, 0xC7, 0xC7, 0xCC, t));
+        Resources["OvFgTertiaryBrush"]  = new SolidColorBrush(Lerp(0xE0, 0xE0, 0xE4, 0xAE, 0xAE, 0xB2, t));
+        Resources["OvFgMutedBrush"]     = new SolidColorBrush(Lerp(0xD5, 0xD5, 0xD9, 0xA1, 0xA1, 0xA6, t));
+    }
+
+    private static SolidColorBrush MakeBrush(byte a, byte r, byte g, byte b)
+        => new(Color.FromArgb(a, r, g, b));
+
+    private static Color Lerp(
+        byte r0, byte g0, byte b0,
+        byte r1, byte g1, byte b1,
+        double t)
+    {
+        return Color.FromRgb(
+            (byte)(r0 + (r1 - r0) * t),
+            (byte)(g0 + (g1 - g0) * t),
+            (byte)(b0 + (b1 - b0) * t));
     }
 
     private void CloseButton_Click(object? sender, RoutedEventArgs e) => FadeOutAndClose();
+
+    private void SendButton_Click(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is OverlayViewModel vm && !_isSending)
+            PerformSend(vm);
+    }
 
     private void FocusSourceInput()
     {
