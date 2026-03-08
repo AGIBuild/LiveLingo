@@ -28,6 +28,8 @@
         "Clean",
         "Mutate",
         "Pack",
+        "PackMac",
+        "PackMsi",
         "Publish",
         "Restore",
         "Run",

@@ -261,6 +261,38 @@ class BuildTask : NukeBuild
                 $"--mainExe {mainExe} " +
                 $"--outputDir {ReleasesDir}",
                 environmentVariables: vpkEnv);
+
+            if (Runtime.StartsWith("win"))
+            {
+                var setupExe = ReleasesDir.GlobFiles("*Setup*.exe").FirstOrDefault();
+                if (setupExe is not null)
+                {
+                    var renamed = ReleasesDir / $"LiveLingo-{Version}-{Runtime}-Setup.exe";
+                    File.Move(setupExe, renamed, overwrite: true);
+                    Log.Information("Renamed installer: {Path}", renamed);
+                }
+            }
+        });
+
+    Target PackMsi => _ => _
+        .DependsOn(Publish)
+        .Requires(() => Runtime.StartsWith("win"))
+        .Executes(() =>
+        {
+            DotNetToolRestore();
+
+            ReleasesDir.CreateDirectory();
+
+            var wxsFile = RootDirectory / "build" / "windows" / "LiveLingo.wxs";
+            var msiOutput = ReleasesDir / $"LiveLingo-{Version}-{Runtime}.msi";
+
+            DotNet(
+                $"wix build \"{wxsFile}\" " +
+                $"-o \"{msiOutput}\" " +
+                $"-d Version={Version} " +
+                $"-d PublishDir={PublishDir / Runtime}");
+
+            Log.Information("Windows MSI created: {Path}", msiOutput);
         });
 
     Target PackMac => _ => _

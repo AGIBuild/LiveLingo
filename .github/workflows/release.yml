@@ -14,22 +14,26 @@ permissions:
   contents: write
 
 jobs:
-  release:
-    runs-on: windows-latest
+  # Stage 1: Verify compilation
+  compile:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+      version: ${{ steps.meta.outputs.version }}
 
     steps:
       - name: Resolve tag and version
         id: meta
-        shell: pwsh
+        shell: bash
         run: |
-          if ('${{ github.event_name }}' -eq 'push') {
-            $tag = '${{ github.ref_name }}'
-          } else {
-            $tag = '${{ inputs.tag }}'
-          }
-          $version = $tag -replace '^v', ''
-          "tag=$tag"         | Out-File -Append $env:GITHUB_OUTPUT
-          "version=$version" | Out-File -Append $env:GITHUB_OUTPUT
+          if [ "${{ github.event_name }}" = "push" ]; then
+            TAG="${{ github.ref_name }}"
+          else
+            TAG="${{ inputs.tag }}"
+          fi
+          VERSION="${TAG#v}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
       - uses: actions/checkout@v4
         with:
@@ -45,17 +49,115 @@ jobs:
           key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
           restore-keys: ${{ runner.os }}-nuget-
 
+      - name: Compile
+        run: dotnet build LiveLingo.slnx -c Release --nologo
+
+  # Stage 2: Run tests
+  test:
+    needs: compile
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.compile.outputs.tag }}
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: ${{ runner.os }}-nuget-
+
       - name: Restore tools
         run: dotnet tool restore
 
-      - name: Test + Build + Pack
+      - name: Test
+        run: |
+          chmod +x build.sh
+          ./build.sh Test
+
+  # Stage 3: Build platform-specific installers
+  pack:
+    needs: [compile, test]
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            runtime: win-x64
+            shell: pwsh
+          - os: macos-latest
+            runtime: osx-arm64
+            shell: bash
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.compile.outputs.tag }}
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: ${{ runner.os }}-nuget-
+
+      - name: Restore tools
+        run: dotnet tool restore
+
+      - name: Pack (Windows)
+        if: matrix.runtime == 'win-x64'
         shell: pwsh
-        run: ./build.ps1 Pack --Version ${{ steps.meta.outputs.version }}
+        run: ./build.ps1 Pack PackMsi --skip Test --Runtime ${{ matrix.runtime }} --Version ${{ needs.compile.outputs.version }}
+
+      - name: Pack (macOS)
+        if: matrix.runtime == 'osx-arm64'
+        shell: bash
+        run: |
+          chmod +x build.sh
+          ./build.sh PackMac --skip Test --Runtime ${{ matrix.runtime }} --Version ${{ needs.compile.outputs.version }}
+
+      - name: Upload installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: installers-${{ matrix.runtime }}
+          path: |
+            releases/*.exe
+            releases/*.msi
+            releases/*.pkg
+          if-no-files-found: error
+
+  # Stage 4: Create GitHub Release with only installer files
+  release:
+    needs: [compile, pack]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download all installer artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: installers
+          pattern: installers-*
+          merge-multiple: true
+
+      - name: List release files
+        run: ls -la installers/
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.meta.outputs.tag }}
-          name: LiveLingo ${{ steps.meta.outputs.tag }}
-          files: releases/*
+          tag_name: ${{ needs.compile.outputs.tag }}
+          name: LiveLingo ${{ needs.compile.outputs.tag }}
+          files: |
+            installers/*.exe
+            installers/*.msi
+            installers/*.pkg
           generate_release_notes: true
