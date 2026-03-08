@@ -3,14 +3,16 @@
         xmlns:vm="using:LiveLingo.Desktop.ViewModels"
         x:Class="LiveLingo.Desktop.Views.OverlayWindow"
         x:DataType="vm:OverlayViewModel"
-        SystemDecorations="None"
+        WindowDecorations="None"
         Topmost="True"
         CanResize="True"
         ShowInTaskbar="False"
+        UseLayoutRounding="True"
         Background="Transparent"
         TransparencyLevelHint="Transparent"
-        Width="600" Height="300"
-        MinWidth="320" MinHeight="180" MaxHeight="600"
+        Width="600"
+        SizeToContent="Height"
+        MinWidth="320" MinHeight="220" MaxHeight="600"
         WindowStartupLocation="Manual">
 
     <Window.Resources>
@@ -33,7 +35,9 @@
             <Setter Property="CornerRadius" Value="8"/>
             <Setter Property="AcceptsReturn" Value="True"/>
             <Setter Property="TextWrapping" Value="Wrap"/>
-            <Setter Property="Watermark" Value=""/>
+            <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
+            <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled"/>
+            <Setter Property="PlaceholderText" Value=""/>
         </Style>
         <Style Selector="TextBox.source:pointerover /template/ Border#PART_BorderElement">
             <Setter Property="Background" Value="{DynamicResource OvPanelBrush}"/>
@@ -104,7 +108,7 @@
                 BorderBrush="#15FFFFFF" BorderThickness="1"/>
 
         <Border CornerRadius="12" Padding="0">
-            <Grid RowDefinitions="Auto,Auto,Auto,*,Auto">
+            <Grid RowDefinitions="Auto,*,Auto">
 
                 <!-- Title bar -->
                 <Border Grid.Row="0" Name="DragHandle"
@@ -129,58 +133,61 @@
                     </Grid>
                 </Border>
 
-                <!-- Source input -->
-                <Grid Grid.Row="1" Margin="14,0,14,0">
-                    <TextBox Classes="source"
-                             Text="{Binding SourceText, Mode=TwoWay}"
-                             Watermark="{Binding SourceHint}"
-                             Name="SourceInput"
-                             MinHeight="60" MaxHeight="120"/>
-                    <TextBlock Text="{Binding SourceTextLength}"
-                               FontSize="10" Foreground="{DynamicResource OvFgMutedBrush}"
-                               HorizontalAlignment="Right"
-                               VerticalAlignment="Bottom"
-                               Margin="0,0,10,6"
-                               IsHitTestVisible="False"/>
+                <Grid Grid.Row="1" RowDefinitions="Auto,Auto,*">
+                    <!-- Source input -->
+                    <Grid Grid.Row="0" Margin="14,0,14,0" MinHeight="64">
+                        <TextBox Classes="source"
+                                 Text="{Binding SourceText, Mode=TwoWay}"
+                                 PlaceholderText="{Binding SourceHint}"
+                                 Name="SourceInput"
+                                 MinHeight="64"
+                                 MaxHeight="220"/>
+                        <TextBlock Text="{Binding SourceTextLength}"
+                                   FontSize="10" Foreground="{DynamicResource OvFgMutedBrush}"
+                                   HorizontalAlignment="Right"
+                                   VerticalAlignment="Bottom"
+                                   Margin="0,0,10,6"
+                                   IsHitTestVisible="False"/>
+                    </Grid>
+
+                    <!-- Loading indicator -->
+                    <ProgressBar Grid.Row="1" IsIndeterminate="True"
+                                 IsVisible="{Binding IsTranslating}"
+                                 Height="2" Margin="14,4,14,0"
+                                 Foreground="{StaticResource AccentBrush}"
+                                 Background="{StaticResource BgSurfaceBrush}"/>
+
+                    <!-- Translation result -->
+                    <Border Grid.Row="2" Margin="14,8,14,0" Name="TranslationBorder"
+                            CornerRadius="8" Background="{DynamicResource OvPanelBrush}"
+                            MinHeight="40"
+                            IsVisible="{Binding TranslatedText,
+                                        Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <ScrollViewer Grid.Column="0"
+                                          HorizontalScrollBarVisibility="Disabled"
+                                          VerticalScrollBarVisibility="Auto">
+                                <SelectableTextBlock Classes="translation"
+                                                     Text="{Binding TranslatedText}"/>
+                            </ScrollViewer>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Top" Margin="0,4,4,0">
+                                <Button Classes="copyBtn"
+                                        Command="{Binding CopyTranslationCommand}">
+                                    <Panel>
+                                        <TextBlock Text="{Binding CopyLabel}"
+                                                   IsVisible="{Binding !ShowCopiedFeedback}"/>
+                                        <TextBlock Text="{Binding CopiedLabel}"
+                                                   Foreground="{StaticResource SuccessBrush}"
+                                                   IsVisible="{Binding ShowCopiedFeedback}"/>
+                                    </Panel>
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
                 </Grid>
 
-                <!-- Loading indicator -->
-                <ProgressBar Grid.Row="2" IsIndeterminate="True"
-                             IsVisible="{Binding IsTranslating}"
-                             Height="2" Margin="14,4,14,0"
-                             Foreground="{StaticResource AccentBrush}"
-                             Background="{StaticResource BgSurfaceBrush}"/>
-
-                <!-- Translation result -->
-                <Border Grid.Row="3" Margin="14,8,14,0" Name="TranslationBorder"
-                        CornerRadius="8" Background="{DynamicResource OvPanelBrush}"
-                        MinHeight="40"
-                        IsVisible="{Binding TranslatedText,
-                                    Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                    <Grid ColumnDefinitions="*,Auto">
-                        <ScrollViewer Grid.Column="0"
-                                      HorizontalScrollBarVisibility="Disabled"
-                                      VerticalScrollBarVisibility="Auto">
-                            <SelectableTextBlock Classes="translation"
-                                                 Text="{Binding TranslatedText}"/>
-                        </ScrollViewer>
-                        <StackPanel Grid.Column="1" VerticalAlignment="Top" Margin="0,4,4,0">
-                            <Button Classes="copyBtn"
-                                    Command="{Binding CopyTranslationCommand}">
-                                <Panel>
-                                    <TextBlock Text="{Binding CopyLabel}"
-                                               IsVisible="{Binding !ShowCopiedFeedback}"/>
-                                    <TextBlock Text="{Binding CopiedLabel}"
-                                               Foreground="{StaticResource SuccessBrush}"
-                                               IsVisible="{Binding ShowCopiedFeedback}"/>
-                                </Panel>
-                            </Button>
-                        </StackPanel>
-                    </Grid>
-                </Border>
-
                 <!-- Bottom bar -->
-                <Grid Grid.Row="4" Margin="14,8,14,12"
+                <Grid Grid.Row="2" Margin="14,8,14,12" MinHeight="30"
                       ColumnDefinitions="Auto,*,Auto,Auto">
                     <TextBlock Grid.Column="0" Classes="status"
                                Text="{Binding StatusText}" VerticalAlignment="Center"/>

@@ -105,7 +105,7 @@ public class ModelItemViewModelTests
         var vm = new ModelItemViewModel(TestDescriptor, mm, isInstalled: false);
 
         var first = vm.DownloadCommand.ExecuteAsync(null);
-        await Task.Delay(50);
+        await Task.Delay(50, TestContext.Current.CancellationToken);
         await vm.DownloadCommand.ExecuteAsync(null);
         tcs.SetResult();
         await first;
@@ -133,7 +133,7 @@ public class ModelItemViewModelTests
         var vm = new ModelItemViewModel(TestDescriptor, mm, isInstalled: false);
 
         var run = vm.DownloadCommand.ExecuteAsync(null);
-        await Task.Delay(80);
+        await Task.Delay(80, TestContext.Current.CancellationToken);
         vm.CancelDownloadCommand.Execute(null);
         await run;
 

@@ -18,7 +18,7 @@ public class JsonSettingsServiceTests : IDisposable
     public async Task LoadAsync_ReturnsDefaults_WhenNoFile()
     {
         var svc = new JsonSettingsService(_settingsPath);
-        await svc.LoadAsync();
+        await svc.LoadAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal("Ctrl+Alt+T", svc.Current.Hotkeys.OverlayToggle);
     }
@@ -29,10 +29,10 @@ public class JsonSettingsServiceTests : IDisposable
         var svc = new JsonSettingsService(_settingsPath);
         svc.Update(s => s);
         svc.Update(s => s);
-        await Task.Delay(100);
+        await Task.Delay(100, TestContext.Current.CancellationToken);
 
         var svc2 = new JsonSettingsService(_settingsPath);
-        await svc2.LoadAsync();
+        await svc2.LoadAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(svc.Current.Hotkeys.OverlayToggle, svc2.Current.Hotkeys.OverlayToggle);
     }
@@ -40,10 +40,10 @@ public class JsonSettingsServiceTests : IDisposable
     [Fact]
     public async Task LoadAsync_HandlesCorruptJson()
     {
-        await File.WriteAllTextAsync(_settingsPath, "{{{{corrupt json!!");
+        await File.WriteAllTextAsync(_settingsPath, "{{{{corrupt json!!", TestContext.Current.CancellationToken);
 
         var svc = new JsonSettingsService(_settingsPath);
-        await svc.LoadAsync();
+        await svc.LoadAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal("Ctrl+Alt+T", svc.Current.Hotkeys.OverlayToggle);
     }
@@ -65,7 +65,7 @@ public class JsonSettingsServiceTests : IDisposable
     {
         var nestedPath = Path.Combine(_tempDir, "sub", "deep", "settings.json");
         var svc = new JsonSettingsService(nestedPath);
-        await svc.SaveAsync();
+        await svc.SaveAsync(TestContext.Current.CancellationToken);
 
         Assert.True(File.Exists(nestedPath));
     }
@@ -81,7 +81,7 @@ public class JsonSettingsServiceTests : IDisposable
     public async Task SettingsFileExists_True_AfterSave()
     {
         var svc = new JsonSettingsService(_settingsPath);
-        await svc.SaveAsync();
+        await svc.SaveAsync(TestContext.Current.CancellationToken);
         Assert.True(svc.SettingsFileExists());
     }
 
@@ -90,10 +90,10 @@ public class JsonSettingsServiceTests : IDisposable
     {
         var svc = new JsonSettingsService(_settingsPath);
         svc.Update(s => s);
-        await Task.Delay(100);
+        await Task.Delay(100, TestContext.Current.CancellationToken);
 
         var svc2 = new JsonSettingsService(_settingsPath);
-        await svc2.LoadAsync();
+        await svc2.LoadAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal("zh", svc2.Current.Translation.DefaultSourceLanguage);
     }
@@ -102,9 +102,9 @@ public class JsonSettingsServiceTests : IDisposable
     public async Task SaveAsync_WritesValidJson()
     {
         var svc = new JsonSettingsService(_settingsPath);
-        await svc.SaveAsync();
+        await svc.SaveAsync(TestContext.Current.CancellationToken);
 
-        var json = await File.ReadAllTextAsync(_settingsPath);
+        var json = await File.ReadAllTextAsync(_settingsPath, TestContext.Current.CancellationToken);
         Assert.Contains("overlayToggle", json);
     }
 
@@ -117,10 +117,10 @@ public class JsonSettingsServiceTests : IDisposable
             "translation": { "defaultSourceLanguage": "ja" }
         }
         """;
-        await File.WriteAllTextAsync(_settingsPath, json);
+        await File.WriteAllTextAsync(_settingsPath, json, TestContext.Current.CancellationToken);
 
         var svc = new JsonSettingsService(_settingsPath);
-        await svc.LoadAsync();
+        await svc.LoadAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal("Alt+X", svc.Current.Hotkeys.OverlayToggle);
         Assert.Equal("ja", svc.Current.Translation.DefaultSourceLanguage);
@@ -144,7 +144,7 @@ public class JsonSettingsServiceTests : IDisposable
     {
         var rootFile = Path.Combine(_tempDir, "settings.json");
         var svc = new JsonSettingsService(rootFile);
-        await svc.SaveAsync();
+        await svc.SaveAsync(TestContext.Current.CancellationToken);
 
         Assert.True(File.Exists(rootFile));
     }
@@ -152,10 +152,10 @@ public class JsonSettingsServiceTests : IDisposable
     [Fact]
     public async Task LoadAsync_EmptyFile_ReturnsDefaults()
     {
-        await File.WriteAllTextAsync(_settingsPath, "");
+        await File.WriteAllTextAsync(_settingsPath, "", TestContext.Current.CancellationToken);
 
         var svc = new JsonSettingsService(_settingsPath);
-        await svc.LoadAsync();
+        await svc.LoadAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal("Ctrl+Alt+T", svc.Current.Hotkeys.OverlayToggle);
     }

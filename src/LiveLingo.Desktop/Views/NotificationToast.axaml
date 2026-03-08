@@ -1,7 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="LiveLingo.Desktop.Views.NotificationToast"
-        SystemDecorations="None"
+        WindowDecorations="None"
         Topmost="True"
         CanResize="False"
         ShowInTaskbar="False"

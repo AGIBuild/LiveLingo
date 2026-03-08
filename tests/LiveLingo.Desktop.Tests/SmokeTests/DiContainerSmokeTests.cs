@@ -56,7 +56,7 @@ public class DiContainerSmokeTests
         using var provider = BuildAppServiceProvider();
 
         var settings = provider.GetRequiredService<ISettingsService>();
-        await settings.LoadAsync();
+        await settings.LoadAsync(TestContext.Current.CancellationToken);
         Assert.NotNull(settings.Current);
         Assert.NotNull(settings.Current.Hotkeys);
         Assert.NotNull(settings.Current.Translation);

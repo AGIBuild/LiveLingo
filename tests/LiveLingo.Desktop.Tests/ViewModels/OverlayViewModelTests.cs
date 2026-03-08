@@ -135,7 +135,7 @@ public class OverlayViewModelTests
         var vm = CreateVm();
         vm.SourceText = "你好";
 
-        await Task.Delay(600);
+        await Task.Delay(600, TestContext.Current.CancellationToken);
 
         await _pipeline.Received()
             .ProcessAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>());
@@ -207,7 +207,7 @@ public class OverlayViewModelTests
 
         var vm = CreateVm();
         vm.SourceText = "你好";
-        await Task.Delay(600);
+        await Task.Delay(600, TestContext.Current.CancellationToken);
 
         Assert.Equal("Translated", vm.TranslatedText);
         Assert.Contains("42", vm.StatusText);
@@ -230,13 +230,13 @@ public class OverlayViewModelTests
 
         var vm = CreateVm();
         vm.SourceText = "first";
-        await Task.Delay(50);
+        await Task.Delay(50, TestContext.Current.CancellationToken);
 
         _pipeline.ProcessAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
             .Returns(new TranslationResult("Latest", "zh", "Latest", TimeSpan.Zero, null));
 
         vm.SourceText = "second";
-        await Task.Delay(600);
+        await Task.Delay(600, TestContext.Current.CancellationToken);
 
         Assert.Equal("Latest", vm.TranslatedText);
     }
@@ -290,7 +290,7 @@ public class OverlayViewModelTests
 
         var vm = CreateVm();
         vm.SourceText = "test";
-        await Task.Delay(700);
+        await Task.Delay(700, TestContext.Current.CancellationToken);
 
         Assert.Equal("Translating...", vm.StatusText);
         Assert.True(vm.IsTranslating);
@@ -314,7 +314,7 @@ public class OverlayViewModelTests
 
         var vm = CreateVm();
         vm.SourceText = "test";
-        await Task.Delay(600);
+        await Task.Delay(600, TestContext.Current.CancellationToken);
 
         Assert.Contains("Model not downloaded", vm.StatusText);
     }
@@ -327,7 +327,7 @@ public class OverlayViewModelTests
 
         var vm = CreateVm();
         vm.SourceText = "test";
-        await Task.Delay(600);
+        await Task.Delay(600, TestContext.Current.CancellationToken);
 
         Assert.Contains("Something broke", vm.StatusText);
         Assert.StartsWith("Error:", vm.StatusText);
@@ -341,7 +341,7 @@ public class OverlayViewModelTests
 
         var vm = CreateVm();
         vm.SourceText = "test";
-        await Task.Delay(600);
+        await Task.Delay(600, TestContext.Current.CancellationToken);
 
         Assert.DoesNotContain("Error", vm.StatusText);
     }
@@ -366,7 +366,7 @@ public class OverlayViewModelTests
         var vm = new OverlayViewModel(_target, pipeline, _injector, engine, settings, localizationService: _loc);
 
         vm.SourceText = "你好世界";
-        await Task.Delay(700);
+        await Task.Delay(700, TestContext.Current.CancellationToken);
 
         Assert.Equal("[zh→en] 你好世界", vm.TranslatedText);
         Assert.Contains("Translated", vm.StatusText);
@@ -388,7 +388,7 @@ public class OverlayViewModelTests
         var vm = new OverlayViewModel(_target, pipeline, _injector, engine, "en", localizationService: _loc);
 
         vm.SourceText = "Hello";
-        await Task.Delay(700);
+        await Task.Delay(700, TestContext.Current.CancellationToken);
 
         Assert.Equal("Hello", vm.TranslatedText);
     }
@@ -415,7 +415,7 @@ public class OverlayViewModelTests
         var vm = new OverlayViewModel(_target, pipeline, _injector, engine, settings, localizationService: _loc);
 
         vm.SourceText = "你好世界";
-        await Task.Delay(700);
+        await Task.Delay(700, TestContext.Current.CancellationToken);
 
         Assert.Equal("SUMMARY([zh→en] 你好世界)", vm.TranslatedText);
         Assert.Contains("post", vm.StatusText);
@@ -484,7 +484,7 @@ public class OverlayViewModelTests
 
         var vm = new OverlayViewModel(_target, _pipeline, _injector, _engine, settings, localizationService: _loc);
         vm.SourceText = "你好世界";
-        await Task.Delay(600);
+        await Task.Delay(600, TestContext.Current.CancellationToken);
 
         await _pipeline.Received().ProcessAsync(
             Arg.Is<TranslationRequest>(r => r.PostProcessing != null && r.PostProcessing.Summarize),
@@ -504,7 +504,7 @@ public class OverlayViewModelTests
 
         var vm = new OverlayViewModel(_target, _pipeline, _injector, _engine, settings, localizationService: _loc);
         vm.SourceText = "こんにちは";
-        await Task.Delay(600);
+        await Task.Delay(600, TestContext.Current.CancellationToken);
 
         await _pipeline.Received().ProcessAsync(
             Arg.Is<TranslationRequest>(r => r.SourceLanguage == "ja"),
@@ -577,10 +577,10 @@ public class OverlayViewModelTests
             .Returns(new TranslationResult("Result", "zh", "Result", TimeSpan.FromMilliseconds(10), null));
         var vm = CreateVm();
         vm.SourceText = "hello";
-        await Task.Delay(600);
+        await Task.Delay(600, TestContext.Current.CancellationToken);
 
         vm.SelectedTargetLanguage = _engine.SupportedLanguages.First(l => l.Code == "zh");
-        await Task.Delay(600);
+        await Task.Delay(600, TestContext.Current.CancellationToken);
 
         await _pipeline.Received().ProcessAsync(
             Arg.Is<TranslationRequest>(r => r.TargetLanguage == "zh"),
@@ -648,7 +648,7 @@ public class OverlayViewModelTests
         var vm = CreateVm();
         vm.TargetLanguage = "";
         vm.SourceText = "hello";
-        await Task.Delay(600);
+        await Task.Delay(600, TestContext.Current.CancellationToken);
 
         Assert.Contains("Target language is not configured", vm.StatusText);
         await _pipeline.DidNotReceive()
@@ -669,7 +669,7 @@ public class OverlayViewModelTests
         };
         var vm = new OverlayViewModel(_target, _pipeline, _injector, engine, settings, localizationService: _loc);
         vm.SourceText = "test";
-        await Task.Delay(600);
+        await Task.Delay(600, TestContext.Current.CancellationToken);
 
         Assert.Contains("Unsupported language pair", vm.StatusText);
         await _pipeline.DidNotReceive()
@@ -704,12 +704,12 @@ public class OverlayViewModelTests
 
         var vm = CreateVm();
         vm.SourceText = "a";
-        await Task.Delay(50);
+        await Task.Delay(50, TestContext.Current.CancellationToken);
         vm.SourceText = "ab";
-        await Task.Delay(50);
+        await Task.Delay(50, TestContext.Current.CancellationToken);
         vm.SourceText = "abc";
 
-        await Task.Delay(600);
+        await Task.Delay(600, TestContext.Current.CancellationToken);
 
         await _pipeline.Received(1)
             .ProcessAsync(
@@ -778,12 +778,12 @@ public class OverlayViewModelTests
 
         var vm = CreateVm();
         vm.SourceText = "test";
-        await Task.Delay(550);
+        await Task.Delay(550, TestContext.Current.CancellationToken);
 
         Assert.True(vm.IsTranslating);
 
         tcs.SetResult(new TranslationResult("Done", "zh", "Done", TimeSpan.Zero, null));
-        await Task.Delay(50);
+        await Task.Delay(50, TestContext.Current.CancellationToken);
 
         Assert.False(vm.IsTranslating);
     }
@@ -796,7 +796,7 @@ public class OverlayViewModelTests
 
         var vm = CreateVm();
         vm.SourceText = "test";
-        await Task.Delay(600);
+        await Task.Delay(600, TestContext.Current.CancellationToken);
 
         Assert.False(vm.IsTranslating);
     }
