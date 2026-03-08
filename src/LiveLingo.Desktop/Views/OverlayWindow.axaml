@@ -5,11 +5,12 @@
         x:DataType="vm:OverlayViewModel"
         SystemDecorations="None"
         Topmost="True"
-        CanResize="False"
+        CanResize="True"
         ShowInTaskbar="False"
         Background="Transparent"
         TransparencyLevelHint="Transparent"
-        Width="600" SizeToContent="Height" MaxHeight="500"
+        Width="600" Height="300"
+        MinWidth="320" MinHeight="180" MaxHeight="600"
         WindowStartupLocation="Manual">
 
     <Window.Resources>
@@ -254,5 +255,19 @@
                 </Grid>
             </Grid>
         </Border>
+
+        <!-- Resize grips (invisible edges + visible corner handle) -->
+        <Border Name="ResizeN" Height="4" VerticalAlignment="Top" Background="Transparent" Cursor="SizeNorthSouth"/>
+        <Border Name="ResizeS" Height="4" VerticalAlignment="Bottom" Background="Transparent" Cursor="SizeNorthSouth"/>
+        <Border Name="ResizeW" Width="4" HorizontalAlignment="Left" Background="Transparent" Cursor="SizeWestEast"/>
+        <Border Name="ResizeE" Width="4" HorizontalAlignment="Right" Background="Transparent" Cursor="SizeWestEast"/>
+        <Border Name="ResizeNW" Width="8" Height="8" VerticalAlignment="Top" HorizontalAlignment="Left" Background="Transparent" Cursor="TopLeftCorner"/>
+        <Border Name="ResizeNE" Width="8" Height="8" VerticalAlignment="Top" HorizontalAlignment="Right" Background="Transparent" Cursor="TopRightCorner"/>
+        <Border Name="ResizeSW" Width="8" Height="8" VerticalAlignment="Bottom" HorizontalAlignment="Left" Background="Transparent" Cursor="BottomLeftCorner"/>
+        <Panel Name="ResizeSE" Width="16" Height="16" VerticalAlignment="Bottom" HorizontalAlignment="Right" Cursor="BottomRightCorner">
+            <TextBlock Text="⌟" FontSize="14" Foreground="{DynamicResource OvFgMutedBrush}"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                       IsHitTestVisible="False"/>
+        </Panel>
     </Panel>
 </Window>

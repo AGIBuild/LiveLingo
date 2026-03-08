@@ -33,6 +33,35 @@ public partial class OverlayWindow : Window
         var langLink = this.FindControl<Avalonia.Controls.TextBlock>("TargetLangLink");
         if (langLink is not null)
             langLink.PointerPressed += (_, _) => vm.ToggleLanguagePickerCommand.Execute(null);
+
+        AttachResizeGrips();
+    }
+
+    private void AttachResizeGrips()
+    {
+        (string name, WindowEdge edge)[] grips =
+        [
+            ("ResizeN",  WindowEdge.North),
+            ("ResizeS",  WindowEdge.South),
+            ("ResizeW",  WindowEdge.West),
+            ("ResizeE",  WindowEdge.East),
+            ("ResizeNW", WindowEdge.NorthWest),
+            ("ResizeNE", WindowEdge.NorthEast),
+            ("ResizeSW", WindowEdge.SouthWest),
+            ("ResizeSE", WindowEdge.SouthEast),
+        ];
+
+        foreach (var (name, edge) in grips)
+        {
+            var el = this.FindControl<Control>(name);
+            if (el is null) continue;
+            var e2 = edge;
+            el.PointerPressed += (_, args) =>
+            {
+                if (args.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+                    BeginResizeDrag(e2, args);
+            };
+        }
     }
 
     private void OnTunnelKeyDown(object? sender, KeyEventArgs e)
