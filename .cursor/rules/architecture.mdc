@@ -1,0 +1,37 @@
+---
+description: LiveLingo architecture boundaries — ViewModel / UI / Platform separation
+alwaysApply: true
+---
+
+# Architecture Boundaries
+
+## Core Principle
+
+UI 不测试逻辑，逻辑不依赖 UI。
+
+## ViewModel Layer
+
+- ViewModel **禁止** 引用 `Avalonia.*` 命名空间
+- ViewModel **禁止** 使用 `Dispatcher`、`Dispatcher.UIThread` 或任何线程调度 API
+- ViewModel 只依赖接口 (`ISettingsService`, `ITranslationPipeline`, `ITextInjector`, `IModelManager` 等)
+- ViewModel 使用 `CommunityToolkit.Mvvm` (`ObservableObject`, `RelayCommand`)
+- 需要通知 UI 的行为通过事件 (`event Action? RequestClose`) 或属性变更实现
+
+## View Layer (Avalonia)
+
+- View 只负责绑定和布局
+- View 中 `code-behind` 仅处理 Avalonia 特有交互 (窗口定位、焦点、动画)
+- Dispatcher 调用只允许出现在 View 或 `App.axaml.cs` 中
+
+## Platform Layer
+
+- 平台差异通过接口抽象 (`IPlatformServices`, `IClipboardService`, `ITextInjector`)
+- 具体实现放在 `Platform/Windows/` 或 `Platform/macOS/`
+- 禁止在 ViewModel 中直接使用 P/Invoke 或平台 API
+
+## Testing
+
+- ViewModel 测试使用 NSubstitute mock 所有依赖
+- Stryker 变异测试 **不测试** Avalonia UI 项目（源生成器不兼容）
+- Stryker 只测试 `LiveLingo.Core` 项目
+- 代码覆盖率通过 `test.runsettings` 排除平台实现和 View 层

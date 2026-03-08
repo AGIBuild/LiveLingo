@@ -417,8 +417,6 @@ FodyWeavers.xsd
 *.msm
 *.msp
 
-# Cursor IDE
-.cursor/
 
 # Code coverage reports
 coverage-report/
