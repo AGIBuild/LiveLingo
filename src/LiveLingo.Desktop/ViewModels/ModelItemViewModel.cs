@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using LiveLingo.Desktop.Services.Localization;
 using LiveLingo.Core.Models;
 
 namespace LiveLingo.Desktop.ViewModels;
@@ -9,6 +10,7 @@ public partial class ModelItemViewModel : ObservableObject
 {
     private readonly ModelDescriptor _descriptor;
     private readonly IModelManager _modelManager;
+    private readonly ILocalizationService? _loc;
 
     [ObservableProperty] private bool _isInstalled;
     [ObservableProperty] private bool _isDownloading;
@@ -19,14 +21,29 @@ public partial class ModelItemViewModel : ObservableObject
 
     public string Id => _descriptor.Id;
     public string DisplayName => _descriptor.DisplayName;
-    public string TypeLabel => _descriptor.Type.ToString();
+    public string TypeLabel => _descriptor.Type switch
+    {
+        ModelType.Translation => L("model.type.translation", "Translation"),
+        ModelType.LanguageDetection => L("model.type.languageDetection", "Language Detection"),
+        ModelType.PostProcessing => L("model.type.postProcessing", "Post-Processing"),
+        _ => _descriptor.Type.ToString()
+    };
     public string SizeText => FormatBytes(_descriptor.SizeBytes);
+    public string DownloadButtonLabel => L("settings.models.download", "Download");
+    public string CancelButtonLabel => L("settings.models.cancel", "Cancel");
+    public string InstalledLabel => L("settings.models.installed", "✓ Installed");
+    public string DeleteButtonLabel => L("settings.models.delete", "Delete");
 
-    public ModelItemViewModel(ModelDescriptor descriptor, IModelManager modelManager, bool isInstalled)
+    public ModelItemViewModel(
+        ModelDescriptor descriptor,
+        IModelManager modelManager,
+        bool isInstalled,
+        ILocalizationService? localizationService = null)
     {
         _descriptor = descriptor;
         _modelManager = modelManager;
         _isInstalled = isInstalled;
+        _loc = localizationService;
     }
 
     [RelayCommand]
@@ -49,7 +66,7 @@ public partial class ModelItemViewModel : ObservableObject
         }
         catch (OperationCanceledException)
         {
-            ErrorMessage = "Cancelled";
+            ErrorMessage = L("wizard.download.cancelled", "Cancelled");
         }
         catch (Exception ex)
         {
@@ -92,13 +109,17 @@ public partial class ModelItemViewModel : ObservableObject
         _ => $"{bytes / 1_073_741_824.0:F1} GB"
     };
 
-    public static ObservableCollection<ModelItemViewModel> CreateAll(IModelManager modelManager)
+    public static ObservableCollection<ModelItemViewModel> CreateAll(
+        IModelManager modelManager,
+        ILocalizationService? localizationService = null)
     {
         var installed = modelManager.ListInstalled();
         var installedIds = new HashSet<string>(installed.Select(m => m.Id));
 
         return new ObservableCollection<ModelItemViewModel>(
             ModelRegistry.AllModels.Select(d =>
-                new ModelItemViewModel(d, modelManager, installedIds.Contains(d.Id))));
+                new ModelItemViewModel(d, modelManager, installedIds.Contains(d.Id), localizationService)));
     }
+
+    private string L(string key, string fallback) => _loc?.T(key) ?? fallback;
 }

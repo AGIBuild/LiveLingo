@@ -68,6 +68,12 @@ public sealed class ModelManager : IModelManager
             var totalBytes = assets.Sum(a => a.SizeBytes > 0 ? a.SizeBytes : 0);
             if (totalBytes <= 0)
                 totalBytes = descriptor.SizeBytes;
+            _logger.LogInformation(
+                "Starting model download {ModelId}: assetCount={AssetCount}, expectedBytes={TotalBytes}, targetDir={ModelDir}",
+                descriptor.Id,
+                assets.Count,
+                totalBytes,
+                modelDir);
 
             long downloadedBytes = 0;
             foreach (var asset in assets)
@@ -86,6 +92,11 @@ public sealed class ModelManager : IModelManager
             await File.WriteAllTextAsync(manifestPath, manifest.ToJson(), ct);
 
             _logger.LogDebug("Model {Id} downloaded to {Path}", descriptor.Id, modelDir);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Model download failed for {ModelId}", descriptor.Id);
+            throw;
         }
         finally
         {
@@ -110,6 +121,11 @@ public sealed class ModelManager : IModelManager
 
             long downloadedBytes = 0;
             var totalBytes = expectedBytes > 0 ? expectedBytes : descriptor.SizeBytes;
+            _logger.LogInformation(
+                "Repairing model assets for {ModelId}: missingCount={MissingCount}, expectedBytes={ExpectedBytes}",
+                descriptor.Id,
+                missingAssets.Count,
+                totalBytes);
             foreach (var asset in missingAssets)
             {
                 downloadedBytes += await DownloadAssetAsync(
@@ -125,6 +141,11 @@ public sealed class ModelManager : IModelManager
             var manifest = ModelManifest.FromDescriptor(descriptor);
             await File.WriteAllTextAsync(manifestPath, manifest.ToJson(), ct);
             _logger.LogDebug("Model {Id} assets repaired at {Path}", descriptor.Id, modelDir);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Model asset repair failed for {ModelId}", descriptor.Id);
+            throw;
         }
         finally
         {
@@ -150,46 +171,128 @@ public sealed class ModelManager : IModelManager
         if (File.Exists(finalPath))
         {
             var existingFileSize = new FileInfo(finalPath).Length;
+            _logger.LogDebug(
+                "Model asset already exists: model={ModelId}, asset={AssetPath}, bytes={Bytes}",
+                modelId,
+                relativePath,
+                existingFileSize);
             progress?.Report(new ModelDownloadProgress(modelId, downloadedBeforeAsset + existingFileSize, totalBytes));
             return existingFileSize;
         }
 
         var partPath = finalPath + ".part";
         var existingPartBytes = File.Exists(partPath) ? new FileInfo(partPath).Length : 0;
-
-        using var request = new HttpRequestMessage(HttpMethod.Get, asset.DownloadUrl);
-        if (existingPartBytes > 0)
-            request.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(existingPartBytes, null);
-
-        using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
-        response.EnsureSuccessStatusCode();
-
-        if (existingPartBytes > 0 && response.StatusCode == System.Net.HttpStatusCode.OK)
+        if (existingPartBytes > 0 && asset.SizeBytes > 0 && existingPartBytes > asset.SizeBytes)
         {
+            _logger.LogWarning(
+                "Discarding oversized part file: model={ModelId}, asset={AssetPath}, partBytes={PartBytes}, expectedBytes={ExpectedBytes}",
+                modelId,
+                relativePath,
+                existingPartBytes,
+                asset.SizeBytes);
             File.Delete(partPath);
             existingPartBytes = 0;
         }
 
-        await using var httpStream = await response.Content.ReadAsStreamAsync(ct);
-        await using var fileStream = new FileStream(
-            partPath,
-            existingPartBytes > 0 ? FileMode.Append : FileMode.Create,
-            FileAccess.Write,
-            FileShare.None);
-
-        long downloadedForAsset = existingPartBytes;
-        var buffer = new byte[81920];
-        int bytesRead;
-        while ((bytesRead = await httpStream.ReadAsync(buffer, ct)) > 0)
+        if (existingPartBytes > 0 && asset.SizeBytes > 0 && existingPartBytes == asset.SizeBytes)
         {
-            await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), ct);
-            downloadedForAsset += bytesRead;
-            progress?.Report(new ModelDownloadProgress(modelId, downloadedBeforeAsset + downloadedForAsset, totalBytes));
+            File.Move(partPath, finalPath, overwrite: true);
+            _logger.LogInformation(
+                "Promoted completed part file without network request: model={ModelId}, asset={AssetPath}, bytes={Bytes}",
+                modelId,
+                relativePath,
+                existingPartBytes);
+            progress?.Report(new ModelDownloadProgress(modelId, downloadedBeforeAsset + existingPartBytes, totalBytes));
+            return existingPartBytes;
         }
 
-        await fileStream.FlushAsync(ct);
-        File.Move(partPath, finalPath, overwrite: true);
-        return downloadedForAsset;
+        _logger.LogInformation(
+            "Downloading model asset: model={ModelId}, asset={AssetPath}, resumeBytes={ResumeBytes}, url={Url}",
+            modelId,
+            relativePath,
+            existingPartBytes,
+            asset.DownloadUrl);
+
+        var response = await SendAssetRequestAsync(asset.DownloadUrl, existingPartBytes, ct);
+        if (existingPartBytes > 0 && response.StatusCode == System.Net.HttpStatusCode.RequestedRangeNotSatisfiable)
+        {
+            var remoteLength = response.Content.Headers.ContentRange?.Length ?? asset.SizeBytes;
+            response.Dispose();
+
+            if (remoteLength > 0 && existingPartBytes == remoteLength)
+            {
+                File.Move(partPath, finalPath, overwrite: true);
+                _logger.LogInformation(
+                    "Received 416 but part file already complete: model={ModelId}, asset={AssetPath}, bytes={Bytes}",
+                    modelId,
+                    relativePath,
+                    existingPartBytes);
+                progress?.Report(new ModelDownloadProgress(modelId, downloadedBeforeAsset + existingPartBytes, totalBytes));
+                return existingPartBytes;
+            }
+
+            _logger.LogWarning(
+                "Received 416 for ranged request; restarting full download: model={ModelId}, asset={AssetPath}, resumeBytes={ResumeBytes}",
+                modelId,
+                relativePath,
+                existingPartBytes);
+            if (File.Exists(partPath))
+                File.Delete(partPath);
+            existingPartBytes = 0;
+            response = await SendAssetRequestAsync(asset.DownloadUrl, existingPartBytes, ct);
+        }
+
+        using (response)
+        {
+            response.EnsureSuccessStatusCode();
+            _logger.LogInformation(
+                "Model asset response: model={ModelId}, asset={AssetPath}, statusCode={StatusCode}",
+                modelId,
+                relativePath,
+                (int)response.StatusCode);
+
+            if (existingPartBytes > 0 && response.StatusCode == System.Net.HttpStatusCode.OK)
+            {
+                File.Delete(partPath);
+                existingPartBytes = 0;
+            }
+
+            await using var httpStream = await response.Content.ReadAsStreamAsync(ct);
+
+            long downloadedForAsset = existingPartBytes;
+            await using (var fileStream = new FileStream(
+                             partPath,
+                             existingPartBytes > 0 ? FileMode.Append : FileMode.Create,
+                             FileAccess.Write,
+                             FileShare.None))
+            {
+                var buffer = new byte[81920];
+                int bytesRead;
+                while ((bytesRead = await httpStream.ReadAsync(buffer, ct)) > 0)
+                {
+                    await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), ct);
+                    downloadedForAsset += bytesRead;
+                    progress?.Report(new ModelDownloadProgress(modelId, downloadedBeforeAsset + downloadedForAsset, totalBytes));
+                }
+
+                await fileStream.FlushAsync(ct);
+            }
+            File.Move(partPath, finalPath, overwrite: true);
+            _logger.LogInformation(
+                "Completed model asset download: model={ModelId}, asset={AssetPath}, bytes={Bytes}",
+                modelId,
+                relativePath,
+                downloadedForAsset);
+            return downloadedForAsset;
+        }
+    }
+
+    private async Task<HttpResponseMessage> SendAssetRequestAsync(string url, long resumeBytes, CancellationToken ct)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        if (resumeBytes > 0)
+            request.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(resumeBytes, null);
+        return await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
     }
 
     private static string GetFileNameFromUrl(string url)

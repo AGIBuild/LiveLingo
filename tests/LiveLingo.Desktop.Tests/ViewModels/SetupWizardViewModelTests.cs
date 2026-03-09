@@ -1,7 +1,9 @@
 using LiveLingo.Desktop.Services.Configuration;
+using LiveLingo.Desktop.Services.LanguageCatalog;
 using LiveLingo.Desktop.Messaging;
 using LiveLingo.Desktop.ViewModels;
 using CommunityToolkit.Mvvm.Messaging;
+using LiveLingo.Core.Engines;
 using LiveLingo.Core.Models;
 using NSubstitute;
 using UserSettings = LiveLingo.Desktop.Services.Configuration.SettingsModel;
@@ -218,6 +220,35 @@ public class SetupWizardViewModelTests
     }
 
     [Fact]
+    public async Task DownloadModelAsync_ShowsPerModelProgressWithOrderLabel()
+    {
+        var (vm, _, models) = Create(startStep: 2);
+        var statusHistory = new List<string>();
+        vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(vm.DownloadStatus) && !string.IsNullOrWhiteSpace(vm.DownloadStatus))
+                statusHistory.Add(vm.DownloadStatus!);
+        };
+
+        models.EnsureModelAsync(
+                Arg.Any<ModelDescriptor>(),
+                Arg.Any<IProgress<ModelDownloadProgress>?>(),
+                Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                var descriptor = call.Arg<ModelDescriptor>();
+                var progress = call.Arg<IProgress<ModelDownloadProgress>?>();
+                progress?.Report(new ModelDownloadProgress(descriptor.Id, descriptor.SizeBytes / 2, descriptor.SizeBytes));
+                progress?.Report(new ModelDownloadProgress(descriptor.Id, descriptor.SizeBytes, descriptor.SizeBytes));
+                return Task.CompletedTask;
+            });
+
+        await vm.DownloadModelCommand.ExecuteAsync(null);
+
+        Assert.Contains(statusHistory, s => s.Contains("(1/1)", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task DownloadModelAsync_ShowsErrorOnFailure()
     {
         var (vm, _, models) = Create(startStep: 2);
@@ -264,5 +295,25 @@ public class SetupWizardViewModelTests
         Assert.False(vm.IsModelInstalled);
         Assert.False(vm.IsDownloading);
         Assert.Equal("Cancelled", vm.DownloadStatus);
+    }
+
+    [Fact]
+    public void AvailableLanguages_ComesFromCatalog()
+    {
+        var settings = Substitute.For<ISettingsService>();
+        settings.Current.Returns(new UserSettings());
+        settings.CloneCurrent().Returns(new UserSettings());
+        var models = Substitute.For<IModelManager>();
+        models.ListInstalled().Returns([]);
+        var catalog = Substitute.For<ILanguageCatalog>();
+        catalog.All.Returns(
+        [
+            new LanguageInfo("en", "English"),
+            new LanguageInfo("ja", "Japanese")
+        ]);
+
+        var vm = new SetupWizardViewModel(settings, models, languageCatalog: catalog);
+
+        Assert.Equal(["en", "ja"], vm.AvailableLanguages.Select(l => l.Code));
     }
 }

@@ -14,11 +14,11 @@ public class ModelRegistryTests
     }
 
     [Fact]
-    public void RequiredModels_ContainsFastTextAndDefaultMarianPair()
+    public void RequiredModels_ContainsDefaultMarianPairOnly()
     {
         Assert.NotEmpty(ModelRegistry.RequiredModels);
-        Assert.Contains(ModelRegistry.FastTextLid, ModelRegistry.RequiredModels);
         Assert.Contains(ModelRegistry.MarianZhEn, ModelRegistry.RequiredModels);
+        Assert.DoesNotContain(ModelRegistry.FastTextLid, ModelRegistry.RequiredModels);
         Assert.DoesNotContain(ModelRegistry.Qwen25_15B, ModelRegistry.RequiredModels);
     }
 
@@ -84,6 +84,12 @@ public class ModelRegistryTests
     public void FastTextLid_HasCorrectType()
     {
         Assert.Equal(ModelType.LanguageDetection, ModelRegistry.FastTextLid.Type);
+    }
+
+    [Fact]
+    public void FastTextLid_HasExpectedSizeBytes()
+    {
+        Assert.Equal(938_013, ModelRegistry.FastTextLid.SizeBytes);
     }
 
     [Fact]

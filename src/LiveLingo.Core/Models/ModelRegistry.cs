@@ -63,7 +63,7 @@ public static class ModelRegistry
         "lid.176.ftz",
         "FastText Language Detection",
         "https://dl.fbaipublicfiles.com/fasttext/supervised-models/lid.176.ftz",
-        917_391,
+        938_013,
         ModelType.LanguageDetection);
 
     public static readonly ModelDescriptor Qwen25_15B = new(
@@ -77,7 +77,7 @@ public static class ModelRegistry
         [MarianZhEn, MarianEnZh, MarianJaEn];
 
     public static IReadOnlyList<ModelDescriptor> RequiredModels { get; } =
-        [FastTextLid, MarianZhEn];
+        [MarianZhEn];
 
     public static IReadOnlyList<ModelDescriptor> OptionalModels { get; } =
         [Qwen25_15B];
@@ -98,6 +98,6 @@ public static class ModelRegistry
         var src = string.IsNullOrWhiteSpace(sourceLanguage) ? "zh" : sourceLanguage;
         var tgt = string.IsNullOrWhiteSpace(targetLanguage) ? "en" : targetLanguage;
         var translationModel = FindTranslationModel(src, tgt) ?? MarianZhEn;
-        return [FastTextLid, translationModel];
+        return [translationModel];
     }
 }

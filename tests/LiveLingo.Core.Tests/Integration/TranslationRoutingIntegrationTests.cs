@@ -1,5 +1,6 @@
 using LiveLingo.Core.Engines;
 using LiveLingo.Core.LanguageDetection;
+using LiveLingo.Core.Models;
 using LiveLingo.Core.Processing;
 using LiveLingo.Core.Translation;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -15,9 +16,11 @@ public class TranslationRoutingIntegrationTests
         var engine = new RecordingTranslationEngine();
         var summarize = new RecordingProcessor("summarize", text => $"sum:{text}");
         var optimize = new RecordingProcessor("optimize", text => $"opt:{text}");
+        var readiness = new AlwaysReadyModelReadinessService();
         var pipeline = new TranslationPipeline(
             new ScriptBasedDetector(),
             engine,
+            readiness,
             [summarize, optimize],
             NullLogger<TranslationPipeline>.Instance);
 
@@ -39,9 +42,11 @@ public class TranslationRoutingIntegrationTests
         var engine = new RecordingTranslationEngine();
         var summarize = new RecordingProcessor("summarize", text => $"sum:{text}");
         var optimize = new RecordingProcessor("optimize", text => $"opt:{text}");
+        var readiness = new AlwaysReadyModelReadinessService();
         var pipeline = new TranslationPipeline(
             new ScriptBasedDetector(),
             engine,
+            readiness,
             [summarize, optimize],
             NullLogger<TranslationPipeline>.Instance);
 
@@ -96,6 +101,19 @@ public class TranslationRoutingIntegrationTests
         }
 
         public void Dispose()
+        {
+        }
+    }
+
+    private sealed class AlwaysReadyModelReadinessService : IModelReadinessService
+    {
+        public bool IsInstalled(string modelId) => true;
+
+        public void EnsureTranslationModelReady(string sourceLanguage, string targetLanguage)
+        {
+        }
+
+        public void EnsurePostProcessingModelReady()
         {
         }
     }

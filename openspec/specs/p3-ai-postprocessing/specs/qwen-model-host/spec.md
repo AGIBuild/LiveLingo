@@ -1,15 +1,15 @@
 ## ADDED Requirements
 
 ### Requirement: Lazy model loading
-`QwenModelHost` SHALL load the Qwen GGUF model lazily on the first `GetWeightsAsync` call. Loading SHALL occur on a background thread to avoid blocking the UI.
+`QwenModelHost` SHALL load the Qwen GGUF model lazily on first use. Model directory resolution SHALL use `IModelManager.GetModelDirectory(ModelRegistry.Qwen25_15B.Id)` as the single source of truth.
 
-#### Scenario: First call loads model
+#### Scenario: First call loads model from manager-resolved path
 - **WHEN** `GetWeightsAsync` is called and no model is loaded
-- **THEN** the model SHALL be loaded from `{ModelStoragePath}/qwen2.5-1.5b-q4/qwen2.5-1.5b-instruct-q4_k_m.gguf` and returned
+- **THEN** the host SHALL resolve the model directory via `IModelManager` and load `.gguf` from that directory
 
 #### Scenario: Subsequent calls return cached instance
-- **WHEN** `GetWeightsAsync` is called after the model is already loaded
-- **THEN** the cached `LLamaWeights` instance SHALL be returned immediately without reloading
+- **WHEN** `GetWeightsAsync` is called after the model is loaded
+- **THEN** the cached `LLamaWeights` instance SHALL be returned without reloading
 
 ### Requirement: Automatic unloading after idle timeout
 `QwenModelHost` SHALL automatically unload (dispose) the model weights after 5 minutes of inactivity. Each `GetWeightsAsync` call SHALL reset the idle timer.
@@ -23,11 +23,11 @@
 - **THEN** the unload timer SHALL be reset to 5 minutes from the latest call
 
 ### Requirement: Thread-safe loading
-Model loading SHALL be protected by a `SemaphoreSlim(1,1)` to prevent concurrent load attempts. Only one thread SHALL load the model; others SHALL await the same load operation.
+Model loading SHALL remain protected by a semaphore to prevent duplicate concurrent load operations.
 
 #### Scenario: Concurrent load requests
-- **WHEN** two threads call `GetWeightsAsync` simultaneously while model is not loaded
-- **THEN** only one load operation SHALL occur; both threads SHALL receive the same `LLamaWeights` instance
+- **WHEN** two threads call `GetWeightsAsync` concurrently while model is unloaded
+- **THEN** only one load operation SHALL execute and both callers SHALL receive the same loaded weights instance
 
 ### Requirement: Model load state notifications
 `QwenModelHost` SHALL expose a `StateChanged` event reporting `ModelLoadState` (Unloaded, Loading, Loaded). The overlay ViewModel SHALL use this to display "Loading AI model..." status.

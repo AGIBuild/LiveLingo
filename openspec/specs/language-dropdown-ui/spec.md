@@ -5,11 +5,11 @@ TBD - created by archiving change model-language-capabilities. Update Purpose af
 ## Requirements
 ### Requirement: Settings source language uses ComboBox
 
-Settings 页面的 DefaultSourceLanguage 输入控件 SHALL 替换为 `ComboBox`，数据源来自 `ITranslationEngine.SupportedLanguages`。
+Settings 页面的 DefaultSourceLanguage 输入控件 SHALL 使用 `ComboBox`，数据源来自固定语言目录（`ILanguageCatalog.All`），而非 `ITranslationEngine.SupportedLanguages`。
 
-#### Scenario: Source language shows dropdown with available languages
+#### Scenario: Source language shows dropdown with fixed languages
 - **WHEN** user opens Settings window
-- **THEN** source language field SHALL display a `ComboBox` containing all languages from the translation engine
+- **THEN** source语言下拉 SHALL 显示固定目录中的所有语言
 
 #### Scenario: Source language selection persists
 - **WHEN** user selects "中文" from source language dropdown and saves
@@ -17,11 +17,11 @@ Settings 页面的 DefaultSourceLanguage 输入控件 SHALL 替换为 `ComboBox`
 
 ### Requirement: Settings target language uses ComboBox
 
-Settings 页面的 DefaultTargetLanguage 输入控件 SHALL 替换为 `ComboBox`，数据源同样来自 `ITranslationEngine.SupportedLanguages`。
+Settings 页面的 DefaultTargetLanguage 输入控件 SHALL 使用 `ComboBox`，数据源同样来自固定语言目录（`ILanguageCatalog.All`）。
 
-#### Scenario: Target language shows dropdown with available languages
+#### Scenario: Target language shows dropdown with fixed languages
 - **WHEN** user opens Settings window
-- **THEN** target language field SHALL display a `ComboBox` containing all languages from the translation engine
+- **THEN** target语言下拉 SHALL 显示固定目录中的所有语言
 
 #### Scenario: Target language selection persists
 - **WHEN** user selects "English" from target language dropdown and saves
@@ -29,11 +29,11 @@ Settings 页面的 DefaultTargetLanguage 输入控件 SHALL 替换为 `ComboBox`
 
 ### Requirement: SettingsViewModel exposes language list from engine
 
-`SettingsViewModel` SHALL inject `ITranslationEngine` and expose `AvailableLanguages` property of type `IReadOnlyList<LanguageInfo>` sourced from `ITranslationEngine.SupportedLanguages`.
+`SettingsViewModel` SHALL expose `AvailableLanguages` property of type `IReadOnlyList<LanguageInfo>` sourced from固定语言目录（`ILanguageCatalog.All`），不再依赖 `ITranslationEngine.SupportedLanguages` 作为 UI 选择来源。
 
-#### Scenario: ViewModel provides language list for binding
-- **WHEN** `SettingsViewModel` is constructed with a valid `ITranslationEngine`
-- **THEN** `AvailableLanguages` SHALL be non-empty and match the engine's supported languages
+#### Scenario: ViewModel provides fixed language list for binding
+- **WHEN** `SettingsViewModel` is constructed
+- **THEN** `AvailableLanguages` SHALL be non-empty and match the fixed language catalog
 
 ### Requirement: ComboBox displays language name and stores code
 
@@ -45,13 +45,13 @@ Settings 页面的 DefaultTargetLanguage 输入控件 SHALL 替换为 `ComboBox`
 
 ### Requirement: Overlay available languages from engine
 
-`OverlayViewModel` SHALL source its available languages from `ITranslationEngine.SupportedLanguages` instead of a hardcoded static list. The static `AvailableLanguages` field SHALL be removed.
+`OverlayViewModel` SHALL source its available languages from固定语言目录（`ILanguageCatalog.All`），而非硬编码静态列表或引擎支持列表；同时，目标语言切换后 MUST 直接触发翻译流程，且 MUST NOT 在翻译前通过 `SupportsLanguagePair` 主动阻断。
 
-#### Scenario: Overlay language cycling uses engine languages
+#### Scenario: Overlay language cycling uses fixed catalog
 - **WHEN** user clicks target language in overlay to cycle
-- **THEN** it SHALL cycle through languages returned by `ITranslationEngine.SupportedLanguages`
+- **THEN** it SHALL cycle through languages returned by the fixed language catalog
 
-#### Scenario: Overlay language list matches engine
-- **WHEN** `OverlayViewModel` is constructed
-- **THEN** the language cycle list SHALL contain exactly the languages from the engine
+#### Scenario: Unsupported pair is not pre-blocked
+- **WHEN** user selects a currently不支持/未安装模型的语对并输入文本
+- **THEN** overlay SHALL still invoke pipeline translation and handle failure via translation error path
 

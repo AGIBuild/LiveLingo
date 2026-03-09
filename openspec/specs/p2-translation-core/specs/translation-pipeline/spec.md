@@ -1,11 +1,11 @@
 ## ADDED Requirements
 
 ### Requirement: Pipeline orchestration
-`TranslationPipeline` SHALL orchestrate: (1) language detection if source language is null, (2) same-language short-circuit, (3) model availability check, (4) translation via engine, (5) post-processing via processors (empty in P2).
+`TranslationPipeline` SHALL orchestrate: (1) language detection if source language is null, (2) same-language short-circuit, (3) model readiness preflight via readiness service, (4) translation via engine, (5) post-processing via processors.
 
 #### Scenario: Full pipeline with auto-detect
 - **WHEN** `ProcessAsync` is called with `SourceLanguage = null` and Chinese input
-- **THEN** the pipeline SHALL detect "zh", translate via MarianMT, and return `TranslationResult` with `DetectedSourceLanguage = "zh"`
+- **THEN** the pipeline SHALL detect "zh", validate translation-model readiness, translate via MarianMT, and return `TranslationResult` with `DetectedSourceLanguage = "zh"`
 
 #### Scenario: Same language short-circuit
 - **WHEN** detected source language equals `TargetLanguage`
@@ -13,7 +13,15 @@
 
 #### Scenario: Specified source language skips detection
 - **WHEN** `SourceLanguage = "zh"` is explicitly set
-- **THEN** the pipeline SHALL NOT call `ILanguageDetector` and proceed directly to translation
+- **THEN** the pipeline SHALL NOT call `ILanguageDetector` and SHALL proceed directly to readiness preflight and translation
+
+#### Scenario: Post-processing readiness enforced only when requested
+- **WHEN** `PostProcessing` is null or disabled
+- **THEN** the pipeline SHALL NOT perform post-processing model readiness checks
+
+#### Scenario: Missing post-processing model raises typed error
+- **WHEN** `PostProcessing` is requested and readiness check fails
+- **THEN** the pipeline SHALL throw `ModelNotReadyException` with post-processing model metadata before invoking processors
 
 ### Requirement: Cancel-and-restart support
 The pipeline SHALL respect `CancellationToken` at each stage boundary (after detection, after translation). When cancelled, it SHALL throw `OperationCanceledException` without leaving partial state.

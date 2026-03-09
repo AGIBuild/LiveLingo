@@ -1,6 +1,7 @@
 using LLama;
 using LLama.Common;
 using LLama.Native;
+using LiveLingo.Core.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -10,6 +11,7 @@ public enum ModelLoadState { Unloaded, Loading, Loaded }
 
 public sealed class QwenModelHost : IDisposable
 {
+    private readonly IModelManager _modelManager;
     private readonly CoreOptions _options;
     private readonly ILogger<QwenModelHost> _logger;
     private readonly SemaphoreSlim _loadLock = new(1, 1);
@@ -24,8 +26,12 @@ public sealed class QwenModelHost : IDisposable
     public string ModelPath { get; private set; } = string.Empty;
     public event Action<ModelLoadState>? StateChanged;
 
-    public QwenModelHost(IOptions<CoreOptions> options, ILogger<QwenModelHost> logger)
+    public QwenModelHost(
+        IModelManager modelManager,
+        IOptions<CoreOptions> options,
+        ILogger<QwenModelHost> logger)
     {
+        _modelManager = modelManager;
         _options = options.Value;
         _logger = logger;
         _idleTimer = new Timer(OnIdleTimeout, null, Timeout.Infinite, Timeout.Infinite);
@@ -48,7 +54,7 @@ public sealed class QwenModelHost : IDisposable
                 return _weights;
 
             SetState(ModelLoadState.Loading);
-            var modelDir = Path.Combine(_options.ModelStoragePath, "qwen25-1.5b");
+            var modelDir = _modelManager.GetModelDirectory(ModelRegistry.Qwen25_15B.Id);
             ModelPath = Directory.Exists(modelDir)
                 ? Directory.GetFiles(modelDir, "*.gguf").FirstOrDefault() ?? ""
                 : "";
@@ -56,7 +62,7 @@ public sealed class QwenModelHost : IDisposable
             if (string.IsNullOrEmpty(ModelPath) || !File.Exists(ModelPath))
                 throw new FileNotFoundException(
                     "Qwen model not found. Please download it from Settings → Models tab.",
-                    ModelPath ?? "qwen25-1.5b/*.gguf");
+                    string.IsNullOrWhiteSpace(ModelPath) ? Path.Combine(modelDir, "*.gguf") : ModelPath);
 
             var threads = _options.InferenceThreads > 0
                 ? _options.InferenceThreads

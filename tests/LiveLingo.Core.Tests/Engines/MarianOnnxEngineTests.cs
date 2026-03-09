@@ -59,8 +59,8 @@ public class MarianOnnxEngineTests
         var ex = await Assert.ThrowsAsync<FileNotFoundException>(
             () => engine.TranslateAsync("你好", "zh", "en", CancellationToken.None));
 
-        Assert.Contains("onnx/encoder_model.onnx", ex.Message);
-        Assert.Contains("onnx/decoder_model_merged.onnx", ex.Message);
+        Assert.Contains("encoder_model.onnx", ex.Message);
+        Assert.Contains("decoder_model_merged.onnx", ex.Message);
         Assert.Contains("source.spm", ex.Message);
         Assert.Contains("target.spm", ex.Message);
     }

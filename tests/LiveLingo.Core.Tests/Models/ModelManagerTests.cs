@@ -186,6 +186,28 @@ public class ModelManagerTests : IDisposable
     }
 
     [Fact]
+    public async Task EnsureModelAsync_PromotesCompletedPartFileWithoutHttpRequest()
+    {
+        var callCount = 0;
+        var handler = new FakeHttpMessageHandler(_ => callCount++);
+        var options = Options.Create(new CoreOptions { ModelStoragePath = _tempDir });
+        var mgr = new ModelManager(options, new HttpClient(handler), Substitute.For<ILogger<ModelManager>>());
+
+        var desc = new ModelDescriptor("resume-complete", "Resume Complete", "http://fake/model.bin", 100, ModelType.Translation);
+        var modelDir = Path.Combine(_tempDir, "resume-complete");
+        Directory.CreateDirectory(modelDir);
+        var partPath = Path.Combine(modelDir, "model.bin.part");
+        await File.WriteAllBytesAsync(partPath, new byte[100]);
+
+        await mgr.EnsureModelAsync(desc, null, CancellationToken.None);
+
+        Assert.Equal(0, callCount);
+        Assert.True(File.Exists(Path.Combine(modelDir, "model.bin")));
+        Assert.False(File.Exists(partPath));
+        Assert.True(File.Exists(Path.Combine(modelDir, "manifest.json")));
+    }
+
+    [Fact]
     public void ListInstalled_ReturnsNull_SkipsNullManifest()
     {
         var dir = Path.Combine(_tempDir, "null-manifest");

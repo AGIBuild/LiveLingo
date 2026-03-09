@@ -3,8 +3,11 @@ using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using LiveLingo.Desktop.Messaging;
 using LiveLingo.Desktop.Services.Configuration;
+using LiveLingo.Desktop.Services.LanguageCatalog;
+using LiveLingo.Desktop.Services.Localization;
 using LiveLingo.Core.Engines;
 using LiveLingo.Core.Models;
+using Microsoft.Extensions.Logging;
 
 namespace LiveLingo.Desktop.ViewModels;
 
@@ -13,6 +16,8 @@ public partial class SetupWizardViewModel : ObservableObject
     private readonly ISettingsService _settings;
     private readonly IModelManager? _modelManager;
     private readonly IMessenger _messenger;
+    private readonly ILogger<SetupWizardViewModel>? _logger;
+    private readonly ILocalizationService? _localization;
     private CancellationTokenSource? _downloadCts;
 
     [ObservableProperty] private int _currentStep;
@@ -29,6 +34,22 @@ public partial class SetupWizardViewModel : ObservableObject
     public int TotalSteps { get; }
     public int StartStep { get; }
     public int DisplayStep => CurrentStep + 1;
+    public string WindowTitle => T("wizard.window.title", "LiveLingo Setup");
+    public string BackButtonLabel => T("wizard.nav.back", "Back");
+    public string NextButtonLabel => T("wizard.nav.next", "Next");
+    public string FinishButtonLabel => T("wizard.nav.finish", "Finish");
+    public string StepIndicator => T("wizard.stepIndicator", "Step {0} of {1}", DisplayStep, TotalSteps);
+    public string Step0Title => T("wizard.step0.title", "Choose Languages");
+    public string Step0Description => T(
+        "wizard.step0.description",
+        "Select the source language you type in and the target language for translation.");
+    public string Step0SourceLabel => T("wizard.step0.source", "Source:");
+    public string Step0TargetLabel => T("wizard.step0.target", "Target:");
+    public string Step1Title => T("wizard.step1.title", "Set Hotkey");
+    public string Step1Description => T(
+        "wizard.step1.description",
+        "This keyboard shortcut opens the translation overlay. You can change it later in settings.");
+    public string Step1HotkeyLabel => T("wizard.step1.hotkey", "Hotkey:");
     public bool CanGoBack => CurrentStep > StartStep;
     public bool CanGoNext => CurrentStep < TotalSteps - 1;
     public bool IsLastStep => CurrentStep == TotalSteps - 1;
@@ -36,32 +57,34 @@ public partial class SetupWizardViewModel : ObservableObject
     public bool IsStep1 => CurrentStep == 1;
     public bool IsStep2 => CurrentStep == 2;
     public IReadOnlyList<LanguageInfo> AvailableLanguages { get; }
+    public string Step2Title => T("wizard.step2.title", "Download Required Models");
+    public string Step2Description => T(
+        "wizard.step2.description",
+        "LiveLingo requires the baseline Marian translation model for your selected language pair. This is a one-time download.");
+    public string Step2CardTitle => T("wizard.step2.card.title", "MarianMT");
+    public string Step2CardSubtitle => T("wizard.step2.card.subtitle", "Baseline translation model (required)");
+    public string Step2DownloadButton => T("wizard.step2.downloadButton", "Download");
+    public string Step2ReadyLabel => T("wizard.step2.ready", "✓ Ready");
+    public string Step2CancelButton => T("wizard.step2.cancelButton", "Cancel");
 
     public SetupWizardViewModel(
         ISettingsService settings,
         IModelManager? modelManager = null,
         int startStep = 0,
-        IMessenger? messenger = null)
+        IMessenger? messenger = null,
+        ILogger<SetupWizardViewModel>? logger = null,
+        ILocalizationService? localization = null,
+        ILanguageCatalog? languageCatalog = null)
     {
         _settings = settings;
         _modelManager = modelManager;
         _messenger = messenger ?? WeakReferenceMessenger.Default;
+        _logger = logger;
+        _localization = localization;
         TotalSteps = 3;
         StartStep = startStep;
         _currentStep = startStep;
-        AvailableLanguages =
-        [
-            new("zh", "Chinese (中文)"),
-            new("en", "English"),
-            new("ja", "Japanese (日本語)"),
-            new("ko", "Korean (한국어)"),
-            new("fr", "French"),
-            new("de", "German"),
-            new("es", "Spanish"),
-            new("ru", "Russian"),
-            new("ar", "Arabic"),
-            new("pt", "Portuguese"),
-        ];
+        AvailableLanguages = languageCatalog?.All ?? LanguageCatalog.DefaultLanguages;
         SelectedSourceLanguage = AvailableLanguages.FirstOrDefault(l =>
             string.Equals(l.Code, SourceLanguage, StringComparison.OrdinalIgnoreCase)) ?? AvailableLanguages[0];
         SelectedTargetLanguage = AvailableLanguages.FirstOrDefault(l =>
@@ -89,6 +112,7 @@ public partial class SetupWizardViewModel : ObservableObject
     partial void OnCurrentStepChanged(int value)
     {
         OnPropertyChanged(nameof(DisplayStep));
+        OnPropertyChanged(nameof(StepIndicator));
         OnPropertyChanged(nameof(CanGoBack));
         OnPropertyChanged(nameof(CanGoNext));
         OnPropertyChanged(nameof(IsLastStep));
@@ -116,35 +140,79 @@ public partial class SetupWizardViewModel : ObservableObject
 
         IsDownloading = true;
         DownloadProgress = 0;
-        DownloadStatus = "Downloading…";
+        DownloadStatus = T("wizard.download.preparing", "Preparing downloads...");
         _downloadCts = new CancellationTokenSource();
 
         try
         {
             var requiredModels = GetRequiredModelsForCurrentPair();
+            if (requiredModels.Count == 0)
+            {
+                IsModelInstalled = true;
+                DownloadProgress = 100;
+                DownloadStatus = T("wizard.download.noneRequired", "No required models.");
+                return;
+            }
+
             for (var index = 0; index < requiredModels.Count; index++)
             {
                 var descriptor = requiredModels[index];
                 var modelIndex = index;
+
+                DownloadProgress = 0;
+                DownloadStatus = T(
+                    "wizard.download.modelProgress",
+                    "{0} ({1}/{2}) {3:F0}%",
+                    descriptor.DisplayName,
+                    modelIndex + 1,
+                    requiredModels.Count,
+                    0d);
+                _logger?.LogInformation(
+                    "Setup wizard model download started: {ModelId} ({Current}/{Total})",
+                    descriptor.Id,
+                    modelIndex + 1,
+                    requiredModels.Count);
+
                 var progress = new Progress<ModelDownloadProgress>(p =>
                 {
-                    var overall = ((modelIndex + (p.Percentage / 100.0)) / requiredModels.Count) * 100.0;
-                    DownloadProgress = overall;
-                    DownloadStatus = $"Downloading {descriptor.DisplayName}… {overall:F0}%";
+                    var modelProgress = Math.Clamp(p.Percentage, 0, 100);
+                    DownloadProgress = modelProgress;
+                    DownloadStatus = T(
+                        "wizard.download.modelProgress",
+                        "{0} ({1}/{2}) {3:F0}%",
+                        descriptor.DisplayName,
+                        modelIndex + 1,
+                        requiredModels.Count,
+                        modelProgress);
                 });
+
                 await _modelManager.EnsureModelAsync(descriptor, progress, _downloadCts.Token);
+                DownloadProgress = 100;
+                DownloadStatus = T(
+                    "wizard.download.modelDone",
+                    "{0} ({1}/{2}) done",
+                    descriptor.DisplayName,
+                    modelIndex + 1,
+                    requiredModels.Count);
+                _logger?.LogInformation(
+                    "Setup wizard model download completed: {ModelId} ({Current}/{Total})",
+                    descriptor.Id,
+                    modelIndex + 1,
+                    requiredModels.Count);
             }
 
             IsModelInstalled = true;
-            DownloadStatus = "Download complete ✓";
+            DownloadStatus = T("wizard.download.complete", "Download complete ✓");
         }
         catch (OperationCanceledException)
         {
-            DownloadStatus = "Cancelled";
+            DownloadStatus = T("wizard.download.cancelled", "Cancelled");
+            _logger?.LogWarning("Setup wizard model download cancelled by user.");
         }
         catch (Exception ex)
         {
-            DownloadStatus = $"Error: {ex.Message}";
+            DownloadStatus = T("wizard.download.error", "Error: {0}", ex.Message);
+            _logger?.LogError(ex, "Setup wizard model download failed.");
         }
         finally
         {
@@ -193,5 +261,12 @@ public partial class SetupWizardViewModel : ObservableObject
 
         IsModelInstalled = GetRequiredModelsForCurrentPair()
             .All(model => installedIds.Contains(model.Id));
+    }
+
+    private string T(string key, string fallback, params object[] args)
+    {
+        if (_localization is not null)
+            return _localization.T(key, args);
+        return args.Length == 0 ? fallback : string.Format(fallback, args);
     }
 }

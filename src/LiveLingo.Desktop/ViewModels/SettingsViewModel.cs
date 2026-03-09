@@ -6,6 +6,8 @@ using CommunityToolkit.Mvvm.Messaging;
 using LiveLingo.Desktop.Messaging;
 using LiveLingo.Desktop.Platform;
 using LiveLingo.Desktop.Services.Configuration;
+using LiveLingo.Desktop.Services.LanguageCatalog;
+using LiveLingo.Desktop.Services.Localization;
 using LiveLingo.Core.Engines;
 using LiveLingo.Core.Models;
 using Microsoft.Extensions.Logging;
@@ -18,6 +20,8 @@ public partial class SettingsViewModel : ObservableObject
     private readonly IModelManager? _modelManager;
     private readonly ILogger? _logger;
     private readonly IMessenger _messenger;
+    private readonly ILocalizationService? _loc;
+    private readonly ILanguageCatalog _languageCatalog;
     private string? _originalModelStoragePath;
     private bool _isLoadingWorkingCopy;
     private bool _isSyncingTranslationSelection;
@@ -26,12 +30,51 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private bool _isDirty;
     [ObservableProperty] private string? _migrationError;
     [ObservableProperty] private bool _showPermissionSection;
+    [ObservableProperty] private int _selectedTabIndex;
 
     public static IReadOnlyList<string> InjectionModes { get; } = ["PasteAndSend", "PasteOnly"];
     public static IReadOnlyList<string> PostProcessModes { get; } = ["Off", "Summarize", "Optimize", "Colloquialize"];
     public static IReadOnlyList<string> LogLevels { get; } = ["Verbose", "Debug", "Information", "Warning", "Error"];
+    public IReadOnlyList<SelectableOption> InjectionModeOptions { get; private set; } = [];
+    public IReadOnlyList<SelectableOption> PostProcessModeOptions { get; private set; } = [];
+    public IReadOnlyList<SelectableOption> LogLevelOptions { get; private set; } = [];
     public static IReadOnlyList<UILanguageOption> UILanguages { get; } =
         [new("en-US", "English"), new("zh-CN", "简体中文")];
+    public string GeneralSectionHotkeys => L("settings.general.hotkeys", "Hotkeys");
+    public string GeneralOverlayToggleLabel => L("settings.general.overlayToggle", "Overlay Toggle:");
+    public string GeneralHotkeyHint => L("settings.general.hotkeyHint", "Click the field, then press a key combo");
+    public string GeneralCheckPermissions => L("settings.general.checkPermissions", "Check Permissions…");
+    public string GeneralSectionOverlay => L("settings.general.overlay", "Overlay");
+    public string GeneralOpacityLabel => L("settings.general.opacity", "Opacity:");
+    public string GeneralInjectionModeLabel => L("settings.general.injectionMode", "Injection Mode:");
+    public string GeneralSectionLanguage => L("settings.general.language", "Language");
+    public string GeneralUiLanguageLabel => L("settings.general.uiLanguage", "UI Language:");
+    public string TranslationSectionDefaultPair => L("settings.translation.defaultPair", "Default Language Pair");
+    public string TranslationSourceLabel => L("settings.translation.source", "Source Language:");
+    public string TranslationTargetLabel => L("settings.translation.target", "Target Language:");
+    public string TranslationActiveModelLabel => L("settings.translation.activeModel", "Active Model:");
+    public string TranslationRefreshModelsTooltip => L("settings.translation.refreshModels", "Refresh translation models");
+    public string TranslationNoInstalledModelsHint => L(
+        "settings.translation.noInstalledModelsHint",
+        "No downloaded model available. Go to Models tab to download.");
+    public string TranslationOpenModelsTab => L("settings.translation.openModelsTab", "Go to Models");
+    public bool ShowNoInstalledModelsHint => AvailableTranslationModels.Count == 0;
+    public string ModelsDownloadLabel => L("settings.models.download", "Download");
+    public string ModelsCancelLabel => L("settings.models.cancel", "Cancel");
+    public string ModelsInstalledLabel => L("settings.models.installed", "✓ Installed");
+    public string ModelsDeleteLabel => L("settings.models.delete", "Delete");
+    public string AdvancedSectionModelStorage => L("settings.advanced.modelStorage", "Model Storage");
+    public string AdvancedStoragePathLabel => L("settings.advanced.storagePath", "Storage Path:");
+    public string AdvancedStoragePathPlaceholder => L("settings.advanced.defaultStoragePath", "Default (AppData)");
+    public string AdvancedBrowseLabel => L("settings.advanced.browse", "Browse…");
+    public string AdvancedSectionPerformance => L("settings.advanced.performance", "Performance");
+    public string AdvancedInferenceThreadsLabel => L("settings.advanced.inferenceThreads", "Inference Threads:");
+    public string AdvancedThreadsHint => L("settings.advanced.threadsHint", "0 = auto-detect (recommended)");
+    public string AdvancedSectionLogging => L("settings.advanced.logging", "Logging");
+    public string AdvancedLogLevelLabel => L("settings.advanced.logLevel", "Log Level:");
+    public string AiSectionPostProcessing => L("settings.ai.postProcessing", "Post-Processing");
+    public string AiDefaultModeLabel => L("settings.ai.defaultMode", "Default Mode:");
+    public string AiModesHint => L("settings.ai.modesHint", "Summarize · Optimize · Colloquialize");
 
     public IReadOnlyList<LanguageInfo> AvailableLanguages { get; }
     public ObservableCollection<ModelItemViewModel> Models { get; }
@@ -42,15 +85,20 @@ public partial class SettingsViewModel : ObservableObject
         IModelManager modelManager,
         ITranslationEngine? engine = null,
         ILogger<SettingsViewModel>? logger = null,
-        IMessenger? messenger = null)
+        IMessenger? messenger = null,
+        ILocalizationService? localizationService = null,
+        ILanguageCatalog? languageCatalog = null)
     {
         _settings = settings;
         _modelManager = modelManager;
         _logger = logger;
         _messenger = messenger ?? WeakReferenceMessenger.Default;
-        AvailableLanguages = engine?.SupportedLanguages ?? [];
+        _loc = localizationService;
+        _languageCatalog = languageCatalog ?? new LanguageCatalog();
+        InitializeLocalizedOptions();
+        AvailableLanguages = _languageCatalog.All;
         AvailableTranslationModels = new ObservableCollection<TranslationModelOption>();
-        Models = ModelItemViewModel.CreateAll(modelManager);
+        Models = ModelItemViewModel.CreateAll(modelManager, localizationService);
         HookWorkingCopy(WorkingCopy);
         HookModelItemChanges();
         RefreshTranslationModelsInternal();
@@ -58,11 +106,19 @@ public partial class SettingsViewModel : ObservableObject
         InitPermissions();
     }
 
-    public SettingsViewModel(ISettingsService settings, ITranslationEngine? engine = null, IMessenger? messenger = null)
+    public SettingsViewModel(
+        ISettingsService settings,
+        ITranslationEngine? engine = null,
+        IMessenger? messenger = null,
+        ILocalizationService? localizationService = null,
+        ILanguageCatalog? languageCatalog = null)
     {
         _settings = settings;
         _messenger = messenger ?? WeakReferenceMessenger.Default;
-        AvailableLanguages = engine?.SupportedLanguages ?? [];
+        _loc = localizationService;
+        _languageCatalog = languageCatalog ?? new LanguageCatalog();
+        InitializeLocalizedOptions();
+        AvailableLanguages = _languageCatalog.All;
         AvailableTranslationModels = new ObservableCollection<TranslationModelOption>();
         Models = [];
         HookWorkingCopy(WorkingCopy);
@@ -177,12 +233,12 @@ public partial class SettingsViewModel : ObservableObject
                 clone.Translation.DefaultTargetLanguage = selectedModel.TargetLanguage!;
                 clone.Translation.ActiveTranslationModelId = selectedModel.Id;
             }
-            else
+            else if (_modelManager is not null &&
+                     !string.IsNullOrWhiteSpace(clone.Translation.ActiveTranslationModelId) &&
+                     !AvailableTranslationModels.Any(m =>
+                         string.Equals(m.Id, clone.Translation.ActiveTranslationModelId, StringComparison.OrdinalIgnoreCase)))
             {
-                clone.Translation.ActiveTranslationModelId ??=
-                    ModelRegistry.FindTranslationModel(
-                        clone.Translation.DefaultSourceLanguage,
-                        clone.Translation.DefaultTargetLanguage)?.Id;
+                clone.Translation.ActiveTranslationModelId = null;
             }
 
             if (!UILanguages.Any(l => string.Equals(l.Code, clone.UI.Language, StringComparison.OrdinalIgnoreCase)))
@@ -220,7 +276,7 @@ public partial class SettingsViewModel : ObservableObject
             }
             catch (Exception ex)
             {
-                MigrationError = $"Migration failed: {ex.Message}";
+                MigrationError = L("settings.advanced.migrationFailed", "Migration failed: {0}", ex.Message);
                 _logger?.LogError(ex, "Failed to migrate model storage path");
                 return;
             }
@@ -242,9 +298,11 @@ public partial class SettingsViewModel : ObservableObject
         }
         else
         {
-            WorkingCopy.Translation.ActiveTranslationModelId = ModelRegistry.FindTranslationModel(
-                WorkingCopy.Translation.DefaultSourceLanguage,
-                WorkingCopy.Translation.DefaultTargetLanguage)?.Id;
+            var matched = AvailableTranslationModels.FirstOrDefault(m =>
+                m.Type == ModelType.Translation &&
+                string.Equals(m.SourceLanguage, WorkingCopy.Translation.DefaultSourceLanguage, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(m.TargetLanguage, WorkingCopy.Translation.DefaultTargetLanguage, StringComparison.OrdinalIgnoreCase));
+            WorkingCopy.Translation.ActiveTranslationModelId = matched?.Id;
         }
 
         _settings.Replace(WorkingCopy);
@@ -259,6 +317,9 @@ public partial class SettingsViewModel : ObservableObject
 
     [RelayCommand]
     private void RefreshTranslationModels() => RefreshTranslationModelsInternal();
+
+    [RelayCommand]
+    private void OpenModelsTab() => SelectedTabIndex = 2;
 
     [RelayCommand]
     private void Reset() => LoadFromSettings(SettingsModel.CreateDefault());
@@ -368,46 +429,21 @@ public partial class SettingsViewModel : ObservableObject
         var currentTarget = WorkingCopy.Translation.DefaultTargetLanguage;
         var currentModelId = WorkingCopy.Translation.ActiveTranslationModelId;
 
-        var merged = BuildRegistryModels().ToDictionary(m => m.Id, StringComparer.OrdinalIgnoreCase);
-        if (_modelManager is not null)
-        {
-            foreach (var installed in _modelManager.ListInstalled()
-                         .Where(m => m.Type is ModelType.Translation or ModelType.PostProcessing))
-            {
-                if (merged.ContainsKey(installed.Id))
-                    continue;
+        var installedModels = (_modelManager?.ListInstalled() ?? [])
+            .Where(m => m.Type == ModelType.Translation)
+            .Select(CreateInstalledTranslationModelOption)
+            .Where(m => m is not null)
+            .Select(m => m!)
+            .DistinctBy(m => m.Id, StringComparer.OrdinalIgnoreCase);
 
-                if (installed.Type == ModelType.Translation &&
-                    TryParseLanguagePairFromModelId(installed.Id, out var src, out var tgt))
-                {
-                    merged[installed.Id] = new TranslationModelOption(
-                        installed.Id,
-                        installed.DisplayName,
-                        ModelType.Translation,
-                        src,
-                        tgt);
-                    continue;
-                }
-
-                if (installed.Type == ModelType.PostProcessing)
-                {
-                    merged[installed.Id] = new TranslationModelOption(
-                        installed.Id,
-                        installed.DisplayName,
-                        ModelType.PostProcessing,
-                        null,
-                        null);
-                }
-            }
-        }
-
-        var ordered = merged.Values
+        var ordered = installedModels
             .OrderBy(m => m.DisplayName, StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
         AvailableTranslationModels.Clear();
         foreach (var model in ordered)
             AvailableTranslationModels.Add(model);
+        OnPropertyChanged(nameof(ShowNoInstalledModelsHint));
 
         _isSyncingTranslationSelection = true;
         try
@@ -428,28 +464,26 @@ public partial class SettingsViewModel : ObservableObject
         }
     }
 
-    private static IReadOnlyList<TranslationModelOption> BuildRegistryModels()
+    private TranslationModelOption? CreateInstalledTranslationModelOption(InstalledModel installed)
     {
-        return ModelRegistry.AllModels
-            .Where(m => m.Type is ModelType.Translation or ModelType.PostProcessing)
-            .Select(CreateTranslationModelOption)
-            .Where(m => m is not null)
-            .Select(m => m!)
-            .ToArray();
-    }
-
-    private static TranslationModelOption? CreateTranslationModelOption(ModelDescriptor descriptor)
-    {
-        if (descriptor.Type == ModelType.Translation)
+        if (installed.Type == ModelType.Translation)
         {
-            if (!TryParseLanguagePairFromModelId(descriptor.Id, out var source, out var target))
-                return null;
+            string? source = null;
+            string? target = null;
+            if (TryParseLanguagePairFromModelId(installed.Id, out var parsedSource, out var parsedTarget))
+            {
+                source = parsedSource;
+                target = parsedTarget;
+            }
 
-            return new TranslationModelOption(descriptor.Id, descriptor.DisplayName, ModelType.Translation, source, target);
+            return new TranslationModelOption(
+                installed.Id,
+                installed.DisplayName,
+                ModelType.Translation,
+                source,
+                target,
+                BuildPairLabel(ModelType.Translation, source, target));
         }
-
-        if (descriptor.Type == ModelType.PostProcessing)
-            return new TranslationModelOption(descriptor.Id, descriptor.DisplayName, ModelType.PostProcessing, null, null);
 
         return null;
     }
@@ -472,6 +506,42 @@ public partial class SettingsViewModel : ObservableObject
         targetLanguage = parts[1];
         return true;
     }
+
+    private void InitializeLocalizedOptions()
+    {
+        InjectionModeOptions =
+        [
+            new SelectableOption("PasteAndSend", L("settings.injectMode.pasteAndSend", "Paste & Send")),
+            new SelectableOption("PasteOnly", L("settings.injectMode.pasteOnly", "Paste Only"))
+        ];
+
+        PostProcessModeOptions =
+        [
+            new SelectableOption("Off", L("settings.postMode.off", "Off")),
+            new SelectableOption("Summarize", L("settings.postMode.summarize", "Summarize")),
+            new SelectableOption("Optimize", L("settings.postMode.optimize", "Optimize")),
+            new SelectableOption("Colloquialize", L("settings.postMode.colloquialize", "Colloquialize"))
+        ];
+
+        LogLevelOptions =
+        [
+            new SelectableOption("Verbose", L("settings.logLevel.verbose", "Verbose")),
+            new SelectableOption("Debug", L("settings.logLevel.debug", "Debug")),
+            new SelectableOption("Information", L("settings.logLevel.information", "Information")),
+            new SelectableOption("Warning", L("settings.logLevel.warning", "Warning")),
+            new SelectableOption("Error", L("settings.logLevel.error", "Error"))
+        ];
+    }
+
+    private string BuildPairLabel(ModelType type, string? source, string? target) =>
+        type == ModelType.Translation && !string.IsNullOrWhiteSpace(source) && !string.IsNullOrWhiteSpace(target)
+            ? $"{source}→{target}"
+            : type == ModelType.PostProcessing
+                ? L("settings.translation.pair.postProcessing", "Post-processing")
+                : type.ToString();
+
+    private string L(string key, string fallback) => _loc?.T(key) ?? fallback;
+    private string L(string key, string fallback, params object[] args) => _loc?.T(key, args) ?? string.Format(fallback, args);
 }
 
 public record UILanguageOption(string Code, string DisplayName)
@@ -484,14 +554,13 @@ public record TranslationModelOption(
     string DisplayName,
     ModelType Type,
     string? SourceLanguage,
-    string? TargetLanguage)
+    string? TargetLanguage,
+    string PairLabel)
 {
     public override string ToString() => DisplayName;
+}
 
-    public string PairLabel =>
-        Type == ModelType.Translation && !string.IsNullOrWhiteSpace(SourceLanguage) && !string.IsNullOrWhiteSpace(TargetLanguage)
-            ? $"{SourceLanguage}→{TargetLanguage}"
-            : Type == ModelType.PostProcessing
-                ? "Post-processing"
-                : Type.ToString();
+public record SelectableOption(string Value, string DisplayName)
+{
+    public override string ToString() => DisplayName;
 }
