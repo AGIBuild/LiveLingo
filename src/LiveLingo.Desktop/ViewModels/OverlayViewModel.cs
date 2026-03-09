@@ -66,6 +66,7 @@ public partial class OverlayViewModel : ObservableObject
     [ObservableProperty] private bool _isVoiceAvailable;
     [ObservableProperty] private bool _showSttDownloadLink;
     [ObservableProperty] private bool _isVoiceLanguagePickerOpen;
+    private string _preRecordingText = string.Empty;
     [ObservableProperty] private LanguageInfo? _selectedVoiceLanguage;
 
     public string CopyLabel => L("overlay.copy");
@@ -597,7 +598,7 @@ public partial class OverlayViewModel : ObservableObject
             {
                 if (!string.IsNullOrWhiteSpace(result.Text))
                 {
-                    SourceText = result.Text;
+                    SourceText = _preRecordingText + result.Text;
                     if (SelectedVoiceLanguage is not null)
                     {
                         SelectedSourceLanguage = SelectedVoiceLanguage;
@@ -618,6 +619,9 @@ public partial class OverlayViewModel : ObservableObject
         else if (VoiceState == VoiceInputState.Idle || VoiceState == VoiceInputState.Error)
         {
             VoiceStatusText = string.Empty;
+            _preRecordingText = SourceText;
+            if (!string.IsNullOrEmpty(_preRecordingText) && !_preRecordingText.EndsWith(' '))
+                _preRecordingText += " ";
             SelectedVoiceLanguage = SelectedSourceLanguage;
             var result = await _speechCoordinator.StartRecordingAsync(SelectedVoiceLanguage?.Code);
             if (!result.Success)
@@ -674,7 +678,7 @@ public partial class OverlayViewModel : ObservableObject
     private void HandlePartialTranscription(string text)
     {
         if (VoiceState == VoiceInputState.Recording)
-            SourceText = text;
+            SourceText = _preRecordingText + text;
     }
 
     private void HandleVoiceStateChanged(VoiceInputState state)

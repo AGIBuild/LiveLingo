@@ -84,6 +84,8 @@ public sealed class WhisperSpeechToTextEngine : ISpeechToTextEngine
             {
                 _logger?.LogDebug("Whisper language set to {Language}", language);
                 builder.WithLanguage(language);
+                if (language.Equals("zh", StringComparison.OrdinalIgnoreCase))
+                    builder.WithPrompt("以下是普通话的句子。");
             }
             else
             {
