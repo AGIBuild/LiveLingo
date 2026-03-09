@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using LiveLingo.Core.Engines;
 using LiveLingo.Core.LanguageDetection;
+using LiveLingo.Core.Models;
 using LiveLingo.Core.Processing;
 using Microsoft.Extensions.Logging;
 
@@ -10,17 +11,20 @@ public sealed class TranslationPipeline : ITranslationPipeline
 {
     private readonly ILanguageDetector _detector;
     private readonly ITranslationEngine _engine;
+    private readonly IModelReadinessService _modelReadiness;
     private readonly IEnumerable<ITextProcessor> _processors;
     private readonly ILogger<TranslationPipeline> _logger;
 
     public TranslationPipeline(
         ILanguageDetector detector,
         ITranslationEngine engine,
+        IModelReadinessService modelReadiness,
         IEnumerable<ITextProcessor> processors,
         ILogger<TranslationPipeline> logger)
     {
         _detector = detector;
         _engine = engine;
+        _modelReadiness = modelReadiness;
         _processors = processors;
         _logger = logger;
     }
@@ -45,6 +49,10 @@ public sealed class TranslationPipeline : ITranslationPipeline
         }
 
         ct.ThrowIfCancellationRequested();
+
+        _modelReadiness.EnsureTranslationModelReady(srcLang, request.TargetLanguage);
+        if (request.PostProcessing is not null)
+            _modelReadiness.EnsurePostProcessingModelReady();
 
         var sw = Stopwatch.StartNew();
         var translated = await _engine.TranslateAsync(

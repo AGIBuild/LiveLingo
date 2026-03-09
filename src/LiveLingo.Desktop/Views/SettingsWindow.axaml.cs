@@ -10,6 +10,8 @@ namespace LiveLingo.Desktop.Views;
 
 public partial class SettingsWindow : Window
 {
+    private readonly ILocalizationService? _loc;
+
     public SettingsWindow()
     {
         InitializeComponent();
@@ -18,6 +20,7 @@ public partial class SettingsWindow : Window
 
     public SettingsWindow(SettingsViewModel vm, ILocalizationService? loc = null)
     {
+        _loc = loc;
         DataContext = vm;
         InitializeComponent();
         HookDragHandle();
@@ -57,7 +60,7 @@ public partial class SettingsWindow : Window
 
         var dialog = new Window
         {
-            Title = "Permission Check",
+            Title = L("settings.permission.title", "Permission Check"),
             Width = 380,
             SizeToContent = Avalonia.Controls.SizeToContent.Height,
             CanResize = false,
@@ -70,22 +73,22 @@ public partial class SettingsWindow : Window
 
         root.Children.Add(new TextBlock
         {
-            Text = "macOS Permissions",
+            Text = L("settings.permission.header", "macOS Permissions"),
             FontSize = 16,
             FontWeight = Avalonia.Media.FontWeight.SemiBold,
             Foreground = fgPrimary
         });
 
-        root.Children.Add(BuildPermissionRow("Accessibility", ax, bgElevated, borderSubtle, fgPrimary, fgMuted, successBrush, dangerBrush, accent,
+        root.Children.Add(BuildPermissionRow(L("settings.permission.accessibility", "Accessibility"), ax, bgElevated, borderSubtle, fgPrimary, fgMuted, successBrush, dangerBrush, accent,
             "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"));
-        root.Children.Add(BuildPermissionRow("Input Monitoring", im, bgElevated, borderSubtle, fgPrimary, fgMuted, successBrush, dangerBrush, accent,
+        root.Children.Add(BuildPermissionRow(L("settings.permission.inputMonitoring", "Input Monitoring"), im, bgElevated, borderSubtle, fgPrimary, fgMuted, successBrush, dangerBrush, accent,
             "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent"));
 
         var hint = new TextBlock
         {
             Text = allGranted
-                ? "All permissions granted. Global hotkey should work."
-                : "Add the terminal app (Terminal / Cursor / iTerm) to both lists, then restart.",
+                ? L("settings.permission.allGranted", "All permissions granted. Global hotkey should work.")
+                : L("settings.permission.hint", "Add the terminal app (Terminal / Cursor / iTerm) to both lists, then restart."),
             Foreground = allGranted ? fgMuted : dangerBrush,
             FontSize = 12,
             TextWrapping = Avalonia.Media.TextWrapping.Wrap,
@@ -102,7 +105,7 @@ public partial class SettingsWindow : Window
 
         var recheck = new Button
         {
-            Content = "↻ Recheck",
+            Content = L("settings.permission.recheck", "↻ Recheck"),
             Background = bgElevated,
             Foreground = fgPrimary,
             BorderBrush = borderSubtle,
@@ -115,7 +118,7 @@ public partial class SettingsWindow : Window
 
         var close = new Button
         {
-            Content = "Done",
+            Content = L("settings.permission.done", "Done"),
             Background = accent,
             Foreground = Avalonia.Media.Brushes.White,
             BorderThickness = new Avalonia.Thickness(0),
@@ -132,7 +135,7 @@ public partial class SettingsWindow : Window
 
     public void RequestShowPermissionDialog() => ShowPermissionDialog();
 
-    private static Border BuildPermissionRow(
+    private Border BuildPermissionRow(
         string label, bool granted,
         Avalonia.Media.IBrush bg, Avalonia.Media.IBrush border,
         Avalonia.Media.IBrush fgPrimary, Avalonia.Media.IBrush fgMuted,
@@ -175,7 +178,9 @@ public partial class SettingsWindow : Window
         });
         info.Children.Add(new TextBlock
         {
-            Text = granted ? "Granted" : "Not Granted",
+            Text = granted
+                ? L("settings.permission.granted", "Granted")
+                : L("settings.permission.notGranted", "Not Granted"),
             FontSize = 11,
             Foreground = granted ? fgMuted : dangerBrush
         });
@@ -186,7 +191,7 @@ public partial class SettingsWindow : Window
         {
             var openBtn = new Button
             {
-                Content = "Open Settings →",
+                Content = L("settings.permission.openSettings", "Open Settings →"),
                 FontSize = 12,
                 Background = Avalonia.Media.Brushes.Transparent,
                 Foreground = accent,
@@ -253,12 +258,14 @@ public partial class SettingsWindow : Window
     {
         var folders = await StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
         {
-            Title = "Select Model Storage Folder",
+            Title = L("settings.advanced.selectModelFolder", "Select Model Storage Folder"),
             AllowMultiple = false
         });
 
         if (folders.Count > 0 && DataContext is SettingsViewModel vm)
             vm.WorkingCopy.Advanced.ModelStoragePath = folders[0].Path.LocalPath;
     }
+
+    private string L(string key, string fallback) => _loc?.T(key) ?? fallback;
 
 }

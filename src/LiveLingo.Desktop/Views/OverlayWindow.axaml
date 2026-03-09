@@ -134,13 +134,13 @@
                         Background="Transparent" Cursor="Hand"
                         Height="28" CornerRadius="12,12,0,0">
                     <Grid ColumnDefinitions="*,Auto,Auto,Auto">
-                        <TextBlock Grid.Column="1" Text="LiveLingo"
+                        <TextBlock Grid.Column="1" Text="{Binding AppTitle}"
                                    FontSize="11" Foreground="{DynamicResource OvFgTertiaryBrush}"
                                    Margin="0,0,4,0" VerticalAlignment="Center"/>
                         <Button Grid.Column="2" Classes="iconBtn"
                                 Content="⚙" FontSize="17"
                                 Command="{Binding OpenSettingsCommand}"
-                                ToolTip.Tip="Settings"
+                                ToolTip.Tip="{Binding SettingsTooltip}"
                                 Margin="0,0,2,0" VerticalAlignment="Center"/>
                         <Button Grid.Column="3" Content="✕"
                                 Click="CloseButton_Click"
@@ -148,6 +148,7 @@
                                 Background="Transparent" BorderThickness="0"
                                 Padding="6,2" Margin="0,0,8,0"
                                 VerticalAlignment="Center" Cursor="Hand"
+                                ToolTip.Tip="{Binding CloseTooltip}"
                                 MinWidth="0" MinHeight="0"/>
                     </Grid>
                 </Border>
@@ -230,10 +231,10 @@
                                     CornerRadius="4"
                                     Background="Transparent"
                                     VerticalAlignment="Center">
-                                <TextBlock Text="{Binding SelectedSourceLanguage.Code, FallbackValue='auto'}"
+                                <TextBlock Text="{Binding SourceLanguageCodeDisplay}"
                                            Foreground="{DynamicResource OvFgMutedBrush}" FontSize="12"
                                            VerticalAlignment="Center"
-                                           ToolTip.Tip="Source language"/>
+                                           ToolTip.Tip="{Binding SourceLanguageTooltip}"/>
                             </Border>
                             <TextBlock Text="→" Foreground="{DynamicResource OvFgTertiaryBrush}"
                                        FontSize="12" VerticalAlignment="Center"/>
@@ -243,7 +244,7 @@
                                     Background="Transparent"
                                     Cursor="Hand"
                                     VerticalAlignment="Center"
-                                    ToolTip.Tip="Target language">
+                                    ToolTip.Tip="{Binding TargetLanguageTooltip}">
                                 <TextBlock Text="{Binding SelectedTargetLanguage.Code, FallbackValue='--'}"
                                            Foreground="{StaticResource AccentBrush}" FontSize="12"
                                            TextDecorations="Underline"
@@ -252,7 +253,7 @@
                             <Button Classes="iconBtn"
                                     Content="⇄" FontSize="17"
                                     Command="{Binding SwapLanguagesCommand}"
-                                    ToolTip.Tip="Swap source ↔ target language"
+                                    ToolTip.Tip="{Binding SwapLanguagesTooltip}"
                                     VerticalAlignment="Center"/>
                         </StackPanel>
 
@@ -297,11 +298,11 @@
 
                     <Button Grid.Column="3" Classes="sendBtn"
                             Name="SendButton"
-                            Content="Send ▶"
+                            Content="{Binding SendLabel}"
                             Click="SendButton_Click"
                             IsEnabled="{Binding TranslatedText,
                                         Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                            ToolTip.Tip="Send translation (Ctrl+Enter)"/>
+                            ToolTip.Tip="{Binding SendTooltip}"/>
                 </Grid>
             </Grid>
         </Border>

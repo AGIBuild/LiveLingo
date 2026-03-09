@@ -24,8 +24,8 @@
                 CornerRadius="8"/>
 
         <StackPanel Margin="28,40,28,24" Spacing="14" VerticalAlignment="Center">
-            <TextBlock Classes="title" Text="LiveLingo" HorizontalAlignment="Center"/>
-            <TextBlock Classes="hint" FontSize="13"
+            <TextBlock Name="MainTitleText" Classes="title" Text="LiveLingo" HorizontalAlignment="Center"/>
+            <TextBlock Name="MainHintPrimaryText" Classes="hint" FontSize="13"
                        Text="Global hotkey registered. Press the shortcut while any app is focused to open the translation overlay."
                        TextAlignment="Center"/>
             <Border Classes="badge" HorizontalAlignment="Center">
@@ -36,11 +36,11 @@
                            Foreground="{StaticResource SuccessBrush}"
                            HorizontalAlignment="Center"/>
             </Border>
-            <TextBlock Classes="hint" FontSize="12"
+            <TextBlock Name="MainHintSecondaryText" Classes="hint" FontSize="12"
                        Text="The overlay pops up over the active window."
                        HorizontalAlignment="Center" TextAlignment="Center"/>
-            <Button Content="⚙ Settings" HorizontalAlignment="Center"
-                    Name="SettingsButton" Padding="20,8"
+            <Button Name="MainSettingsButton" Content="⚙ Settings" HorizontalAlignment="Center"
+                    Padding="20,8"
                     Classes="themed"
                     Click="OnSettingsClick"/>
         </StackPanel>

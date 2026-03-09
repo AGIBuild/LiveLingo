@@ -23,6 +23,7 @@ public static class ServiceCollectionExtensions
 
         services.AddHttpClient<ModelManager>();
         services.AddSingleton<IModelManager>(sp => sp.GetRequiredService<ModelManager>());
+        services.AddSingleton<IModelReadinessService, ModelReadinessService>();
 
         services.AddSingleton<QwenModelHost>();
         services.AddSingleton<ITranslationEngine, MarianOnnxEngine>();

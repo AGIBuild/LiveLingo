@@ -1,4 +1,5 @@
 using LiveLingo.Core.Engines;
+using LiveLingo.Core.Models;
 using LiveLingo.Core.Processing;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -8,6 +9,17 @@ namespace LiveLingo.Core.Tests.Engines;
 
 public class LlamaTranslationEngineTests
 {
+    private static QwenModelHost CreateHost()
+    {
+        var modelManager = Substitute.For<IModelManager>();
+        modelManager.GetModelDirectory(ModelRegistry.Qwen25_15B.Id)
+            .Returns(Path.Combine("/fake", ModelRegistry.Qwen25_15B.Id));
+        return new QwenModelHost(
+            modelManager,
+            Options.Create(new CoreOptions()),
+            Substitute.For<ILogger<QwenModelHost>>());
+    }
+
     [Theory]
     [InlineData("zh", "en", true)]
     [InlineData("en", "zh", true)]
@@ -16,9 +28,7 @@ public class LlamaTranslationEngineTests
     [InlineData("zh", "xyz", false)]
     public void SupportsLanguagePair_ChecksLanguages(string src, string tgt, bool expected)
     {
-        var host = new QwenModelHost(
-            Options.Create(new CoreOptions()),
-            Substitute.For<ILogger<QwenModelHost>>());
+        var host = CreateHost();
         var engine = new LlamaTranslationEngine(host, Substitute.For<ILogger<LlamaTranslationEngine>>());
 
         Assert.Equal(expected, engine.SupportsLanguagePair(src, tgt));
@@ -40,9 +50,7 @@ public class LlamaTranslationEngineTests
     [InlineData("pt", "Português")]
     public void SupportedLanguages_ContainsLanguage(string code, string displayName)
     {
-        var host = new QwenModelHost(
-            Options.Create(new CoreOptions()),
-            Substitute.For<ILogger<QwenModelHost>>());
+        var host = CreateHost();
         var engine = new LlamaTranslationEngine(host, Substitute.For<ILogger<LlamaTranslationEngine>>());
 
         Assert.Contains(engine.SupportedLanguages, l => l.Code == code && l.DisplayName == displayName);
@@ -54,9 +62,7 @@ public class LlamaTranslationEngineTests
     [Fact]
     public void SupportedLanguages_ContainsAtLeast10()
     {
-        var host = new QwenModelHost(
-            Options.Create(new CoreOptions()),
-            Substitute.For<ILogger<QwenModelHost>>());
+        var host = CreateHost();
         var engine = new LlamaTranslationEngine(host, Substitute.For<ILogger<LlamaTranslationEngine>>());
 
         Assert.True(engine.SupportedLanguages.Count >= 10);
@@ -68,9 +74,7 @@ public class LlamaTranslationEngineTests
     [Fact]
     public void SupportedLanguages_CodesMatchSupportsLanguagePair()
     {
-        var host = new QwenModelHost(
-            Options.Create(new CoreOptions()),
-            Substitute.For<ILogger<QwenModelHost>>());
+        var host = CreateHost();
         var engine = new LlamaTranslationEngine(host, Substitute.For<ILogger<LlamaTranslationEngine>>());
 
         foreach (var lang in engine.SupportedLanguages)
@@ -83,9 +87,7 @@ public class LlamaTranslationEngineTests
     [Fact]
     public void Dispose_DoesNotThrow()
     {
-        var host = new QwenModelHost(
-            Options.Create(new CoreOptions()),
-            Substitute.For<ILogger<QwenModelHost>>());
+        var host = CreateHost();
         var engine = new LlamaTranslationEngine(host, Substitute.For<ILogger<LlamaTranslationEngine>>());
 
         engine.Dispose();
@@ -95,9 +97,7 @@ public class LlamaTranslationEngineTests
     [Fact]
     public async Task TranslateAsync_ThrowsOnCancellation()
     {
-        var host = new QwenModelHost(
-            Options.Create(new CoreOptions()),
-            Substitute.For<ILogger<QwenModelHost>>());
+        var host = CreateHost();
         var engine = new LlamaTranslationEngine(host, Substitute.For<ILogger<LlamaTranslationEngine>>());
 
         using var cts = new CancellationTokenSource();

@@ -36,29 +36,29 @@
                         Padding="14,7" IsDefault="True" Classes="accent"/>
             </StackPanel>
 
-            <TabControl>
+            <TabControl SelectedIndex="{Binding SelectedTabIndex}">
                 <!-- General -->
                 <TabItem Name="TabGeneral" Header="General" Classes="themed">
                     <ScrollViewer>
                         <StackPanel Spacing="2" Margin="0,4">
-                            <TextBlock Classes="section" Text="Hotkeys"/>
+                            <TextBlock Classes="section" Text="{Binding GeneralSectionHotkeys}"/>
                             <Grid ColumnDefinitions="130,*">
-                                <TextBlock Classes="label" Text="Overlay Toggle:"/>
+                                <TextBlock Classes="label" Text="{Binding GeneralOverlayToggleLabel}"/>
                                 <ctrl:HotkeyRecorder Grid.Column="1"
                                     Hotkey="{Binding WorkingCopy.Hotkeys.OverlayToggle, Mode=TwoWay}"/>
                             </Grid>
                             <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,3,0,0">
-                                <TextBlock Classes="hint" Text="Click the field, then press a key combo"/>
-                                <Button Content="Check Permissions…" Classes="themed sm"
+                                <TextBlock Classes="hint" Text="{Binding GeneralHotkeyHint}"/>
+                                <Button Content="{Binding GeneralCheckPermissions}" Classes="themed sm"
                                         Command="{Binding CheckPermissionsCommand}"
                                         IsVisible="{Binding ShowPermissionSection}"
                                         Padding="8,3" VerticalAlignment="Center"/>
                             </StackPanel>
 
                             <Separator Classes="themed"/>
-                            <TextBlock Classes="section" Text="Overlay"/>
+                            <TextBlock Classes="section" Text="{Binding GeneralSectionOverlay}"/>
                             <Grid ColumnDefinitions="130,*" RowDefinitions="Auto,Auto" RowSpacing="10">
-                                <TextBlock Classes="label" Text="Opacity:"/>
+                                <TextBlock Classes="label" Text="{Binding GeneralOpacityLabel}"/>
                                 <Grid Grid.Column="1" ColumnDefinitions="*,36">
                                     <Slider Classes="themed" Minimum="0.1" Maximum="1.0"
                                             Value="{Binding WorkingCopy.UI.OverlayOpacity}"
@@ -71,16 +71,23 @@
                                         </TextBlock.Text>
                                     </TextBlock>
                                 </Grid>
-                                <TextBlock Grid.Row="1" Classes="label" Text="Injection Mode:"/>
+                                <TextBlock Grid.Row="1" Classes="label" Text="{Binding GeneralInjectionModeLabel}"/>
                                 <ComboBox Grid.Row="1" Grid.Column="1" MinWidth="160"
                                           Classes="themed"
-                                          ItemsSource="{Binding InjectionModes}"
-                                          SelectedItem="{Binding WorkingCopy.UI.DefaultInjectionMode}"/>
+                                          ItemsSource="{Binding InjectionModeOptions}"
+                                          SelectedValueBinding="{Binding Value}"
+                                          SelectedValue="{Binding WorkingCopy.UI.DefaultInjectionMode}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:SelectableOption">
+                                            <TextBlock Text="{Binding DisplayName}"/>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
                             </Grid>
                             <Separator Classes="themed"/>
-                            <TextBlock Classes="section" Text="Language"/>
+                            <TextBlock Classes="section" Text="{Binding GeneralSectionLanguage}"/>
                             <Grid ColumnDefinitions="130,*">
-                                <TextBlock Classes="label" Text="UI Language:"/>
+                                <TextBlock Classes="label" Text="{Binding GeneralUiLanguageLabel}"/>
                                 <ComboBox Grid.Column="1" MinWidth="160"
                                           Classes="themed"
                                           ItemsSource="{Binding UILanguages}"
@@ -95,9 +102,9 @@
                 <TabItem Name="TabTranslation" Header="Translation" Classes="themed">
                     <ScrollViewer>
                         <StackPanel Spacing="2" Margin="0,4">
-                            <TextBlock Classes="section" Text="Default Language Pair"/>
-                            <Grid ColumnDefinitions="130,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="10">
-                                <TextBlock Classes="label" Text="Source Language:"/>
+                            <TextBlock Classes="section" Text="{Binding TranslationSectionDefaultPair}"/>
+                            <Grid ColumnDefinitions="130,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="10">
+                                <TextBlock Classes="label" Text="{Binding TranslationSourceLabel}"/>
                                 <ComboBox Grid.Column="1" MinWidth="200"
                                           Classes="themed"
                                           ItemsSource="{Binding AvailableLanguages}"
@@ -109,7 +116,7 @@
                                         </DataTemplate>
                                     </ComboBox.ItemTemplate>
                                 </ComboBox>
-                                <TextBlock Grid.Row="1" Classes="label" Text="Target Language:"/>
+                                <TextBlock Grid.Row="1" Classes="label" Text="{Binding TranslationTargetLabel}"/>
                                 <ComboBox Grid.Row="1" Grid.Column="1" MinWidth="200"
                                           Classes="themed"
                                           ItemsSource="{Binding AvailableLanguages}"
@@ -121,7 +128,7 @@
                                         </DataTemplate>
                                     </ComboBox.ItemTemplate>
                                 </ComboBox>
-                                <TextBlock Grid.Row="2" Classes="label" Text="Active Model:"/>
+                                <TextBlock Grid.Row="2" Classes="label" Text="{Binding TranslationActiveModelLabel}"/>
                                 <Grid Grid.Row="2" Grid.Column="1" ColumnDefinitions="*,Auto" ColumnSpacing="6">
                                     <ComboBox MinWidth="260"
                                               Classes="themed"
@@ -141,9 +148,28 @@
                                             Content="↻"
                                             Classes="themed sm"
                                             Command="{Binding RefreshTranslationModelsCommand}"
-                                            ToolTip.Tip="Refresh translation models"
+                                            ToolTip.Tip="{Binding TranslationRefreshModelsTooltip}"
                                             Padding="10,6"/>
                                 </Grid>
+                                <StackPanel Grid.Row="3" Grid.Column="1"
+                                            Orientation="Horizontal"
+                                            Spacing="8"
+                                            IsVisible="{Binding ShowNoInstalledModelsHint}">
+                                    <TextBlock Classes="hint"
+                                               Foreground="{StaticResource FgTertiaryBrush}"
+                                               VerticalAlignment="Center"
+                                               Text="{Binding TranslationNoInstalledModelsHint}"/>
+                                    <Button Command="{Binding OpenModelsTabCommand}"
+                                            Background="Transparent"
+                                            BorderThickness="0"
+                                            Padding="0"
+                                            Cursor="Hand"
+                                            VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding TranslationOpenModelsTab}"
+                                                   Foreground="{StaticResource AccentBrush}"
+                                                   TextDecorations="Underline"/>
+                                    </Button>
+                                </StackPanel>
                             </Grid>
                         </StackPanel>
                     </ScrollViewer>
@@ -170,19 +196,19 @@
 
                                             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
                                                 <Button Classes="accent sm"
-                                                        Content="Download"
+                                                        Content="{Binding DownloadButtonLabel}"
                                                         Command="{Binding DownloadCommand}"
                                                         IsVisible="{Binding !IsInstalled}"/>
                                                 <Button Classes="themed sm"
-                                                        Content="Cancel"
+                                                        Content="{Binding CancelButtonLabel}"
                                                         Command="{Binding CancelDownloadCommand}"
                                                         IsVisible="{Binding IsDownloading}"/>
-                                                <TextBlock Text="✓ Installed" FontSize="11"
+                                                <TextBlock Text="{Binding InstalledLabel}" FontSize="11"
                                                            Foreground="{StaticResource SuccessBrush}"
                                                            VerticalAlignment="Center"
                                                            IsVisible="{Binding IsInstalled}"/>
                                                 <Button Classes="danger sm"
-                                                        Content="Delete"
+                                                        Content="{Binding DeleteButtonLabel}"
                                                         Command="{Binding DeleteCommand}"
                                                         IsVisible="{Binding IsInstalled}"/>
                                             </StackPanel>
@@ -216,13 +242,13 @@
                 <TabItem Name="TabAdvanced" Header="Advanced" Classes="themed">
                     <ScrollViewer>
                         <StackPanel Spacing="2" Margin="0,4">
-                            <TextBlock Classes="section" Text="Model Storage"/>
+                            <TextBlock Classes="section" Text="{Binding AdvancedSectionModelStorage}"/>
                             <Grid ColumnDefinitions="130,*,Auto">
-                                <TextBlock Classes="label" Text="Storage Path:"/>
+                                <TextBlock Classes="label" Text="{Binding AdvancedStoragePathLabel}"/>
                                 <TextBox Grid.Column="1" Classes="themed"
                                          Text="{Binding WorkingCopy.Advanced.ModelStoragePath}"
-                                         PlaceholderText="Default (AppData)"/>
-                                <Button Grid.Column="2" Content="Browse…"
+                                         PlaceholderText="{Binding AdvancedStoragePathPlaceholder}"/>
+                                <Button Grid.Column="2" Content="{Binding AdvancedBrowseLabel}"
                                         Click="BrowseModelPath_Click"
                                         Margin="6,0,0,0" Padding="10,6"
                                         Classes="themed sm"/>
@@ -232,23 +258,30 @@
                                        IsVisible="{Binding MigrationError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                                        Margin="0,3,0,0"/>
                             <Separator Classes="themed"/>
-                            <TextBlock Classes="section" Text="Performance"/>
+                            <TextBlock Classes="section" Text="{Binding AdvancedSectionPerformance}"/>
                             <Grid ColumnDefinitions="130,*">
-                                <TextBlock Classes="label" Text="Inference Threads:"/>
+                                <TextBlock Classes="label" Text="{Binding AdvancedInferenceThreadsLabel}"/>
                                 <NumericUpDown Grid.Column="1" Minimum="0" Maximum="32"
                                                Classes="themed"
                                                Value="{Binding WorkingCopy.Advanced.InferenceThreads}"
                                                MinWidth="100" HorizontalAlignment="Left"/>
                             </Grid>
-                            <TextBlock Classes="hint" Text="0 = auto-detect (recommended)"/>
+                            <TextBlock Classes="hint" Text="{Binding AdvancedThreadsHint}"/>
                             <Separator Classes="themed"/>
-                            <TextBlock Classes="section" Text="Logging"/>
+                            <TextBlock Classes="section" Text="{Binding AdvancedSectionLogging}"/>
                             <Grid ColumnDefinitions="130,*">
-                                <TextBlock Classes="label" Text="Log Level:"/>
+                                <TextBlock Classes="label" Text="{Binding AdvancedLogLevelLabel}"/>
                                 <ComboBox Grid.Column="1" MinWidth="160"
                                           Classes="themed"
-                                          ItemsSource="{Binding LogLevels}"
-                                          SelectedItem="{Binding WorkingCopy.Advanced.LogLevel}"/>
+                                          ItemsSource="{Binding LogLevelOptions}"
+                                          SelectedValueBinding="{Binding Value}"
+                                          SelectedValue="{Binding WorkingCopy.Advanced.LogLevel}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:SelectableOption">
+                                            <TextBlock Text="{Binding DisplayName}"/>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
                             </Grid>
                         </StackPanel>
                     </ScrollViewer>
@@ -258,16 +291,23 @@
                 <TabItem Name="TabAI" Header="AI" Classes="themed">
                     <ScrollViewer>
                         <StackPanel Spacing="2" Margin="0,4">
-                            <TextBlock Classes="section" Text="Post-Processing"/>
+                            <TextBlock Classes="section" Text="{Binding AiSectionPostProcessing}"/>
                             <Grid ColumnDefinitions="130,*">
-                                <TextBlock Classes="label" Text="Default Mode:"/>
+                                <TextBlock Classes="label" Text="{Binding AiDefaultModeLabel}"/>
                                 <ComboBox Grid.Column="1" MinWidth="160"
                                           Classes="themed"
-                                          ItemsSource="{Binding PostProcessModes}"
-                                          SelectedItem="{Binding WorkingCopy.Processing.DefaultMode}"/>
+                                          ItemsSource="{Binding PostProcessModeOptions}"
+                                          SelectedValueBinding="{Binding Value}"
+                                          SelectedValue="{Binding WorkingCopy.Processing.DefaultMode}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:SelectableOption">
+                                            <TextBlock Text="{Binding DisplayName}"/>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
                             </Grid>
                             <TextBlock Classes="hint"
-                                       Text="Summarize · Optimize · Colloquialize"/>
+                                       Text="{Binding AiModesHint}"/>
                         </StackPanel>
                     </ScrollViewer>
                 </TabItem>

@@ -1,4 +1,5 @@
 using LiveLingo.Desktop.Services.Configuration;
+using LiveLingo.Desktop.Services.LanguageCatalog;
 using LiveLingo.Desktop.Messaging;
 using LiveLingo.Desktop.ViewModels;
 using CommunityToolkit.Mvvm.Messaging;
@@ -378,35 +379,114 @@ public class SettingsViewModelTests
     }
 
     [Fact]
-    public void Constructor_IncludesQwenInActiveModelList()
+    public void ActiveModelList_OnlyContainsInstalledModels()
     {
-        var vm = new SettingsViewModel(CreateSettings(), Substitute.For<IModelManager>(), new StubTranslationEngine());
+        var modelManager = Substitute.For<IModelManager>();
+        modelManager.ListInstalled().Returns(
+        [
+            new InstalledModel(
+                "opus-mt-zh-en",
+                "MarianMT Chinese→English",
+                "/tmp/models/opus-mt-zh-en",
+                100,
+                ModelType.Translation,
+                DateTime.UtcNow)
+        ]);
+        var vm = new SettingsViewModel(CreateSettings(), modelManager, new StubTranslationEngine());
 
-        Assert.Contains(vm.AvailableTranslationModels, m =>
-            string.Equals(m.Id, ModelRegistry.Qwen25_15B.Id, StringComparison.OrdinalIgnoreCase) &&
-            m.Type == ModelType.PostProcessing);
+        Assert.Single(vm.AvailableTranslationModels);
+        Assert.Equal("opus-mt-zh-en", vm.AvailableTranslationModels[0].Id);
+        Assert.DoesNotContain(vm.AvailableTranslationModels, m =>
+            string.Equals(m.Id, "opus-mt-en-zh", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
-    public async Task SaveCommand_WhenSelectingQwen_PersistsModelIdWithoutChangingLanguagePair()
+    public void ActiveModelList_Empty_ShowsDownloadHint()
     {
-        var svc = CreateSettings(new UserSettings
+        var modelManager = Substitute.For<IModelManager>();
+        modelManager.ListInstalled().Returns([]);
+        var vm = new SettingsViewModel(CreateSettings(), modelManager, new StubTranslationEngine());
+
+        Assert.True(vm.ShowNoInstalledModelsHint);
+    }
+
+    [Fact]
+    public void ActiveModelList_HintUpdatesAfterRefresh()
+    {
+        var installed = new List<InstalledModel>();
+        var modelManager = Substitute.For<IModelManager>();
+        modelManager.ListInstalled().Returns(_ => installed);
+        var vm = new SettingsViewModel(CreateSettings(), modelManager, new StubTranslationEngine());
+        Assert.True(vm.ShowNoInstalledModelsHint);
+
+        installed.Add(new InstalledModel(
+            "opus-mt-zh-en",
+            "MarianMT Chinese→English",
+            "/tmp/models/opus-mt-zh-en",
+            100,
+            ModelType.Translation,
+            DateTime.UtcNow));
+        vm.RefreshTranslationModelsCommand.Execute(null);
+
+        Assert.False(vm.ShowNoInstalledModelsHint);
+    }
+
+    [Fact]
+    public void OpenModelsTabCommand_SwitchesToModelsTab()
+    {
+        var vm = new SettingsViewModel(CreateSettings());
+        Assert.Equal(0, vm.SelectedTabIndex);
+
+        vm.OpenModelsTabCommand.Execute(null);
+
+        Assert.Equal(2, vm.SelectedTabIndex);
+    }
+
+    [Fact]
+    public void Constructor_ExcludesQwenFromActiveModelList()
+    {
+        var modelManager = Substitute.For<IModelManager>();
+        modelManager.ListInstalled().Returns(
+        [
+            new InstalledModel(
+                ModelRegistry.Qwen25_15B.Id,
+                ModelRegistry.Qwen25_15B.DisplayName,
+                "/tmp/models/qwen",
+                ModelRegistry.Qwen25_15B.SizeBytes,
+                ModelType.PostProcessing,
+                DateTime.UtcNow)
+        ]);
+        var vm = new SettingsViewModel(CreateSettings(), modelManager, new StubTranslationEngine());
+
+        Assert.DoesNotContain(vm.AvailableTranslationModels, m =>
+            string.Equals(m.Id, ModelRegistry.Qwen25_15B.Id, StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void Constructor_WithQwenAsActiveTranslationModel_ClearsInvalidSelection()
+    {
+        var modelManager = Substitute.For<IModelManager>();
+        modelManager.ListInstalled().Returns(
+        [
+            new InstalledModel(
+                ModelRegistry.Qwen25_15B.Id,
+                ModelRegistry.Qwen25_15B.DisplayName,
+                "/tmp/models/qwen",
+                ModelRegistry.Qwen25_15B.SizeBytes,
+                ModelType.PostProcessing,
+                DateTime.UtcNow)
+        ]);
+        var vm = new SettingsViewModel(CreateSettings(new UserSettings
         {
             Translation = new TranslationSettings
             {
                 DefaultSourceLanguage = "zh",
-                DefaultTargetLanguage = "en"
+                DefaultTargetLanguage = "en",
+                ActiveTranslationModelId = ModelRegistry.Qwen25_15B.Id
             }
-        });
-        var vm = new SettingsViewModel(svc, Substitute.For<IModelManager>(), new StubTranslationEngine());
-        vm.WorkingCopy.Translation.ActiveTranslationModelId = ModelRegistry.Qwen25_15B.Id;
+        }), modelManager, new StubTranslationEngine());
 
-        await vm.SaveCommand.ExecuteAsync(null);
-        var saved = svc.Current;
-
-        Assert.Equal("zh", saved.Translation.DefaultSourceLanguage);
-        Assert.Equal("en", saved.Translation.DefaultTargetLanguage);
-        Assert.Equal(ModelRegistry.Qwen25_15B.Id, saved.Translation.ActiveTranslationModelId);
+        Assert.Null(vm.WorkingCopy.Translation.ActiveTranslationModelId);
     }
 
     [Fact]
@@ -449,21 +529,36 @@ public class SettingsViewModelTests
     }
 
     [Fact]
-    public void AvailableLanguages_ComesFromEngine()
+    public void AvailableLanguages_ComesFromFixedCatalog()
     {
         var engine = new StubTranslationEngine();
         var vm = new SettingsViewModel(CreateSettings(), engine);
 
-        Assert.Equal(engine.SupportedLanguages.Count, vm.AvailableLanguages.Count);
-        Assert.Contains(vm.AvailableLanguages, l => l.Code == "en");
+        Assert.Equal(LanguageCatalog.DefaultLanguages.Count, vm.AvailableLanguages.Count);
+        Assert.Equal(LanguageCatalog.DefaultLanguages.Select(l => l.Code), vm.AvailableLanguages.Select(l => l.Code));
     }
 
     [Fact]
-    public void AvailableLanguages_EmptyWithoutEngine()
+    public void AvailableLanguages_StillAvailableWithoutEngine()
     {
         var vm = new SettingsViewModel(CreateSettings());
 
-        Assert.Empty(vm.AvailableLanguages);
+        Assert.Equal(LanguageCatalog.DefaultLanguages.Count, vm.AvailableLanguages.Count);
+        Assert.Equal(LanguageCatalog.DefaultLanguages.Select(l => l.Code), vm.AvailableLanguages.Select(l => l.Code));
+    }
+
+    [Fact]
+    public void AvailableLanguages_UsesInjectedCatalog()
+    {
+        var catalog = Substitute.For<ILanguageCatalog>();
+        catalog.All.Returns(
+        [
+            new LanguageInfo("fr", "French"),
+            new LanguageInfo("de", "German")
+        ]);
+        var vm = new SettingsViewModel(CreateSettings(), languageCatalog: catalog);
+
+        Assert.Equal(["fr", "de"], vm.AvailableLanguages.Select(l => l.Code));
     }
 
     [Fact]
@@ -513,6 +608,17 @@ public class SettingsViewModelTests
     public void Constructor_PrefersActiveTranslationModel_WhenConfigured()
     {
         var engine = new StubTranslationEngine();
+        var modelManager = Substitute.For<IModelManager>();
+        modelManager.ListInstalled().Returns(
+        [
+            new InstalledModel(
+                "opus-mt-en-zh",
+                "MarianMT English→Chinese",
+                "/tmp/models/opus-mt-en-zh",
+                100,
+                ModelType.Translation,
+                DateTime.UtcNow)
+        ]);
         var settings = new UserSettings
         {
             Translation = new TranslationSettings
@@ -523,7 +629,7 @@ public class SettingsViewModelTests
             }
         };
 
-        var vm = new SettingsViewModel(CreateSettings(settings), engine);
+        var vm = new SettingsViewModel(CreateSettings(settings), modelManager, engine);
 
         Assert.Equal("opus-mt-en-zh", vm.WorkingCopy.Translation.ActiveTranslationModelId);
         Assert.Equal("en", vm.WorkingCopy.Translation.DefaultSourceLanguage);
@@ -535,7 +641,18 @@ public class SettingsViewModelTests
     {
         var engine = new StubTranslationEngine();
         var svc = CreateSettings();
-        var vm = new SettingsViewModel(svc, engine);
+        var modelManager = Substitute.For<IModelManager>();
+        modelManager.ListInstalled().Returns(
+        [
+            new InstalledModel(
+                "opus-mt-en-zh",
+                "MarianMT English→Chinese",
+                "/tmp/models/opus-mt-en-zh",
+                100,
+                ModelType.Translation,
+                DateTime.UtcNow)
+        ]);
+        var vm = new SettingsViewModel(svc, modelManager, engine);
         vm.WorkingCopy.Translation.ActiveTranslationModelId = "opus-mt-en-zh";
 
         await vm.SaveCommand.ExecuteAsync(null);

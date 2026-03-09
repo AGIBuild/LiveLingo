@@ -23,14 +23,22 @@
 - **THEN** the `.part` file SHALL be preserved for future resumption
 
 ### Requirement: Model manifest
-Each installed model directory SHALL contain a `manifest.json` file recording model metadata: id, displayName, type, version, sizeBytes, sha256, installedAt, and file list.
+Each installed model directory SHALL continue to contain a `manifest.json` used by `ListInstalled()` for readiness checks and user-visible model lists.
 
 #### Scenario: Manifest created after successful download
 - **WHEN** model download completes successfully
 - **THEN** a `manifest.json` SHALL be written to the model directory with accurate metadata
 
+#### Scenario: Installed model discoverable by readiness service
+- **WHEN** model download completes and manifest exists
+- **THEN** `ListInstalled()` SHALL include the model with correct id/type metadata
+
 ### Requirement: Model registry
-A static `ModelRegistry` class SHALL define all known model descriptors with pre-populated download URLs, sizes, and types. At minimum: `MarianZhEn`, `MarianJaEn`, `FastTextLid`.
+A static `ModelRegistry` class SHALL define model descriptors for translation and post-processing. FastText MAY remain defined as a descriptor, but SHALL NOT be part of the setup required download set.
+
+#### Scenario: Required set excludes FastText
+- **WHEN** `ModelRegistry.RequiredModels` or `GetRequiredModelsForLanguagePair()` is queried
+- **THEN** returned required models SHALL include translation baseline only and SHALL NOT include `FastTextLid`
 
 #### Scenario: Lookup model by ID
 - **WHEN** `ModelRegistry.All` is queried for `"marian-zh-en"`

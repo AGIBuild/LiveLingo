@@ -1,6 +1,7 @@
 using LiveLingo.Desktop.Platform;
 using LiveLingo.Desktop.Messaging;
 using LiveLingo.Desktop.Services.Configuration;
+using LiveLingo.Desktop.Services.LanguageCatalog;
 using LiveLingo.Desktop.Services.Localization;
 using LiveLingo.Desktop.ViewModels;
 using CommunityToolkit.Mvvm.Messaging;
@@ -14,6 +15,7 @@ namespace LiveLingo.Desktop.Tests.ViewModels;
 
 public class OverlayViewModelTests
 {
+    private static readonly IReadOnlyList<LanguageInfo> CatalogLanguages = LanguageCatalog.DefaultLanguages;
     private readonly TargetWindowInfo _target = new(1, 2, "slack", "Slack", 0, 0, 1920, 1080);
     private readonly ITranslationPipeline _pipeline;
     private readonly ITextInjector _injector;
@@ -407,8 +409,9 @@ public class OverlayViewModelTests
     {
         var engine = new DeterministicTranslationEngine();
         var detector = new LiveLingo.Core.LanguageDetection.ScriptBasedDetector();
+        var readiness = Substitute.For<IModelReadinessService>();
         var pipeline = new LiveLingo.Core.Translation.TranslationPipeline(
-            detector, engine, [],
+            detector, engine, readiness, [],
             NSubstitute.Substitute.For<Microsoft.Extensions.Logging.ILogger<LiveLingo.Core.Translation.TranslationPipeline>>());
 
         var settings = new UserSettings
@@ -436,9 +439,10 @@ public class OverlayViewModelTests
         var detector = NSubstitute.Substitute.For<LiveLingo.Core.LanguageDetection.ILanguageDetector>();
         detector.DetectAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(new LiveLingo.Core.LanguageDetection.DetectionResult("en", 0.99f));
+        var readiness = Substitute.For<IModelReadinessService>();
 
         var pipeline = new LiveLingo.Core.Translation.TranslationPipeline(
-            detector, engine, [],
+            detector, engine, readiness, [],
             NSubstitute.Substitute.For<Microsoft.Extensions.Logging.ILogger<LiveLingo.Core.Translation.TranslationPipeline>>());
 
         var vm = new OverlayViewModel(_target, pipeline, _injector, engine, "en", localizationService: _loc);
@@ -454,13 +458,14 @@ public class OverlayViewModelTests
     {
         var engine = new DeterministicTranslationEngine();
         var detector = new LiveLingo.Core.LanguageDetection.ScriptBasedDetector();
+        var readiness = Substitute.For<IModelReadinessService>();
         var processor = NSubstitute.Substitute.For<LiveLingo.Core.Processing.ITextProcessor>();
         processor.Name.Returns("summarize");
         processor.ProcessAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(callInfo => $"SUMMARY({callInfo.ArgAt<string>(0)})");
 
         var pipeline = new LiveLingo.Core.Translation.TranslationPipeline(
-            detector, engine, [processor],
+            detector, engine, readiness, [processor],
             NSubstitute.Substitute.For<Microsoft.Extensions.Logging.ILogger<LiveLingo.Core.Translation.TranslationPipeline>>());
 
         var settings = new UserSettings
@@ -550,7 +555,7 @@ public class OverlayViewModelTests
     }
 
     [Fact]
-    public async Task Constructor_WithQwenSelected_UsesPostProcessingEvenWhenDefaultModeOff()
+    public async Task Constructor_WithQwenSelected_DoesNotForcePostProcessingWhenDefaultModeOff()
     {
         var settings = new UserSettings
         {
@@ -571,21 +576,28 @@ public class OverlayViewModelTests
         await Task.Delay(600, TestContext.Current.CancellationToken);
 
         await _pipeline.Received().ProcessAsync(
-            Arg.Is<TranslationRequest>(r => r.PostProcessing != null && r.PostProcessing.Optimize),
+            Arg.Is<TranslationRequest>(r => r.PostProcessing == null),
             Arg.Any<CancellationToken>());
     }
 
     [Fact]
-    public async Task Constructor_WithSettings_SkipsPostProcessing_WhenQwenMissing()
+    public async Task Constructor_WithSettings_FallsBackToTranslationOnly_WhenPostProcessingModelMissing()
     {
         var settings = new UserSettings
         {
             Processing = new ProcessingSettings { DefaultMode = "Summarize" }
         };
-        var modelManager = Substitute.For<IModelManager>();
-        modelManager.ListInstalled().Returns([]);
-
-        _pipeline.ProcessAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+        _pipeline.ProcessAsync(
+                Arg.Is<TranslationRequest>(r => r.PostProcessing != null),
+                Arg.Any<CancellationToken>())
+            .Returns<TranslationResult>(_ => throw new ModelNotReadyException(
+                ModelType.PostProcessing,
+                ModelRegistry.Qwen25_15B.Id,
+                "missing",
+                "download"));
+        _pipeline.ProcessAsync(
+                Arg.Is<TranslationRequest>(r => r.PostProcessing == null),
+                Arg.Any<CancellationToken>())
             .Returns(new TranslationResult("Result", "zh", "Result", TimeSpan.FromMilliseconds(10), null));
 
         var vm = new OverlayViewModel(
@@ -594,15 +606,51 @@ public class OverlayViewModelTests
             _injector,
             _engine,
             settings,
-            localizationService: _loc,
-            modelManager: modelManager);
+            localizationService: _loc);
         vm.SourceText = "你好世界";
         await Task.Delay(600, TestContext.Current.CancellationToken);
 
         await _pipeline.Received().ProcessAsync(
+            Arg.Is<TranslationRequest>(r => r.PostProcessing != null),
+            Arg.Any<CancellationToken>());
+        await _pipeline.Received().ProcessAsync(
             Arg.Is<TranslationRequest>(r => r.PostProcessing == null),
             Arg.Any<CancellationToken>());
-        Assert.Contains("Model not downloaded", vm.StatusText);
+        Assert.Contains("translation-only", vm.StatusText, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task PostProcessingModelMissing_DisablesPostProcessingForCurrentSession()
+    {
+        var settings = new UserSettings
+        {
+            Processing = new ProcessingSettings { DefaultMode = "Summarize" }
+        };
+        _pipeline.ProcessAsync(
+                Arg.Is<TranslationRequest>(r => r.PostProcessing != null),
+                Arg.Any<CancellationToken>())
+            .Returns<TranslationResult>(_ => throw new ModelNotReadyException(
+                ModelType.PostProcessing,
+                ModelRegistry.Qwen25_15B.Id,
+                "missing",
+                "download"));
+        _pipeline.ProcessAsync(
+                Arg.Is<TranslationRequest>(r => r.PostProcessing == null),
+                Arg.Any<CancellationToken>())
+            .Returns(new TranslationResult("Result", "zh", "Result", TimeSpan.FromMilliseconds(10), null));
+
+        var vm = new OverlayViewModel(_target, _pipeline, _injector, _engine, settings, localizationService: _loc);
+        vm.SourceText = "你好世界";
+        await Task.Delay(600, TestContext.Current.CancellationToken);
+        vm.SourceText = "你好，第二次";
+        await Task.Delay(600, TestContext.Current.CancellationToken);
+
+        await _pipeline.Received(1).ProcessAsync(
+            Arg.Is<TranslationRequest>(r => r.PostProcessing != null),
+            Arg.Any<CancellationToken>());
+        await _pipeline.Received(2).ProcessAsync(
+            Arg.Is<TranslationRequest>(r => r.PostProcessing == null),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -626,7 +674,7 @@ public class OverlayViewModelTests
     }
 
     [Fact]
-    public void CycleLanguage_CyclesThroughEngineLanguages()
+    public void CycleLanguage_CyclesThroughCatalogLanguages()
     {
         var settings = new UserSettings
         {
@@ -636,17 +684,18 @@ public class OverlayViewModelTests
         Assert.Equal("en", vm.TargetLanguage);
 
         vm.CycleLanguageCommand.Execute(null);
-        Assert.Equal(_engine.SupportedLanguages[1].Code, vm.TargetLanguage);
+        var enIndex = CatalogLanguages.ToList().FindIndex(l => l.Code == "en");
+        Assert.Equal(CatalogLanguages[(enIndex + 1) % CatalogLanguages.Count].Code, vm.TargetLanguage);
     }
 
     [Fact]
     public void CycleLanguage_WrapsAroundToFirst()
     {
-        var lastLang = _engine.SupportedLanguages[^1].Code;
+        var lastLang = CatalogLanguages[^1].Code;
         var vm = new OverlayViewModel(_target, _pipeline, _injector, _engine, lastLang, localizationService: _loc);
 
         vm.CycleLanguageCommand.Execute(null);
-        Assert.Equal(_engine.SupportedLanguages[0].Code, vm.TargetLanguage);
+        Assert.Equal(CatalogLanguages[0].Code, vm.TargetLanguage);
     }
 
     [Fact]
@@ -660,24 +709,46 @@ public class OverlayViewModelTests
         Assert.Equal("ja", vm.TargetLanguage);
 
         vm.CycleLanguageCommand.Execute(null);
-        var jaIndex = _engine.SupportedLanguages.ToList().FindIndex(l => l.Code == "ja");
-        Assert.Equal(_engine.SupportedLanguages[(jaIndex + 1) % _engine.SupportedLanguages.Count].Code, vm.TargetLanguage);
+        var jaIndex = CatalogLanguages.ToList().FindIndex(l => l.Code == "ja");
+        Assert.Equal(CatalogLanguages[(jaIndex + 1) % CatalogLanguages.Count].Code, vm.TargetLanguage);
     }
 
     [Fact]
-    public void AvailableLanguages_ComesFromEngine()
+    public void AvailableLanguages_ComesFromCatalog()
     {
-        Assert.True(_engine.SupportedLanguages.Count >= 5);
-        Assert.Contains(_engine.SupportedLanguages, l => l.Code == "en");
-        Assert.Contains(_engine.SupportedLanguages, l => l.Code == "zh");
-        Assert.Contains(_engine.SupportedLanguages, l => l.Code == "ja");
+        Assert.True(CatalogLanguages.Count >= 5);
+        Assert.Contains(CatalogLanguages, l => l.Code == "en");
+        Assert.Contains(CatalogLanguages, l => l.Code == "zh");
+        Assert.Contains(CatalogLanguages, l => l.Code == "ja");
+    }
+
+    [Fact]
+    public void AvailableLanguages_UsesInjectedCatalog()
+    {
+        var catalog = Substitute.For<ILanguageCatalog>();
+        catalog.All.Returns(
+        [
+            new LanguageInfo("fr", "French"),
+            new LanguageInfo("de", "German")
+        ]);
+        var vm = new OverlayViewModel(
+            _target,
+            _pipeline,
+            _injector,
+            _engine,
+            "de",
+            localizationService: _loc,
+            languageCatalog: catalog);
+
+        Assert.Equal(["fr", "de"], vm.AvailableTargetLanguages.Select(l => l.Code));
+        Assert.Equal("de", vm.TargetLanguage);
     }
 
     [Fact]
     public void SelectedTargetLanguage_UpdatesTargetLanguage()
     {
         var vm = CreateVm();
-        var zh = _engine.SupportedLanguages.First(l => l.Code == "zh");
+        var zh = CatalogLanguages.First(l => l.Code == "zh");
 
         vm.SelectedTargetLanguage = zh;
 
@@ -693,7 +764,7 @@ public class OverlayViewModelTests
         vm.SourceText = "hello";
         await Task.Delay(600, TestContext.Current.CancellationToken);
 
-        vm.SelectedTargetLanguage = _engine.SupportedLanguages.First(l => l.Code == "zh");
+        vm.SelectedTargetLanguage = CatalogLanguages.First(l => l.Code == "zh");
         await Task.Delay(600, TestContext.Current.CancellationToken);
 
         await _pipeline.Received().ProcessAsync(
@@ -710,20 +781,21 @@ public class OverlayViewModelTests
         };
         var vm = new OverlayViewModel(_target, _pipeline, _injector, _engine, settings, localizationService: _loc);
 
-        Assert.Equal(_engine.SupportedLanguages[0].Code, vm.TargetLanguage);
+        Assert.Equal("en", vm.TargetLanguage);
         Assert.NotNull(vm.SelectedTargetLanguage);
-        Assert.Equal(_engine.SupportedLanguages[0].Code, vm.SelectedTargetLanguage!.Code);
+        Assert.Equal("en", vm.SelectedTargetLanguage!.Code);
     }
 
     [Fact]
-    public void Constructor_WithEmptySupportedLanguages_LeavesSelectedTargetNull()
+    public void Constructor_WithEmptyEngineLanguages_StillUsesCatalog()
     {
         var engine = new EmptyLanguageEngine();
         var vm = new OverlayViewModel(_target, _pipeline, _injector, engine, "en", localizationService: _loc);
 
         Assert.Equal("en", vm.TargetLanguage);
-        Assert.Null(vm.SelectedTargetLanguage);
-        Assert.Empty(vm.AvailableTargetLanguages);
+        Assert.NotNull(vm.SelectedTargetLanguage);
+        Assert.Equal("en", vm.SelectedTargetLanguage!.Code);
+        Assert.Equal(CatalogLanguages.Count, vm.AvailableTargetLanguages.Count);
     }
 
     [Fact]
@@ -742,18 +814,19 @@ public class OverlayViewModelTests
         var vm = new OverlayViewModel(_target, _pipeline, _injector, engine, settings, localizationService: _loc);
 
         Assert.Equal("en", vm.TargetLanguage);
-        Assert.Null(vm.SelectedTargetLanguage);
+        Assert.NotNull(vm.SelectedTargetLanguage);
+        Assert.Equal("en", vm.SelectedTargetLanguage!.Code);
     }
 
     [Fact]
-    public void CycleLanguage_DoesNothing_WhenNoLanguages()
+    public void CycleLanguage_UsesCatalog_WhenEngineHasNoLanguages()
     {
         var engine = new EmptyLanguageEngine();
         var vm = new OverlayViewModel(_target, _pipeline, _injector, engine, "en", localizationService: _loc);
 
         vm.CycleLanguageCommand.Execute(null);
 
-        Assert.Equal("en", vm.TargetLanguage);
+        Assert.Equal("ja", vm.TargetLanguage);
     }
 
     [Fact]
@@ -770,7 +843,7 @@ public class OverlayViewModelTests
     }
 
     [Fact]
-    public async Task RunPipelineAsync_ShowsError_WhenLanguagePairUnsupported()
+    public async Task RunPipelineAsync_RunsPipeline_WhenLanguagePairWouldBeUnsupported()
     {
         var engine = new PairRejectingEngine();
         var settings = new UserSettings
@@ -781,12 +854,14 @@ public class OverlayViewModelTests
                 DefaultTargetLanguage = "en"
             }
         };
+        _pipeline.ProcessAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+            .Returns<TranslationResult>(_ => throw new NotSupportedException("unsupported pair"));
         var vm = new OverlayViewModel(_target, _pipeline, _injector, engine, settings, localizationService: _loc);
         vm.SourceText = "test";
         await Task.Delay(600, TestContext.Current.CancellationToken);
 
-        Assert.Contains("Unsupported language pair", vm.StatusText);
-        await _pipeline.DidNotReceive()
+        Assert.Contains("Model not downloaded", vm.StatusText);
+        await _pipeline.Received(1)
             .ProcessAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>());
     }
 
@@ -1024,7 +1099,7 @@ public class OverlayViewModelTests
         var vm = new OverlayViewModel(_target, _pipeline, _injector, _engine, settings,
             localizationService: _loc, settingsService: settingsService);
 
-        vm.SelectedTargetLanguage = _engine.SupportedLanguages.First(l => l.Code == "zh");
+        vm.SelectedTargetLanguage = CatalogLanguages.First(l => l.Code == "zh");
         vm.PersistIfChanged();
 
         settingsService.Received(1).Replace(Arg.Any<UserSettings>());
@@ -1074,7 +1149,7 @@ public class OverlayViewModelTests
         var vm = new OverlayViewModel(_target, _pipeline, _injector, _engine, settings,
             localizationService: _loc, settingsService: settingsService);
 
-        vm.SelectedTargetLanguage = _engine.SupportedLanguages.First(l => l.Code == "ja");
+        vm.SelectedTargetLanguage = CatalogLanguages.First(l => l.Code == "ja");
         vm.CancelCommand.Execute(null);
 
         settingsService.DidNotReceive().Replace(Arg.Any<UserSettings>());
@@ -1093,7 +1168,7 @@ public class OverlayViewModelTests
         var vm = new OverlayViewModel(_target, _pipeline, _injector, _engine, settings,
             localizationService: _loc);
 
-        vm.SelectedTargetLanguage = _engine.SupportedLanguages.First(l => l.Code == "zh");
+        vm.SelectedTargetLanguage = CatalogLanguages.First(l => l.Code == "zh");
         vm.PersistIfChanged();
     }
 
@@ -1141,7 +1216,7 @@ public class OverlayViewModelTests
     {
         var vm = CreateVm();
         vm.IsLanguagePickerOpen = true;
-        var ja = _engine.SupportedLanguages.First(l => l.Code == "ja");
+        var ja = CatalogLanguages.First(l => l.Code == "ja");
 
         vm.SelectLanguageCommand.Execute(ja);
 

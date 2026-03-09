@@ -233,8 +233,8 @@ public class ModelItemViewModelTests
 
     [Theory]
     [InlineData(ModelType.Translation, "Translation")]
-    [InlineData(ModelType.PostProcessing, "PostProcessing")]
-    [InlineData(ModelType.LanguageDetection, "LanguageDetection")]
+    [InlineData(ModelType.PostProcessing, "Post-Processing")]
+    [InlineData(ModelType.LanguageDetection, "Language Detection")]
     public void TypeLabel_MatchesModelType(ModelType type, string expected)
     {
         var descriptor = new ModelDescriptor("t", "T", "https://x", 1024, type);

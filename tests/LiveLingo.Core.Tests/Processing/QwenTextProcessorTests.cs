@@ -1,4 +1,5 @@
 using LLama.Common;
+using LiveLingo.Core.Models;
 using LiveLingo.Core.Processing;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -26,7 +27,10 @@ public class QwenTextProcessorTests
     {
         var opts = Options.Create(new CoreOptions { ModelStoragePath = "/fake" });
         var logger = Substitute.For<ILogger<QwenModelHost>>();
-        return new QwenModelHost(opts, logger);
+        var modelManager = Substitute.For<IModelManager>();
+        modelManager.GetModelDirectory(ModelRegistry.Qwen25_15B.Id)
+            .Returns(Path.Combine("/fake", ModelRegistry.Qwen25_15B.Id));
+        return new QwenModelHost(modelManager, opts, logger);
     }
 
     private sealed class TestProcessor : QwenTextProcessor

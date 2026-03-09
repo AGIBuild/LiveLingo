@@ -12,6 +12,7 @@ using LiveLingo.Desktop.Platform;
 using LiveLingo.Desktop.Platform.Windows;
 using LiveLingo.Desktop.Platform.macOS;
 using LiveLingo.Desktop.Services.Configuration;
+using LiveLingo.Desktop.Services.LanguageCatalog;
 using LiveLingo.Desktop.Services.Localization;
 using LiveLingo.Desktop.Services.Update;
 using LiveLingo.Desktop.ViewModels;
@@ -91,6 +92,7 @@ public partial class App : Application
             loc.SetCulture(userSettings.UI.Language);
             return loc;
         });
+        services.AddSingleton<ILanguageCatalog, LanguageCatalog>();
 
         if (OperatingSystem.IsWindows())
             services.AddSingleton<IPlatformServices, WindowsPlatformServices>();
@@ -153,7 +155,7 @@ public partial class App : Application
         _trayIcon = new TrayIcon
         {
             Icon = LoadTrayIcon(),
-            ToolTipText = "LiveLingo"
+            ToolTipText = _serviceProvider?.GetService<ILocalizationService>()?.T("app.name") ?? "LiveLingo"
         };
         BuildTrayMenu(desktop, platform, settingsService);
     }
@@ -236,7 +238,14 @@ public partial class App : Application
         var modelManager = _serviceProvider!.GetRequiredService<IModelManager>();
         var engine = _serviceProvider!.GetRequiredService<ITranslationEngine>();
         var loc = _serviceProvider!.GetRequiredService<ILocalizationService>();
-        var vm = new SettingsViewModel(settingsService, modelManager, engine, messenger: _messenger);
+        var languageCatalog = _serviceProvider!.GetRequiredService<ILanguageCatalog>();
+        var vm = new SettingsViewModel(
+            settingsService,
+            modelManager,
+            engine,
+            messenger: _messenger,
+            localizationService: loc,
+            languageCatalog: languageCatalog);
         var subscribedUi = vm.WorkingCopy.UI;
         PropertyChangedEventHandler? uiHandler = (_, e) =>
         {
@@ -273,6 +282,7 @@ public partial class App : Application
 
     private void ShowAboutDialog()
     {
+        var loc = _serviceProvider?.GetService<ILocalizationService>();
         var assembly = typeof(App).Assembly;
         var version = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
             ?? assembly.GetName().Version?.ToString()
@@ -288,7 +298,7 @@ public partial class App : Application
 
         var dialog = new Window
         {
-            Title = "About LiveLingo",
+            Title = loc?.T("dialog.about.title") ?? "About LiveLingo",
             Width = 340,
             SizeToContent = SizeToContent.Height,
             CanResize = false,
@@ -325,7 +335,7 @@ public partial class App : Application
 
         root.Children.Add(new TextBlock
         {
-            Text = "LiveLingo",
+            Text = loc?.T("app.name") ?? "LiveLingo",
             FontSize = 22,
             FontWeight = FontWeight.Bold,
             Foreground = fgPrimary,
@@ -351,7 +361,7 @@ public partial class App : Application
 
         root.Children.Add(new TextBlock
         {
-            Text = "Local AI-powered translation assistant.\nReal-time overlay for any application.",
+            Text = loc?.T("app.about.summary") ?? "Local AI-powered translation assistant.\nReal-time overlay for any application.",
             FontSize = 13,
             Foreground = fgSecondary,
             TextWrapping = TextWrapping.Wrap,
@@ -362,7 +372,7 @@ public partial class App : Application
 
         root.Children.Add(new TextBlock
         {
-            Text = $"© {DateTime.Now.Year} LiveLingo Contributors",
+            Text = loc?.T("app.about.copyright", DateTime.Now.Year) ?? $"© {DateTime.Now.Year} LiveLingo Contributors",
             FontSize = 11,
             Foreground = fgMuted,
             HorizontalAlignment = HorizontalAlignment.Center,
@@ -371,7 +381,7 @@ public partial class App : Application
 
         var okBtn = new Button
         {
-            Content = "OK",
+            Content = loc?.T("dialog.ok") ?? "OK",
             Background = accent,
             Foreground = Brushes.White,
             BorderThickness = new Thickness(0),
@@ -524,16 +534,18 @@ public partial class App : Application
     }
 
     [System.Runtime.Versioning.SupportedOSPlatform("macos")]
-    private static void PromptAccessibilityPermission()
+    private void PromptAccessibilityPermission()
     {
+        var loc = _serviceProvider?.GetService<ILocalizationService>();
         ShowInfoDialog(
-            "System Permission Required",
+            loc?.T("app.permission.title") ?? "System Permission Required",
+            loc?.T("app.permission.body") ??
             "LiveLingo needs two macOS permissions to register global hotkeys:\n\n" +
             "1. Privacy & Security → Accessibility\n" +
             "2. Privacy & Security → Input Monitoring\n\n" +
             "Add and enable the terminal app you're using (e.g. Terminal, Cursor, iTerm) in BOTH lists.\n" +
             "After granting, restart the terminal and the app.",
-            primaryText: "Open Accessibility",
+            primaryText: loc?.T("app.permission.openAccessibility") ?? "Open Accessibility",
             primaryAction: () =>
             {
                 System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
@@ -544,7 +556,7 @@ public partial class App : Application
                 });
                 return Task.CompletedTask;
             },
-            secondaryText: "Open Input Monitoring",
+            secondaryText: loc?.T("app.permission.openInputMonitoring") ?? "Open Input Monitoring",
             secondaryAction: () =>
             {
                 System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
@@ -574,15 +586,14 @@ public partial class App : Application
                 var ok = ReloadHotkey(platform, settings);
                 Dispatcher.UIThread.Post(() =>
                 {
+                    var loc = _serviceProvider!.GetRequiredService<ILocalizationService>();
                     if (ok)
-                        ShowNotification($"Hotkey updated to {settings.Hotkeys.OverlayToggle}");
+                        ShowNotification(loc.T("app.hotkey.updated", settings.Hotkeys.OverlayToggle));
                     else
-                        ShowInfoDialog("Hotkey Registration Failed",
-                            $"Could not register \"{settings.Hotkeys.OverlayToggle}\".\n\n" +
-                            "The key combination may conflict with another application, " +
-                            "or the required system permissions are not granted.\n\n" +
-                            "Please try a different key combination in Settings.",
-                            primaryText: "OK");
+                        ShowInfoDialog(
+                            loc.T("app.hotkey.registrationFailed.title"),
+                            loc.T("app.hotkey.registrationFailed.body", settings.Hotkeys.OverlayToggle),
+                            primaryText: loc.T("dialog.ok"));
                 });
             }
 
@@ -697,6 +708,7 @@ public partial class App : Application
         var pipeline = _serviceProvider!.GetRequiredService<ITranslationPipeline>();
         var engine = _serviceProvider!.GetRequiredService<ITranslationEngine>();
         var loc = _serviceProvider!.GetRequiredService<ILocalizationService>();
+        var languageCatalog = _serviceProvider!.GetRequiredService<ILanguageCatalog>();
         var overlayLogger = _serviceProvider!.GetRequiredService<ILogger<OverlayViewModel>>();
         var clipboard = platform.Clipboard;
         var vm = new OverlayViewModel(
@@ -710,7 +722,8 @@ public partial class App : Application
             settingsService,
             overlayLogger,
             modelManager,
-            _messenger);
+            _messenger,
+            languageCatalog);
         _activeOverlay = new OverlayWindow(vm);
         var uiSettings = settingsService.Current.UI;
         _activeOverlay.ApplyAutoSizingDefaults();
@@ -755,7 +768,14 @@ public partial class App : Application
             return;
         }
 
-        var wizardVm = new SetupWizardViewModel(settingsService, modelManager, startStep, _messenger);
+        var wizardVm = new SetupWizardViewModel(
+            settingsService,
+            modelManager,
+            startStep,
+            _messenger,
+            _serviceProvider?.GetService<ILogger<SetupWizardViewModel>>(),
+            _serviceProvider?.GetService<ILocalizationService>(),
+            _serviceProvider?.GetService<ILanguageCatalog>());
         _wizardWindow = new SetupWizardWindow(wizardVm);
         var done = new TaskCompletionSource();
         _wizardWindow.Closed += (_, _) =>

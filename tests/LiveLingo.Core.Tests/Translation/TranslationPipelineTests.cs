@@ -1,5 +1,6 @@
 using LiveLingo.Core.Engines;
 using LiveLingo.Core.LanguageDetection;
+using LiveLingo.Core.Models;
 using LiveLingo.Core.Processing;
 using LiveLingo.Core.Translation;
 using Microsoft.Extensions.Logging;
@@ -11,6 +12,7 @@ public class TranslationPipelineTests
 {
     private readonly ILanguageDetector _detector;
     private readonly ITranslationEngine _engine;
+    private readonly IModelReadinessService _readiness;
     private readonly ILogger<TranslationPipeline> _logger;
     private readonly TranslationPipeline _pipeline;
 
@@ -18,8 +20,9 @@ public class TranslationPipelineTests
     {
         _detector = Substitute.For<ILanguageDetector>();
         _engine = Substitute.For<ITranslationEngine>();
+        _readiness = Substitute.For<IModelReadinessService>();
         _logger = Substitute.For<ILogger<TranslationPipeline>>();
-        _pipeline = new TranslationPipeline(_detector, _engine, [], _logger);
+        _pipeline = new TranslationPipeline(_detector, _engine, _readiness, [], _logger);
     }
 
     [Fact]
@@ -128,7 +131,7 @@ public class TranslationPipelineTests
             .Returns("Hello world");
 
         var pipeline = new TranslationPipeline(
-            _detector, _engine, new[] { summarizer }, _logger);
+            _detector, _engine, _readiness, new[] { summarizer }, _logger);
 
         var result = await pipeline.ProcessAsync(
             new TranslationRequest("你好世界", "zh", "en",
@@ -169,7 +172,7 @@ public class TranslationPipelineTests
             .Returns("raw");
 
         var pipeline = new TranslationPipeline(
-            _detector, _engine, new[] { optimizer, colloquializer }, _logger);
+            _detector, _engine, _readiness, new[] { optimizer, colloquializer }, _logger);
 
         var result = await pipeline.ProcessAsync(
             new TranslationRequest("src", "zh", "en",
@@ -201,7 +204,7 @@ public class TranslationPipelineTests
             .Returns("translated");
 
         var pipeline = new TranslationPipeline(
-            _detector, _engine, new[] { optimizer }, _logger);
+            _detector, _engine, _readiness, new[] { optimizer }, _logger);
 
         var result = await pipeline.ProcessAsync(
             new TranslationRequest("x", "zh", "en",
@@ -245,7 +248,7 @@ public class TranslationPipelineTests
             .Returns("translated");
 
         var pipeline = new TranslationPipeline(
-            _detector, _engine, new[] { processor }, _logger);
+            _detector, _engine, _readiness, new[] { processor }, _logger);
 
         await Assert.ThrowsAsync<OperationCanceledException>(
             () => pipeline.ProcessAsync(
@@ -273,7 +276,7 @@ public class TranslationPipelineTests
             });
 
         var pipeline = new TranslationPipeline(
-            _detector, _engine, new[] { processor }, _logger);
+            _detector, _engine, _readiness, new[] { processor }, _logger);
 
         var result = await pipeline.ProcessAsync(
             new TranslationRequest("src", "zh", "en",
@@ -346,7 +349,7 @@ public class TranslationPipelineTests
         processor.Name.Returns("summarize");
 
         var pipeline = new TranslationPipeline(
-            _detector, _engine, [processor], _logger);
+            _detector, _engine, _readiness, [processor], _logger);
 
         await Assert.ThrowsAsync<OperationCanceledException>(
             () => pipeline.ProcessAsync(
@@ -386,7 +389,7 @@ public class TranslationPipelineTests
             });
 
         var pipeline = new TranslationPipeline(
-            _detector, _engine, [processor], _logger);
+            _detector, _engine, _readiness, [processor], _logger);
 
         var result = await pipeline.ProcessAsync(
             new TranslationRequest("src", "zh", "en",
@@ -396,5 +399,38 @@ public class TranslationPipelineTests
         Assert.True(result.TranslationDuration.TotalMilliseconds >= 150);
         Assert.True(result.PostProcessingDuration!.Value.TotalMilliseconds < 150,
             $"Post-processing took {result.PostProcessingDuration.Value.TotalMilliseconds}ms, expected < 150ms");
+    }
+
+    [Fact]
+    public async Task ProcessAsync_ThrowsModelNotReady_WhenPostProcessingModelMissing()
+    {
+        _readiness
+            .When(r => r.EnsurePostProcessingModelReady())
+            .Do(_ => throw new ModelNotReadyException(
+                ModelType.PostProcessing,
+                ModelRegistry.Qwen25_15B.Id,
+                "missing",
+                "download"));
+
+        await Assert.ThrowsAsync<ModelNotReadyException>(() => _pipeline.ProcessAsync(
+            new TranslationRequest("src", "zh", "en", new ProcessingOptions(Summarize: true)),
+            CancellationToken.None));
+
+        await _engine.DidNotReceive()
+            .TranslateAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ProcessAsync_DoesNotCheckPostProcessingReadiness_WhenModeOff()
+    {
+        _engine.TranslateAsync("src", "zh", "en", Arg.Any<CancellationToken>())
+            .Returns("translated");
+
+        var result = await _pipeline.ProcessAsync(
+            new TranslationRequest("src", "zh", "en", null),
+            CancellationToken.None);
+
+        Assert.Equal("translated", result.Text);
+        _readiness.DidNotReceive().EnsurePostProcessingModelReady();
     }
 }

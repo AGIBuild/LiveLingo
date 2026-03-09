@@ -19,6 +19,7 @@ public class ServiceCollectionExtensionsTests
 
         Assert.NotNull(sp.GetService<ITranslationPipeline>());
         Assert.NotNull(sp.GetService<IModelManager>());
+        Assert.NotNull(sp.GetService<IModelReadinessService>());
         Assert.NotNull(sp.GetService<ITranslationEngine>());
         Assert.NotNull(sp.GetService<ILanguageDetector>());
     }
