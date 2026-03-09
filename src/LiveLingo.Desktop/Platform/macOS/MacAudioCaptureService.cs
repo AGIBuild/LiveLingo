@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
 using LiveLingo.Core.Speech;
@@ -9,13 +10,16 @@ internal sealed class MacAudioCaptureService : IAudioCaptureService
 {
     private const int TargetSampleRate = 16000;
     private const int TargetChannels = 1;
-    private const int MaxRecordingSeconds = 60;
+    private const int MaxRecordingSeconds = 180;
     private const int MaxCaptureBytes = MaxRecordingSeconds * TargetSampleRate * TargetChannels * 2;
     private const uint TapBufferFrames = 4096;
 
+    private static readonly Lazy<TapSelectors> s_selectors = new(TapSelectors.Resolve);
+
     private IntPtr _engine;
     private IntPtr _inputNode;
-    private readonly MemoryStream _capturedData = new();
+    private readonly byte[] _captureBuffer = new byte[MaxCaptureBytes];
+    private int _capturePosition;
     private readonly object _gate = new();
     private bool _isRecording;
 
@@ -61,7 +65,7 @@ internal sealed class MacAudioCaptureService : IAudioCaptureService
                 throw new InvalidOperationException("Already recording.");
         }
 
-        _capturedData.SetLength(0);
+        _capturePosition = 0;
         _activeInstance = this;
 
         var engineClass = MacNativeMethods.objc_getClass("AVAudioEngine");
@@ -105,13 +109,18 @@ internal sealed class MacAudioCaptureService : IAudioCaptureService
         var stopSel = MacNativeMethods.sel_registerName("stop");
         MacNativeMethods.objc_msgSend(_engine, stopSel);
 
-        lock (_gate) _isRecording = false;
+        int length;
+        lock (_gate)
+        {
+            _isRecording = false;
+            length = _capturePosition;
+        }
         _activeInstance = null;
         CleanupEngine();
 
-        var pcm = _capturedData.ToArray();
-        var duration = TimeSpan.FromSeconds(
-            (double)pcm.Length / (TargetSampleRate * TargetChannels * 2));
+        var pcm = new byte[length];
+        Buffer.BlockCopy(_captureBuffer, 0, pcm, 0, length);
+        var duration = TimeSpan.FromSeconds((double)length / (TargetSampleRate * TargetChannels * 2));
         return Task.FromResult(new AudioCaptureResult(pcm, TargetSampleRate, TargetChannels, duration));
     }
 
@@ -119,10 +128,11 @@ internal sealed class MacAudioCaptureService : IAudioCaptureService
     {
         lock (_gate)
         {
-            if (!_isRecording || _capturedData.Length == 0) return null;
-            var pcm = _capturedData.ToArray();
+            if (!_isRecording || _capturePosition == 0) return null;
+            var pcm = new byte[_capturePosition];
+            Buffer.BlockCopy(_captureBuffer, 0, pcm, 0, _capturePosition);
             var duration = TimeSpan.FromSeconds(
-                (double)pcm.Length / (TargetSampleRate * TargetChannels * 2));
+                (double)_capturePosition / (TargetSampleRate * TargetChannels * 2));
             return new AudioCaptureResult(pcm, TargetSampleRate, TargetChannels, duration);
         }
     }
@@ -149,7 +159,7 @@ internal sealed class MacAudioCaptureService : IAudioCaptureService
             _inputNode, tapSel,
             0,
             TapBufferFrames,
-            IntPtr.Zero, // nil = use the node's native hardware format
+            IntPtr.Zero,
             _blockPtr);
     }
 
@@ -188,60 +198,73 @@ internal sealed class MacAudioCaptureService : IAudioCaptureService
 
         try
         {
-            var frameLengthSel = MacNativeMethods.sel_registerName("frameLength");
-            var frameLength = MacAudioNative.objc_msgSend_uint(pcmBuffer, frameLengthSel);
+            var sel = s_selectors.Value;
+
+            var frameLength = (int)MacAudioNative.objc_msgSend_uint(pcmBuffer, sel.FrameLength);
             if (frameLength == 0) return;
 
-            var formatSel = MacNativeMethods.sel_registerName("format");
-            var bufferFormat = MacNativeMethods.objc_msgSend(pcmBuffer, formatSel);
-
-            var sampleRateSel = MacNativeMethods.sel_registerName("sampleRate");
+            var bufferFormat = MacNativeMethods.objc_msgSend(pcmBuffer, sel.Format);
             var sourceSampleRate = (int)Math.Round(
-                MacAudioNative.objc_msgSend_double(bufferFormat, sampleRateSel));
-
-            var channelCountSel = MacNativeMethods.sel_registerName("channelCount");
-            var channelCount = MacAudioNative.objc_msgSend_uint(bufferFormat, channelCountSel);
-
-            var floatDataSel = MacNativeMethods.sel_registerName("floatChannelData");
-            var floatDataPtr = MacNativeMethods.objc_msgSend(pcmBuffer, floatDataSel);
+                MacAudioNative.objc_msgSend_double(bufferFormat, sel.SampleRate));
+            var channelCount = (int)MacAudioNative.objc_msgSend_uint(bufferFormat, sel.ChannelCount);
+            var floatDataPtr = MacNativeMethods.objc_msgSend(pcmBuffer, sel.FloatChannelData);
             if (floatDataPtr == IntPtr.Zero) return;
 
             var channel0Ptr = Marshal.ReadIntPtr(floatDataPtr);
             if (channel0Ptr == IntPtr.Zero) return;
-            var channel0 = new float[frameLength];
-            Marshal.Copy(channel0Ptr, channel0, 0, (int)frameLength);
 
-            float[] mono;
-            if (channelCount >= 2)
+            var ch0 = ArrayPool<float>.Shared.Rent(frameLength);
+            float[]? ch1 = null;
+            try
             {
-                var channel1Ptr = Marshal.ReadIntPtr(floatDataPtr, IntPtr.Size);
-                var channel1 = new float[frameLength];
-                if (channel1Ptr != IntPtr.Zero)
-                    Marshal.Copy(channel1Ptr, channel1, 0, (int)frameLength);
-                mono = new float[frameLength];
-                for (var i = 0; i < (int)frameLength; i++)
-                    mono[i] = (channel0[i] + channel1[i]) * 0.5f;
+                Marshal.Copy(channel0Ptr, ch0, 0, frameLength);
+
+                if (channelCount >= 2)
+                {
+                    var channel1Ptr = Marshal.ReadIntPtr(floatDataPtr, IntPtr.Size);
+                    if (channel1Ptr != IntPtr.Zero)
+                    {
+                        ch1 = ArrayPool<float>.Shared.Rent(frameLength);
+                        Marshal.Copy(channel1Ptr, ch1, 0, frameLength);
+                        for (var i = 0; i < frameLength; i++)
+                            ch0[i] = (ch0[i] + ch1[i]) * 0.5f;
+                    }
+                }
+
+                var ratio = (double)sourceSampleRate / TargetSampleRate;
+                var outSamples = sourceSampleRate == TargetSampleRate
+                    ? frameLength
+                    : (int)(frameLength / ratio);
+                if (outSamples <= 0) return;
+
+                var pcmByteCount = outSamples * 2;
+                var pcmBytes = ArrayPool<byte>.Shared.Rent(pcmByteCount);
+                try
+                {
+                    WritePcm16(ch0, frameLength, sourceSampleRate, pcmBytes, outSamples);
+
+                    lock (instance._gate)
+                    {
+                        if (!instance._isRecording) return;
+                        var space = MaxCaptureBytes - instance._capturePosition;
+                        var toWrite = Math.Min(pcmByteCount, space);
+                        if (toWrite > 0)
+                        {
+                            Buffer.BlockCopy(pcmBytes, 0,
+                                instance._captureBuffer, instance._capturePosition, toWrite);
+                            instance._capturePosition += toWrite;
+                        }
+                    }
+                }
+                finally
+                {
+                    ArrayPool<byte>.Shared.Return(pcmBytes);
+                }
             }
-            else
+            finally
             {
-                mono = channel0;
-            }
-
-            var resampled = ResampleLinear(mono, sourceSampleRate, TargetSampleRate);
-
-            var pcmBytes = new byte[resampled.Length * 2];
-            for (var i = 0; i < resampled.Length; i++)
-            {
-                var clamped = Math.Clamp(resampled[i], -1f, 1f);
-                var int16 = (short)(clamped * 32767f);
-                pcmBytes[i * 2] = (byte)(int16 & 0xFF);
-                pcmBytes[i * 2 + 1] = (byte)((int16 >> 8) & 0xFF);
-            }
-
-            lock (instance._gate)
-            {
-                if (instance._isRecording && instance._capturedData.Length < MaxCaptureBytes)
-                    instance._capturedData.Write(pcmBytes, 0, pcmBytes.Length);
+                ArrayPool<float>.Shared.Return(ch0);
+                if (ch1 is not null) ArrayPool<float>.Shared.Return(ch1);
             }
         }
         catch
@@ -250,29 +273,42 @@ internal sealed class MacAudioCaptureService : IAudioCaptureService
         }
     }
 
-    private static float[] ResampleLinear(float[] input, int sourceRate, int targetRate)
+    private static void WritePcm16(
+        float[] mono, int monoLength,
+        int sourceRate,
+        byte[] dest, int outSamples)
     {
-        if (sourceRate == targetRate)
-            return input;
-
-        var ratio = (double)sourceRate / targetRate;
-        var outputLength = (int)(input.Length / ratio);
-        if (outputLength <= 0) return [];
-
-        var output = new float[outputLength];
-        for (var i = 0; i < outputLength; i++)
+        if (sourceRate == TargetSampleRate)
         {
-            var srcPos = i * ratio;
-            var srcIdx = (int)srcPos;
-            var frac = (float)(srcPos - srcIdx);
-
-            if (srcIdx + 1 < input.Length)
-                output[i] = input[srcIdx] * (1f - frac) + input[srcIdx + 1] * frac;
-            else if (srcIdx < input.Length)
-                output[i] = input[srcIdx];
+            for (var i = 0; i < outSamples; i++)
+            {
+                var int16 = (short)(Math.Clamp(mono[i], -1f, 1f) * 32767f);
+                dest[i * 2] = (byte)(int16 & 0xFF);
+                dest[i * 2 + 1] = (byte)((int16 >> 8) & 0xFF);
+            }
         }
+        else
+        {
+            var ratio = (double)sourceRate / TargetSampleRate;
+            for (var i = 0; i < outSamples; i++)
+            {
+                var srcPos = i * ratio;
+                var srcIdx = (int)srcPos;
+                var frac = (float)(srcPos - srcIdx);
 
-        return output;
+                float sample;
+                if (srcIdx + 1 < monoLength)
+                    sample = mono[srcIdx] * (1f - frac) + mono[srcIdx + 1] * frac;
+                else if (srcIdx < monoLength)
+                    sample = mono[srcIdx];
+                else
+                    sample = 0;
+
+                var int16 = (short)(Math.Clamp(sample, -1f, 1f) * 32767f);
+                dest[i * 2] = (byte)(int16 & 0xFF);
+                dest[i * 2 + 1] = (byte)((int16 >> 8) & 0xFF);
+            }
+        }
     }
 
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
@@ -293,6 +329,33 @@ internal sealed class MacAudioCaptureService : IAudioCaptureService
     {
         public ulong reserved;
         public ulong size;
+    }
+
+    private sealed class TapSelectors
+    {
+        public readonly IntPtr FrameLength;
+        public readonly IntPtr Format;
+        public readonly IntPtr SampleRate;
+        public readonly IntPtr ChannelCount;
+        public readonly IntPtr FloatChannelData;
+
+        private TapSelectors(
+            IntPtr frameLength, IntPtr format, IntPtr sampleRate,
+            IntPtr channelCount, IntPtr floatChannelData)
+        {
+            FrameLength = frameLength;
+            Format = format;
+            SampleRate = sampleRate;
+            ChannelCount = channelCount;
+            FloatChannelData = floatChannelData;
+        }
+
+        public static TapSelectors Resolve() => new(
+            MacNativeMethods.sel_registerName("frameLength"),
+            MacNativeMethods.sel_registerName("format"),
+            MacNativeMethods.sel_registerName("sampleRate"),
+            MacNativeMethods.sel_registerName("channelCount"),
+            MacNativeMethods.sel_registerName("floatChannelData"));
     }
 
     #endregion

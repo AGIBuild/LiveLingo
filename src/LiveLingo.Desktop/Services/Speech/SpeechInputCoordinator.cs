@@ -9,6 +9,9 @@ public sealed class SpeechInputCoordinator : ISpeechInputCoordinator
 {
     private static readonly TimeSpan VadPollInterval = TimeSpan.FromMilliseconds(100);
     private static readonly TimeSpan FallbackTranscriptionInterval = TimeSpan.FromSeconds(5);
+    private const int PartialWindowSeconds = 10;
+    private const int FinalWindowSeconds = 30;
+    private const int BytesPerSample = 2;
 
     private readonly IAudioCaptureService _audioCapture;
     private readonly ISpeechToTextEngine _sttEngine;
@@ -129,7 +132,8 @@ public sealed class SpeechInputCoordinator : ISpeechInputCoordinator
             var audio = await _audioCapture.StopAsync(_sessionCts.Token);
 
             var lang = language ?? _recordingLanguage;
-            var result = await _sttEngine.TranscribeAsync(audio, lang, _sessionCts.Token);
+            var windowedAudio = CreateWindow(audio, FinalWindowSeconds);
+            var result = await _sttEngine.TranscribeAsync(windowedAudio, lang, _sessionCts.Token);
             SetState(VoiceInputState.Idle);
             return new SpeechInputResult(true, result.Text, SpeechInputErrorCode.None);
         }
@@ -192,7 +196,8 @@ public sealed class SpeechInputCoordinator : ISpeechInputCoordinator
 
                 try
                 {
-                    var result = await _sttEngine.TranscribeAsync(buffer, _recordingLanguage, ct);
+                    var windowBuffer = CreateWindow(buffer, PartialWindowSeconds);
+                    var result = await _sttEngine.TranscribeAsync(windowBuffer, _recordingLanguage, ct);
                     if (!string.IsNullOrWhiteSpace(result.Text))
                         PartialTranscription?.Invoke(result.Text);
                 }
@@ -211,6 +216,20 @@ public sealed class SpeechInputCoordinator : ISpeechInputCoordinator
         {
             _logger?.LogError(ex, "VAD transcription loop terminated unexpectedly");
         }
+    }
+
+    private static AudioCaptureResult CreateWindow(AudioCaptureResult full, int windowSeconds)
+    {
+        var maxWindowBytes = windowSeconds * full.SampleRate * full.Channels * BytesPerSample;
+        if (full.PcmData.Length <= maxWindowBytes)
+            return full;
+
+        var windowStart = full.PcmData.Length - maxWindowBytes;
+        var windowPcm = new byte[maxWindowBytes];
+        Buffer.BlockCopy(full.PcmData, windowStart, windowPcm, 0, maxWindowBytes);
+        var duration = TimeSpan.FromSeconds(
+            (double)maxWindowBytes / (full.SampleRate * full.Channels * BytesPerSample));
+        return new AudioCaptureResult(windowPcm, full.SampleRate, full.Channels, duration);
     }
 
     private static float[] ConvertPcmToFloat(byte[] pcm, int byteOffset, int byteCount)
