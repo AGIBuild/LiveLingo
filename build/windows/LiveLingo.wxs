@@ -21,17 +21,36 @@
     </StandardDirectory>
 
     <StandardDirectory Id="ProgramMenuFolder">
-      <Shortcut Id="StartMenuShortcut"
-                Name="$(ProductName)"
-                Target="[INSTALLFOLDER]LiveLingo.Desktop.exe"
-                WorkingDirectory="INSTALLFOLDER" />
+      <Directory Id="ProgramMenuDir" Name="$(ProductName)">
+        <Component Id="StartMenuShortcutComponent" Guid="*">
+          <Shortcut Id="StartMenuShortcut"
+                    Name="$(ProductName)"
+                    Target="[INSTALLFOLDER]LiveLingo.Desktop.exe"
+                    WorkingDirectory="INSTALLFOLDER" />
+          <RemoveFolder Id="RemoveProgramMenuDir" On="uninstall" />
+          <RegistryValue Root="HKCU"
+                         Key="Software\$(Manufacturer)\$(ProductName)"
+                         Name="StartMenuShortcut"
+                         Type="integer"
+                         Value="1"
+                         KeyPath="yes" />
+        </Component>
+      </Directory>
     </StandardDirectory>
 
     <StandardDirectory Id="DesktopFolder">
-      <Shortcut Id="DesktopShortcut"
-                Name="$(ProductName)"
-                Target="[INSTALLFOLDER]LiveLingo.Desktop.exe"
-                WorkingDirectory="INSTALLFOLDER" />
+      <Component Id="DesktopShortcutComponent" Guid="*">
+        <Shortcut Id="DesktopShortcut"
+                  Name="$(ProductName)"
+                  Target="[INSTALLFOLDER]LiveLingo.Desktop.exe"
+                  WorkingDirectory="INSTALLFOLDER" />
+        <RegistryValue Root="HKCU"
+                       Key="Software\$(Manufacturer)\$(ProductName)"
+                       Name="DesktopShortcut"
+                       Type="integer"
+                       Value="1"
+                       KeyPath="yes" />
+      </Component>
     </StandardDirectory>
 
   </Package>
