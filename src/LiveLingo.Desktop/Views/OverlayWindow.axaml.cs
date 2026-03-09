@@ -1,10 +1,13 @@
+using System.ComponentModel;
 using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.Controls;
+using AvaloniaPath = Avalonia.Controls.Shapes.Path;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Threading;
+using LiveLingo.Core.Speech;
 using LiveLingo.Desktop.Platform.Windows;
 using LiveLingo.Desktop.ViewModels;
 
@@ -36,7 +39,29 @@ public partial class OverlayWindow : Window
         if (langLink is not null)
             langLink.PointerPressed += (_, _) => vm.ToggleLanguagePickerCommand.Execute(null);
 
+        var voiceLangBadge = this.FindControl<Control>("VoiceLangBadge");
+        if (voiceLangBadge is not null)
+            voiceLangBadge.PointerPressed += (_, _) => vm.ToggleVoiceLanguagePickerCommand.Execute(null);
+
+        vm.PropertyChanged += OnViewModelPropertyChanged;
         AttachResizeHandle();
+    }
+
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(OverlayViewModel.VoiceState))
+            UpdateMicIconState();
+    }
+
+    private void UpdateMicIconState()
+    {
+        var idle = this.FindControl<AvaloniaPath>("MicIconIdle");
+        var stop = this.FindControl<Border>("StopIconRecording");
+        if (idle is null || stop is null) return;
+
+        var isRecording = DataContext is OverlayViewModel { VoiceState: VoiceInputState.Recording };
+        idle.IsVisible = !isRecording;
+        stop.IsVisible = isRecording;
     }
 
     private void AttachResizeHandle()

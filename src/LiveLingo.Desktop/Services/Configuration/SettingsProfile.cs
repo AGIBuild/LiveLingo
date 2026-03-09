@@ -137,11 +137,13 @@ public partial class AdvancedSettings : ObservableObject
     [ObservableProperty] private string? _modelStoragePath;
     [ObservableProperty] private int _inferenceThreads;
     [ObservableProperty] private string _logLevel = "Information";
+    [ObservableProperty] private string? _huggingFaceMirror;
 
     public AdvancedSettings DeepClone() => new()
     {
         ModelStoragePath = ModelStoragePath,
         InferenceThreads = InferenceThreads,
-        LogLevel = LogLevel
+        LogLevel = LogLevel,
+        HuggingFaceMirror = HuggingFaceMirror
     };
 }

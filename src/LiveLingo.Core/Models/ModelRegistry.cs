@@ -79,11 +79,25 @@ public static class ModelRegistry
     public static IReadOnlyList<ModelDescriptor> RequiredModels { get; } =
         [MarianZhEn];
 
+    public static readonly ModelDescriptor WhisperBase = new(
+        "whisper-base",
+        "Whisper Base (Speech-to-Text)",
+        "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin",
+        147_951_465,
+        ModelType.SpeechToText);
+
+    public static readonly ModelDescriptor SileroVad = new(
+        "silero-vad",
+        "Silero VAD v5 (Voice Activity Detection)",
+        "https://huggingface.co/runanywhere/silero-vad-v5/resolve/main/silero_vad.onnx",
+        2_440_000,
+        ModelType.VoiceActivityDetection);
+
     public static IReadOnlyList<ModelDescriptor> OptionalModels { get; } =
-        [Qwen25_15B];
+        [Qwen25_15B, WhisperBase, SileroVad];
 
     public static IReadOnlyList<ModelDescriptor> AllModels { get; } =
-        [MarianZhEn, MarianEnZh, MarianJaEn, FastTextLid, Qwen25_15B];
+        [MarianZhEn, MarianEnZh, MarianJaEn, FastTextLid, Qwen25_15B, WhisperBase, SileroVad];
 
     public static ModelDescriptor? FindTranslationModel(string sourceLanguage, string targetLanguage)
     {
