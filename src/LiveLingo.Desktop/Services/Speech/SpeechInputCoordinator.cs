@@ -118,6 +118,7 @@ public sealed class SpeechInputCoordinator : ISpeechInputCoordinator
             {
                 try { await _partialLoop; }
                 catch (OperationCanceledException) { }
+                catch (Exception ex) { _logger?.LogWarning(ex, "Partial loop ended with error"); }
             }
             _partialLoop = null;
 
@@ -170,7 +171,15 @@ public sealed class SpeechInputCoordinator : ISpeechInputCoordinator
                 var newSamples = ConvertPcmToFloat(buffer.PcmData, lastProcessedBytes, newBytes);
                 lastProcessedBytes = buffer.PcmData.Length;
 
-                _vadMonitor.ProcessSamples(newSamples, newSamples.Length);
+                try
+                {
+                    _vadMonitor.ProcessSamples(newSamples, newSamples.Length);
+                }
+                catch (Exception ex)
+                {
+                    _logger?.LogWarning(ex, "VAD processing failed, skipping frame");
+                    continue;
+                }
 
                 var timeSinceLastTranscribe = DateTime.UtcNow - lastTranscribeTime;
                 var shouldTranscribe = pauseDetected ||
@@ -190,13 +199,17 @@ public sealed class SpeechInputCoordinator : ISpeechInputCoordinator
                 catch (OperationCanceledException) { throw; }
                 catch (Exception ex)
                 {
-                    _logger?.LogDebug(ex, "Partial transcription failed (non-fatal)");
+                    _logger?.LogWarning(ex, "Partial transcription failed (non-fatal)");
                 }
             }
         }
         catch (OperationCanceledException)
         {
             // Expected on stop/cancel
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "VAD transcription loop terminated unexpectedly");
         }
     }
 

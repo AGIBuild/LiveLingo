@@ -6,10 +6,14 @@ namespace LiveLingo.Core.Models;
 
 public sealed class ModelManager : IModelManager
 {
+    private const string HuggingFaceHost = "https://huggingface.co";
+    private const string DefaultFallbackMirror = "https://hf-mirror.com";
+
     private readonly CoreOptions _options;
     private readonly HttpClient _http;
     private readonly ILogger<ModelManager> _logger;
     private readonly ConcurrentDictionary<string, Task> _inflight = new();
+    private volatile bool _useFallbackMirror;
 
     public ModelManager(IOptions<CoreOptions> options, HttpClient http, ILogger<ModelManager> logger)
     {
@@ -290,23 +294,56 @@ public sealed class ModelManager : IModelManager
     private async Task<HttpResponseMessage> SendAssetRequestAsync(string url, long resumeBytes, CancellationToken ct)
     {
         var effectiveUrl = ApplyMirror(url);
-        using var request = new HttpRequestMessage(HttpMethod.Get, effectiveUrl);
+        try
+        {
+            return await SendHttpGetAsync(effectiveUrl, resumeBytes, ct);
+        }
+        catch (HttpRequestException ex) when (ShouldFallbackToMirror(url, ex))
+        {
+            _logger.LogWarning(ex,
+                "HuggingFace is unreachable, retrying with fallback mirror {Mirror}",
+                DefaultFallbackMirror);
+            _useFallbackMirror = true;
+            var mirrorUrl = DefaultFallbackMirror + url[HuggingFaceHost.Length..];
+            return await SendHttpGetAsync(mirrorUrl, resumeBytes, ct);
+        }
+    }
+
+    private async Task<HttpResponseMessage> SendHttpGetAsync(string url, long resumeBytes, CancellationToken ct)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
         if (resumeBytes > 0)
             request.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(resumeBytes, null);
         return await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
     }
 
+    private bool ShouldFallbackToMirror(string originalUrl, HttpRequestException ex)
+    {
+        return !_useFallbackMirror
+            && string.IsNullOrWhiteSpace(_options.HuggingFaceMirror)
+            && originalUrl.StartsWith(HuggingFaceHost, StringComparison.OrdinalIgnoreCase)
+            && ex.InnerException is System.Net.Sockets.SocketException;
+    }
+
     private string ApplyMirror(string url)
     {
-        if (string.IsNullOrWhiteSpace(_options.HuggingFaceMirror))
-            return url;
-
-        const string hfHost = "https://huggingface.co";
-        if (url.StartsWith(hfHost, StringComparison.OrdinalIgnoreCase))
+        if (!string.IsNullOrWhiteSpace(_options.HuggingFaceMirror))
         {
-            var mirror = _options.HuggingFaceMirror.TrimEnd('/');
-            var rewritten = mirror + url[hfHost.Length..];
-            _logger.LogDebug("Rewriting HuggingFace URL: {Original} → {Mirror}", url, rewritten);
+            if (url.StartsWith(HuggingFaceHost, StringComparison.OrdinalIgnoreCase))
+            {
+                var mirror = _options.HuggingFaceMirror.TrimEnd('/');
+                var rewritten = mirror + url[HuggingFaceHost.Length..];
+                _logger.LogDebug("Rewriting HuggingFace URL: {Original} → {Mirror}", url, rewritten);
+                return rewritten;
+            }
+
+            return url;
+        }
+
+        if (_useFallbackMirror && url.StartsWith(HuggingFaceHost, StringComparison.OrdinalIgnoreCase))
+        {
+            var rewritten = DefaultFallbackMirror + url[HuggingFaceHost.Length..];
+            _logger.LogDebug("Rewriting HuggingFace URL via fallback mirror: {Original} → {Mirror}", url, rewritten);
             return rewritten;
         }
 
