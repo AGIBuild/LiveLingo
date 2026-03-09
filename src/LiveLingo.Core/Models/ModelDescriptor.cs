@@ -19,5 +19,7 @@ public enum ModelType
 {
     Translation,
     PostProcessing,
-    LanguageDetection
+    LanguageDetection,
+    SpeechToText,
+    VoiceActivityDetection
 }

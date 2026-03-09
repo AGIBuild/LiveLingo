@@ -6,9 +6,11 @@ using LiveLingo.Desktop.Platform;
 using LiveLingo.Desktop.Services.Configuration;
 using LiveLingo.Desktop.Services.LanguageCatalog;
 using LiveLingo.Desktop.Services.Localization;
+using LiveLingo.Desktop.Services.Speech;
 using LiveLingo.Core.Engines;
 using LiveLingo.Core.Models;
 using LiveLingo.Core.Processing;
+using LiveLingo.Core.Speech;
 using LiveLingo.Core.Translation;
 using Microsoft.Extensions.Logging;
 
@@ -31,6 +33,7 @@ public partial class OverlayViewModel : ObservableObject
     private readonly ILogger<OverlayViewModel>? _logger;
     private readonly IMessenger _messenger;
     private readonly IReadOnlyList<LanguageInfo> _availableLanguages;
+    private readonly ISpeechInputCoordinator? _speechCoordinator;
     private CancellationTokenSource? _pipelineCts;
     private string _postProcessMode;
     private string? _activeModelId;
@@ -58,6 +61,12 @@ public partial class OverlayViewModel : ObservableObject
     [ObservableProperty] private string _activeModelLabel = string.Empty;
     [ObservableProperty] private string _activeModelTooltip = string.Empty;
     [ObservableProperty] private bool _isSending;
+    [ObservableProperty] private VoiceInputState _voiceState = VoiceInputState.Idle;
+    [ObservableProperty] private string _voiceStatusText = string.Empty;
+    [ObservableProperty] private bool _isVoiceAvailable;
+    [ObservableProperty] private bool _showSttDownloadLink;
+    [ObservableProperty] private bool _isVoiceLanguagePickerOpen;
+    [ObservableProperty] private LanguageInfo? _selectedVoiceLanguage;
 
     public string CopyLabel => L("overlay.copy");
     public string CopiedLabel => L("overlay.copied");
@@ -70,7 +79,14 @@ public partial class OverlayViewModel : ObservableObject
     public string SwapLanguagesTooltip => L("overlay.tooltip.swapLanguage");
     public string SendLabel => L("overlay.send");
     public string SendTooltip => L("overlay.tooltip.send");
+    public bool IsRecording => VoiceState == VoiceInputState.Recording;
+    public string VoiceTooltip => VoiceState == VoiceInputState.Recording
+        ? L("overlay.voice.tooltip.recording")
+        : L("overlay.voice.tooltip");
+    public string DownloadModelLabel => L("overlay.voice.downloadModel");
     public string SourceLanguageCodeDisplay => SelectedSourceLanguage?.Code ?? L("overlay.language.auto");
+    public string VoiceLanguageDisplay => SelectedVoiceLanguage?.Code ?? L("overlay.language.auto");
+    public IReadOnlyList<LanguageInfo> AvailableVoiceLanguages => _availableLanguages;
 
     public IReadOnlyList<LanguageInfo> AvailableTargetLanguages => _availableLanguages;
 
@@ -90,7 +106,8 @@ public partial class OverlayViewModel : ObservableObject
         ILogger<OverlayViewModel>? logger = null,
         IModelManager? modelManager = null,
         IMessenger? messenger = null,
-        ILanguageCatalog? languageCatalog = null)
+        ILanguageCatalog? languageCatalog = null,
+        ISpeechInputCoordinator? speechCoordinator = null)
     {
         _targetWindow = targetWindow;
         _pipeline = pipeline;
@@ -101,6 +118,8 @@ public partial class OverlayViewModel : ObservableObject
         _logger = logger;
         _messenger = messenger ?? WeakReferenceMessenger.Default;
         _availableLanguages = languageCatalog?.All ?? LanguageCatalog.DefaultLanguages;
+        _speechCoordinator = speechCoordinator;
+        _isVoiceAvailable = speechCoordinator is not null;
         _activeModelId = settings.Translation.ActiveTranslationModelId;
         _sourceLanguage = string.IsNullOrWhiteSpace(settings.Translation.DefaultSourceLanguage)
             ? null
@@ -129,6 +148,7 @@ public partial class OverlayViewModel : ObservableObject
 
         UpdateModeDisplay();
         UpdateActiveModelDisplay();
+        SubscribeSpeechCoordinator();
         _messenger.Register<OverlayViewModel, SettingsChangedMessage>(this, static (recipient, _) =>
         {
             if (recipient._settingsService is not null)
@@ -196,6 +216,11 @@ public partial class OverlayViewModel : ObservableObject
     partial void OnSelectedSourceLanguageChanged(LanguageInfo? value)
     {
         OnPropertyChanged(nameof(SourceLanguageCodeDisplay));
+    }
+
+    partial void OnSelectedVoiceLanguageChanged(LanguageInfo? value)
+    {
+        OnPropertyChanged(nameof(VoiceLanguageDisplay));
     }
 
     private int FindLanguageIndex(string code)
@@ -551,8 +576,128 @@ public partial class OverlayViewModel : ObservableObject
     [RelayCommand]
     private void Cancel()
     {
+        _speechCoordinator?.CancelCurrent();
         _messenger.Send(new AppUiRequestMessage(new AppUiRequest(this, AppUiRequestKind.CloseOverlay)));
     }
+
+    [RelayCommand]
+    private async Task ToggleVoiceInputAsync()
+    {
+        if (_speechCoordinator is null) return;
+
+        ShowSttDownloadLink = false;
+
+        if (VoiceState == VoiceInputState.Recording)
+        {
+            VoiceStatusText = L("overlay.voice.transcribing");
+            IsVoiceLanguagePickerOpen = false;
+            var voiceLang = SelectedVoiceLanguage?.Code;
+            var result = await _speechCoordinator.StopAndTranscribeAsync(voiceLang);
+            if (result.Success)
+            {
+                if (!string.IsNullOrWhiteSpace(result.Text))
+                {
+                    SourceText = result.Text;
+                    if (SelectedVoiceLanguage is not null)
+                    {
+                        SelectedSourceLanguage = SelectedVoiceLanguage;
+                        _sourceLanguage = SelectedVoiceLanguage.Code;
+                    }
+                }
+                else
+                {
+                    VoiceStatusText = L("overlay.voice.noSpeech");
+                }
+            }
+            else if (result.ErrorCode != SpeechInputErrorCode.Cancelled)
+            {
+                VoiceStatusText = MapVoiceError(result);
+                ShowSttDownloadLink = result.ErrorCode == SpeechInputErrorCode.ModelMissing;
+            }
+        }
+        else if (VoiceState == VoiceInputState.Idle || VoiceState == VoiceInputState.Error)
+        {
+            VoiceStatusText = string.Empty;
+            SelectedVoiceLanguage = SelectedSourceLanguage;
+            var result = await _speechCoordinator.StartRecordingAsync(SelectedVoiceLanguage?.Code);
+            if (!result.Success)
+            {
+                VoiceStatusText = MapVoiceError(result);
+                ShowSttDownloadLink = result.ErrorCode == SpeechInputErrorCode.ModelMissing;
+            }
+            else
+            {
+                VoiceStatusText = L("overlay.voice.recording");
+            }
+        }
+    }
+
+    [RelayCommand]
+    private void ToggleVoiceLanguagePicker()
+    {
+        IsVoiceLanguagePickerOpen = !IsVoiceLanguagePickerOpen;
+    }
+
+    [RelayCommand]
+    private void SelectVoiceLanguage(LanguageInfo lang)
+    {
+        SelectedVoiceLanguage = lang;
+        IsVoiceLanguagePickerOpen = false;
+    }
+
+    [RelayCommand]
+    private async Task DownloadSttModelAsync()
+    {
+        if (_speechCoordinator is null) return;
+
+        ShowSttDownloadLink = false;
+        VoiceStatusText = L("overlay.voice.downloading");
+        var result = await _speechCoordinator.EnsureSttModelAsync();
+        if (result.Success)
+        {
+            VoiceStatusText = L("overlay.voice.modelReady");
+        }
+        else
+        {
+            VoiceStatusText = MapVoiceError(result);
+            ShowSttDownloadLink = result.ErrorCode == SpeechInputErrorCode.ModelMissing;
+        }
+    }
+
+    private void SubscribeSpeechCoordinator()
+    {
+        if (_speechCoordinator is null) return;
+        _speechCoordinator.StateChanged += HandleVoiceStateChanged;
+        _speechCoordinator.PartialTranscription += HandlePartialTranscription;
+    }
+
+    private void HandlePartialTranscription(string text)
+    {
+        if (VoiceState == VoiceInputState.Recording)
+            SourceText = text;
+    }
+
+    private void HandleVoiceStateChanged(VoiceInputState state)
+    {
+        VoiceState = state;
+        if (state == VoiceInputState.Idle)
+        {
+            VoiceStatusText = string.Empty;
+            ShowSttDownloadLink = false;
+        }
+        OnPropertyChanged(nameof(VoiceTooltip));
+        OnPropertyChanged(nameof(IsRecording));
+    }
+
+    private string MapVoiceError(SpeechInputResult result) => result.ErrorCode switch
+    {
+        SpeechInputErrorCode.PermissionDenied => L("overlay.voice.permissionDenied"),
+        SpeechInputErrorCode.ModelMissing => L("overlay.voice.modelMissing"),
+        SpeechInputErrorCode.PlatformNotSupported => L("overlay.voice.platformNotSupported"),
+        SpeechInputErrorCode.AlreadyRecording => L("overlay.voice.alreadyRecording"),
+        SpeechInputErrorCode.TranscriptionFailed => result.ErrorMessage ?? L("overlay.voice.transcriptionFailed"),
+        _ => result.ErrorMessage ?? L("overlay.voice.error")
+    };
 
     private void UpdateActiveModelDisplay()
     {

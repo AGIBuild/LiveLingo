@@ -26,13 +26,13 @@
 
     <Window.Styles>
         <Style Selector="TextBox.source">
-            <Setter Property="Background" Value="{DynamicResource OvPanelBrush}"/>
+            <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="{DynamicResource OvFgPrimaryBrush}"/>
             <Setter Property="CaretBrush" Value="{StaticResource AccentBrush}"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Setter Property="FontSize" Value="15"/>
-            <Setter Property="Padding" Value="12,8"/>
-            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="12,8,12,4"/>
+            <Setter Property="CornerRadius" Value="0"/>
             <Setter Property="AcceptsReturn" Value="True"/>
             <Setter Property="TextWrapping" Value="Wrap"/>
             <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
@@ -40,10 +40,10 @@
             <Setter Property="PlaceholderText" Value=""/>
         </Style>
         <Style Selector="TextBox.source:pointerover /template/ Border#PART_BorderElement">
-            <Setter Property="Background" Value="{DynamicResource OvPanelBrush}"/>
+            <Setter Property="Background" Value="Transparent"/>
         </Style>
         <Style Selector="TextBox.source:focus /template/ Border#PART_BorderElement">
-            <Setter Property="Background" Value="{DynamicResource OvPanelBrush}"/>
+            <Setter Property="Background" Value="Transparent"/>
         </Style>
         <Style Selector="SelectableTextBlock.translation">
             <Setter Property="Foreground" Value="{DynamicResource OvFgSecondaryBrush}"/>
@@ -166,21 +166,141 @@
                       Margin="14,8,14,0"
                       MinHeight="0"
                       ClipToBounds="True">
-                    <!-- Source input -->
-                    <Grid Grid.Row="0" Height="120">
-                        <TextBox Classes="source"
-                                 Text="{Binding SourceText, Mode=TwoWay}"
-                                 PlaceholderText="{Binding SourceHint}"
-                                 Name="SourceInput"
-                                 Height="120"
-                                 VerticalAlignment="Stretch"/>
-                        <TextBlock Text="{Binding SourceTextLength}"
-                                   FontSize="10" Foreground="{DynamicResource OvFgMutedBrush}"
-                                   HorizontalAlignment="Right"
-                                   VerticalAlignment="Bottom"
-                                   Margin="0,0,10,6"
-                                   IsHitTestVisible="False"/>
-                    </Grid>
+                    <!-- Source input with embedded toolbar -->
+                    <Border Grid.Row="0" Height="120"
+                            CornerRadius="8"
+                            Background="{DynamicResource OvPanelBrush}"
+                            ClipToBounds="True">
+                        <Grid RowDefinitions="*,Auto">
+                            <TextBox Grid.Row="0" Classes="source"
+                                     Text="{Binding SourceText, Mode=TwoWay}"
+                                     PlaceholderText="{Binding SourceHint}"
+                                     Name="SourceInput"
+                                     VerticalAlignment="Stretch"/>
+
+                            <!-- Inner toolbar -->
+                            <Grid Grid.Row="1" ColumnDefinitions="Auto,Auto,*,Auto,Auto"
+                                  Margin="6,0,6,4" Height="26">
+
+                                <!-- Character count (left) -->
+                                <TextBlock Grid.Column="0"
+                                           Text="{Binding SourceTextLength}"
+                                           FontSize="10"
+                                           Foreground="{DynamicResource OvFgMutedBrush}"
+                                           VerticalAlignment="Center"
+                                           Margin="6,0,4,0"
+                                           IsHitTestVisible="False"/>
+
+                                <!-- Voice status + download link (left, after count) -->
+                                <StackPanel Grid.Column="1" Orientation="Horizontal"
+                                            Spacing="4" VerticalAlignment="Center"
+                                            IsVisible="{Binding !IsRecording}">
+                                    <TextBlock Text="{Binding VoiceStatusText}"
+                                               FontSize="11"
+                                               Foreground="{StaticResource AccentBrush}"
+                                               VerticalAlignment="Center"
+                                               IsVisible="{Binding VoiceStatusText,
+                                                           Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                                    <Button Command="{Binding DownloadSttModelCommand}"
+                                            IsVisible="{Binding ShowSttDownloadLink}"
+                                            Background="Transparent"
+                                            BorderThickness="0"
+                                            Padding="2,0"
+                                            Cursor="Hand"
+                                            MinWidth="0" MinHeight="0"
+                                            VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding DownloadModelLabel}"
+                                                   FontSize="11"
+                                                   Foreground="{StaticResource AccentBrush}"
+                                                   TextDecorations="Underline"/>
+                                    </Button>
+                                </StackPanel>
+
+                                <!-- Voice language picker (right, next to mic, recording only) -->
+                                <Panel Grid.Column="3" VerticalAlignment="Center"
+                                       Margin="0,0,4,0"
+                                       IsVisible="{Binding IsRecording}">
+                                    <Border Name="VoiceLangBadge"
+                                            Padding="6,2"
+                                            CornerRadius="4"
+                                            Background="#12FFFFFF"
+                                            Cursor="Hand"
+                                            VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding VoiceLanguageDisplay}"
+                                                   Foreground="{StaticResource AccentBrush}" FontSize="11"
+                                                   VerticalAlignment="Center"/>
+                                    </Border>
+                                    <Popup Name="VoiceLangPopup"
+                                           IsOpen="{Binding IsVoiceLanguagePickerOpen, Mode=TwoWay}"
+                                           PlacementTarget="{Binding #VoiceLangBadge}"
+                                           Placement="Top"
+                                           IsLightDismissEnabled="True"
+                                           MaxHeight="260">
+                                        <Border Background="{StaticResource BgSurfaceBrush}" CornerRadius="8"
+                                                BorderBrush="{StaticResource BorderSubtleBrush}" BorderThickness="1"
+                                                Padding="4" MinWidth="140">
+                                            <ScrollViewer MaxHeight="240"
+                                                          HorizontalScrollBarVisibility="Disabled">
+                                                <ItemsControl ItemsSource="{Binding AvailableVoiceLanguages}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Button Background="Transparent"
+                                                                    BorderThickness="0"
+                                                                    HorizontalContentAlignment="Stretch"
+                                                                    HorizontalAlignment="Stretch"
+                                                                    Padding="8,6" Cursor="Hand"
+                                                                    Command="{Binding $parent[Window].((vm:OverlayViewModel)DataContext).SelectVoiceLanguageCommand}"
+                                                                    CommandParameter="{Binding}">
+                                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                                    <TextBlock Text="{Binding Code}"
+                                                                               Foreground="{StaticResource FgPrimaryBrush}"
+                                                                               FontSize="12" FontWeight="SemiBold"
+                                                                               Width="28"/>
+                                                                    <TextBlock Text="{Binding DisplayName}"
+                                                                               Foreground="{StaticResource FgMutedBrush}"
+                                                                               FontSize="12"/>
+                                                                </StackPanel>
+                                                            </Button>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </ScrollViewer>
+                                        </Border>
+                                    </Popup>
+                                </Panel>
+
+                                <!-- Microphone button (rightmost) -->
+                                <Button Grid.Column="4"
+                                        Name="MicButton"
+                                        Command="{Binding ToggleVoiceInputCommand}"
+                                        IsVisible="{Binding IsVoiceAvailable}"
+                                        Background="Transparent"
+                                        BorderThickness="0"
+                                        Padding="4"
+                                        Cursor="Hand"
+                                        MinWidth="24" MinHeight="24"
+                                        VerticalAlignment="Center"
+                                        ToolTip.Tip="{Binding VoiceTooltip}">
+                                    <Panel Width="16" Height="16">
+                                        <!-- Mic icon (idle/error) -->
+                                        <Path Data="M8,1 C9.657,1 11,2.343 11,4 L11,8 C11,9.657 9.657,11 8,11 C6.343,11 5,9.657 5,8 L5,4 C5,2.343 6.343,1 8,1 Z M13,8 C13,10.419 11.171,12.377 8.8,12.826 L8.8,15 L7.2,15 L7.2,12.826 C4.829,12.377 3,10.419 3,8 L4.2,8 C4.2,10.098 5.902,11.8 8,11.8 C10.098,11.8 11.8,10.098 11.8,8 Z"
+                                              Fill="{DynamicResource OvFgMutedBrush}"
+                                              Stretch="Uniform"
+                                              Width="16" Height="16"
+                                              Name="MicIconIdle"/>
+                                        <!-- Stop icon (recording - red square) -->
+                                        <Border Width="12" Height="12"
+                                                Background="#FF453A"
+                                                CornerRadius="2"
+                                                HorizontalAlignment="Center"
+                                                VerticalAlignment="Center"
+                                                Name="StopIconRecording"
+                                                IsVisible="False"/>
+                                    </Panel>
+                                </Button>
+                            </Grid>
+                        </Grid>
+                    </Border>
 
                     <!-- Translation result -->
                     <Border Grid.Row="1" Name="TranslationBorder"

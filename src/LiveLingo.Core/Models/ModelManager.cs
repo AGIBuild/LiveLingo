@@ -289,10 +289,28 @@ public sealed class ModelManager : IModelManager
 
     private async Task<HttpResponseMessage> SendAssetRequestAsync(string url, long resumeBytes, CancellationToken ct)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        var effectiveUrl = ApplyMirror(url);
+        using var request = new HttpRequestMessage(HttpMethod.Get, effectiveUrl);
         if (resumeBytes > 0)
             request.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(resumeBytes, null);
         return await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+    }
+
+    private string ApplyMirror(string url)
+    {
+        if (string.IsNullOrWhiteSpace(_options.HuggingFaceMirror))
+            return url;
+
+        const string hfHost = "https://huggingface.co";
+        if (url.StartsWith(hfHost, StringComparison.OrdinalIgnoreCase))
+        {
+            var mirror = _options.HuggingFaceMirror.TrimEnd('/');
+            var rewritten = mirror + url[hfHost.Length..];
+            _logger.LogDebug("Rewriting HuggingFace URL: {Original} → {Mirror}", url, rewritten);
+            return rewritten;
+        }
+
+        return url;
     }
 
     private static string GetFileNameFromUrl(string url)

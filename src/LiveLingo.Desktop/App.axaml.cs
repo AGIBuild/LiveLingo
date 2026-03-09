@@ -14,12 +14,14 @@ using LiveLingo.Desktop.Platform.macOS;
 using LiveLingo.Desktop.Services.Configuration;
 using LiveLingo.Desktop.Services.LanguageCatalog;
 using LiveLingo.Desktop.Services.Localization;
+using LiveLingo.Desktop.Services.Speech;
 using LiveLingo.Desktop.Services.Update;
 using LiveLingo.Desktop.ViewModels;
 using LiveLingo.Desktop.Views;
 using LiveLingo.Core;
 using LiveLingo.Core.Engines;
 using LiveLingo.Core.Models;
+using LiveLingo.Core.Speech;
 using LiveLingo.Core.Translation;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -82,6 +84,7 @@ public partial class App : Application
                 opts.ModelStoragePath = userSettings.Advanced.ModelStoragePath;
             opts.DefaultTargetLanguage = userSettings.Translation.DefaultTargetLanguage;
             opts.InferenceThreads = userSettings.Advanced.InferenceThreads;
+            opts.HuggingFaceMirror = userSettings.Advanced.HuggingFaceMirror;
         });
         services.AddSingleton<ISettingsService>(settingsService);
         services.AddSingleton<IMessenger>(_ => WeakReferenceMessenger.Default);
@@ -98,6 +101,10 @@ public partial class App : Application
             services.AddSingleton<IPlatformServices, WindowsPlatformServices>();
         else if (OperatingSystem.IsMacOS())
             services.AddSingleton<IPlatformServices, MacPlatformServices>();
+
+        services.AddSingleton<IAudioCaptureService>(sp =>
+            sp.GetService<IPlatformServices>()?.AudioCapture ?? new StubAudioCaptureService());
+        services.AddSingleton<ISpeechInputCoordinator, SpeechInputCoordinator>();
 
         _serviceProvider = services.BuildServiceProvider();
         _messenger = _serviceProvider.GetRequiredService<IMessenger>();
@@ -711,6 +718,7 @@ public partial class App : Application
         var languageCatalog = _serviceProvider!.GetRequiredService<ILanguageCatalog>();
         var overlayLogger = _serviceProvider!.GetRequiredService<ILogger<OverlayViewModel>>();
         var clipboard = platform.Clipboard;
+        var speechCoordinator = _serviceProvider!.GetService<ISpeechInputCoordinator>();
         var vm = new OverlayViewModel(
             target,
             pipeline,
@@ -723,7 +731,8 @@ public partial class App : Application
             overlayLogger,
             modelManager,
             _messenger,
-            languageCatalog);
+            languageCatalog,
+            speechCoordinator);
         _activeOverlay = new OverlayWindow(vm);
         var uiSettings = settingsService.Current.UI;
         _activeOverlay.ApplyAutoSizingDefaults();

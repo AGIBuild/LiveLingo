@@ -31,8 +31,9 @@ public class ModelRegistryTests
     [Fact]
     public void AllModels_ContainsAll()
     {
-        Assert.Equal(5, ModelRegistry.AllModels.Count);
+        Assert.Equal(6, ModelRegistry.AllModels.Count);
         Assert.Contains(ModelRegistry.Qwen25_15B, ModelRegistry.AllModels);
+        Assert.Contains(ModelRegistry.WhisperBase, ModelRegistry.AllModels);
     }
 
     [Fact]

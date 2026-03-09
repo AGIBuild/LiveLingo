@@ -6,4 +6,5 @@ public interface IPlatformServices : IDisposable
     IWindowTracker WindowTracker { get; }
     ITextInjector TextInjector { get; }
     IClipboardService Clipboard { get; }
+    IAudioCaptureService AudioCapture { get; }
 }
