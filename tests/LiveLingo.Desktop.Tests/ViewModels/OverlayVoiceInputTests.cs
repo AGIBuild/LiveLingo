@@ -274,6 +274,116 @@ public class OverlayVoiceInputTests
             Arg.Any<CancellationToken>());
     }
 
+    [Fact]
+    public async Task ToggleVoice_AppendsToExistingSourceText()
+    {
+        var vm = CreateVm();
+        vm.SourceText = "existing text";
+        vm.VoiceState = VoiceInputState.Idle;
+
+        _coordinator.State.Returns(VoiceInputState.Idle);
+        _coordinator.StartRecordingAsync(Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(new SpeechInputResult(true, null, SpeechInputErrorCode.None));
+
+        await vm.ToggleVoiceInputCommand.ExecuteAsync(null);
+
+        vm.VoiceState = VoiceInputState.Recording;
+
+        _coordinator.StopAndTranscribeAsync(Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(new SpeechInputResult(true, "new voice", SpeechInputErrorCode.None));
+
+        await vm.ToggleVoiceInputCommand.ExecuteAsync(null);
+
+        Assert.Equal("existing text new voice", vm.SourceText);
+    }
+
+    [Fact]
+    public async Task ToggleVoice_EmptySourceText_NoLeadingSpace()
+    {
+        var vm = CreateVm();
+        vm.SourceText = string.Empty;
+        vm.VoiceState = VoiceInputState.Idle;
+
+        _coordinator.State.Returns(VoiceInputState.Idle);
+        _coordinator.StartRecordingAsync(Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(new SpeechInputResult(true, null, SpeechInputErrorCode.None));
+
+        await vm.ToggleVoiceInputCommand.ExecuteAsync(null);
+
+        vm.VoiceState = VoiceInputState.Recording;
+
+        _coordinator.StopAndTranscribeAsync(Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(new SpeechInputResult(true, "hello", SpeechInputErrorCode.None));
+
+        await vm.ToggleVoiceInputCommand.ExecuteAsync(null);
+
+        Assert.Equal("hello", vm.SourceText);
+    }
+
+    [Fact]
+    public async Task PartialTranscription_AppendsToExistingSourceText()
+    {
+        var coordinator = Substitute.For<ISpeechInputCoordinator>();
+        Action<string>? partialHandler = null;
+        coordinator.When(c => c.PartialTranscription += Arg.Any<Action<string>>())
+            .Do(ci => partialHandler = ci.Arg<Action<string>>());
+
+        var vm = CreateVm(coordinator);
+        vm.SourceText = "before";
+
+        coordinator.State.Returns(VoiceInputState.Idle);
+        coordinator.StartRecordingAsync(Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(new SpeechInputResult(true, null, SpeechInputErrorCode.None));
+
+        await vm.ToggleVoiceInputCommand.ExecuteAsync(null);
+
+        vm.VoiceState = VoiceInputState.Recording;
+        Assert.NotNull(partialHandler);
+        partialHandler!.Invoke("partial result");
+
+        Assert.Equal("before partial result", vm.SourceText);
+    }
+
+    [Fact]
+    public async Task PartialTranscription_IgnoredWhenNotRecording()
+    {
+        var coordinator = Substitute.For<ISpeechInputCoordinator>();
+        Action<string>? partialHandler = null;
+        coordinator.When(c => c.PartialTranscription += Arg.Any<Action<string>>())
+            .Do(ci => partialHandler = ci.Arg<Action<string>>());
+
+        var vm = CreateVm(coordinator);
+        vm.SourceText = "original";
+
+        Assert.NotNull(partialHandler);
+        partialHandler!.Invoke("should be ignored");
+
+        Assert.Equal("original", vm.SourceText);
+    }
+
+    [Fact]
+    public async Task ToggleVoice_ExistingTextEndingWithSpace_NoDoubleSpace()
+    {
+        var vm = CreateVm();
+        vm.SourceText = "ends with space ";
+        vm.VoiceState = VoiceInputState.Idle;
+
+        _coordinator.State.Returns(VoiceInputState.Idle);
+        _coordinator.StartRecordingAsync(Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(new SpeechInputResult(true, null, SpeechInputErrorCode.None));
+
+        await vm.ToggleVoiceInputCommand.ExecuteAsync(null);
+
+        vm.VoiceState = VoiceInputState.Recording;
+
+        _coordinator.StopAndTranscribeAsync(Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(new SpeechInputResult(true, "next", SpeechInputErrorCode.None));
+
+        await vm.ToggleVoiceInputCommand.ExecuteAsync(null);
+
+        Assert.Equal("ends with space next", vm.SourceText);
+    }
+
     private sealed class DeterministicTranslationEngine : ITranslationEngine
     {
         public IReadOnlyList<LanguageInfo> SupportedLanguages { get; } =
