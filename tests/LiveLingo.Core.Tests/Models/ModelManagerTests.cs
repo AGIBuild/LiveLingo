@@ -565,6 +565,94 @@ public class ModelManagerTests : IDisposable
         }
     }
 
+    [Fact]
+    public async Task EnsureModelAsync_FallsBackToMirror_WhenHuggingFaceUnreachable()
+    {
+        var requestedUrls = new List<string>();
+        var handler = new FallbackHttpMessageHandler(req =>
+        {
+            requestedUrls.Add(req.RequestUri!.ToString());
+            if (req.RequestUri.Host == "huggingface.co")
+                throw new HttpRequestException("DNS failure",
+                    new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.HostNotFound));
+        });
+        var options = Options.Create(new CoreOptions { ModelStoragePath = _tempDir });
+        var mgr = new ModelManager(options, new HttpClient(handler), _logger);
+
+        var desc = new ModelDescriptor("fallback-test", "Fallback Test",
+            "https://huggingface.co/test/model/resolve/main/model.bin", 100, ModelType.SpeechToText);
+
+        await mgr.EnsureModelAsync(desc, null, CancellationToken.None);
+
+        Assert.Contains(requestedUrls, u => u.Contains("hf-mirror.com"));
+        Assert.True(File.Exists(Path.Combine(_tempDir, "fallback-test", "manifest.json")));
+    }
+
+    [Fact]
+    public async Task EnsureModelAsync_UsesUserMirror_WhenConfigured()
+    {
+        var requestedUrls = new List<string>();
+        var handler = new FakeHttpMessageHandler(req => requestedUrls.Add(req.RequestUri!.ToString()));
+        var options = Options.Create(new CoreOptions
+        {
+            ModelStoragePath = _tempDir,
+            HuggingFaceMirror = "https://my-mirror.example.com"
+        });
+        var mgr = new ModelManager(options, new HttpClient(handler), _logger);
+
+        var desc = new ModelDescriptor("mirror-test", "Mirror Test",
+            "https://huggingface.co/test/model/resolve/main/model.bin", 100, ModelType.Translation);
+
+        await mgr.EnsureModelAsync(desc, null, CancellationToken.None);
+
+        Assert.All(requestedUrls, u => Assert.DoesNotContain("huggingface.co", u));
+        Assert.Contains(requestedUrls, u => u.Contains("my-mirror.example.com"));
+    }
+
+    [Fact]
+    public async Task EnsureModelAsync_DoesNotRewrite_NonHuggingFaceUrl()
+    {
+        var requestedUrls = new List<string>();
+        var handler = new FakeHttpMessageHandler(req => requestedUrls.Add(req.RequestUri!.ToString()));
+        var options = Options.Create(new CoreOptions
+        {
+            ModelStoragePath = _tempDir,
+            HuggingFaceMirror = "https://my-mirror.example.com"
+        });
+        var mgr = new ModelManager(options, new HttpClient(handler), _logger);
+
+        var desc = new ModelDescriptor("nonhf-test", "NonHF Test",
+            "https://dl.fbaipublicfiles.com/fasttext/model.ftz", 100, ModelType.LanguageDetection);
+
+        await mgr.EnsureModelAsync(desc, null, CancellationToken.None);
+
+        Assert.Contains(requestedUrls, u => u.Contains("dl.fbaipublicfiles.com"));
+        Assert.DoesNotContain(requestedUrls, u => u.Contains("my-mirror.example.com"));
+    }
+
+    [Fact]
+    public async Task EnsureModelAsync_NoFallback_WhenUserMirrorIsSet()
+    {
+        var handler = new FallbackHttpMessageHandler(req =>
+        {
+            if (req.RequestUri!.Host == "my-mirror.example.com")
+                throw new HttpRequestException("Mirror also failed",
+                    new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.HostNotFound));
+        });
+        var options = Options.Create(new CoreOptions
+        {
+            ModelStoragePath = _tempDir,
+            HuggingFaceMirror = "https://my-mirror.example.com"
+        });
+        var mgr = new ModelManager(options, new HttpClient(handler), _logger);
+
+        var desc = new ModelDescriptor("nofallback-test", "NoFallback",
+            "https://huggingface.co/test/model.bin", 100, ModelType.Translation);
+
+        await Assert.ThrowsAsync<HttpRequestException>(
+            () => mgr.EnsureModelAsync(desc, null, CancellationToken.None));
+    }
+
     private sealed class FakeHttpMessageHandler : HttpMessageHandler
     {
         private readonly Action<HttpRequestMessage>? _inspector;
@@ -585,6 +673,28 @@ public class ModelManagerTests : IDisposable
                 Content = new ByteArrayContent(content)
             };
             return Task.FromResult(response);
+        }
+    }
+
+    private sealed class FallbackHttpMessageHandler : HttpMessageHandler
+    {
+        private readonly Action<HttpRequestMessage>? _inspector;
+
+        public FallbackHttpMessageHandler(Action<HttpRequestMessage>? inspector = null)
+        {
+            _inspector = inspector;
+        }
+
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken ct)
+        {
+            _inspector?.Invoke(request);
+            var content = new byte[100];
+            Array.Fill(content, (byte)'x');
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new ByteArrayContent(content)
+            });
         }
     }
 }

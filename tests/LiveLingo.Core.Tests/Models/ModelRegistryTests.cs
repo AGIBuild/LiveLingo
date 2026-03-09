@@ -31,9 +31,10 @@ public class ModelRegistryTests
     [Fact]
     public void AllModels_ContainsAll()
     {
-        Assert.Equal(6, ModelRegistry.AllModels.Count);
+        Assert.Equal(7, ModelRegistry.AllModels.Count);
         Assert.Contains(ModelRegistry.Qwen25_15B, ModelRegistry.AllModels);
         Assert.Contains(ModelRegistry.WhisperBase, ModelRegistry.AllModels);
+        Assert.Contains(ModelRegistry.SileroVad, ModelRegistry.AllModels);
     }
 
     [Fact]
@@ -123,6 +124,19 @@ public class ModelRegistryTests
     {
         foreach (var model in ModelRegistry.AllModels)
             Assert.False(string.IsNullOrEmpty(model.DisplayName), $"Model {model.Id} has empty DisplayName");
+    }
+
+    [Fact]
+    public void SileroVad_HasCorrectType()
+    {
+        Assert.Equal(ModelType.VoiceActivityDetection, ModelRegistry.SileroVad.Type);
+        Assert.True(ModelRegistry.SileroVad.SizeBytes > 0);
+    }
+
+    [Fact]
+    public void OptionalModels_ContainsSileroVad()
+    {
+        Assert.Contains(ModelRegistry.SileroVad, ModelRegistry.OptionalModels);
     }
 
     [Theory]
