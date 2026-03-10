@@ -6,6 +6,9 @@ namespace LiveLingo.Core.Speech;
 
 public sealed class WhisperSpeechToTextEngine : ISpeechToTextEngine
 {
+    private const int MinSampleRate = 16000;
+    private const int MinDurationSamples = MinSampleRate; // 1 second at 16kHz
+
     private readonly IModelManager _modelManager;
     private readonly ILogger<WhisperSpeechToTextEngine>? _logger;
     private WhisperFactory? _factory;
@@ -31,6 +34,14 @@ public sealed class WhisperSpeechToTextEngine : ISpeechToTextEngine
 
         var processor = await GetOrLoadProcessorAsync(language, ct);
         var samples = ConvertPcmToFloat(audio);
+
+        if (samples.Length < MinDurationSamples)
+        {
+            _logger?.LogDebug(
+                "Audio too short for Whisper encoding ({Samples} samples, minimum {Min})",
+                samples.Length, MinDurationSamples);
+            return new SpeechTranscriptionResult(string.Empty, language ?? "en", 0f);
+        }
 
         var segments = new List<string>();
         string detectedLanguage = language ?? "en";

@@ -18,7 +18,6 @@ internal sealed class Win32AudioCaptureService : IAudioCaptureService
     private readonly MemoryStream _capturedData = new();
     private readonly object _gate = new();
     private bool _isRecording;
-    private TaskCompletionSource? _stopTcs;
 
     public bool IsRecording
     {
@@ -94,9 +93,8 @@ internal sealed class Win32AudioCaptureService : IAudioCaptureService
         {
             if (!_isRecording)
                 throw new InvalidOperationException("Not recording.");
+            _isRecording = false;
         }
-
-        _stopTcs = new TaskCompletionSource();
 
         WaveIn.waveInStop(_hWaveIn);
         WaveIn.waveInReset(_hWaveIn);
@@ -116,13 +114,9 @@ internal sealed class Win32AudioCaptureService : IAudioCaptureService
         WaveIn.waveInClose(_hWaveIn);
         _hWaveIn = IntPtr.Zero;
 
-        lock (_gate) _isRecording = false;
-
         var pcm = _capturedData.ToArray();
         var duration = TimeSpan.FromSeconds((double)pcm.Length / (SampleRate * Channels * BitsPerSample / 8));
-        var result = new AudioCaptureResult(pcm, SampleRate, Channels, duration);
-
-        return Task.FromResult(result);
+        return Task.FromResult(new AudioCaptureResult(pcm, SampleRate, Channels, duration));
     }
 
     private readonly WaveIn.WaveInProc _waveInCallback = (hWaveIn, msg, _, headerPtr, _) =>
@@ -141,24 +135,21 @@ internal sealed class Win32AudioCaptureService : IAudioCaptureService
     {
         if (msg != WaveIn.WIM_DATA) return;
 
-        var header = Marshal.PtrToStructure<WaveIn.WAVEHDR>(headerPtr);
-        if (header.dwBytesRecorded > 0)
-        {
-            var data = new byte[header.dwBytesRecorded];
-            Marshal.Copy(header.lpData, data, 0, (int)header.dwBytesRecorded);
-            lock (_gate)
-            {
-                if (_isRecording && _capturedData.Length < MaxRecordingSeconds * SampleRate * Channels * BitsPerSample / 8)
-                    _capturedData.Write(data, 0, data.Length);
-            }
-        }
-
         lock (_gate)
         {
-            if (_isRecording && _hWaveIn != IntPtr.Zero)
+            if (!_isRecording) return;
+
+            var header = Marshal.PtrToStructure<WaveIn.WAVEHDR>(headerPtr);
+            if (header.dwBytesRecorded > 0)
             {
-                WaveIn.waveInAddBuffer(_hWaveIn, headerPtr, (uint)Marshal.SizeOf<WaveIn.WAVEHDR>());
+                var data = new byte[header.dwBytesRecorded];
+                Marshal.Copy(header.lpData, data, 0, (int)header.dwBytesRecorded);
+                if (_capturedData.Length < MaxRecordingSeconds * SampleRate * Channels * BitsPerSample / 8)
+                    _capturedData.Write(data, 0, data.Length);
             }
+
+            if (_hWaveIn != IntPtr.Zero)
+                WaveIn.waveInAddBuffer(_hWaveIn, headerPtr, (uint)Marshal.SizeOf<WaveIn.WAVEHDR>());
         }
     }
 
