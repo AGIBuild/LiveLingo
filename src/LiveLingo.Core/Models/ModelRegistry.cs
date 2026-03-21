@@ -73,11 +73,18 @@ public static class ModelRegistry
         1_073_741_824,
         ModelType.PostProcessing);
 
+    public static readonly ModelDescriptor Qwen35_9B = new(
+        "qwen35-9b",
+        "Qwen3.5-9B-Instruct (GGUF Q4_K_M)",
+        "https://hf-mirror.com/Qwen/Qwen3.5-9B-Instruct-GGUF/resolve/main/qwen3.5-9b-instruct-q4_k_m.gguf",
+        5_910_000_000,
+        ModelType.Translation);
+
     public static IReadOnlyList<ModelDescriptor> TranslationModels { get; } =
-        [MarianZhEn, MarianEnZh, MarianJaEn];
+        [Qwen35_9B, MarianZhEn, MarianEnZh, MarianJaEn];
 
     public static IReadOnlyList<ModelDescriptor> RequiredModels { get; } =
-        [MarianZhEn];
+        [Qwen35_9B];
 
     public static readonly ModelDescriptor WhisperBase = new(
         "whisper-base",
@@ -97,21 +104,18 @@ public static class ModelRegistry
         [Qwen25_15B, WhisperBase, SileroVad];
 
     public static IReadOnlyList<ModelDescriptor> AllModels { get; } =
-        [MarianZhEn, MarianEnZh, MarianJaEn, FastTextLid, Qwen25_15B, WhisperBase, SileroVad];
+        [Qwen35_9B, MarianZhEn, MarianEnZh, MarianJaEn, FastTextLid, Qwen25_15B, WhisperBase, SileroVad];
 
     public static ModelDescriptor? FindTranslationModel(string sourceLanguage, string targetLanguage)
     {
-        var id = $"opus-mt-{sourceLanguage}-{targetLanguage}";
-        return TranslationModels.FirstOrDefault(m => m.Id == id);
+        // By default use Qwen 3.5 9B as the primary translation engine
+        return Qwen35_9B;
     }
 
     public static IReadOnlyList<ModelDescriptor> GetRequiredModelsForLanguagePair(
         string? sourceLanguage,
         string? targetLanguage)
     {
-        var src = string.IsNullOrWhiteSpace(sourceLanguage) ? "zh" : sourceLanguage;
-        var tgt = string.IsNullOrWhiteSpace(targetLanguage) ? "en" : targetLanguage;
-        var translationModel = FindTranslationModel(src, tgt) ?? MarianZhEn;
-        return [translationModel];
+        return [Qwen35_9B];
     }
 }

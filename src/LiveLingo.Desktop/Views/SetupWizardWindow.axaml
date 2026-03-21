@@ -129,12 +129,20 @@
                             <Grid ColumnDefinitions="*,Auto"
                                   IsVisible="{Binding DownloadStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                                 <TextBlock Text="{Binding DownloadStatus}" FontSize="11"
+                                           TextWrapping="Wrap"
                                            Foreground="{StaticResource FgTertiaryBrush}"/>
-                                <Button Grid.Column="1" Content="{Binding Step2CancelButton}" Padding="8,3"
-                                        FontSize="11" MinWidth="0" MinHeight="0"
-                                        Classes="themed"
-                                        Command="{Binding CancelDownloadCommand}"
-                                        IsVisible="{Binding IsDownloading}"/>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                    <Button Content="{Binding CopyUrlButtonLabel}" Padding="8,3"
+                                            FontSize="11" MinWidth="0" MinHeight="0"
+                                            Classes="themed" VerticalAlignment="Top"
+                                            Command="{Binding CopyUrlCommand}"
+                                            IsVisible="{Binding HasError}"/>
+                                    <Button Content="{Binding Step2CancelButton}" Padding="8,3"
+                                            FontSize="11" MinWidth="0" MinHeight="0"
+                                            Classes="themed" VerticalAlignment="Top"
+                                            Command="{Binding CancelDownloadCommand}"
+                                            IsVisible="{Binding IsDownloading}"/>
+                                </StackPanel>
                             </Grid>
                         </StackPanel>
                     </Border>

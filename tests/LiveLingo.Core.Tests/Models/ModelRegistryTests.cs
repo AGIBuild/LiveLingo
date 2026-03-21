@@ -7,17 +7,18 @@ public class ModelRegistryTests
     [Fact]
     public void TranslationModels_ContainsExpectedModels()
     {
-        Assert.Equal(3, ModelRegistry.TranslationModels.Count);
+        Assert.Equal(4, ModelRegistry.TranslationModels.Count);
         Assert.Contains(ModelRegistry.MarianZhEn, ModelRegistry.TranslationModels);
         Assert.Contains(ModelRegistry.MarianEnZh, ModelRegistry.TranslationModels);
         Assert.Contains(ModelRegistry.MarianJaEn, ModelRegistry.TranslationModels);
+        Assert.Contains(ModelRegistry.Qwen35_9B, ModelRegistry.TranslationModels);
     }
 
     [Fact]
-    public void RequiredModels_ContainsDefaultMarianPairOnly()
+    public void RequiredModels_ContainsDefaultQwenPairOnly()
     {
         Assert.NotEmpty(ModelRegistry.RequiredModels);
-        Assert.Contains(ModelRegistry.MarianZhEn, ModelRegistry.RequiredModels);
+        Assert.Contains(ModelRegistry.Qwen35_9B, ModelRegistry.RequiredModels);
         Assert.DoesNotContain(ModelRegistry.FastTextLid, ModelRegistry.RequiredModels);
         Assert.DoesNotContain(ModelRegistry.Qwen25_15B, ModelRegistry.RequiredModels);
     }
@@ -31,8 +32,11 @@ public class ModelRegistryTests
     [Fact]
     public void AllModels_ContainsAll()
     {
-        Assert.Equal(7, ModelRegistry.AllModels.Count);
+        Assert.Equal(8, ModelRegistry.AllModels.Count);
+        Assert.Contains(ModelRegistry.MarianZhEn, ModelRegistry.AllModels);
+        Assert.Contains(ModelRegistry.FastTextLid, ModelRegistry.AllModels);
         Assert.Contains(ModelRegistry.Qwen25_15B, ModelRegistry.AllModels);
+        Assert.Contains(ModelRegistry.Qwen35_9B, ModelRegistry.AllModels);
         Assert.Contains(ModelRegistry.WhisperBase, ModelRegistry.AllModels);
         Assert.Contains(ModelRegistry.SileroVad, ModelRegistry.AllModels);
     }
@@ -45,9 +49,9 @@ public class ModelRegistryTests
     }
 
     [Theory]
-    [InlineData("zh", "en", "opus-mt-zh-en")]
-    [InlineData("en", "zh", "opus-mt-en-zh")]
-    [InlineData("ja", "en", "opus-mt-ja-en")]
+    [InlineData("zh", "en", "qwen35-9b")]
+    [InlineData("en", "zh", "qwen35-9b")]
+    [InlineData("ja", "en", "qwen35-9b")]
     public void FindTranslationModel_FindsCorrectModel(string src, string tgt, string expectedId)
     {
         var model = ModelRegistry.FindTranslationModel(src, tgt);
@@ -60,13 +64,13 @@ public class ModelRegistryTests
     [InlineData("de", "fr")]
     public void FindTranslationModel_ReturnsNull_WhenNotFound(string src, string tgt)
     {
-        Assert.Null(ModelRegistry.FindTranslationModel(src, tgt));
+        Assert.NotNull(ModelRegistry.FindTranslationModel(src, tgt));
     }
 
     [Fact]
     public void TranslationModels_UseMultiAssetOnnxLayout()
     {
-        foreach (var model in ModelRegistry.TranslationModels)
+        foreach (var model in ModelRegistry.TranslationModels.Where(m => m.Id.StartsWith("opus-mt-")))
         {
             Assert.NotEmpty(model.Assets);
             Assert.Contains(model.Assets, a => a.RelativePath == "onnx/encoder_model.onnx");

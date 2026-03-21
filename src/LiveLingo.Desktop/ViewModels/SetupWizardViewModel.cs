@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using LiveLingo.Desktop.Messaging;
+using LiveLingo.Desktop.Platform;
 using LiveLingo.Desktop.Services.Configuration;
 using LiveLingo.Desktop.Services.LanguageCatalog;
 using LiveLingo.Desktop.Services.Localization;
@@ -18,6 +19,7 @@ public partial class SetupWizardViewModel : ObservableObject
     private readonly IMessenger _messenger;
     private readonly ILogger<SetupWizardViewModel>? _logger;
     private readonly ILocalizationService? _localization;
+    private readonly IClipboardService? _clipboard;
     private CancellationTokenSource? _downloadCts;
 
     [ObservableProperty] private int _currentStep;
@@ -28,6 +30,7 @@ public partial class SetupWizardViewModel : ObservableObject
     [ObservableProperty] private double _downloadProgress;
     [ObservableProperty] private string? _downloadStatus;
     [ObservableProperty] private bool _isModelInstalled;
+    [ObservableProperty] private bool _hasError;
     [ObservableProperty] private LanguageInfo? _selectedSourceLanguage;
     [ObservableProperty] private LanguageInfo? _selectedTargetLanguage;
 
@@ -60,12 +63,13 @@ public partial class SetupWizardViewModel : ObservableObject
     public string Step2Title => T("wizard.step2.title", "Download Required Models");
     public string Step2Description => T(
         "wizard.step2.description",
-        "LiveLingo requires the baseline Marian translation model for your selected language pair. This is a one-time download.");
-    public string Step2CardTitle => T("wizard.step2.card.title", "MarianMT");
+        "LiveLingo requires the baseline translation model for your selected language pair. This is a one-time download.");
+    public string Step2CardTitle => T("wizard.step2.card.title", "Qwen3.5 9B");
     public string Step2CardSubtitle => T("wizard.step2.card.subtitle", "Baseline translation model (required)");
     public string Step2DownloadButton => T("wizard.step2.downloadButton", "Download");
     public string Step2ReadyLabel => T("wizard.step2.ready", "✓ Ready");
     public string Step2CancelButton => T("wizard.step2.cancelButton", "Cancel");
+    public string CopyUrlButtonLabel => T("wizard.download.copyUrl", "Copy URL");
 
     public SetupWizardViewModel(
         ISettingsService settings,
@@ -74,13 +78,15 @@ public partial class SetupWizardViewModel : ObservableObject
         IMessenger? messenger = null,
         ILogger<SetupWizardViewModel>? logger = null,
         ILocalizationService? localization = null,
-        ILanguageCatalog? languageCatalog = null)
+        ILanguageCatalog? languageCatalog = null,
+        IClipboardService? clipboard = null)
     {
         _settings = settings;
         _modelManager = modelManager;
         _messenger = messenger ?? WeakReferenceMessenger.Default;
         _logger = logger;
         _localization = localization;
+        _clipboard = clipboard;
         TotalSteps = 3;
         StartStep = startStep;
         _currentStep = startStep;
@@ -139,6 +145,7 @@ public partial class SetupWizardViewModel : ObservableObject
         if (_modelManager is null || IsDownloading || IsModelInstalled) return;
 
         IsDownloading = true;
+        HasError = false;
         DownloadProgress = 0;
         DownloadStatus = T("wizard.download.preparing", "Preparing downloads...");
         _downloadCts = new CancellationTokenSource();
@@ -202,16 +209,25 @@ public partial class SetupWizardViewModel : ObservableObject
             }
 
             IsModelInstalled = true;
+            HasError = false;
             DownloadStatus = T("wizard.download.complete", "Download complete ✓");
         }
         catch (OperationCanceledException)
         {
+            HasError = false;
             DownloadStatus = T("wizard.download.cancelled", "Cancelled");
             _logger?.LogWarning("Setup wizard model download cancelled by user.");
         }
+        catch (System.Net.Http.HttpRequestException ex) when (ex.Message.Contains("404") || ex.Message.Contains("401"))
+        {
+            HasError = true;
+            DownloadStatus = T("wizard.download.errorAuth", "Download failed. This model may require authorization on HuggingFace. You can download it manually from https://huggingface.co/Qwen and place the .gguf file in your models directory, or configure a HuggingFace token/mirror in the settings.");
+            _logger?.LogError(ex, "Setup wizard model download failed with HTTP error.");
+        }
         catch (Exception ex)
         {
-            DownloadStatus = T("wizard.download.error", "Error: {0}", ex.Message);
+            HasError = true;
+            DownloadStatus = T("wizard.download.error", "Download failed. You can download it manually from https://huggingface.co/Qwen and place it in the models directory.", ex.Message);
             _logger?.LogError(ex, "Setup wizard model download failed.");
         }
         finally
@@ -226,6 +242,17 @@ public partial class SetupWizardViewModel : ObservableObject
     private void CancelDownload()
     {
         _downloadCts?.Cancel();
+    }
+
+    [RelayCommand]
+    private async Task CopyUrlAsync()
+    {
+        if (_clipboard is null) return;
+        var requiredModels = GetRequiredModelsForCurrentPair();
+        if (requiredModels.Count > 0)
+        {
+            await _clipboard.SetTextAsync(requiredModels[0].DownloadUrl);
+        }
     }
 
     [RelayCommand]

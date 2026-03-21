@@ -60,7 +60,8 @@ public sealed class LlamaTranslationEngine : ITranslationEngine
             }
         };
 
-        var systemPrompt = $"You are a professional translator. Translate the user's text from {srcName} to {tgtName}. Output ONLY the translated text, nothing else.";
+        // Enforce non-thinking mode for reasoning models
+        var systemPrompt = $"You are a professional translator. Translate the user's text from {srcName} to {tgtName}. Output ONLY the translated text, nothing else. Do not output any thought process or explanation.";
         var prompt = $"<|im_start|>system\n{systemPrompt}<|im_end|>\n<|im_start|>user\n{text}<|im_end|>\n<|im_start|>assistant\n";
 
         _logger.LogDebug("Translation prompt for {Src}→{Tgt}: {Prompt}", sourceLanguage, targetLanguage, prompt);
@@ -94,7 +95,7 @@ public sealed class LlamaTranslationEngine : ITranslationEngine
     {
         var srcName = GetLanguageName(sourceLanguage);
         var tgtName = GetLanguageName(targetLanguage);
-        var systemPrompt = $"You are a professional translator. Translate the user's text from {srcName} to {tgtName}. Output ONLY the translated text, nothing else.";
+        var systemPrompt = $"You are a professional translator. Translate the user's text from {srcName} to {tgtName}. Output ONLY the translated text, nothing else. Do not output any thought process or explanation.";
         return $"<|im_start|>system\n{systemPrompt}<|im_end|>\n<|im_start|>user\n{text}<|im_end|>\n<|im_start|>assistant\n";
     }
 
