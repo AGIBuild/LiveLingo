@@ -53,7 +53,7 @@ public class VoiceOverlayIntegrationTests
         Assert.Equal("hello from mic", vm.SourceText);
         Assert.Equal(VoiceInputState.Idle, vm.VoiceState);
 
-        await Task.Delay(600, TestContext.Current.CancellationToken);
+        await Task.Delay(1000, TestContext.Current.CancellationToken);
         await _pipeline.Received().ProcessAsync(
             Arg.Is<TranslationRequest>(r => r.SourceText == "hello from mic"),
             Arg.Any<CancellationToken>());
@@ -171,7 +171,7 @@ public class VoiceOverlayIntegrationTests
         var vm = CreateVm(coordinator);
 
         vm.SourceText = "manual text";
-        await Task.Delay(600, TestContext.Current.CancellationToken);
+        await Task.Delay(1000, TestContext.Current.CancellationToken);
         Assert.Equal("translated", vm.TranslatedText);
 
         await vm.ToggleVoiceInputCommand.ExecuteAsync(null);

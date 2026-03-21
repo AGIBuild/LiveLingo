@@ -64,14 +64,14 @@ public class ServiceCollectionExtensionsTests
     }
 
     [Fact]
-    public void AddLiveLingoCore_UsesMarianAsTranslationEngine()
+    public void AddLiveLingoCore_UsesLlamaAsTranslationEngine()
     {
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddLiveLingoCore();
         var sp = services.BuildServiceProvider();
 
-        Assert.IsType<MarianOnnxEngine>(sp.GetService<ITranslationEngine>());
+        Assert.IsType<LlamaTranslationEngine>(sp.GetService<ITranslationEngine>());
     }
 
     [Fact]

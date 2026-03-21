@@ -260,7 +260,7 @@ public class SetupWizardViewModelTests
 
         Assert.False(vm.IsModelInstalled);
         Assert.False(vm.IsDownloading);
-        Assert.Contains("Network error", vm.DownloadStatus!);
+        Assert.Contains("Download failed. You can download it manually from", vm.DownloadStatus!);
     }
 
     [Fact]

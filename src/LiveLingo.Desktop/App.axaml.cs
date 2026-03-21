@@ -784,7 +784,8 @@ public partial class App : Application
             _messenger,
             _serviceProvider?.GetService<ILogger<SetupWizardViewModel>>(),
             _serviceProvider?.GetService<ILocalizationService>(),
-            _serviceProvider?.GetService<ILanguageCatalog>());
+            _serviceProvider?.GetService<ILanguageCatalog>(),
+            _serviceProvider?.GetService<IPlatformServices>()?.Clipboard);
         _wizardWindow = new SetupWizardWindow(wizardVm);
         var done = new TaskCompletionSource();
         _wizardWindow.Closed += (_, _) =>

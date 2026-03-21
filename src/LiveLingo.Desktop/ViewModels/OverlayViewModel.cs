@@ -270,7 +270,8 @@ public partial class OverlayViewModel : ObservableObject
 
     private async Task DebounceAndTranslateAsync(string text, CancellationToken ct)
     {
-        await Task.Delay(400, ct);
+        // Increased debounce from 400ms to 800ms to reduce LLM churn
+        await Task.Delay(800, ct);
         await RunPipelineAsync(text, ct);
     }
 

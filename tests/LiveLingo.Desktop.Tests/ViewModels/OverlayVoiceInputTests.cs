@@ -229,7 +229,7 @@ public class OverlayVoiceInputTests
         var vm = CreateVm();
         vm.SourceText = "manual input";
 
-        await Task.Delay(600, TestContext.Current.CancellationToken);
+        await Task.Delay(1000, TestContext.Current.CancellationToken);
 
         Assert.False(string.IsNullOrEmpty(vm.TranslatedText));
 
@@ -268,7 +268,7 @@ public class OverlayVoiceInputTests
         await vm.ToggleVoiceInputCommand.ExecuteAsync(null);
         Assert.Equal("voice text", vm.SourceText);
 
-        await Task.Delay(600, TestContext.Current.CancellationToken);
+        await Task.Delay(1000, TestContext.Current.CancellationToken);
         await _pipeline.Received().ProcessAsync(
             Arg.Is<TranslationRequest>(r => r.SourceText == "voice text"),
             Arg.Any<CancellationToken>());

@@ -16,17 +16,19 @@ public class ModelReadinessServiceTests
             service.EnsureTranslationModelReady("zh", "en"));
 
         Assert.Equal(ModelType.Translation, ex.ModelType);
-        Assert.Equal(ModelRegistry.MarianZhEn.Id, ex.ModelId);
+        Assert.Equal("qwen35-9b", ex.ModelId);
     }
 
     [Fact]
-    public void EnsureTranslationModelReady_ThrowsNotSupported_WhenPairUnknown()
+    public void EnsureTranslationModelReady_Throws_WhenPairUnknown()
     {
         var manager = Substitute.For<IModelManager>();
         var service = new ModelReadinessService(manager);
 
-        Assert.Throws<NotSupportedException>(() =>
+        var ex = Assert.Throws<ModelNotReadyException>(() =>
             service.EnsureTranslationModelReady("ko", "fr"));
+
+        Assert.Equal("qwen35-9b", ex.ModelId);
     }
 
     [Fact]

@@ -45,7 +45,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IModelReadinessService, ModelReadinessService>();
 
         services.AddSingleton<QwenModelHost>();
-        services.AddSingleton<ITranslationEngine, MarianOnnxEngine>();
+        services.AddSingleton<ITranslationEngine, LlamaTranslationEngine>();
         services.AddSingleton<ITextProcessor, SummarizeProcessor>();
         services.AddSingleton<ITextProcessor, OptimizeProcessor>();
         services.AddSingleton<ITextProcessor, ColloquializeProcessor>();
