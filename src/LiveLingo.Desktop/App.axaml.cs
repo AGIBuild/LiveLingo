@@ -140,6 +140,11 @@ public partial class App : Application
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            desktop.Exit += (_, _) =>
+            {
+                _serviceProvider?.Dispose();
+                Log.CloseAndFlush();
+            };
 
             if (!settingsService.SettingsFileExists())
             {
@@ -222,7 +227,6 @@ public partial class App : Application
             _settingsWindow = null;
             _wizardWindow?.Close();
             _wizardWindow = null;
-            Log.CloseAndFlush();
             _trayIcon?.Dispose();
             _trayIcon = null;
             desktop.Shutdown();

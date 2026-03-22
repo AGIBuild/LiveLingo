@@ -104,10 +104,19 @@ internal static class MacNativeMethods
     public static extern void CFRunLoopStop(IntPtr runLoop);
 
     [DllImport(CF)]
+    public static extern void CFRunLoopWakeUp(IntPtr runLoop);
+
+    [DllImport(CF)]
     public static extern IntPtr CFRunLoopGetCurrent();
 
     [DllImport(CF)]
     public static extern void CFRelease(IntPtr obj);
+
+    [DllImport(CF)]
+    public static extern void CFRunLoopSourceInvalidate(IntPtr source);
+
+    [DllImport(CF)]
+    public static extern void CFMachPortInvalidate(IntPtr port);
 
     #endregion
 
