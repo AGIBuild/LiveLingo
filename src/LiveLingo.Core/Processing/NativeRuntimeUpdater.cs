@@ -121,6 +121,31 @@ public class NativeRuntimeUpdater(
                         var dest = Path.Combine(libDir, "libggml.dylib");
                         if (!File.Exists(dest)) File.Copy(file, dest);
                     }
+                    if (fileName.StartsWith("libggml-cpu.0") && !fileName.Equals("libggml-cpu.dylib", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var dest = Path.Combine(libDir, "libggml-cpu.dylib");
+                        if (!File.Exists(dest)) File.Copy(file, dest);
+                    }
+                    if (fileName.StartsWith("libggml-base.0") && !fileName.Equals("libggml-base.dylib", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var dest = Path.Combine(libDir, "libggml-base.dylib");
+                        if (!File.Exists(dest)) File.Copy(file, dest);
+                    }
+                    if (fileName.StartsWith("libggml-metal.0") && !fileName.Equals("libggml-metal.dylib", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var dest = Path.Combine(libDir, "libggml-metal.dylib");
+                        if (!File.Exists(dest)) File.Copy(file, dest);
+                    }
+                    if (fileName.StartsWith("libggml-blas.0") && !fileName.Equals("libggml-blas.dylib", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var dest = Path.Combine(libDir, "libggml-blas.dylib");
+                        if (!File.Exists(dest)) File.Copy(file, dest);
+                    }
+                    if (fileName.StartsWith("libggml-rpc.0") && !fileName.Equals("libggml-rpc.dylib", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var dest = Path.Combine(libDir, "libggml-rpc.dylib");
+                        if (!File.Exists(dest)) File.Copy(file, dest);
+                    }
                 }
             }
 
