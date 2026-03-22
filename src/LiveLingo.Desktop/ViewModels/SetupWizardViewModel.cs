@@ -6,8 +6,10 @@ using LiveLingo.Desktop.Platform;
 using LiveLingo.Desktop.Services.Configuration;
 using LiveLingo.Desktop.Services.LanguageCatalog;
 using LiveLingo.Desktop.Services.Localization;
+using LiveLingo.Core;
 using LiveLingo.Core.Engines;
 using LiveLingo.Core.Models;
+using LiveLingo.Core.Processing;
 using Microsoft.Extensions.Logging;
 
 namespace LiveLingo.Desktop.ViewModels;
@@ -20,6 +22,9 @@ public partial class SetupWizardViewModel : ObservableObject
     private readonly ILogger<SetupWizardViewModel>? _logger;
     private readonly ILocalizationService? _localization;
     private readonly IClipboardService? _clipboard;
+    private readonly CoreOptions? _coreOptions;
+    private readonly ILlmModelLoadCoordinator? _llmCoordinator;
+    private readonly IPlatformServices? _platform;
     private CancellationTokenSource? _downloadCts;
 
     [ObservableProperty] private int _currentStep;
@@ -70,6 +75,25 @@ public partial class SetupWizardViewModel : ObservableObject
     public string Step2ReadyLabel => T("wizard.step2.ready", "✓ Ready");
     public string Step2CancelButton => T("wizard.step2.cancelButton", "Cancel");
     public string CopyUrlButtonLabel => T("wizard.download.copyUrl", "Copy URL");
+    public string Step2HuggingFaceIntroHint => T(
+        "wizard.step2.huggingFace.intro",
+        "This download uses Hugging Face. If the model is gated or the download fails with access denied, add a read access token under Settings → Advanced (create one at huggingface.co/settings/tokens), click Save, then retry.");
+    public string Step2HuggingFaceTokenMissingHint => T(
+        "wizard.step2.huggingFace.missingToken",
+        "No access token is configured yet. Open Advanced settings below, paste your token, save, then return here and tap Download again.");
+    public string Step2HuggingFaceTokenOkHint => T(
+        "wizard.step2.huggingFace.tokenOk",
+        "An access token is present in your saved settings; it will be sent with this download.");
+    public string Step2OpenAdvancedForTokenLabel => T("wizard.step2.huggingFace.openAdvanced", "Open Settings → Advanced…");
+    public string Step2OpenModelOnHuggingFaceLabel => T(
+        "wizard.step2.huggingFace.openModelPage",
+        "Open model page (accept access if required)…");
+    public bool ShowOpenRequiredModelOnHuggingFace =>
+        _platform is not null
+        && GetRequiredModelsForCurrentPair().Any(m => HuggingFaceWebUrls.TryGetModelCardUrl(m.DownloadUrl, out _));
+    public bool ShowOpenModelPageOnDownloadFailure => HasError && ShowOpenRequiredModelOnHuggingFace;
+    public bool HasHuggingFaceTokenConfigured => !string.IsNullOrWhiteSpace(_coreOptions?.HuggingFaceToken);
+    public bool ShowHuggingFaceTokenMissingCallout => !HasHuggingFaceTokenConfigured;
 
     public SetupWizardViewModel(
         ISettingsService settings,
@@ -79,10 +103,16 @@ public partial class SetupWizardViewModel : ObservableObject
         ILogger<SetupWizardViewModel>? logger = null,
         ILocalizationService? localization = null,
         ILanguageCatalog? languageCatalog = null,
-        IClipboardService? clipboard = null)
+        IClipboardService? clipboard = null,
+        CoreOptions? coreOptions = null,
+        ILlmModelLoadCoordinator? llmCoordinator = null,
+        IPlatformServices? platformServices = null)
     {
         _settings = settings;
         _modelManager = modelManager;
+        _coreOptions = coreOptions;
+        _llmCoordinator = llmCoordinator;
+        _platform = platformServices;
         _messenger = messenger ?? WeakReferenceMessenger.Default;
         _logger = logger;
         _localization = localization;
@@ -96,8 +126,39 @@ public partial class SetupWizardViewModel : ObservableObject
         SelectedTargetLanguage = AvailableLanguages.FirstOrDefault(l =>
             string.Equals(l.Code, TargetLanguage, StringComparison.OrdinalIgnoreCase)) ?? AvailableLanguages[1];
 
+        _messenger.Register<SetupWizardViewModel, SettingsChangedMessage>(
+            this,
+            static (r, _) => r.RefreshHuggingFaceTokenUiState());
+
         RefreshModelInstalledState();
     }
+
+    private void RefreshHuggingFaceTokenUiState()
+    {
+        OnPropertyChanged(nameof(HasHuggingFaceTokenConfigured));
+        OnPropertyChanged(nameof(ShowHuggingFaceTokenMissingCallout));
+    }
+
+    [RelayCommand]
+    private void OpenAdvancedForHuggingFace() =>
+        _messenger.Send(new AppUiRequestMessage(new AppUiRequest(this, AppUiRequestKind.OpenSettings, 3)));
+
+    [RelayCommand]
+    private void OpenRequiredModelOnHuggingFace()
+    {
+        if (_platform is null) return;
+        foreach (var m in GetRequiredModelsForCurrentPair())
+        {
+            if (HuggingFaceWebUrls.TryGetModelCardUrl(m.DownloadUrl, out var url))
+            {
+                _platform.OpenUrl(url);
+                return;
+            }
+        }
+    }
+
+    partial void OnHasErrorChanged(bool value) =>
+        OnPropertyChanged(nameof(ShowOpenModelPageOnDownloadFailure));
 
     partial void OnSourceLanguageChanged(string value) => RefreshModelInstalledState();
     partial void OnTargetLanguageChanged(string value) => RefreshModelInstalledState();
@@ -147,6 +208,7 @@ public partial class SetupWizardViewModel : ObservableObject
         IsDownloading = true;
         HasError = false;
         DownloadProgress = 0;
+        RefreshHuggingFaceTokenUiState();
         DownloadStatus = T("wizard.download.preparing", "Preparing downloads...");
         _downloadCts = new CancellationTokenSource();
 
@@ -218,10 +280,18 @@ public partial class SetupWizardViewModel : ObservableObject
             DownloadStatus = T("wizard.download.cancelled", "Cancelled");
             _logger?.LogWarning("Setup wizard model download cancelled by user.");
         }
+        catch (ModelDownloadAuthorizationException ex)
+        {
+            HasError = true;
+            DownloadStatus = T(
+                "wizard.download.errorAuth",
+                "Download failed: Hugging Face access denied. Add a read token under Settings → Advanced (huggingface.co/settings/tokens), click Save, then retry.");
+            _logger?.LogError(ex, "Setup wizard model download failed: Hugging Face authorization.");
+        }
         catch (System.Net.Http.HttpRequestException ex) when (ex.Message.Contains("404") || ex.Message.Contains("401"))
         {
             HasError = true;
-            DownloadStatus = T("wizard.download.errorAuth", "Download failed. This model may require authorization on HuggingFace. You can download it manually from https://huggingface.co/Qwen and place the .gguf file in your models directory, or configure a HuggingFace token/mirror in the settings.");
+            DownloadStatus = T("wizard.download.errorAuth", "Download failed. This model may require authorization on HuggingFace. Configure an access token under Settings → Advanced, or download manually into your models folder.");
             _logger?.LogError(ex, "Setup wizard model download failed with HTTP error.");
         }
         catch (Exception ex)
@@ -256,8 +326,9 @@ public partial class SetupWizardViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void Finish()
+    private async Task Finish()
     {
+        var advancedBefore = _settings.Current.Advanced.DeepClone();
         var workingCopy = _settings.CloneCurrent();
         workingCopy.Hotkeys.OverlayToggle = OverlayHotkey;
         workingCopy.Translation.DefaultSourceLanguage = SourceLanguage;
@@ -267,6 +338,11 @@ public partial class SetupWizardViewModel : ObservableObject
         workingCopy.Translation.LanguagePairs = [new LanguagePair(SourceLanguage, TargetLanguage)];
 
         _settings.Replace(workingCopy);
+        if (_coreOptions is not null)
+            CoreOptionsSync.ApplyFromSettings(workingCopy, _coreOptions, _modelManager);
+        if (_llmCoordinator is not null &&
+            (CoreOptionsSync.AdvancedSettingsAffectLlmLoad(advancedBefore, workingCopy.Advanced) || IsModelInstalled))
+            await _llmCoordinator.RequestRetryPrimaryTranslationModelAsync(CancellationToken.None).ConfigureAwait(false);
         _messenger.Send(new SettingsChangedMessage());
         _messenger.Send(new AppUiRequestMessage(new AppUiRequest(this, AppUiRequestKind.CloseSetupWizard)));
     }
@@ -287,7 +363,7 @@ public partial class SetupWizardViewModel : ObservableObject
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         IsModelInstalled = GetRequiredModelsForCurrentPair()
-            .All(model => installedIds.Contains(model.Id));
+            .All(model => installedIds.Contains(model.Id) && _modelManager.HasAllExpectedLocalAssets(model));
     }
 
     private string T(string key, string fallback, params object[] args)

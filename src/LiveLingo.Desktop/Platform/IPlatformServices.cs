@@ -7,4 +7,9 @@ public interface IPlatformServices : IDisposable
     ITextInjector TextInjector { get; }
     IClipboardService Clipboard { get; }
     IAudioCaptureService AudioCapture { get; }
+
+    /// <summary>
+    /// Opens an https URL in the system default browser.
+    /// </summary>
+    void OpenUrl(string url);
 }

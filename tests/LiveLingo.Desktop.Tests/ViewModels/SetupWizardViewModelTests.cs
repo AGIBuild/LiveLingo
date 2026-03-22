@@ -5,6 +5,7 @@ using LiveLingo.Desktop.ViewModels;
 using CommunityToolkit.Mvvm.Messaging;
 using LiveLingo.Core.Engines;
 using LiveLingo.Core.Models;
+using LiveLingo.Core.Processing;
 using NSubstitute;
 using UserSettings = LiveLingo.Desktop.Services.Configuration.SettingsModel;
 
@@ -14,7 +15,9 @@ public class SetupWizardViewModelTests
 {
     private static (SetupWizardViewModel vm, ISettingsService settings, IModelManager models) Create(
         int startStep = 0,
-        IMessenger? messenger = null)
+        IMessenger? messenger = null,
+        ILlmModelLoadCoordinator? llmCoordinator = null,
+        IReadOnlyList<InstalledModel>? installedModels = null)
     {
         var current = new UserSettings();
         var settings = Substitute.For<ISettingsService>();
@@ -23,8 +26,9 @@ public class SetupWizardViewModelTests
         settings.When(x => x.Replace(Arg.Any<UserSettings>()))
             .Do(ci => current = ci.Arg<UserSettings>().DeepClone());
         var models = Substitute.For<IModelManager>();
-        models.ListInstalled().Returns([]);
-        var vm = new SetupWizardViewModel(settings, models, startStep, messenger);
+        models.ListInstalled().Returns(installedModels ?? []);
+        models.HasAllExpectedLocalAssets(Arg.Any<ModelDescriptor>()).Returns(true);
+        var vm = new SetupWizardViewModel(settings, models, startStep, messenger, llmCoordinator: llmCoordinator);
         return (vm, settings, models);
     }
 
@@ -129,20 +133,20 @@ public class SetupWizardViewModelTests
     }
 
     [Fact]
-    public void FinishCommand_SavesSettings()
+    public async Task FinishCommand_SavesSettings()
     {
         var (vm, settings, _) = Create();
         vm.SourceLanguage = "ja";
         vm.TargetLanguage = "zh";
         vm.OverlayHotkey = "Alt+Space";
 
-        vm.FinishCommand.Execute(null);
+        await vm.FinishCommand.ExecuteAsync(null);
 
         settings.Received(1).Replace(Arg.Any<UserSettings>());
     }
 
     [Fact]
-    public void FinishCommand_SendsCloseMessage()
+    public async Task FinishCommand_SendsCloseMessage()
     {
         var messenger = new WeakReferenceMessenger();
         var recipient = new object();
@@ -151,7 +155,7 @@ public class SetupWizardViewModelTests
             receivedKind = message.Value.Kind);
         var (vm, _, _) = Create(messenger: messenger);
 
-        vm.FinishCommand.Execute(null);
+        await vm.FinishCommand.ExecuteAsync(null);
 
         Assert.Equal(AppUiRequestKind.CloseSetupWizard, receivedKind);
     }
@@ -188,20 +192,47 @@ public class SetupWizardViewModelTests
     }
 
     [Fact]
-    public void FinishCommand_SavesCorrectLanguageValues()
+    public async Task FinishCommand_SavesCorrectLanguageValues()
     {
         var (vm, settings, _) = Create();
         vm.SourceLanguage = "ja";
         vm.TargetLanguage = "zh";
         vm.OverlayHotkey = "Alt+Space";
 
-        vm.FinishCommand.Execute(null);
+        await vm.FinishCommand.ExecuteAsync(null);
         var saved = settings.Current;
 
         Assert.Equal("Alt+Space", saved.Hotkeys.OverlayToggle);
         Assert.Equal("ja", saved.Translation.DefaultSourceLanguage);
         Assert.Equal("zh", saved.Translation.DefaultTargetLanguage);
         Assert.Contains(saved.Translation.LanguagePairs, p => p.Source == "ja" && p.Target == "zh");
+    }
+
+    [Fact]
+    public async Task FinishCommand_WhenModelsInstalled_RequestsLlmRetry()
+    {
+        var coordinator = Substitute.For<ILlmModelLoadCoordinator>();
+        coordinator.RequestRetryPrimaryTranslationModelAsync(Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+        var installed = ModelRegistry.GetRequiredModelsForLanguagePair("zh", "en")
+            .Select(m => new InstalledModel(m.Id, m.DisplayName, "/p", m.SizeBytes, m.Type, DateTime.UtcNow))
+            .ToArray();
+        var (vm, _, _) = Create(llmCoordinator: coordinator, installedModels: installed);
+
+        await vm.FinishCommand.ExecuteAsync(null);
+
+        await coordinator.Received(1).RequestRetryPrimaryTranslationModelAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task FinishCommand_WhenModelsNotInstalled_DoesNotRequestLlmRetry()
+    {
+        var coordinator = Substitute.For<ILlmModelLoadCoordinator>();
+        var (vm, _, _) = Create(llmCoordinator: coordinator);
+
+        await vm.FinishCommand.ExecuteAsync(null);
+
+        await coordinator.DidNotReceive().RequestRetryPrimaryTranslationModelAsync(Arg.Any<CancellationToken>());
     }
 
     [Fact]

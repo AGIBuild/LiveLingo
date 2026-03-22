@@ -8,6 +8,11 @@ public record ModelDescriptor(
     ModelType Type)
 {
     public IReadOnlyList<ModelAsset> Assets { get; init; } = [];
+
+    /// <summary>
+    /// When set, runtime may switch to this descriptor if the primary model fails to load (e.g. insufficient RAM).
+    /// </summary>
+    public ModelDescriptor? LoadFailureFallback { get; init; }
 }
 
 public record ModelAsset(

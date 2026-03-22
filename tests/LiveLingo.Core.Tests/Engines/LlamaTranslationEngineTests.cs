@@ -12,10 +12,11 @@ public class LlamaTranslationEngineTests
     private static QwenModelHost CreateHost()
     {
         var modelManager = Substitute.For<IModelManager>();
-        modelManager.GetModelDirectory(ModelRegistry.Qwen25_15B.Id)
-            .Returns(Path.Combine("/fake", ModelRegistry.Qwen25_15B.Id));
+        modelManager.GetModelDirectory(Arg.Any<string>())
+            .Returns(ci => Path.Combine("/fake", ci.ArgAt<string>(0)));
         return new QwenModelHost(
             modelManager,
+            Substitute.For<INativeRuntimeUpdater>(),
             Options.Create(new CoreOptions()),
             Substitute.For<ILogger<QwenModelHost>>());
     }

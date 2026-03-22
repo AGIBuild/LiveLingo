@@ -30,6 +30,7 @@ public partial class OverlayViewModel : ObservableObject
     private readonly IClipboardService? _clipboard;
     private readonly ILocalizationService? _loc;
     private readonly ISettingsService? _settingsService;
+    private readonly IModelManager? _modelManager;
     private readonly ILogger<OverlayViewModel>? _logger;
     private readonly IMessenger _messenger;
     private readonly IReadOnlyList<LanguageInfo> _availableLanguages;
@@ -116,6 +117,7 @@ public partial class OverlayViewModel : ObservableObject
         _clipboard = clipboard;
         _loc = localizationService;
         _settingsService = settingsService;
+        _modelManager = modelManager;
         _logger = logger;
         _messenger = messenger ?? WeakReferenceMessenger.Default;
         _availableLanguages = languageCatalog?.All ?? LanguageCatalog.DefaultLanguages;
@@ -175,6 +177,7 @@ public partial class OverlayViewModel : ObservableObject
         _clipboard = clipboard;
         _loc = localizationService;
         _logger = logger;
+        _modelManager = null;
         _messenger = messenger ?? WeakReferenceMessenger.Default;
         _availableLanguages = languageCatalog?.All ?? LanguageCatalog.DefaultLanguages;
         _targetLanguage = NormalizeTargetLanguage(targetLanguage);
@@ -720,6 +723,20 @@ public partial class OverlayViewModel : ObservableObject
 
     private ModelDescriptor? ResolveActiveTranslationModel(string source, string target)
     {
+        if (!string.IsNullOrWhiteSpace(_activeModelId))
+        {
+            var byId = ModelRegistry.AllModels.FirstOrDefault(m => string.Equals(m.Id, _activeModelId, StringComparison.OrdinalIgnoreCase));
+            if (byId is not null)
+                return byId;
+                
+            if (_modelManager is not null)
+            {
+                var installed = _modelManager.ListInstalled().FirstOrDefault(m => string.Equals(m.Id, _activeModelId, StringComparison.OrdinalIgnoreCase));
+                if (installed is not null)
+                    return new ModelDescriptor(installed.Id, installed.DisplayName, "", installed.SizeBytes, installed.Type);
+            }
+        }
+
         if (TryResolveTranslationPairFromModelId(_activeModelId, out var pairSource, out var pairTarget))
             return ModelRegistry.FindTranslationModel(pairSource, pairTarget);
 

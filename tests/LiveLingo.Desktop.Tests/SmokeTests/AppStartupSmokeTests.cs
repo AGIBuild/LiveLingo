@@ -24,6 +24,7 @@ public class AppStartupSmokeTests
                     m.Id, m.DisplayName, "/path", m.SizeBytes, m.Type, DateTime.UtcNow))
                 .ToArray();
             mm.ListInstalled().Returns(installed);
+            mm.HasAllExpectedLocalAssets(Arg.Any<ModelDescriptor>()).Returns(true);
         }
         else
         {

@@ -28,9 +28,9 @@ public class QwenTextProcessorTests
         var opts = Options.Create(new CoreOptions { ModelStoragePath = "/fake" });
         var logger = Substitute.For<ILogger<QwenModelHost>>();
         var modelManager = Substitute.For<IModelManager>();
-        modelManager.GetModelDirectory(ModelRegistry.Qwen25_15B.Id)
-            .Returns(Path.Combine("/fake", ModelRegistry.Qwen25_15B.Id));
-        return new QwenModelHost(modelManager, opts, logger);
+        modelManager.GetModelDirectory(Arg.Any<string>())
+            .Returns(ci => Path.Combine("/fake", ci.ArgAt<string>(0)));
+        return new QwenModelHost(modelManager, Substitute.For<INativeRuntimeUpdater>(), opts, logger);
     }
 
     private sealed class TestProcessor : QwenTextProcessor

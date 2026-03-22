@@ -26,8 +26,7 @@ public abstract class QwenTextProcessor : ITextProcessor
         try
         {
             var weights = await _host.GetWeightsAsync(ct);
-            var modelParams = new ModelParams(_host.ModelPath) { ContextSize = 2048 };
-            var executor = new StatelessExecutor(weights, modelParams);
+            var executor = new StatelessExecutor(weights, _host.CreateExecutorModelParams());
 
             var inferenceParams = CreateInferenceParams();
 

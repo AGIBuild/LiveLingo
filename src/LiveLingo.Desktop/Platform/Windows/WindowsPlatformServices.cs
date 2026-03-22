@@ -1,3 +1,5 @@
+using LiveLingo.Desktop.Platform;
+
 namespace LiveLingo.Desktop.Platform.Windows;
 
 internal sealed class WindowsPlatformServices : IPlatformServices
@@ -16,6 +18,8 @@ internal sealed class WindowsPlatformServices : IPlatformServices
         TextInjector = new Win32TextInjector(Clipboard);
         AudioCapture = new Win32AudioCaptureService();
     }
+
+    public void OpenUrl(string url) => BrowserLauncher.OpenUrl(url);
 
     public void Dispose()
     {

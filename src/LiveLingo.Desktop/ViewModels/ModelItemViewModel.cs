@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using LiveLingo.Desktop.Platform;
 using LiveLingo.Desktop.Services.Localization;
 using LiveLingo.Core.Models;
 
@@ -11,6 +12,7 @@ public partial class ModelItemViewModel : ObservableObject
     private readonly ModelDescriptor _descriptor;
     private readonly IModelManager _modelManager;
     private readonly ILocalizationService? _loc;
+    private readonly IPlatformServices? _platform;
 
     [ObservableProperty] private bool _isInstalled;
     [ObservableProperty] private bool _isDownloading;
@@ -33,17 +35,22 @@ public partial class ModelItemViewModel : ObservableObject
     public string CancelButtonLabel => L("settings.models.cancel", "Cancel");
     public string InstalledLabel => L("settings.models.installed", "✓ Installed");
     public string DeleteButtonLabel => L("settings.models.delete", "Delete");
+    public string OpenOnHuggingFaceLabel => L("settings.models.openOnHuggingFace", "Open on Hugging Face");
+    public bool ShowOpenOnHuggingFace =>
+        _platform is not null && HuggingFaceWebUrls.TryGetModelCardUrl(_descriptor.DownloadUrl, out _);
 
     public ModelItemViewModel(
         ModelDescriptor descriptor,
         IModelManager modelManager,
         bool isInstalled,
-        ILocalizationService? localizationService = null)
+        ILocalizationService? localizationService = null,
+        IPlatformServices? platformServices = null)
     {
         _descriptor = descriptor;
         _modelManager = modelManager;
         _isInstalled = isInstalled;
         _loc = localizationService;
+        _platform = platformServices;
     }
 
     [RelayCommand]
@@ -68,6 +75,12 @@ public partial class ModelItemViewModel : ObservableObject
         {
             ErrorMessage = L("wizard.download.cancelled", "Cancelled");
         }
+        catch (ModelDownloadAuthorizationException)
+        {
+            ErrorMessage = L(
+                "settings.models.errorHuggingFaceAuth",
+                "Access denied by Hugging Face. Add a read token under Advanced → Access token, click Save, then retry.");
+        }
         catch (Exception ex)
         {
             ErrorMessage = ex.Message;
@@ -84,6 +97,14 @@ public partial class ModelItemViewModel : ObservableObject
     private void CancelDownload()
     {
         _downloadCts?.Cancel();
+    }
+
+    [RelayCommand]
+    private void OpenOnHuggingFace()
+    {
+        if (_platform is null) return;
+        if (!HuggingFaceWebUrls.TryGetModelCardUrl(_descriptor.DownloadUrl, out var url)) return;
+        _platform.OpenUrl(url);
     }
 
     [RelayCommand]
@@ -111,14 +132,20 @@ public partial class ModelItemViewModel : ObservableObject
 
     public static ObservableCollection<ModelItemViewModel> CreateAll(
         IModelManager modelManager,
-        ILocalizationService? localizationService = null)
+        ILocalizationService? localizationService = null,
+        IPlatformServices? platformServices = null)
     {
         var installed = modelManager.ListInstalled();
         var installedIds = new HashSet<string>(installed.Select(m => m.Id));
 
         return new ObservableCollection<ModelItemViewModel>(
             ModelRegistry.AllModels.Select(d =>
-                new ModelItemViewModel(d, modelManager, installedIds.Contains(d.Id), localizationService)));
+                new ModelItemViewModel(
+                    d,
+                    modelManager,
+                    installedIds.Contains(d.Id),
+                    localizationService,
+                    platformServices)));
     }
 
     private string L(string key, string fallback) => _loc?.T(key) ?? fallback;

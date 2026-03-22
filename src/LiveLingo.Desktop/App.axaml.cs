@@ -21,6 +21,7 @@ using LiveLingo.Desktop.Views;
 using LiveLingo.Core;
 using LiveLingo.Core.Engines;
 using LiveLingo.Core.Models;
+using LiveLingo.Core.Processing;
 using LiveLingo.Core.Speech;
 using LiveLingo.Core.Translation;
 using Microsoft.Extensions.DependencyInjection;
@@ -58,6 +59,9 @@ public partial class App : Application
         await settingsService.LoadAsync();
         var userSettings = settingsService.Current;
 
+        var llamaNativeFromEnv = Environment.GetEnvironmentVariable(LlamaNativeBootstrap.SearchPathEnvironmentVariable);
+        LlamaNativeBootstrap.ApplySearchPathOverrides(userSettings.Advanced.LlamaNativeSearchPath, llamaNativeFromEnv);
+
         var logDirectory = Path.Combine(GetUserDataDirectory(), "logs");
         Directory.CreateDirectory(logDirectory);
         var logPath = Path.Combine(logDirectory, "livelingo-.log");
@@ -83,8 +87,21 @@ public partial class App : Application
             if (!string.IsNullOrEmpty(userSettings.Advanced.ModelStoragePath))
                 opts.ModelStoragePath = userSettings.Advanced.ModelStoragePath;
             opts.DefaultTargetLanguage = userSettings.Translation.DefaultTargetLanguage;
+            opts.ActiveTranslationModelId = userSettings.Translation.ActiveTranslationModelId;
             opts.InferenceThreads = userSettings.Advanced.InferenceThreads;
             opts.HuggingFaceMirror = userSettings.Advanced.HuggingFaceMirror;
+            opts.HuggingFaceToken = userSettings.Advanced.HuggingFaceToken;
+            if (!string.IsNullOrWhiteSpace(userSettings.Advanced.LlamaNativeSearchPath))
+            {
+                try
+                {
+                    opts.LlamaNativeSearchPath = Path.GetFullPath(userSettings.Advanced.LlamaNativeSearchPath.Trim());
+                }
+                catch
+                {
+                    opts.LlamaNativeSearchPath = userSettings.Advanced.LlamaNativeSearchPath.Trim();
+                }
+            }
         });
         services.AddSingleton<ISettingsService>(settingsService);
         services.AddSingleton<IMessenger>(_ => WeakReferenceMessenger.Default);
@@ -108,6 +125,7 @@ public partial class App : Application
 
         _serviceProvider = services.BuildServiceProvider();
         _messenger = _serviceProvider.GetRequiredService<IMessenger>();
+        _serviceProvider.GetRequiredService<QwenModelHost>().ModelLoadFallbackApplied += OnQwenModelLoadFallbackApplied;
         _messenger.Register<App, AppUiRequestMessage>(this, static (recipient, message) =>
             Dispatcher.UIThread.Post(() => recipient.HandleAppUiRequest(message)));
 
@@ -185,7 +203,7 @@ public partial class App : Application
         });
 
         var settingsItem = new NativeMenuItem(loc.T("tray.settings"));
-        settingsItem.Click += (_, _) => Dispatcher.UIThread.Post(ShowSettings);
+        settingsItem.Click += (_, _) => Dispatcher.UIThread.Post(() => ShowSettings());
 
         var checkUpdateItem = new NativeMenuItem(loc.T("tray.checkUpdates"));
         checkUpdateItem.Click += (_, _) => Dispatcher.UIThread.Post(async () => await CheckForUpdatesFromMenuAsync());
@@ -233,11 +251,13 @@ public partial class App : Application
         return new WindowIcon(AssetLoader.Open(new Uri(iconPath)));
     }
 
-    public void ShowSettings()
+    public void ShowSettings(int? initialTabIndex = null)
     {
-        if (_settingsWindow is { IsVisible: true })
+        if (_settingsWindow is { IsVisible: true } existing)
         {
-            _settingsWindow.Activate();
+            existing.Activate();
+            if (initialTabIndex is { } tab && existing.DataContext is SettingsViewModel vmExisting)
+                vmExisting.SelectedTabIndex = tab;
             return;
         }
 
@@ -246,13 +266,21 @@ public partial class App : Application
         var engine = _serviceProvider!.GetRequiredService<ITranslationEngine>();
         var loc = _serviceProvider!.GetRequiredService<ILocalizationService>();
         var languageCatalog = _serviceProvider!.GetRequiredService<ILanguageCatalog>();
+        var coreOptions = _serviceProvider.GetRequiredService<CoreOptions>();
+        var llmCoordinator = _serviceProvider.GetRequiredService<ILlmModelLoadCoordinator>();
+        var platform = _serviceProvider.GetRequiredService<IPlatformServices>();
         var vm = new SettingsViewModel(
             settingsService,
             modelManager,
             engine,
             messenger: _messenger,
             localizationService: loc,
-            languageCatalog: languageCatalog);
+            languageCatalog: languageCatalog,
+            coreOptions: coreOptions,
+            llmCoordinator: llmCoordinator,
+            platformServices: platform);
+        if (initialTabIndex is { } idx)
+            vm.SelectedTabIndex = idx;
         var subscribedUi = vm.WorkingCopy.UI;
         PropertyChangedEventHandler? uiHandler = (_, e) =>
         {
@@ -633,7 +661,7 @@ public partial class App : Application
         switch (request.Kind)
         {
             case AppUiRequestKind.OpenSettings:
-                ShowSettings();
+                ShowSettings(request.SettingsInitialTabIndex);
                 break;
             case AppUiRequestKind.CloseOverlay:
                 if (_activeOverlay is not null && ReferenceEquals(_activeOverlay.DataContext, request.Sender))
@@ -763,8 +791,9 @@ public partial class App : Application
         var requiredModels = ModelRegistry.GetRequiredModelsForLanguagePair(
             settings.Translation.DefaultSourceLanguage,
             settings.Translation.DefaultTargetLanguage);
-        return requiredModels.All(
-            req => installed.Any(m => m.Id == req.Id));
+        return requiredModels.All(req =>
+            installed.Any(m => m.Id == req.Id) &&
+            modelManager.HasAllExpectedLocalAssets(req));
     }
 
     private SetupWizardWindow? _wizardWindow;
@@ -777,6 +806,9 @@ public partial class App : Application
             return;
         }
 
+        var coreOptions = _serviceProvider!.GetRequiredService<CoreOptions>();
+        var llmCoordinator = _serviceProvider.GetRequiredService<ILlmModelLoadCoordinator>();
+        var platform = _serviceProvider.GetRequiredService<IPlatformServices>();
         var wizardVm = new SetupWizardViewModel(
             settingsService,
             modelManager,
@@ -785,7 +817,10 @@ public partial class App : Application
             _serviceProvider?.GetService<ILogger<SetupWizardViewModel>>(),
             _serviceProvider?.GetService<ILocalizationService>(),
             _serviceProvider?.GetService<ILanguageCatalog>(),
-            _serviceProvider?.GetService<IPlatformServices>()?.Clipboard);
+            platform.Clipboard,
+            coreOptions: coreOptions,
+            llmCoordinator: llmCoordinator,
+            platformServices: platform);
         _wizardWindow = new SetupWizardWindow(wizardVm);
         var done = new TaskCompletionSource();
         _wizardWindow.Closed += (_, _) =>
@@ -928,6 +963,18 @@ public partial class App : Application
     {
         var toast = new NotificationToast(message, duration ?? TimeSpan.FromSeconds(3));
         toast.Show();
+    }
+
+    private void OnQwenModelLoadFallbackApplied(object? sender, QwenModelFallbackEventArgs e)
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            var loc = _serviceProvider?.GetService<ILocalizationService>();
+            var message = loc is not null
+                ? loc.T("toast.qwenModelFallback", e.Primary.DisplayName, e.Fallback.DisplayName)
+                : $"{e.Primary.DisplayName} could not load; using {e.Fallback.DisplayName}.";
+            ShowNotification(message, TimeSpan.FromSeconds(12));
+        });
     }
 
     private static Serilog.Events.LogEventLevel ParseSerilogLevel(string level) => level switch

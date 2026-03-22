@@ -1,4 +1,6 @@
 using System.Collections.Concurrent;
+using System.Net.Http.Headers;
+using LiveLingo.HfGguf;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -12,14 +14,18 @@ public sealed class ModelManager : IModelManager
     private readonly CoreOptions _options;
     private readonly HttpClient _http;
     private readonly ILogger<ModelManager> _logger;
+    private readonly HfResolveDownloader _hfDownloader;
     private readonly ConcurrentDictionary<string, Task> _inflight = new();
     private volatile bool _useFallbackMirror;
+
+    public void ResetHuggingfaceTransportFallback() => _useFallbackMirror = false;
 
     public ModelManager(IOptions<CoreOptions> options, HttpClient http, ILogger<ModelManager> logger)
     {
         _options = options.Value;
         _http = http;
         _logger = logger;
+        _hfDownloader = new HfResolveDownloader(http);
     }
 
     public async Task EnsureModelAsync(
@@ -217,6 +223,20 @@ public sealed class ModelManager : IModelManager
             existingPartBytes,
             asset.DownloadUrl);
 
+        if (HuggingFaceResolveUrl.TryParse(asset.DownloadUrl, out _, out _, out _))
+        {
+            return await DownloadViaHuggingFaceResolveAsync(
+                    modelId,
+                    relativePath,
+                    finalPath,
+                    asset,
+                    downloadedBeforeAsset,
+                    totalBytes,
+                    progress,
+                    ct)
+                .ConfigureAwait(false);
+        }
+
         var response = await SendAssetRequestAsync(asset.DownloadUrl, existingPartBytes, ct);
         if (existingPartBytes > 0 && response.StatusCode == System.Net.HttpStatusCode.RequestedRangeNotSatisfiable)
         {
@@ -248,6 +268,12 @@ public sealed class ModelManager : IModelManager
 
         using (response)
         {
+            if (response.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
+            {
+                throw new ModelDownloadAuthorizationException(
+                    "Hugging Face rejected this download. Create a read token at huggingface.co/settings/tokens, paste it under Settings → Advanced → Access token, then click Save.");
+            }
+
             response.EnsureSuccessStatusCode();
             _logger.LogInformation(
                 "Model asset response: model={ModelId}, asset={AssetPath}, statusCode={StatusCode}",
@@ -291,6 +317,102 @@ public sealed class ModelManager : IModelManager
         }
     }
 
+    private string GetEffectiveHubBase(string originalAssetUrl)
+    {
+        if (originalAssetUrl.StartsWith(HuggingFaceHost, StringComparison.OrdinalIgnoreCase))
+        {
+            if (!string.IsNullOrWhiteSpace(_options.HuggingFaceMirror))
+                return _options.HuggingFaceMirror.TrimEnd('/');
+            if (_useFallbackMirror)
+                return DefaultFallbackMirror;
+            return HuggingFaceHost;
+        }
+
+        var uri = new Uri(originalAssetUrl);
+        return $"{uri.Scheme}://{uri.Authority}";
+    }
+
+    private bool ShouldMirrorFallbackForDownload(string originalUrl, Exception ex) =>
+        !_useFallbackMirror
+        && string.IsNullOrWhiteSpace(_options.HuggingFaceMirror)
+        && originalUrl.StartsWith(HuggingFaceHost, StringComparison.OrdinalIgnoreCase)
+        && ex is HttpRequestException { InnerException: System.Net.Sockets.SocketException };
+
+    private async Task<long> DownloadViaHuggingFaceResolveAsync(
+        string modelId,
+        string relativePath,
+        string finalPath,
+        ModelAsset asset,
+        long downloadedBeforeAsset,
+        long totalBytes,
+        IProgress<ModelDownloadProgress>? progress,
+        CancellationToken ct)
+    {
+        if (!HuggingFaceResolveUrl.TryParse(asset.DownloadUrl, out var repoId, out var revision, out var filePath))
+            throw new InvalidOperationException("Expected a Hugging Face /resolve/ URL.");
+
+        var token = string.IsNullOrWhiteSpace(_options.HuggingFaceToken) ? null : _options.HuggingFaceToken.Trim();
+        const int bufferSize = 1024 * 1024;
+        var hfProgress = new Progress<HfDownloadProgress>(p =>
+            progress?.Report(new ModelDownloadProgress(modelId, downloadedBeforeAsset + p.DownloadedBytes, totalBytes)));
+
+        var hub = GetEffectiveHubBase(asset.DownloadUrl);
+        try
+        {
+            try
+            {
+                await _hfDownloader
+                    .DownloadAsync(
+                        repoId!,
+                        revision,
+                        filePath!,
+                        finalPath,
+                        token,
+                        forceRestart: false,
+                        bufferSize,
+                        hfProgress,
+                        ct,
+                        hubResolveBaseOverride: hub)
+                    .ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ShouldMirrorFallbackForDownload(asset.DownloadUrl, ex))
+            {
+                _logger.LogWarning(ex,
+                    "HF asset download unreachable via primary hub, retrying fallback mirror for model={ModelId} asset={AssetPath}",
+                    modelId,
+                    relativePath);
+                _useFallbackMirror = true;
+                await _hfDownloader
+                    .DownloadAsync(
+                        repoId!,
+                        revision,
+                        filePath!,
+                        finalPath,
+                        token,
+                        forceRestart: false,
+                        bufferSize,
+                        hfProgress,
+                        ct,
+                        hubResolveBaseOverride: DefaultFallbackMirror)
+                    .ConfigureAwait(false);
+            }
+
+            _logger.LogInformation(
+                "Completed HF resolve download: model={ModelId}, asset={AssetPath}",
+                modelId,
+                relativePath);
+            var len = new FileInfo(finalPath).Length;
+            progress?.Report(new ModelDownloadProgress(modelId, downloadedBeforeAsset + len, totalBytes));
+            return len;
+        }
+        catch (HfHubException ex) when (ex.StatusCode is 401 or 403)
+        {
+            throw new ModelDownloadAuthorizationException(
+                "Hugging Face rejected this download. Create a read token at huggingface.co/settings/tokens, paste it under Settings → Advanced → Access token, then click Save.",
+                ex);
+        }
+    }
+
     private async Task<HttpResponseMessage> SendAssetRequestAsync(string url, long resumeBytes, CancellationToken ct)
     {
         var effectiveUrl = ApplyMirror(url);
@@ -313,8 +435,30 @@ public sealed class ModelManager : IModelManager
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
         if (resumeBytes > 0)
-            request.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(resumeBytes, null);
+            request.Headers.Range = new RangeHeaderValue(resumeBytes, null);
+        if (ShouldAttachBearerForRequest(url)
+            && !string.IsNullOrWhiteSpace(_options.HuggingFaceToken))
+        {
+            request.Headers.Authorization =
+                new AuthenticationHeaderValue("Bearer", _options.HuggingFaceToken.Trim());
+        }
+
         return await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+    }
+
+    private bool ShouldAttachBearerForRequest(string url)
+    {
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri))
+            return false;
+        if (uri.Host.Equals("huggingface.co", StringComparison.OrdinalIgnoreCase))
+            return true;
+        if (_useFallbackMirror && uri.Host.Equals("hf-mirror.com", StringComparison.OrdinalIgnoreCase))
+            return true;
+        if (!string.IsNullOrWhiteSpace(_options.HuggingFaceMirror)
+            && Uri.TryCreate(_options.HuggingFaceMirror.Trim(), UriKind.Absolute, out var mirror)
+            && uri.Host.Equals(mirror.Host, StringComparison.OrdinalIgnoreCase))
+            return true;
+        return false;
     }
 
     private bool ShouldFallbackToMirror(string originalUrl, HttpRequestException ex)
@@ -391,6 +535,22 @@ public sealed class ModelManager : IModelManager
         }
 
         return models;
+    }
+
+    public bool HasAllExpectedLocalAssets(ModelDescriptor descriptor)
+    {
+        var modelDir = GetModelDirectory(descriptor.Id);
+        if (!Directory.Exists(modelDir))
+            return false;
+
+        foreach (var asset in GetExpectedAssets(descriptor))
+        {
+            var path = Path.Combine(modelDir, NormalizeRelativePath(asset.RelativePath));
+            if (!File.Exists(path))
+                return false;
+        }
+
+        return true;
     }
 
     public async Task DeleteModelAsync(string modelId, CancellationToken ct)

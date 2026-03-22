@@ -1,4 +1,5 @@
 using System.Runtime.Versioning;
+using LiveLingo.Desktop.Platform;
 
 namespace LiveLingo.Desktop.Platform.macOS;
 
@@ -19,6 +20,8 @@ internal sealed class MacPlatformServices : IPlatformServices
         TextInjector = new MacTextInjector(Clipboard);
         AudioCapture = new MacAudioCaptureService();
     }
+
+    public void OpenUrl(string url) => BrowserLauncher.OpenUrl(url);
 
     public void Dispose()
     {

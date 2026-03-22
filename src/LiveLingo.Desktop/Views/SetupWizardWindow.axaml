@@ -4,7 +4,7 @@
         x:Class="LiveLingo.Desktop.Views.SetupWizardWindow"
         x:DataType="vm:SetupWizardViewModel"
         Title="{Binding WindowTitle}"
-        Width="480" Height="380"
+        Width="480" SizeToContent="Height"
         CanResize="False"
         WindowStartupLocation="CenterScreen"
         TransparencyLevelHint="AcrylicBlur"
@@ -96,7 +96,29 @@
                 <StackPanel IsVisible="{Binding IsStep2}" Spacing="8">
                     <TextBlock Classes="heading" Text="{Binding Step2Title}"/>
                     <TextBlock Classes="desc"
-                               Text="{Binding Step2Description}"/>
+                               Text="{Binding Step2Description}" TextWrapping="Wrap"/>
+                    <TextBlock Classes="hint" Text="{Binding Step2HuggingFaceIntroHint}" TextWrapping="Wrap"/>
+                    <Button HorizontalAlignment="Left" Padding="10,6" Classes="themed sm"
+                            Content="{Binding Step2OpenModelOnHuggingFaceLabel}"
+                            Command="{Binding OpenRequiredModelOnHuggingFaceCommand}"
+                            IsVisible="{Binding ShowOpenRequiredModelOnHuggingFace}"/>
+                    <Border Padding="10,8" CornerRadius="6"
+                            Background="#25FF9F0A"
+                            BorderBrush="#40FF9F0A" BorderThickness="1"
+                            IsVisible="{Binding ShowHuggingFaceTokenMissingCallout}">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="{Binding Step2HuggingFaceTokenMissingHint}"
+                                       FontSize="11" TextWrapping="Wrap"
+                                       Foreground="{StaticResource FgSecondaryBrush}"/>
+                            <Button HorizontalAlignment="Left" Padding="12,6" Classes="themed"
+                                    Content="{Binding Step2OpenAdvancedForTokenLabel}"
+                                    Command="{Binding OpenAdvancedForHuggingFaceCommand}"/>
+                        </StackPanel>
+                    </Border>
+                    <TextBlock FontSize="11" TextWrapping="Wrap"
+                               Foreground="{StaticResource SuccessBrush}"
+                               Text="{Binding Step2HuggingFaceTokenOkHint}"
+                               IsVisible="{Binding HasHuggingFaceTokenConfigured}"/>
 
                     <Border Padding="16,14" CornerRadius="8"
                             Background="{StaticResource BgSurfaceBrush}">
@@ -137,6 +159,11 @@
                                             Classes="themed" VerticalAlignment="Top"
                                             Command="{Binding CopyUrlCommand}"
                                             IsVisible="{Binding HasError}"/>
+                                    <Button Content="{Binding Step2OpenModelOnHuggingFaceLabel}" Padding="8,3"
+                                            FontSize="11" MinWidth="0" MinHeight="0"
+                                            Classes="themed" VerticalAlignment="Top"
+                                            Command="{Binding OpenRequiredModelOnHuggingFaceCommand}"
+                                            IsVisible="{Binding ShowOpenModelPageOnDownloadFailure}"/>
                                     <Button Content="{Binding Step2CancelButton}" Padding="8,3"
                                             FontSize="11" MinWidth="0" MinHeight="0"
                                             Classes="themed" VerticalAlignment="Top"
