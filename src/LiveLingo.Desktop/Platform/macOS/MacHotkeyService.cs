@@ -122,21 +122,26 @@ internal sealed class MacHotkeyService : IHotkeyService
         _disposed = true;
 
         if (_runLoop != IntPtr.Zero)
+        {
             CFRunLoopStop(_runLoop);
+        }
+
+        // Wait for the run loop to actually exit before destroying the ports
+        _tapThread?.Join(TimeSpan.FromSeconds(2));
 
         if (_eventTap != IntPtr.Zero)
         {
             CGEventTapEnable(_eventTap, false);
+            CFMachPortInvalidate(_eventTap);
             CFRelease(_eventTap);
             _eventTap = IntPtr.Zero;
         }
 
         if (_runLoopSource != IntPtr.Zero)
         {
+            CFRunLoopSourceInvalidate(_runLoopSource);
             CFRelease(_runLoopSource);
             _runLoopSource = IntPtr.Zero;
         }
-
-        _tapThread?.Join(TimeSpan.FromSeconds(2));
     }
 }
