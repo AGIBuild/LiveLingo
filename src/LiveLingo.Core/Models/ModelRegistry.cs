@@ -70,18 +70,37 @@ public static class ModelRegistry
         "qwen25-1.5b",
         "Qwen2.5-1.5B-Instruct (GGUF Q4_K_M)",
         "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf",
-        1_073_741_824,
+        1_117_320_736,
         ModelType.PostProcessing);
 
+    /// <summary>
+    /// Primary translation GGUF. Folder id remains <c>qwen35-9b</c> for existing installs.
+    /// Uses <see href="https://huggingface.co/Abhiray/Qwen3.5-9B-abliterated-GGUF">Abhiray</see> text-generation
+    /// Q4_K_M. This model uses the new 'qwen35' hybrid Mamba architecture.
+    /// It requires a newer llama.cpp native binary than what LLamaSharp 0.26.0 bundles.
+    /// </summary>
     public static readonly ModelDescriptor Qwen35_9B = new(
         "qwen35-9b",
-        "Qwen3.5-9B-Instruct (GGUF Q4_K_M)",
-        "https://hf-mirror.com/Qwen/Qwen3.5-9B-Instruct-GGUF/resolve/main/qwen3.5-9b-instruct-q4_k_m.gguf",
-        5_910_000_000,
-        ModelType.Translation);
+        "Qwen3.5-9B Abliterated (GGUF Q4_K_M)",
+        "https://huggingface.co/Abhiray/Qwen3.5-9B-abliterated-GGUF/resolve/main/Qwen3.5-9B-abliterated-Q4_K_M.gguf",
+        5_627_044_704,
+        ModelType.Translation)
+    {
+        LoadFailureFallback = Qwen25_15B,
+    };
+
+    public static readonly ModelDescriptor Qwen25_7B = new(
+        "qwen25-7b",
+        "Qwen2.5-7B-Instruct (GGUF Q4_K_M)",
+        "https://huggingface.co/bartowski/Qwen2.5-7B-Instruct-GGUF/resolve/main/Qwen2.5-7B-Instruct-Q4_K_M.gguf",
+        4_683_074_240,
+        ModelType.Translation)
+    {
+        LoadFailureFallback = Qwen25_15B,
+    };
 
     public static IReadOnlyList<ModelDescriptor> TranslationModels { get; } =
-        [Qwen35_9B, MarianZhEn, MarianEnZh, MarianJaEn];
+        [Qwen35_9B, Qwen25_7B, MarianZhEn, MarianEnZh, MarianJaEn];
 
     public static IReadOnlyList<ModelDescriptor> RequiredModels { get; } =
         [Qwen35_9B];
@@ -104,11 +123,11 @@ public static class ModelRegistry
         [Qwen25_15B, WhisperBase, SileroVad];
 
     public static IReadOnlyList<ModelDescriptor> AllModels { get; } =
-        [Qwen35_9B, MarianZhEn, MarianEnZh, MarianJaEn, FastTextLid, Qwen25_15B, WhisperBase, SileroVad];
+        [Qwen35_9B, Qwen25_7B, MarianZhEn, MarianEnZh, MarianJaEn, FastTextLid, Qwen25_15B, WhisperBase, SileroVad];
 
     public static ModelDescriptor? FindTranslationModel(string sourceLanguage, string targetLanguage)
     {
-        // By default use Qwen 3.5 9B as the primary translation engine
+        // Primary translation engine (see Qwen35_9B descriptor comment).
         return Qwen35_9B;
     }
 

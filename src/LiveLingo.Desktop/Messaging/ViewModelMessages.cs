@@ -11,7 +11,7 @@ public enum AppUiRequestKind
     CloseSetupWizard
 }
 
-public sealed record AppUiRequest(object Sender, AppUiRequestKind Kind);
+public sealed record AppUiRequest(object Sender, AppUiRequestKind Kind, int? SettingsInitialTabIndex = null);
 
 public sealed class AppUiRequestMessage(AppUiRequest value) : ValueChangedMessage<AppUiRequest>(value);
 

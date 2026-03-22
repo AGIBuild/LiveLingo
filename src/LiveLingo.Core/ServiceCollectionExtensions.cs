@@ -17,9 +17,10 @@ public static class ServiceCollectionExtensions
         this IServiceCollection services,
         Action<CoreOptions>? configure = null)
     {
-        var options = new CoreOptions();
-        configure?.Invoke(options);
-        services.AddSingleton(Options.Create(options));
+        var coreOptions = new CoreOptions();
+        configure?.Invoke(coreOptions);
+        services.AddSingleton(coreOptions);
+        services.AddSingleton<IOptions<CoreOptions>>(_ => Options.Create(coreOptions));
 
         services.AddSingleton<ITranslationPipeline, TranslationPipeline>();
         services.AddSingleton<ILanguageDetector, ScriptBasedDetector>();
@@ -44,7 +45,9 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IModelManager>(sp => sp.GetRequiredService<ModelManager>());
         services.AddSingleton<IModelReadinessService, ModelReadinessService>();
 
+        services.AddSingleton<INativeRuntimeUpdater, NativeRuntimeUpdater>();
         services.AddSingleton<QwenModelHost>();
+        services.AddSingleton<ILlmModelLoadCoordinator>(sp => sp.GetRequiredService<QwenModelHost>());
         services.AddSingleton<ITranslationEngine, LlamaTranslationEngine>();
         services.AddSingleton<ITextProcessor, SummarizeProcessor>();
         services.AddSingleton<ITextProcessor, OptimizeProcessor>();

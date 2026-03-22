@@ -178,7 +178,12 @@
                 <!-- Models -->
                 <TabItem Name="TabModels" Header="Models" Classes="themed">
                     <ScrollViewer>
-                        <ItemsControl ItemsSource="{Binding Models}" Margin="0,4">
+                        <StackPanel Spacing="8" Margin="0,4">
+                            <TextBlock Classes="hint" Text="{Binding ModelsHuggingFaceHint}" TextWrapping="Wrap"/>
+                            <Button HorizontalAlignment="Left" Padding="10,6" Classes="themed sm"
+                                    Content="{Binding ModelsOpenAdvancedForTokenLabel}"
+                                    Command="{Binding OpenAdvancedTabForTokenCommand}"/>
+                        <ItemsControl ItemsSource="{Binding Models}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:ModelItemViewModel">
                                     <Border Margin="0,0,0,6" Padding="12,10"
@@ -195,6 +200,10 @@
                                             </StackPanel>
 
                                             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                                                <Button Classes="themed sm"
+                                                        Content="{Binding OpenOnHuggingFaceLabel}"
+                                                        Command="{Binding OpenOnHuggingFaceCommand}"
+                                                        IsVisible="{Binding ShowOpenOnHuggingFace}"/>
                                                 <Button Classes="accent sm"
                                                         Content="{Binding DownloadButtonLabel}"
                                                         Command="{Binding DownloadCommand}"
@@ -235,6 +244,7 @@
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
+                        </StackPanel>
                     </ScrollViewer>
                 </TabItem>
 
@@ -257,6 +267,39 @@
                                        Text="{Binding MigrationError}"
                                        IsVisible="{Binding MigrationError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                                        Margin="0,3,0,0"/>
+                            <Separator Classes="themed"/>
+                            <TextBlock Classes="section" Text="{Binding AdvancedSectionLlamaNative}"/>
+                            <Grid ColumnDefinitions="130,*">
+                                <TextBlock Classes="label" Text="{Binding AdvancedLlamaNativePathLabel}"/>
+                                <TextBox Grid.Column="1" Classes="themed"
+                                         Text="{Binding WorkingCopy.Advanced.LlamaNativeSearchPath}"
+                                         PlaceholderText="{Binding AdvancedLlamaNativePathPlaceholder}"/>
+                            </Grid>
+                            <TextBlock Classes="hint" Text="{Binding AdvancedLlamaNativePathHint}" TextWrapping="Wrap"/>
+                            <Separator Classes="themed"/>
+                            <TextBlock Classes="section" Text="{Binding AdvancedSectionHuggingFace}"/>
+                            <Grid ColumnDefinitions="130,*">
+                                <TextBlock Classes="label" Text="{Binding AdvancedHuggingFaceMirrorLabel}"/>
+                                <TextBox Grid.Column="1" Classes="themed"
+                                         Text="{Binding WorkingCopy.Advanced.HuggingFaceMirror}"
+                                         PlaceholderText="{Binding AdvancedHuggingFaceMirrorPlaceholder}"/>
+                            </Grid>
+                            <Grid ColumnDefinitions="130,*">
+                                <TextBlock Classes="label" Text="{Binding AdvancedHuggingFaceTokenLabel}"/>
+                                <TextBox Grid.Column="1" Classes="themed"
+                                         PasswordChar="*"
+                                         Text="{Binding WorkingCopy.Advanced.HuggingFaceToken, Mode=TwoWay}"/>
+                            </Grid>
+                            <TextBlock Classes="hint" Text="{Binding AdvancedHuggingFaceTokenHint}" TextWrapping="Wrap"/>
+                            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,6,0,0"
+                                        IsVisible="{Binding ShowAdvancedHuggingFaceBrowserLinks}">
+                                <Button Padding="10,6" Classes="themed sm"
+                                        Content="{Binding AdvancedOpenHuggingFaceTokensLabel}"
+                                        Command="{Binding OpenHuggingFaceTokenSettingsPageCommand}"/>
+                                <Button Padding="10,6" Classes="themed sm"
+                                        Content="{Binding AdvancedOpenTranslationModelLabel}"
+                                        Command="{Binding OpenPrimaryTranslationModelOnHuggingFaceCommand}"/>
+                            </StackPanel>
                             <Separator Classes="themed"/>
                             <TextBlock Classes="section" Text="{Binding AdvancedSectionPerformance}"/>
                             <Grid ColumnDefinitions="130,*">

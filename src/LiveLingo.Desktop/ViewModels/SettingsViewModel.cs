@@ -8,8 +8,10 @@ using LiveLingo.Desktop.Platform;
 using LiveLingo.Desktop.Services.Configuration;
 using LiveLingo.Desktop.Services.LanguageCatalog;
 using LiveLingo.Desktop.Services.Localization;
+using LiveLingo.Core;
 using LiveLingo.Core.Engines;
 using LiveLingo.Core.Models;
+using LiveLingo.Core.Processing;
 using Microsoft.Extensions.Logging;
 
 namespace LiveLingo.Desktop.ViewModels;
@@ -18,6 +20,9 @@ public partial class SettingsViewModel : ObservableObject
 {
     private readonly ISettingsService _settings;
     private readonly IModelManager? _modelManager;
+    private readonly CoreOptions? _coreOptions;
+    private readonly ILlmModelLoadCoordinator? _llmCoordinator;
+    private readonly IPlatformServices? _platformServices;
     private readonly ILogger? _logger;
     private readonly IMessenger _messenger;
     private readonly ILocalizationService? _loc;
@@ -63,6 +68,10 @@ public partial class SettingsViewModel : ObservableObject
     public string ModelsCancelLabel => L("settings.models.cancel", "Cancel");
     public string ModelsInstalledLabel => L("settings.models.installed", "✓ Installed");
     public string ModelsDeleteLabel => L("settings.models.delete", "Delete");
+    public string ModelsHuggingFaceHint => L(
+        "settings.models.huggingFaceHint",
+        "Hugging Face downloads use the read access token under Advanced (huggingface.co/settings/tokens). After changing the token, click Save, then retry download here.");
+    public string ModelsOpenAdvancedForTokenLabel => L("settings.models.openAdvancedForToken", "Open Advanced (token)…");
     public string AdvancedSectionModelStorage => L("settings.advanced.modelStorage", "Model Storage");
     public string AdvancedStoragePathLabel => L("settings.advanced.storagePath", "Storage Path:");
     public string AdvancedStoragePathPlaceholder => L("settings.advanced.defaultStoragePath", "Default (AppData)");
@@ -70,6 +79,27 @@ public partial class SettingsViewModel : ObservableObject
     public string AdvancedSectionPerformance => L("settings.advanced.performance", "Performance");
     public string AdvancedInferenceThreadsLabel => L("settings.advanced.inferenceThreads", "Inference Threads:");
     public string AdvancedThreadsHint => L("settings.advanced.threadsHint", "0 = auto-detect (recommended)");
+    public string AdvancedSectionLlamaNative => L("settings.advanced.llamaNativeSection", "LLama native runtime (optional)");
+    public string AdvancedLlamaNativePathLabel => L("settings.advanced.llamaNativePath", "Custom search root:");
+    public string AdvancedLlamaNativePathPlaceholder => L(
+        "settings.advanced.llamaNativePathPlaceholder",
+        "Folder containing LLamaSharpRuntimes/… (see LLamaSharp docs)");
+    public string AdvancedLlamaNativePathHint => L(
+        "settings.advanced.llamaNativePathHint",
+        "Use a build that matches your installed LLamaSharp version. Env override (first): LIVELINGO_LLAMA_NATIVE_PATH. Restart the app after changing this.");
+    public string AdvancedSectionHuggingFace => L("settings.advanced.huggingFace", "Hugging Face");
+    public string AdvancedHuggingFaceMirrorLabel => L("settings.advanced.huggingFaceMirror", "Mirror base URL:");
+    public string AdvancedHuggingFaceMirrorPlaceholder =>
+        L("settings.advanced.huggingFaceMirrorPlaceholder", "https://hf-mirror.com (optional)");
+    public string AdvancedHuggingFaceTokenLabel => L("settings.advanced.huggingFaceToken", "Access token:");
+    public string AdvancedHuggingFaceTokenHint => L(
+        "settings.advanced.huggingFaceTokenHint",
+        "Strongly recommended for Qwen and other gated GGUF weights. Create a read token at huggingface.co/settings/tokens, paste it here, then Save. Models tab downloads use this token.");
+    public bool ShowAdvancedHuggingFaceBrowserLinks => _platformServices is not null;
+    public string AdvancedOpenHuggingFaceTokensLabel => L("settings.advanced.openHfTokensPage", "Open Hugging Face token settings…");
+    public string AdvancedOpenTranslationModelLabel => L(
+        "settings.advanced.openTranslationModelPage",
+        "Open translation model page (accept access)…");
     public string AdvancedSectionLogging => L("settings.advanced.logging", "Logging");
     public string AdvancedLogLevelLabel => L("settings.advanced.logLevel", "Log Level:");
     public string AiSectionPostProcessing => L("settings.ai.postProcessing", "Post-Processing");
@@ -87,10 +117,16 @@ public partial class SettingsViewModel : ObservableObject
         ILogger<SettingsViewModel>? logger = null,
         IMessenger? messenger = null,
         ILocalizationService? localizationService = null,
-        ILanguageCatalog? languageCatalog = null)
+        ILanguageCatalog? languageCatalog = null,
+        CoreOptions? coreOptions = null,
+        ILlmModelLoadCoordinator? llmCoordinator = null,
+        IPlatformServices? platformServices = null)
     {
         _settings = settings;
         _modelManager = modelManager;
+        _coreOptions = coreOptions;
+        _llmCoordinator = llmCoordinator;
+        _platformServices = platformServices;
         _logger = logger;
         _messenger = messenger ?? WeakReferenceMessenger.Default;
         _loc = localizationService;
@@ -98,7 +134,7 @@ public partial class SettingsViewModel : ObservableObject
         InitializeLocalizedOptions();
         AvailableLanguages = _languageCatalog.All;
         AvailableTranslationModels = new ObservableCollection<TranslationModelOption>();
-        Models = ModelItemViewModel.CreateAll(modelManager, localizationService);
+        Models = ModelItemViewModel.CreateAll(modelManager, localizationService, platformServices);
         HookWorkingCopy(WorkingCopy);
         HookModelItemChanges();
         RefreshTranslationModelsInternal();
@@ -111,9 +147,16 @@ public partial class SettingsViewModel : ObservableObject
         ITranslationEngine? engine = null,
         IMessenger? messenger = null,
         ILocalizationService? localizationService = null,
-        ILanguageCatalog? languageCatalog = null)
+        ILanguageCatalog? languageCatalog = null,
+        CoreOptions? coreOptions = null,
+        ILlmModelLoadCoordinator? llmCoordinator = null)
     {
         _settings = settings;
+        _modelManager = null;
+        _logger = null;
+        _coreOptions = coreOptions;
+        _llmCoordinator = llmCoordinator;
+        _platformServices = null;
         _messenger = messenger ?? WeakReferenceMessenger.Default;
         _loc = localizationService;
         _languageCatalog = languageCatalog ?? new LanguageCatalog();
@@ -264,8 +307,10 @@ public partial class SettingsViewModel : ObservableObject
         }
 
         MigrationError = null;
-        var oldPath = NormalizePathForCompare(_originalModelStoragePath);
-        var newPath = NormalizePathForCompare(WorkingCopy.Advanced.ModelStoragePath);
+        var advancedBefore = _settings.Current.Advanced.DeepClone();
+        var translationBefore = _settings.Current.Translation.DeepClone();
+        var oldPath = CoreOptionsSync.NormalizePathForCompare(_originalModelStoragePath);
+        var newPath = CoreOptionsSync.NormalizePathForCompare(WorkingCopy.Advanced.ModelStoragePath);
         if (_modelManager is not null && !string.IsNullOrEmpty(newPath) &&
             !string.Equals(oldPath, newPath, StringComparison.OrdinalIgnoreCase))
         {
@@ -306,6 +351,19 @@ public partial class SettingsViewModel : ObservableObject
         }
 
         _settings.Replace(WorkingCopy);
+        if (_coreOptions is not null)
+            CoreOptionsSync.ApplyFromSettings(WorkingCopy, _coreOptions, _modelManager);
+        if (CoreOptionsSync.AdvancedLlamaNativePathChanged(advancedBefore, WorkingCopy.Advanced))
+        {
+            _logger?.LogWarning(
+                "LLama native search path changed; restart LiveLingo for the new native library search root to take effect.");
+        }
+
+        var translationModelChanged = !string.Equals(translationBefore.ActiveTranslationModelId, WorkingCopy.Translation.ActiveTranslationModelId, StringComparison.OrdinalIgnoreCase);
+
+        if (_llmCoordinator is not null &&
+            (CoreOptionsSync.AdvancedSettingsAffectLlmLoad(advancedBefore, WorkingCopy.Advanced) || translationModelChanged))
+            await _llmCoordinator.RequestRetryPrimaryTranslationModelAsync(CancellationToken.None).ConfigureAwait(false);
         _messenger.Send(new SettingsChangedMessage());
         IsDirty = false;
         _messenger.Send(new AppUiRequestMessage(new AppUiRequest(this, AppUiRequestKind.CloseSettings)));
@@ -322,6 +380,21 @@ public partial class SettingsViewModel : ObservableObject
     private void OpenModelsTab() => SelectedTabIndex = 2;
 
     [RelayCommand]
+    private void OpenAdvancedTabForToken() => SelectedTabIndex = 3;
+
+    [RelayCommand]
+    private void OpenHuggingFaceTokenSettingsPage() =>
+        _platformServices?.OpenUrl("https://huggingface.co/settings/tokens");
+
+    [RelayCommand]
+    private void OpenPrimaryTranslationModelOnHuggingFace()
+    {
+        if (_platformServices is null) return;
+        if (!HuggingFaceWebUrls.TryGetModelCardUrl(ModelRegistry.Qwen35_9B.DownloadUrl, out var url)) return;
+        _platformServices.OpenUrl(url);
+    }
+
+    [RelayCommand]
     private void Reset() => LoadFromSettings(SettingsModel.CreateDefault());
 
     [RelayCommand]
@@ -329,22 +402,6 @@ public partial class SettingsViewModel : ObservableObject
     {
         LoadFromSettings(_settings.Current);
         _messenger.Send(new AppUiRequestMessage(new AppUiRequest(this, AppUiRequestKind.CloseSettings)));
-    }
-
-    private static string NormalizePathForCompare(string? path)
-    {
-        if (string.IsNullOrWhiteSpace(path))
-            return string.Empty;
-
-        var trimmed = path.Trim().TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        try
-        {
-            return Path.GetFullPath(trimmed);
-        }
-        catch
-        {
-            return trimmed;
-        }
     }
 
     private void OnActiveTranslationModelIdChanged(string? modelId)

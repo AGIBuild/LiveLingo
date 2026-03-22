@@ -46,8 +46,7 @@ public sealed class LlamaTranslationEngine : ITranslationEngine
         var tgtName = GetLanguageName(targetLanguage);
 
         var weights = await _host.GetWeightsAsync(ct);
-        var modelParams = new ModelParams(_host.ModelPath) { ContextSize = 2048 };
-        var executor = new StatelessExecutor(weights, modelParams);
+        var executor = new StatelessExecutor(weights, _host.CreateExecutorModelParams());
 
         var inferenceParams = new InferenceParams
         {

@@ -135,15 +135,19 @@ public partial class UpdateSettings : ObservableObject
 public partial class AdvancedSettings : ObservableObject
 {
     [ObservableProperty] private string? _modelStoragePath;
+    [ObservableProperty] private string? _llamaNativeSearchPath;
     [ObservableProperty] private int _inferenceThreads;
     [ObservableProperty] private string _logLevel = "Information";
     [ObservableProperty] private string? _huggingFaceMirror;
+    [ObservableProperty] private string? _huggingFaceToken;
 
     public AdvancedSettings DeepClone() => new()
     {
         ModelStoragePath = ModelStoragePath,
+        LlamaNativeSearchPath = LlamaNativeSearchPath,
         InferenceThreads = InferenceThreads,
         LogLevel = LogLevel,
-        HuggingFaceMirror = HuggingFaceMirror
+        HuggingFaceMirror = HuggingFaceMirror,
+        HuggingFaceToken = HuggingFaceToken
     };
 }

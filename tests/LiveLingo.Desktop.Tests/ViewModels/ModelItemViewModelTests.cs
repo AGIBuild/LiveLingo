@@ -1,3 +1,4 @@
+using LiveLingo.Desktop.Platform;
 using LiveLingo.Desktop.ViewModels;
 using LiveLingo.Core.Models;
 using NSubstitute;
@@ -186,6 +187,33 @@ public class ModelItemViewModelTests
 
         Assert.Contains("delete failed", vm.ErrorMessage);
         Assert.True(vm.IsInstalled);
+    }
+
+    [Fact]
+    public void ShowOpenOnHuggingFace_TrueWhenPlatformAndHfResolveUrl()
+    {
+        var platform = Substitute.For<IPlatformServices>();
+        var mm = Substitute.For<IModelManager>();
+        var vm = new ModelItemViewModel(ModelRegistry.Qwen35_9B, mm, false, platformServices: platform);
+        Assert.True(vm.ShowOpenOnHuggingFace);
+    }
+
+    [Fact]
+    public void ShowOpenOnHuggingFace_FalseWithoutPlatform()
+    {
+        var mm = Substitute.For<IModelManager>();
+        var vm = new ModelItemViewModel(ModelRegistry.Qwen35_9B, mm, false);
+        Assert.False(vm.ShowOpenOnHuggingFace);
+    }
+
+    [Fact]
+    public void OpenOnHuggingFace_InvokesPlatformWithModelCardUrl()
+    {
+        var platform = Substitute.For<IPlatformServices>();
+        var mm = Substitute.For<IModelManager>();
+        var vm = new ModelItemViewModel(ModelRegistry.Qwen35_9B, mm, false, platformServices: platform);
+        vm.OpenOnHuggingFaceCommand.Execute(null);
+        platform.Received(1).OpenUrl("https://huggingface.co/Abhiray/Qwen3.5-9B-abliterated-GGUF");
     }
 
     [Fact]

@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using LiveLingo.Core.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -29,6 +30,26 @@ public class ModelManagerTests : IDisposable
     public void ListInstalled_Empty_WhenNoModels()
     {
         Assert.Empty(_manager.ListInstalled());
+    }
+
+    [Fact]
+    public void HasAllExpectedLocalAssets_False_WhenExpectedFileMissing()
+    {
+        var modelDir = _manager.GetModelDirectory(ModelRegistry.Qwen35_9B.Id);
+        Directory.CreateDirectory(modelDir);
+        File.WriteAllText(Path.Combine(modelDir, "stale-other.gguf"), "x");
+        Assert.False(_manager.HasAllExpectedLocalAssets(ModelRegistry.Qwen35_9B));
+    }
+
+    [Fact]
+    public void HasAllExpectedLocalAssets_True_WhenExpectedGgufExists()
+    {
+        var modelDir = _manager.GetModelDirectory(ModelRegistry.Qwen35_9B.Id);
+        Directory.CreateDirectory(modelDir);
+        File.WriteAllText(
+            Path.Combine(modelDir, "Qwen3.5-9B-abliterated-Q4_K_M.gguf"),
+            "x");
+        Assert.True(_manager.HasAllExpectedLocalAssets(ModelRegistry.Qwen35_9B));
     }
 
     [Fact]
@@ -589,6 +610,47 @@ public class ModelManagerTests : IDisposable
     }
 
     [Fact]
+    public async Task EnsureModelAsync_SendsBearer_WhenHuggingFaceTokenConfigured()
+    {
+        AuthenticationHeaderValue? auth = null;
+        var handler = new FakeHttpMessageHandler(req =>
+        {
+            auth = req.Headers.Authorization;
+        });
+        var options = Options.Create(new CoreOptions
+        {
+            ModelStoragePath = _tempDir,
+            HuggingFaceToken = "hf_test_secret"
+        });
+        var mgr = new ModelManager(options, new HttpClient(handler), _logger);
+
+        var desc = new ModelDescriptor("bearer-test", "Bearer",
+            "https://huggingface.co/test/model/resolve/main/model.bin", 100, ModelType.Translation);
+
+        await mgr.EnsureModelAsync(desc, null, CancellationToken.None);
+
+        Assert.NotNull(auth);
+        Assert.Equal("Bearer", auth!.Scheme);
+        Assert.Equal("hf_test_secret", auth.Parameter);
+    }
+
+    [Fact]
+    public async Task EnsureModelAsync_HfResolve_ThrowsModelDownloadAuthorization_On401()
+    {
+        var handler = new FixedStatusHttpMessageHandler(HttpStatusCode.Unauthorized);
+        var options = Options.Create(new CoreOptions { ModelStoragePath = _tempDir });
+        var mgr = new ModelManager(options, new HttpClient(handler), _logger);
+
+        var desc = new ModelDescriptor("auth-denied-test", "AuthDenied",
+            "https://huggingface.co/org/repo/resolve/main/file.gguf", 100, ModelType.Translation);
+
+        var ex = await Assert.ThrowsAsync<ModelDownloadAuthorizationException>(
+            () => mgr.EnsureModelAsync(desc, null, CancellationToken.None));
+
+        Assert.Contains("Hugging Face", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task EnsureModelAsync_UsesUserMirror_WhenConfigured()
     {
         var requestedUrls = new List<string>();
@@ -696,5 +758,16 @@ public class ModelManagerTests : IDisposable
                 Content = new ByteArrayContent(content)
             });
         }
+    }
+
+    private sealed class FixedStatusHttpMessageHandler : HttpMessageHandler
+    {
+        private readonly HttpStatusCode _statusCode;
+
+        public FixedStatusHttpMessageHandler(HttpStatusCode statusCode) => _statusCode = statusCode;
+
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken cancellationToken) =>
+            Task.FromResult(new HttpResponseMessage(_statusCode));
     }
 }

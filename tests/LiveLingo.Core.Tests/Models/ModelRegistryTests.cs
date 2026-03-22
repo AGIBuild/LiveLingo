@@ -7,11 +7,12 @@ public class ModelRegistryTests
     [Fact]
     public void TranslationModels_ContainsExpectedModels()
     {
-        Assert.Equal(4, ModelRegistry.TranslationModels.Count);
+        Assert.Equal(5, ModelRegistry.TranslationModels.Count);
         Assert.Contains(ModelRegistry.MarianZhEn, ModelRegistry.TranslationModels);
         Assert.Contains(ModelRegistry.MarianEnZh, ModelRegistry.TranslationModels);
         Assert.Contains(ModelRegistry.MarianJaEn, ModelRegistry.TranslationModels);
         Assert.Contains(ModelRegistry.Qwen35_9B, ModelRegistry.TranslationModels);
+        Assert.Contains(ModelRegistry.Qwen25_7B, ModelRegistry.TranslationModels);
     }
 
     [Fact]
@@ -32,13 +33,20 @@ public class ModelRegistryTests
     [Fact]
     public void AllModels_ContainsAll()
     {
-        Assert.Equal(8, ModelRegistry.AllModels.Count);
+        Assert.Equal(9, ModelRegistry.AllModels.Count);
         Assert.Contains(ModelRegistry.MarianZhEn, ModelRegistry.AllModels);
         Assert.Contains(ModelRegistry.FastTextLid, ModelRegistry.AllModels);
         Assert.Contains(ModelRegistry.Qwen25_15B, ModelRegistry.AllModels);
         Assert.Contains(ModelRegistry.Qwen35_9B, ModelRegistry.AllModels);
+        Assert.Contains(ModelRegistry.Qwen25_7B, ModelRegistry.AllModels);
         Assert.Contains(ModelRegistry.WhisperBase, ModelRegistry.AllModels);
         Assert.Contains(ModelRegistry.SileroVad, ModelRegistry.AllModels);
+    }
+
+    [Fact]
+    public void Qwen35_9B_HasLoadFailureFallback_ToQwen25()
+    {
+        Assert.Same(ModelRegistry.Qwen25_15B, ModelRegistry.Qwen35_9B.LoadFailureFallback);
     }
 
     [Fact]
@@ -149,6 +157,7 @@ public class ModelRegistryTests
     [InlineData("opus-mt-ja-en", "MarianMT Japanese\u2192English")]
     [InlineData("lid.176.ftz", "FastText Language Detection")]
     [InlineData("qwen25-1.5b", "Qwen2.5-1.5B-Instruct (GGUF Q4_K_M)")]
+    [InlineData("qwen35-9b", "Qwen3.5-9B Abliterated (GGUF Q4_K_M)")]
     public void Model_HasExpectedIdAndDisplayName(string expectedId, string expectedName)
     {
         var model = ModelRegistry.AllModels.FirstOrDefault(m => m.Id == expectedId);

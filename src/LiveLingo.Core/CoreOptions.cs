@@ -8,6 +8,11 @@ public class CoreOptions
 
     public string DefaultTargetLanguage { get; set; } = "en";
 
+    /// <summary>
+    /// The currently selected model id for translation.
+    /// </summary>
+    public string? ActiveTranslationModelId { get; set; }
+
     public int InferenceThreads { get; set; }
 
     /// <summary>
@@ -15,4 +20,15 @@ public class CoreOptions
     /// When set, all huggingface.co URLs are rewritten to use this mirror.
     /// </summary>
     public string? HuggingFaceMirror { get; set; }
+
+    /// <summary>
+    /// Optional Hugging Face access token for gated models (sent as Authorization: Bearer).
+    /// </summary>
+    public string? HuggingFaceToken { get; set; }
+
+    /// <summary>
+    /// Optional root directory passed to LLamaSharp native loader before libllama is loaded
+    /// (same layout as LLamaSharp.Backend.Cpu: contains <c>LLamaSharpRuntimes/…</c>). Requires app restart to take effect.
+    /// </summary>
+    public string? LlamaNativeSearchPath { get; set; }
 }
