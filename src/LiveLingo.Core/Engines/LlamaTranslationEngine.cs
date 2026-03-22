@@ -66,10 +66,11 @@ public sealed class LlamaTranslationEngine : ITranslationEngine
         _logger.LogDebug("Translation prompt for {Src}→{Tgt}: {Prompt}", sourceLanguage, targetLanguage, prompt);
 
         var output = new List<string>();
+        var maxOutputLen = Math.Max(150, text.Length * 5);
         await foreach (var token in executor.InferAsync(prompt, inferenceParams, ct))
         {
             output.Add(token);
-            if (string.Concat(output).Length > text.Length * 5)
+            if (string.Concat(output).Length > maxOutputLen)
                 break;
         }
 
