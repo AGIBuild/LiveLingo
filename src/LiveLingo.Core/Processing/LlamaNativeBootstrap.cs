@@ -21,10 +21,17 @@ public static class LlamaNativeBootstrap
     /// <param name="environmentPath">Optional path from <see cref="SearchPathEnvironmentVariable"/>.</param>
     public static void ApplySearchPathOverrides(string? settingsPath, string? environmentPath)
     {
-        foreach (var dir in EnumerateExistingDirectories(environmentPath, settingsPath))
+        try
         {
-            NativeLibraryConfig.LLama.WithSearchDirectory(dir);
-            NativeLibraryConfig.Mtmd.WithSearchDirectory(dir);
+            foreach (var dir in EnumerateExistingDirectories(environmentPath, settingsPath))
+            {
+                NativeLibraryConfig.LLama.WithSearchDirectory(dir);
+                NativeLibraryConfig.Mtmd.WithSearchDirectory(dir);
+            }
+        }
+        catch (InvalidOperationException)
+        {
+            // Ignore if library is already loaded
         }
     }
 
