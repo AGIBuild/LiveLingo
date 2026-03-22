@@ -103,6 +103,27 @@ public class NativeRuntimeUpdater(
             File.Delete(archivePath);
             
             var libDir = GetLibDir(nativeDir);
+
+            // Fix up macOS library names for LLamaSharp
+            if (os == "macos")
+            {
+                foreach (var file in Directory.GetFiles(libDir, "*.dylib"))
+                {
+                    var fileName = Path.GetFileName(file);
+                    // libllama.0.0.8472.dylib -> libllama.dylib
+                    if (fileName.StartsWith("libllama.0") && !fileName.Equals("libllama.dylib", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var dest = Path.Combine(libDir, "libllama.dylib");
+                        if (!File.Exists(dest)) File.Copy(file, dest);
+                    }
+                    if (fileName.StartsWith("libggml.0") && !fileName.Equals("libggml.dylib", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var dest = Path.Combine(libDir, "libggml.dylib");
+                        if (!File.Exists(dest)) File.Copy(file, dest);
+                    }
+                }
+            }
+
             LlamaNativeBootstrap.ApplySearchPathOverrides(libDir, null);
             logger.LogInformation("Native runtime updated and injected from {Path}", libDir);
         }
@@ -120,6 +141,10 @@ public class NativeRuntimeUpdater(
             var ext = Path.GetExtension(file).ToLowerInvariant();
             if (ext == ".dll" || ext == ".dylib" || ext == ".so")
             {
+                // Note: The LLamaSharp runtime expects the directory containing 'libllama.dylib', etc.
+                // In recent llama.cpp mac releases, they renamed libllama.dylib to libllama.0.0.X.dylib
+                // LLamaSharp's default DllImport uses "llama", which macOS dyld maps to "libllama.dylib"
+                // So we must ensure symlinks or exact named files exist if needed.
                 return Path.GetDirectoryName(file) ?? nativeDir;
             }
         }
