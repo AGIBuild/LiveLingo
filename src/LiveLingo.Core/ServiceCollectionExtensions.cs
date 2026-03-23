@@ -45,7 +45,10 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IModelManager>(sp => sp.GetRequiredService<ModelManager>());
         services.AddSingleton<IModelReadinessService, ModelReadinessService>();
 
-        services.AddHttpClient<NativeRuntimeUpdater>()
+        services.AddHttpClient<NativeRuntimeUpdater>(client =>
+            {
+                client.Timeout = TimeSpan.FromMinutes(10); // Llama.cpp binaries can be quite large
+            })
             .AddResilienceHandler("native-runtime-download", pipeline =>
             {
                 pipeline.AddRetry(new HttpRetryStrategyOptions
@@ -60,7 +63,7 @@ public static class ServiceCollectionExtensions
                             or System.Net.HttpStatusCode.ServiceUnavailable
                             or System.Net.HttpStatusCode.GatewayTimeout })
                 });
-                pipeline.AddTimeout(TimeSpan.FromMinutes(3));
+                pipeline.AddTimeout(TimeSpan.FromMinutes(10));
             });
         services.AddSingleton<INativeRuntimeUpdater>(sp => sp.GetRequiredService<NativeRuntimeUpdater>());
         services.AddSingleton<ILlamaServerProcessManager, LlamaServerProcessManager>();
