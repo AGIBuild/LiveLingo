@@ -49,8 +49,8 @@ public sealed class LlamaTranslationEngine : ITranslationEngine
         var endpoint = await _host.GetOrStartServerAsync(ct);
         var url = $"{endpoint}/completion";
 
-        var systemPrompt = $"You are an expert translation engine. Translate the text from {srcName} to {tgtName}.\nRules:\n1. Output ONLY the translated text in {tgtName}.\n2. Do NOT repeat or output the original {srcName} text.\n3. Do NOT add any explanations, notes, or conversational text.\n4. Do NOT use <think> tags or output any thought process.";
-        var prompt = $"<|im_start|>system\n{systemPrompt}<|im_end|>\n<|im_start|>user\nTranslate this to {tgtName}:\n\n{text}<|im_end|>\n<|im_start|>assistant\n";
+        var systemPrompt = $"You are an expert translation engine. Your task is to translate the source text from {srcName} to {tgtName}.\n\nRules:\n1. Output ONLY the final {tgtName} translation.\n2. Do NOT output any {srcName} text.\n3. Do NOT output any explanations, conversational text, or notes.\n4. Do NOT use <think> tags or output any thought process.";
+        var prompt = $"<|im_start|>system\n{systemPrompt}<|im_end|>\n<|im_start|>user\nTranslate the following {srcName} text to {tgtName}:\n\n<source>\n{text}\n</source><|im_end|>\n<|im_start|>assistant\n";
 
         _logger.LogDebug("Translation prompt for {Src}→{Tgt}: {Prompt}", sourceLanguage, targetLanguage, prompt);
 
