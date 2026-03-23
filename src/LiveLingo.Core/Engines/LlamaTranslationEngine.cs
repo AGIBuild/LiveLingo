@@ -47,17 +47,21 @@ public sealed class LlamaTranslationEngine : ITranslationEngine
         var tgtName = GetLanguageName(targetLanguage);
 
         var endpoint = await _host.GetOrStartServerAsync(ct);
-        var url = $"{endpoint}/completion";
+        var url = $"{endpoint}/v1/chat/completions";
 
         var systemPrompt = $"You are an expert translation engine. Your task is to translate the source text from {srcName} to {tgtName}.\n\nRules:\n1. Output ONLY the final {tgtName} translation.\n2. Do NOT output any {srcName} text.\n3. Do NOT output any explanations, conversational text, or notes.\n4. Do NOT use <think> tags or output any thought process.";
-        var prompt = $"<|im_start|>system\n{systemPrompt}<|im_end|>\n<|im_start|>user\nTranslate the following {srcName} text to {tgtName}:\n\n<source>\n{text}\n</source><|im_end|>\n<|im_start|>assistant\n";
+        var userPrompt = $"Translate the following {srcName} text to {tgtName}:\n\n<source>\n{text}\n</source>";
 
-        _logger.LogDebug("Translation prompt for {Src}→{Tgt}: {Prompt}", sourceLanguage, targetLanguage, prompt);
+        _logger.LogDebug("Translation prompt for {Src}→{Tgt}: {Prompt}", sourceLanguage, targetLanguage, userPrompt);
 
         var requestBody = new
         {
-            prompt = prompt,
-            n_predict = 512,
+            messages = new[]
+            {
+                new { role = "system", content = systemPrompt },
+                new { role = "user", content = userPrompt }
+            },
+            max_tokens = 512,
             temperature = 0.1f,
             top_p = 0.95f,
             stop = StopSequences,
@@ -69,7 +73,11 @@ public sealed class LlamaTranslationEngine : ITranslationEngine
         
         var json = await response.Content.ReadAsStringAsync(ct);
         using var doc = JsonDocument.Parse(json);
-        var result = doc.RootElement.GetProperty("content").GetString()?.Trim() ?? string.Empty;
+        var result = doc.RootElement
+            .GetProperty("choices")[0]
+            .GetProperty("message")
+            .GetProperty("content")
+            .GetString()?.Trim() ?? string.Empty;
 
         // Clean up <think> tags if the model still generated them
         if (result.Contains("</think>"))
