@@ -79,14 +79,6 @@ public partial class SettingsViewModel : ObservableObject
     public string AdvancedSectionPerformance => L("settings.advanced.performance", "Performance");
     public string AdvancedInferenceThreadsLabel => L("settings.advanced.inferenceThreads", "Inference Threads:");
     public string AdvancedThreadsHint => L("settings.advanced.threadsHint", "0 = auto-detect (recommended)");
-    public string AdvancedSectionLlamaNative => L("settings.advanced.llamaNativeSection", "LLama native runtime (optional)");
-    public string AdvancedLlamaNativePathLabel => L("settings.advanced.llamaNativePath", "Custom search root:");
-    public string AdvancedLlamaNativePathPlaceholder => L(
-        "settings.advanced.llamaNativePathPlaceholder",
-        "Folder containing LLamaSharpRuntimes/… (see LLamaSharp docs)");
-    public string AdvancedLlamaNativePathHint => L(
-        "settings.advanced.llamaNativePathHint",
-        "Use a build that matches your installed LLamaSharp version. Env override (first): LIVELINGO_LLAMA_NATIVE_PATH. Restart the app after changing this.");
     public string AdvancedSectionHuggingFace => L("settings.advanced.huggingFace", "Hugging Face");
     public string AdvancedHuggingFaceMirrorLabel => L("settings.advanced.huggingFaceMirror", "Mirror base URL:");
     public string AdvancedHuggingFaceMirrorPlaceholder =>
@@ -353,11 +345,6 @@ public partial class SettingsViewModel : ObservableObject
         _settings.Replace(WorkingCopy);
         if (_coreOptions is not null)
             CoreOptionsSync.ApplyFromSettings(WorkingCopy, _coreOptions, _modelManager);
-        if (CoreOptionsSync.AdvancedLlamaNativePathChanged(advancedBefore, WorkingCopy.Advanced))
-        {
-            _logger?.LogWarning(
-                "LLama native search path changed; restart LiveLingo for the new native library search root to take effect.");
-        }
 
         var translationModelChanged = !string.Equals(translationBefore.ActiveTranslationModelId, WorkingCopy.Translation.ActiveTranslationModelId, StringComparison.OrdinalIgnoreCase);
 

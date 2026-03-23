@@ -12,7 +12,7 @@ namespace LiveLingo.Core.Processing;
 
 public interface INativeRuntimeUpdater
 {
-    Task EnsureLatestNativeRuntimeAsync(CancellationToken ct = default);
+    Task<string?> EnsureLatestLlamaServerAsync(CancellationToken ct = default);
 }
 
 public class NativeRuntimeUpdater(
@@ -20,7 +20,7 @@ public class NativeRuntimeUpdater(
     IOptions<CoreOptions> options,
     ILogger<NativeRuntimeUpdater> logger) : INativeRuntimeUpdater
 {
-    public async Task EnsureLatestNativeRuntimeAsync(CancellationToken ct = default)
+    public async Task<string?> EnsureLatestLlamaServerAsync(CancellationToken ct = default)
     {
         try
         {
@@ -39,7 +39,7 @@ public class NativeRuntimeUpdater(
             }
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
-                os = "win-cpu"; // LlamaSharp fallback assumes CPU
+                os = "win";
                 ext = "zip";
             }
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
@@ -49,11 +49,11 @@ public class NativeRuntimeUpdater(
 
             // Fallback for macos-arm64
             if (os == "macos" && arch == "x64") os = "macos"; // it's macos-x64.tar.gz
+            if (os == "win") os = "win-cpu"; // try win-cpu for best compatibility first, or win-vulkan etc. if desired
 
             string tagName;
             try
             {
-                // Bypassing GitHub API rate limits by following the redirect of the latest release page
                 var request = new HttpRequestMessage(HttpMethod.Head, "https://github.com/ggml-org/llama.cpp/releases/latest");
                 var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
                 var finalUrl = response.RequestMessage?.RequestUri?.ToString() ?? "";
@@ -62,21 +62,22 @@ public class NativeRuntimeUpdater(
                 if (!match.Success)
                 {
                     logger.LogWarning("Could not determine latest llama.cpp release tag from redirect URL: {Url}", finalUrl);
-                    return;
+                    return null;
                 }
                 tagName = match.Groups[1].Value;
             }
             catch (Exception ex)
             {
                 logger.LogWarning(ex, "Failed to resolve latest llama.cpp release tag.");
-                return;
+                return null;
             }
 
             var nativeDir = Path.Combine(options.Value.ModelStoragePath, "native", tagName);
-            if (Directory.Exists(nativeDir) && Directory.GetFiles(nativeDir, "*llama*", SearchOption.AllDirectories).Length > 0)
+            var serverExecutable = FindServerExecutable(nativeDir);
+            
+            if (serverExecutable is not null)
             {
-                LlamaNativeBootstrap.ApplySearchPathOverrides(GetLibDir(nativeDir), null);
-                return;
+                return serverExecutable;
             }
 
             var assetName = $"llama-{tagName}-bin-{os}-{arch}.{ext}";
@@ -102,77 +103,36 @@ public class NativeRuntimeUpdater(
 
             File.Delete(archivePath);
             
-            var libDir = GetLibDir(nativeDir);
-
-            // Fix up macOS library names for LLamaSharp
-            if (os == "macos")
+            serverExecutable = FindServerExecutable(nativeDir);
+            
+            if (serverExecutable is not null)
             {
-                foreach (var file in Directory.GetFiles(libDir, "*.dylib"))
+                // Ensure executable permissions on Unix
+                if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 {
-                    var fileName = Path.GetFileName(file);
-                    // libllama.0.0.8472.dylib -> libllama.dylib
-                    if (fileName.StartsWith("libllama.0") && !fileName.Equals("libllama.dylib", StringComparison.OrdinalIgnoreCase))
-                    {
-                        var dest = Path.Combine(libDir, "libllama.dylib");
-                        if (!File.Exists(dest)) File.Copy(file, dest);
-                    }
-                    if (fileName.StartsWith("libggml.0") && !fileName.Equals("libggml.dylib", StringComparison.OrdinalIgnoreCase))
-                    {
-                        var dest = Path.Combine(libDir, "libggml.dylib");
-                        if (!File.Exists(dest)) File.Copy(file, dest);
-                    }
-                    if (fileName.StartsWith("libggml-cpu.0") && !fileName.Equals("libggml-cpu.dylib", StringComparison.OrdinalIgnoreCase))
-                    {
-                        var dest = Path.Combine(libDir, "libggml-cpu.dylib");
-                        if (!File.Exists(dest)) File.Copy(file, dest);
-                    }
-                    if (fileName.StartsWith("libggml-base.0") && !fileName.Equals("libggml-base.dylib", StringComparison.OrdinalIgnoreCase))
-                    {
-                        var dest = Path.Combine(libDir, "libggml-base.dylib");
-                        if (!File.Exists(dest)) File.Copy(file, dest);
-                    }
-                    if (fileName.StartsWith("libggml-metal.0") && !fileName.Equals("libggml-metal.dylib", StringComparison.OrdinalIgnoreCase))
-                    {
-                        var dest = Path.Combine(libDir, "libggml-metal.dylib");
-                        if (!File.Exists(dest)) File.Copy(file, dest);
-                    }
-                    if (fileName.StartsWith("libggml-blas.0") && !fileName.Equals("libggml-blas.dylib", StringComparison.OrdinalIgnoreCase))
-                    {
-                        var dest = Path.Combine(libDir, "libggml-blas.dylib");
-                        if (!File.Exists(dest)) File.Copy(file, dest);
-                    }
-                    if (fileName.StartsWith("libggml-rpc.0") && !fileName.Equals("libggml-rpc.dylib", StringComparison.OrdinalIgnoreCase))
-                    {
-                        var dest = Path.Combine(libDir, "libggml-rpc.dylib");
-                        if (!File.Exists(dest)) File.Copy(file, dest);
-                    }
+                    File.SetUnixFileMode(serverExecutable, File.GetUnixFileMode(serverExecutable) | UnixFileMode.UserExecute | UnixFileMode.GroupExecute | UnixFileMode.OtherExecute);
                 }
+                logger.LogInformation("llama-server updated and ready at {Path}", serverExecutable);
+                return serverExecutable;
             }
-
-            LlamaNativeBootstrap.ApplySearchPathOverrides(libDir, null);
-            logger.LogInformation("Native runtime updated and injected from {Path}", libDir);
+            
+            logger.LogWarning("Could not find llama-server executable in the downloaded archive.");
+            return null;
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to update native runtime");
+            return null;
         }
     }
 
-    private static string GetLibDir(string nativeDir)
+    private static string? FindServerExecutable(string nativeDir)
     {
-        var libFiles = Directory.GetFiles(nativeDir, "*llama*", SearchOption.AllDirectories);
-        foreach (var file in libFiles)
-        {
-            var ext = Path.GetExtension(file).ToLowerInvariant();
-            if (ext == ".dll" || ext == ".dylib" || ext == ".so")
-            {
-                // Note: The LLamaSharp runtime expects the directory containing 'libllama.dylib', etc.
-                // In recent llama.cpp mac releases, they renamed libllama.dylib to libllama.0.0.X.dylib
-                // LLamaSharp's default DllImport uses "llama", which macOS dyld maps to "libllama.dylib"
-                // So we must ensure symlinks or exact named files exist if needed.
-                return Path.GetDirectoryName(file) ?? nativeDir;
-            }
-        }
-        return nativeDir;
+        if (!Directory.Exists(nativeDir)) return null;
+
+        var exeName = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "llama-server.exe" : "llama-server";
+        var files = Directory.GetFiles(nativeDir, exeName, SearchOption.AllDirectories);
+        
+        return files.FirstOrDefault();
     }
 }

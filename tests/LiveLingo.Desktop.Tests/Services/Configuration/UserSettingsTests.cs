@@ -22,7 +22,6 @@ public class UserSettingsTests
         Assert.Equal("", s.Update.UpdateUrl);
         Assert.Equal(4, s.Update.CheckIntervalHours);
         Assert.Null(s.Advanced.ModelStoragePath);
-        Assert.Null(s.Advanced.LlamaNativeSearchPath);
         Assert.Equal(0, s.Advanced.InferenceThreads);
         Assert.Equal("Information", s.Advanced.LogLevel);
     }

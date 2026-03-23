@@ -268,15 +268,6 @@
                                        IsVisible="{Binding MigrationError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                                        Margin="0,3,0,0"/>
                             <Separator Classes="themed"/>
-                            <TextBlock Classes="section" Text="{Binding AdvancedSectionLlamaNative}"/>
-                            <Grid ColumnDefinitions="130,*">
-                                <TextBlock Classes="label" Text="{Binding AdvancedLlamaNativePathLabel}"/>
-                                <TextBox Grid.Column="1" Classes="themed"
-                                         Text="{Binding WorkingCopy.Advanced.LlamaNativeSearchPath}"
-                                         PlaceholderText="{Binding AdvancedLlamaNativePathPlaceholder}"/>
-                            </Grid>
-                            <TextBlock Classes="hint" Text="{Binding AdvancedLlamaNativePathHint}" TextWrapping="Wrap"/>
-                            <Separator Classes="themed"/>
                             <TextBlock Classes="section" Text="{Binding AdvancedSectionHuggingFace}"/>
                             <Grid ColumnDefinitions="130,*">
                                 <TextBlock Classes="label" Text="{Binding AdvancedHuggingFaceMirrorLabel}"/>

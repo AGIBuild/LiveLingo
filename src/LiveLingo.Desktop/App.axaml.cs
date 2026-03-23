@@ -59,9 +59,6 @@ public partial class App : Application
         await settingsService.LoadAsync();
         var userSettings = settingsService.Current;
 
-        var llamaNativeFromEnv = Environment.GetEnvironmentVariable(LlamaNativeBootstrap.SearchPathEnvironmentVariable);
-        LlamaNativeBootstrap.ApplySearchPathOverrides(userSettings.Advanced.LlamaNativeSearchPath, llamaNativeFromEnv);
-
         var logDirectory = Path.Combine(GetUserDataDirectory(), "logs");
         Directory.CreateDirectory(logDirectory);
         var logPath = Path.Combine(logDirectory, "livelingo-.log");
@@ -91,17 +88,6 @@ public partial class App : Application
             opts.InferenceThreads = userSettings.Advanced.InferenceThreads;
             opts.HuggingFaceMirror = userSettings.Advanced.HuggingFaceMirror;
             opts.HuggingFaceToken = userSettings.Advanced.HuggingFaceToken;
-            if (!string.IsNullOrWhiteSpace(userSettings.Advanced.LlamaNativeSearchPath))
-            {
-                try
-                {
-                    opts.LlamaNativeSearchPath = Path.GetFullPath(userSettings.Advanced.LlamaNativeSearchPath.Trim());
-                }
-                catch
-                {
-                    opts.LlamaNativeSearchPath = userSettings.Advanced.LlamaNativeSearchPath.Trim();
-                }
-            }
         });
         services.AddSingleton<ISettingsService>(settingsService);
         services.AddSingleton<IMessenger>(_ => WeakReferenceMessenger.Default);
