@@ -45,7 +45,24 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IModelManager>(sp => sp.GetRequiredService<ModelManager>());
         services.AddSingleton<IModelReadinessService, ModelReadinessService>();
 
-        services.AddSingleton<INativeRuntimeUpdater, NativeRuntimeUpdater>();
+        services.AddHttpClient<NativeRuntimeUpdater>()
+            .AddResilienceHandler("native-runtime-download", pipeline =>
+            {
+                pipeline.AddRetry(new HttpRetryStrategyOptions
+                {
+                    MaxRetryAttempts = 3,
+                    BackoffType = DelayBackoffType.Exponential,
+                    Delay = TimeSpan.FromSeconds(2),
+                    ShouldHandle = args => ValueTask.FromResult(
+                        args.Outcome.Exception is HttpRequestException or IOException or TaskCanceledException ||
+                        args.Outcome.Result is { IsSuccessStatusCode: false, StatusCode: System.Net.HttpStatusCode.RequestTimeout
+                            or System.Net.HttpStatusCode.BadGateway
+                            or System.Net.HttpStatusCode.ServiceUnavailable
+                            or System.Net.HttpStatusCode.GatewayTimeout })
+                });
+                pipeline.AddTimeout(TimeSpan.FromMinutes(3));
+            });
+        services.AddSingleton<INativeRuntimeUpdater>(sp => sp.GetRequiredService<NativeRuntimeUpdater>());
         services.AddSingleton<QwenModelHost>();
         services.AddSingleton<ILlmModelLoadCoordinator>(sp => sp.GetRequiredService<QwenModelHost>());
         services.AddSingleton<ITranslationEngine, LlamaTranslationEngine>();
