@@ -87,8 +87,16 @@ public class NativeRuntimeUpdater(
             Directory.CreateDirectory(nativeDir);
             
             var archivePath = Path.Combine(nativeDir, $"temp.{ext}");
-            var bytes = await http.GetByteArrayAsync(downloadUrl, ct);
-            await File.WriteAllBytesAsync(archivePath, bytes, ct);
+            try
+            {
+                var bytes = await http.GetByteArrayAsync(downloadUrl, ct);
+                await File.WriteAllBytesAsync(archivePath, bytes, ct);
+            }
+            catch (Exception ex) when (ex is HttpRequestException or IOException or TaskCanceledException)
+            {
+                logger.LogWarning(ex, "Failed to download llama-server from {Url}", downloadUrl);
+                return null;
+            }
             
             if (ext == "zip")
             {
