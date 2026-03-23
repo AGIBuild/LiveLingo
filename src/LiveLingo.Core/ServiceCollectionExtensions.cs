@@ -63,12 +63,14 @@ public static class ServiceCollectionExtensions
                 pipeline.AddTimeout(TimeSpan.FromMinutes(3));
             });
         services.AddSingleton<INativeRuntimeUpdater>(sp => sp.GetRequiredService<NativeRuntimeUpdater>());
+        services.AddSingleton<ILlamaServerProcessManager, LlamaServerProcessManager>();
         services.AddSingleton<QwenModelHost>();
         services.AddSingleton<ILlmModelLoadCoordinator>(sp => sp.GetRequiredService<QwenModelHost>());
-        services.AddSingleton<ITranslationEngine, LlamaTranslationEngine>();
-        services.AddSingleton<ITextProcessor, SummarizeProcessor>();
-        services.AddSingleton<ITextProcessor, OptimizeProcessor>();
-        services.AddSingleton<ITextProcessor, ColloquializeProcessor>();
+
+        services.AddHttpClient<ITranslationEngine, LlamaTranslationEngine>();
+        services.AddHttpClient<ITextProcessor, SummarizeProcessor>();
+        services.AddHttpClient<ITextProcessor, OptimizeProcessor>();
+        services.AddHttpClient<ITextProcessor, ColloquializeProcessor>();
 
         services.AddSingleton<ISpeechToTextEngine, WhisperSpeechToTextEngine>();
         services.AddSingleton<IVoiceActivityDetector, SileroVadDetector>();

@@ -1,6 +1,5 @@
-using LLama;
-using LLama.Common;
-using LLama.Sampling;
+using System.Net.Http.Json;
+using System.Text.Json;
 using Microsoft.Extensions.Logging;
 
 namespace LiveLingo.Core.Processing;
@@ -8,14 +7,16 @@ namespace LiveLingo.Core.Processing;
 public abstract class QwenTextProcessor : ITextProcessor
 {
     private readonly QwenModelHost _host;
+    private readonly HttpClient _http;
     private readonly ILogger _logger;
 
     public abstract string Name { get; }
     protected abstract string SystemPrompt { get; }
 
-    protected QwenTextProcessor(QwenModelHost host, ILogger logger)
+    protected QwenTextProcessor(QwenModelHost host, HttpClient http, ILogger logger)
     {
         _host = host;
+        _http = http;
         _logger = logger;
     }
 
@@ -25,22 +26,39 @@ public abstract class QwenTextProcessor : ITextProcessor
 
         try
         {
-            var weights = await _host.GetWeightsAsync(ct);
-            var executor = new StatelessExecutor(weights, _host.CreateExecutorModelParams());
+            var endpoint = await _host.GetOrStartServerAsync(ct);
+            var url = $"{endpoint}/completion";
 
-            var inferenceParams = CreateInferenceParams();
+            var prompt = $"<|im_start|>system\n{SystemPrompt} Do not use <think> tags.<|im_end|>\n<|im_start|>user\n{text}<|im_end|>\n<|im_start|>assistant\n";
 
-            var prompt = $"<|im_start|>system\n{SystemPrompt}<|im_end|>\n<|im_start|>user\n{text}<|im_end|>\n<|im_start|>assistant\n";
-
-            var output = new List<string>();
-            await foreach (var token in executor.InferAsync(prompt, inferenceParams, ct))
+            var requestBody = new
             {
-                output.Add(token);
-                if (string.Concat(output).Length > text.Length * 3)
-                    break;
-            }
+                prompt = prompt,
+                n_predict = 512,
+                temperature = 0.3f,
+                top_p = 0.9f,
+                stop = new[] { "</s>", "<|im_end|>", "</think>" },
+                stream = false
+            };
 
-            var result = string.Concat(output).Trim();
+            var response = await _http.PostAsJsonAsync(url, requestBody, ct);
+            response.EnsureSuccessStatusCode();
+
+            var json = await response.Content.ReadAsStringAsync(ct);
+            using var doc = JsonDocument.Parse(json);
+            var result = doc.RootElement.GetProperty("content").GetString()?.Trim() ?? string.Empty;
+
+            // Clean up <think> tags if the model still generated them
+            if (result.Contains("</think>"))
+            {
+                var parts = result.Split("</think>");
+                result = parts.Last().Trim();
+            }
+            else if (result.StartsWith("<think>"))
+            {
+                // Model generated <think> but didn't finish it
+                result = string.Empty;
+            }
 
             if (string.IsNullOrWhiteSpace(result))
             {
@@ -56,22 +74,6 @@ public abstract class QwenTextProcessor : ITextProcessor
             _logger.LogError(ex, "{Processor} failed, falling back to original text", Name);
             return text;
         }
-    }
-
-    protected virtual InferenceParams CreateInferenceParams()
-    {
-        return new InferenceParams
-        {
-            MaxTokens = 512,
-            // Keep stop tokens model-specific; do not stop on blank lines,
-            // otherwise multi-paragraph content is truncated.
-            AntiPrompts = ["</s>", "<|im_end|>"],
-            SamplingPipeline = new DefaultSamplingPipeline
-            {
-                Temperature = 0.3f,
-                TopP = 0.9f,
-            }
-        };
     }
 
     public void Dispose() { }

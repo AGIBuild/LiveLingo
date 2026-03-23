@@ -135,7 +135,6 @@ public partial class UpdateSettings : ObservableObject
 public partial class AdvancedSettings : ObservableObject
 {
     [ObservableProperty] private string? _modelStoragePath;
-    [ObservableProperty] private string? _llamaNativeSearchPath;
     [ObservableProperty] private int _inferenceThreads;
     [ObservableProperty] private string _logLevel = "Information";
     [ObservableProperty] private string? _huggingFaceMirror;
@@ -144,7 +143,6 @@ public partial class AdvancedSettings : ObservableObject
     public AdvancedSettings DeepClone() => new()
     {
         ModelStoragePath = ModelStoragePath,
-        LlamaNativeSearchPath = LlamaNativeSearchPath,
         InferenceThreads = InferenceThreads,
         LogLevel = LogLevel,
         HuggingFaceMirror = HuggingFaceMirror,

@@ -39,22 +39,6 @@ public static class CoreOptionsSync
             ? null
             : settings.Advanced.HuggingFaceToken.Trim();
 
-        if (!string.IsNullOrWhiteSpace(settings.Advanced.LlamaNativeSearchPath))
-        {
-            try
-            {
-                target.LlamaNativeSearchPath = Path.GetFullPath(settings.Advanced.LlamaNativeSearchPath.Trim());
-            }
-            catch
-            {
-                target.LlamaNativeSearchPath = settings.Advanced.LlamaNativeSearchPath.Trim();
-            }
-        }
-        else
-        {
-            target.LlamaNativeSearchPath = null;
-        }
-
         modelManager?.ResetHuggingfaceTransportFallback();
     }
 
@@ -69,15 +53,6 @@ public static class CoreOptionsSync
             StringComparison.OrdinalIgnoreCase)
         || !string.Equals(before.HuggingFaceMirror ?? "", after.HuggingFaceMirror ?? "", StringComparison.OrdinalIgnoreCase)
         || !string.Equals(before.HuggingFaceToken ?? "", after.HuggingFaceToken ?? "", StringComparison.Ordinal);
-
-    /// <summary>
-    /// LLama native search path is read only at process start; changing it requires a full app restart.
-    /// </summary>
-    public static bool AdvancedLlamaNativePathChanged(AdvancedSettings before, AdvancedSettings after) =>
-        !string.Equals(
-            NormalizePathForCompare(before.LlamaNativeSearchPath),
-            NormalizePathForCompare(after.LlamaNativeSearchPath),
-            StringComparison.OrdinalIgnoreCase);
 
     public static string NormalizePathForCompare(string? path)
     {

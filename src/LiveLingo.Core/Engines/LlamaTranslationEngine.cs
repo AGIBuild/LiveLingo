@@ -1,6 +1,5 @@
-using LLama;
-using LLama.Common;
-using LLama.Sampling;
+using System.Net.Http.Json;
+using System.Text.Json;
 using LiveLingo.Core.Processing;
 using Microsoft.Extensions.Logging;
 
@@ -9,6 +8,7 @@ namespace LiveLingo.Core.Engines;
 public sealed class LlamaTranslationEngine : ITranslationEngine
 {
     private readonly QwenModelHost _host;
+    private readonly HttpClient _http;
     private readonly ILogger<LlamaTranslationEngine> _logger;
 
     private static readonly Dictionary<string, (string EnglishName, string DisplayName)> Languages =
@@ -29,11 +29,12 @@ public sealed class LlamaTranslationEngine : ITranslationEngine
     public IReadOnlyList<LanguageInfo> SupportedLanguages { get; } =
         Languages.Select(kv => new LanguageInfo(kv.Key, kv.Value.DisplayName)).ToList();
 
-    internal static readonly string[] StopSequences = ["</s>", "<|im_end|>"];
+    internal static readonly string[] StopSequences = ["</s>", "<|im_end|>", "</think>"];
 
-    public LlamaTranslationEngine(QwenModelHost host, ILogger<LlamaTranslationEngine> logger)
+    public LlamaTranslationEngine(QwenModelHost host, HttpClient http, ILogger<LlamaTranslationEngine> logger)
     {
         _host = host;
+        _http = http;
         _logger = logger;
     }
 
@@ -45,36 +46,42 @@ public sealed class LlamaTranslationEngine : ITranslationEngine
         var srcName = GetLanguageName(sourceLanguage);
         var tgtName = GetLanguageName(targetLanguage);
 
-        var weights = await _host.GetWeightsAsync(ct);
-        var executor = new StatelessExecutor(weights, _host.CreateExecutorModelParams());
+        var endpoint = await _host.GetOrStartServerAsync(ct);
+        var url = $"{endpoint}/completion";
 
-        var inferenceParams = new InferenceParams
-        {
-            MaxTokens = 512,
-            AntiPrompts = StopSequences,
-            SamplingPipeline = new DefaultSamplingPipeline
-            {
-                Temperature = 0.1f,
-                TopP = 0.95f,
-            }
-        };
-
-        // Enforce non-thinking mode for reasoning models
-        var systemPrompt = $"You are a professional translator. Translate the user's text from {srcName} to {tgtName}. Output ONLY the translated text, nothing else. Do not output any thought process or explanation.";
+        var systemPrompt = $"You are a professional translator. Translate the user's text from {srcName} to {tgtName}. Output ONLY the translated text, nothing else. Do not output any thought process or explanation. Do not use <think> tags.";
         var prompt = $"<|im_start|>system\n{systemPrompt}<|im_end|>\n<|im_start|>user\n{text}<|im_end|>\n<|im_start|>assistant\n";
 
         _logger.LogDebug("Translation prompt for {Src}→{Tgt}: {Prompt}", sourceLanguage, targetLanguage, prompt);
 
-        var output = new List<string>();
-        var maxOutputLen = Math.Max(150, text.Length * 5);
-        await foreach (var token in executor.InferAsync(prompt, inferenceParams, ct))
+        var requestBody = new
         {
-            output.Add(token);
-            if (string.Concat(output).Length > maxOutputLen)
-                break;
-        }
+            prompt = prompt,
+            n_predict = 512,
+            temperature = 0.1f,
+            top_p = 0.95f,
+            stop = StopSequences,
+            stream = false
+        };
 
-        var result = string.Concat(output).Trim();
+        var response = await _http.PostAsJsonAsync(url, requestBody, ct);
+        response.EnsureSuccessStatusCode();
+        
+        var json = await response.Content.ReadAsStringAsync(ct);
+        using var doc = JsonDocument.Parse(json);
+        var result = doc.RootElement.GetProperty("content").GetString()?.Trim() ?? string.Empty;
+
+        // Clean up <think> tags if the model still generated them
+        if (result.Contains("</think>"))
+        {
+            var parts = result.Split("</think>");
+            result = parts.Last().Trim();
+        }
+        else if (result.StartsWith("<think>"))
+        {
+            // Model generated <think> but didn't finish it
+            result = string.Empty;
+        }
 
         if (string.IsNullOrWhiteSpace(result))
         {
@@ -95,10 +102,10 @@ public sealed class LlamaTranslationEngine : ITranslationEngine
     {
         var srcName = GetLanguageName(sourceLanguage);
         var tgtName = GetLanguageName(targetLanguage);
-        var systemPrompt = $"You are a professional translator. Translate the user's text from {srcName} to {tgtName}. Output ONLY the translated text, nothing else. Do not output any thought process or explanation.";
+        var systemPrompt = $"You are a professional translator. Translate the user's text from {srcName} to {tgtName}. Output ONLY the translated text, nothing else. Do not output any thought process or explanation. Do not use <think> tags.";
         return $"<|im_start|>system\n{systemPrompt}<|im_end|>\n<|im_start|>user\n{text}<|im_end|>\n<|im_start|>assistant\n";
     }
 
     private static string GetLanguageName(string code) =>
-        Languages.TryGetValue(code, out var lang) ? lang.EnglishName : code;
+        Languages.TryGetValue(code, out var info) ? info.EnglishName : code;
 }
