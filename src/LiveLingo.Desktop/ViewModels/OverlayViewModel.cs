@@ -267,8 +267,17 @@ public partial class OverlayViewModel : ObservableObject
             return;
         }
 
+        // Prevent NoKvSlot crash by truncating extremely long texts
+        const int MaxTranslationLength = 2000;
+        var textToTranslate = value;
+        if (textToTranslate.Length > MaxTranslationLength)
+        {
+            textToTranslate = textToTranslate[..MaxTranslationLength];
+            _logger?.LogWarning("Source text too long ({Length} chars), truncated to {MaxLength}", value.Length, MaxTranslationLength);
+        }
+
         _pipelineCts = new CancellationTokenSource();
-        _ = DebounceAndTranslateAsync(value, _pipelineCts.Token);
+        _ = DebounceAndTranslateAsync(textToTranslate, _pipelineCts.Token);
     }
 
     private async Task DebounceAndTranslateAsync(string text, CancellationToken ct)

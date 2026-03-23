@@ -200,7 +200,7 @@ public sealed class QwenModelHost : IDisposable, ILlmModelLoadCoordinator
 
         return new ModelParams(ModelPath)
         {
-            ContextSize = 2048,
+            ContextSize = 4096,
             GpuLayerCount = 0,
             Threads = GetInferenceThreadCount()
         };
@@ -238,7 +238,7 @@ public sealed class QwenModelHost : IDisposable, ILlmModelLoadCoordinator
 
         var parameters = new ModelParams(ModelPath)
         {
-            ContextSize = 2048,
+            ContextSize = 4096, // Increased to support longer texts, but limited by user text length in VM
             GpuLayerCount = 0,
             Threads = GetInferenceThreadCount()
         };
