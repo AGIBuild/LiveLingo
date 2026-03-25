@@ -1,0 +1,86 @@
+
+<h2>推荐目标架构（Section 1: System Architecture）</h2>
+<p class="subtitle">核心思想：前端只消费用例接口；能力编排只依赖 capability；模型后端通过 providers 注册；本地与云端统一到同一套执行协议。</p>
+
+<div class="mockup">
+  <div class="mockup-header">Layered Platform Architecture</div>
+  <div class="mockup-body">
+    <div style="display:grid;gap:14px;">
+      <div style="border:1px solid #6b7280;border-radius:14px;padding:14px;background:#151826;">
+        <div class="label">Frontends</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;">
+          <div class="mock-button">Desktop</div>
+          <div class="mock-button">CLI</div>
+          <div class="mock-button">Future Extension</div>
+        </div>
+      </div>
+
+      <div style="border:1px solid #6b7280;border-radius:14px;padding:14px;background:#131c21;">
+        <div class="label">Host / Shell</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;">
+          <div class="mock-button">Tray</div>
+          <div class="mock-button">Overlay</div>
+          <div class="mock-button">Permissions</div>
+          <div class="mock-button">Updates</div>
+        </div>
+      </div>
+
+      <div style="border:1px solid #6b7280;border-radius:14px;padding:14px;background:#18192c;">
+        <div class="label">Application / Use Cases</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;">
+          <div class="mock-button">TranslateText</div>
+          <div class="mock-button">PolishText</div>
+          <div class="mock-button">SpeechSession</div>
+          <div class="mock-button">ModelSetup</div>
+        </div>
+      </div>
+
+      <div style="border:1px solid #6b7280;border-radius:14px;padding:14px;background:#1e1730;">
+        <div class="label">Capability Runtime</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;">
+          <div class="mock-button">Capability Router</div>
+          <div class="mock-button">Execution Policy</div>
+          <div class="mock-button">Fallback Policy</div>
+          <div class="mock-button">Metrics</div>
+        </div>
+      </div>
+
+      <div style="border:1px solid #6b7280;border-radius:14px;padding:14px;background:#201818;">
+        <div class="label">Provider Registry</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;">
+          <div class="mock-button">Translation Providers</div>
+          <div class="mock-button">Text Processing Providers</div>
+          <div class="mock-button">STT / VAD Providers</div>
+          <div class="mock-button">Cloud Adapters</div>
+        </div>
+      </div>
+
+      <div style="border:1px solid #6b7280;border-radius:14px;padding:14px;background:#1f1f1f;">
+        <div class="label">Infrastructure</div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;">
+          <div class="mock-button">Model Catalog</div>
+          <div class="mock-button">Model Manager</div>
+          <div class="mock-button">Secrets / Profiles</div>
+          <div class="mock-button">Storage</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="yes" onclick="toggleSelect(this)">
+    <div class="letter">✓</div>
+    <div class="content">
+      <h3>This direction looks right</h3>
+      <p>Keep this structure and move to runtime / model-routing details.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="adjust" onclick="toggleSelect(this)">
+    <div class="letter">↺</div>
+    <div class="content">
+      <h3>Adjust boundaries</h3>
+      <p>Keep A, but change some layer boundaries before we continue.</p>
+    </div>
+  </div>
+</div>
