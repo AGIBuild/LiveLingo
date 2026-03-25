@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using System.Net.Http.Headers;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -56,12 +57,15 @@ public class NativeRuntimeUpdater(
             {
                 var request = new HttpRequestMessage(HttpMethod.Head, "https://github.com/ggml-org/llama.cpp/releases/latest");
                 var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
-                var finalUrl = response.RequestMessage?.RequestUri?.ToString() ?? "";
-                
-                var match = Regex.Match(finalUrl, @"tag/([^/]+)");
+                var match = TryMatchReleaseTag(response.RequestMessage?.RequestUri, response.Headers.Location);
                 if (!match.Success)
                 {
-                    logger.LogWarning("Could not determine latest llama.cpp release tag from redirect URL: {Url}", finalUrl);
+                    var requestUrl = response.RequestMessage?.RequestUri?.ToString() ?? "";
+                    var locationUrl = response.Headers.Location?.ToString() ?? "";
+                    logger.LogWarning(
+                        "Could not determine latest llama.cpp release tag from redirect response. RequestUri={RequestUrl}, Location={LocationUrl}",
+                        requestUrl,
+                        locationUrl);
                     return null;
                 }
                 tagName = match.Groups[1].Value;
@@ -86,11 +90,11 @@ public class NativeRuntimeUpdater(
             logger.LogInformation("Downloading newer llama.cpp runtime: {Url}", downloadUrl);
             Directory.CreateDirectory(nativeDir);
             
-            var archivePath = Path.Combine(nativeDir, $"temp.{ext}");
+            // Use a stable name so we can resume partial downloads on retry.
+            var archivePath = Path.Combine(nativeDir, assetName);
             try
             {
-                var bytes = await http.GetByteArrayAsync(downloadUrl, ct);
-                await File.WriteAllBytesAsync(archivePath, bytes, ct);
+                await DownloadWithResumeAsync(http, downloadUrl, archivePath, logger, ct);
             }
             catch (Exception ex) when (ex is HttpRequestException or IOException or TaskCanceledException)
             {
@@ -109,7 +113,14 @@ public class NativeRuntimeUpdater(
                 await TarFile.ExtractToDirectoryAsync(gzipStream, nativeDir, overwriteFiles: true, cancellationToken: ct);
             }
 
-            File.Delete(archivePath);
+            try
+            {
+                File.Delete(archivePath);
+            }
+            catch (IOException)
+            {
+                // Best-effort cleanup only.
+            }
             
             serverExecutable = FindServerExecutable(nativeDir);
             
@@ -132,6 +143,101 @@ public class NativeRuntimeUpdater(
             logger.LogError(ex, "Failed to update native runtime");
             return null;
         }
+    }
+
+    private static async Task DownloadWithResumeAsync(
+        HttpClient http,
+        string url,
+        string destinationPath,
+        ILogger logger,
+        CancellationToken ct)
+    {
+        const int maxAttempts = 3;
+        var delay = TimeSpan.FromSeconds(1);
+
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            try
+            {
+                var existingLength = 0L;
+                if (File.Exists(destinationPath))
+                {
+                    try { existingLength = new FileInfo(destinationPath).Length; }
+                    catch (IOException) { existingLength = 0; }
+                }
+
+                using var request = new HttpRequestMessage(HttpMethod.Get, url);
+                if (existingLength > 0)
+                    request.Headers.Range = new RangeHeaderValue(existingLength, null);
+
+                using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+                response.EnsureSuccessStatusCode();
+
+                var append = response.StatusCode == System.Net.HttpStatusCode.PartialContent && existingLength > 0;
+
+                await using var input = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+                await using var output = new FileStream(
+                    destinationPath,
+                    append ? FileMode.Append : FileMode.Create,
+                    FileAccess.Write,
+                    FileShare.Read,
+                    bufferSize: 1024 * 128,
+                    useAsync: true);
+
+                await input.CopyToAsync(output, ct).ConfigureAwait(false);
+                await output.FlushAsync(ct).ConfigureAwait(false);
+
+                // Best-effort validation for ranged downloads.
+                var contentRange = response.Content.Headers.ContentRange;
+                if (contentRange is { HasLength: true })
+                {
+                    var expectedTotal = contentRange.Length ?? 0;
+                    if (expectedTotal > 0)
+                    {
+                        var finalLen = 0L;
+                        try { finalLen = new FileInfo(destinationPath).Length; } catch (IOException) { }
+                        if (finalLen != expectedTotal)
+                            throw new IOException($"Partial download incomplete (bytes={finalLen}, expected={expectedTotal}).");
+                    }
+                }
+
+                return;
+            }
+            catch (Exception ex) when (ex is HttpRequestException or IOException or TaskCanceledException)
+            {
+                if (attempt == maxAttempts)
+                    throw;
+
+                logger.LogWarning(ex, "Download attempt {Attempt}/{MaxAttempts} failed; retrying in {Delay}.", attempt, maxAttempts, delay);
+                await Task.Delay(delay, ct).ConfigureAwait(false);
+                delay = TimeSpan.FromMilliseconds(Math.Min(delay.TotalMilliseconds * 2, 8000));
+            }
+        }
+    }
+
+    private static Match TryMatchReleaseTag(Uri? requestUri, Uri? locationHeader)
+    {
+        var candidates = new List<string>();
+
+        if (requestUri is not null)
+            candidates.Add(requestUri.ToString());
+
+        if (locationHeader is not null)
+        {
+            candidates.Add(locationHeader.ToString());
+
+            if (!locationHeader.IsAbsoluteUri && requestUri is not null)
+                candidates.Add(new Uri(requestUri, locationHeader).ToString());
+        }
+
+        foreach (var candidate in candidates)
+        {
+            var match = Regex.Match(candidate, @"tag/([^/]+)");
+            if (match.Success)
+                return match;
+        }
+
+        return Regex.Match(string.Empty, @"tag/([^/]+)");
     }
 
     private static string? FindServerExecutable(string nativeDir)

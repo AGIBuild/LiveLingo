@@ -1,8 +1,10 @@
 using LiveLingo.Desktop.Services.Configuration;
 using LiveLingo.Desktop.Services.LanguageCatalog;
 using LiveLingo.Desktop.Messaging;
+using LiveLingo.Desktop.Platform;
 using LiveLingo.Desktop.ViewModels;
 using CommunityToolkit.Mvvm.Messaging;
+using LiveLingo.Core;
 using LiveLingo.Core.Engines;
 using LiveLingo.Core.Models;
 using LiveLingo.Core.Processing;
@@ -17,7 +19,10 @@ public class SetupWizardViewModelTests
         int startStep = 0,
         IMessenger? messenger = null,
         ILlmModelLoadCoordinator? llmCoordinator = null,
-        IReadOnlyList<InstalledModel>? installedModels = null)
+        IReadOnlyList<InstalledModel>? installedModels = null,
+        IClipboardService? clipboard = null,
+        CoreOptions? coreOptions = null,
+        IPlatformServices? platformServices = null)
     {
         var current = new UserSettings();
         var settings = Substitute.For<ISettingsService>();
@@ -28,7 +33,15 @@ public class SetupWizardViewModelTests
         var models = Substitute.For<IModelManager>();
         models.ListInstalled().Returns(installedModels ?? []);
         models.HasAllExpectedLocalAssets(Arg.Any<ModelDescriptor>()).Returns(true);
-        var vm = new SetupWizardViewModel(settings, models, startStep, messenger, llmCoordinator: llmCoordinator);
+        var vm = new SetupWizardViewModel(
+            settings,
+            models,
+            startStep,
+            messenger,
+            clipboard: clipboard,
+            coreOptions: coreOptions,
+            llmCoordinator: llmCoordinator,
+            platformServices: platformServices);
         return (vm, settings, models);
     }
 
@@ -181,14 +194,15 @@ public class SetupWizardViewModelTests
         vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
 
         vm.GoNextCommand.Execute(null);
+        var snapshot = changed.ToArray();
 
-        Assert.Contains(nameof(vm.CanGoBack), changed);
-        Assert.Contains(nameof(vm.CanGoNext), changed);
-        Assert.Contains(nameof(vm.IsLastStep), changed);
-        Assert.Contains(nameof(vm.IsStep0), changed);
-        Assert.Contains(nameof(vm.IsStep1), changed);
-        Assert.Contains(nameof(vm.IsStep2), changed);
-        Assert.Contains(nameof(vm.DisplayStep), changed);
+        Assert.Contains(nameof(vm.CanGoBack), snapshot);
+        Assert.Contains(nameof(vm.CanGoNext), snapshot);
+        Assert.Contains(nameof(vm.IsLastStep), snapshot);
+        Assert.Contains(nameof(vm.IsStep0), snapshot);
+        Assert.Contains(nameof(vm.IsStep1), snapshot);
+        Assert.Contains(nameof(vm.IsStep2), snapshot);
+        Assert.Contains(nameof(vm.DisplayStep), snapshot);
     }
 
     [Fact]
@@ -346,5 +360,113 @@ public class SetupWizardViewModelTests
         var vm = new SetupWizardViewModel(settings, models, languageCatalog: catalog);
 
         Assert.Equal(["en", "ja"], vm.AvailableLanguages.Select(l => l.Code));
+    }
+
+    [Fact]
+    public async Task DownloadModelAsync_ShowsAuthorizationRecoveryMessage_OnAuthFailure()
+    {
+        var (vm, _, models) = Create(startStep: 2);
+
+        models.EnsureModelAsync(Arg.Any<ModelDescriptor>(), Arg.Any<IProgress<ModelDownloadProgress>?>(), Arg.Any<CancellationToken>())
+            .Returns<Task>(_ => throw new ModelDownloadAuthorizationException("forbidden"));
+
+        await vm.DownloadModelCommand.ExecuteAsync(null);
+
+        Assert.True(vm.HasError);
+        Assert.Contains("token", vm.DownloadStatus!, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Settings", vm.DownloadStatus!, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void OpenAdvancedForHuggingFaceCommand_SendsOpenSettingsAdvancedRequest()
+    {
+        var messenger = new WeakReferenceMessenger();
+        var recipient = new object();
+        AppUiRequest? received = null;
+        messenger.Register<object, AppUiRequestMessage>(recipient, (_, message) =>
+            received = message.Value);
+        var (vm, _, _) = Create(messenger: messenger);
+
+        vm.OpenAdvancedForHuggingFaceCommand.Execute(null);
+
+        Assert.NotNull(received);
+        Assert.Equal(AppUiRequestKind.OpenSettings, received!.Kind);
+        Assert.Equal(3, received.SettingsInitialTabIndex);
+    }
+
+    [Fact]
+    public void SettingsChangedMessage_RefreshesHuggingFaceTokenUiState()
+    {
+        var messenger = new WeakReferenceMessenger();
+        var coreOptions = new CoreOptions();
+        var (vm, _, _) = Create(messenger: messenger, coreOptions: coreOptions);
+
+        Assert.False(vm.HasHuggingFaceTokenConfigured);
+        Assert.True(vm.ShowHuggingFaceTokenMissingCallout);
+
+        coreOptions.HuggingFaceToken = "hf_test_token";
+        messenger.Send(new SettingsChangedMessage());
+
+        Assert.True(vm.HasHuggingFaceTokenConfigured);
+        Assert.False(vm.ShowHuggingFaceTokenMissingCallout);
+    }
+
+    [Fact]
+    public async Task CopyUrlCommand_CopiesRequiredModelDownloadUrl()
+    {
+        var clipboard = Substitute.For<IClipboardService>();
+        var (vm, _, _) = Create(startStep: 2, clipboard: clipboard);
+
+        await vm.CopyUrlCommand.ExecuteAsync(null);
+
+        await clipboard.Received(1).SetTextAsync(ModelRegistry.Qwen35_9B.DownloadUrl, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public void OpenRequiredModelOnHuggingFaceCommand_OpensResolvedModelCardUrl()
+    {
+        var platform = Substitute.For<IPlatformServices>();
+        var (vm, _, _) = Create(startStep: 2, platformServices: platform);
+
+        vm.OpenRequiredModelOnHuggingFaceCommand.Execute(null);
+
+        platform.Received(1).OpenUrl("https://huggingface.co/Abhiray/Qwen3.5-9B-abliterated-GGUF");
+    }
+
+    [Fact]
+    public void SourceLanguageChange_RefreshesModelInstalledState()
+    {
+        var installed = ModelRegistry.GetRequiredModelsForLanguagePair("zh", "en")
+            .Select(m => new InstalledModel(m.Id, m.DisplayName, "/path", m.SizeBytes, m.Type, DateTime.UtcNow))
+            .ToArray();
+        var (vm, _, models) = Create(installedModels: installed);
+
+        Assert.True(vm.IsModelInstalled);
+
+        models.ListInstalled().Returns([]);
+        vm.SourceLanguage = "ja";
+
+        Assert.False(vm.IsModelInstalled);
+    }
+
+    [Fact]
+    public void ShowOpenRequiredModelOnHuggingFace_IsFalseWithoutPlatform()
+    {
+        var (vm, _, _) = Create(startStep: 2);
+
+        Assert.False(vm.ShowOpenRequiredModelOnHuggingFace);
+    }
+
+    [Fact]
+    public void ShowOpenModelPageOnDownloadFailure_RequiresErrorAndPlatform()
+    {
+        var platform = Substitute.For<IPlatformServices>();
+        var (vm, _, _) = Create(startStep: 2, platformServices: platform);
+
+        Assert.False(vm.ShowOpenModelPageOnDownloadFailure);
+
+        vm.HasError = true;
+
+        Assert.True(vm.ShowOpenModelPageOnDownloadFailure);
     }
 }

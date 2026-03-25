@@ -55,8 +55,20 @@ public sealed class TranslationPipeline : ITranslationPipeline
             _modelReadiness.EnsurePostProcessingModelReady();
 
         var sw = Stopwatch.StartNew();
-        var translated = await _engine.TranslateAsync(
-            request.SourceText, srcLang, request.TargetLanguage, ct);
+        string translated;
+        try
+        {
+            translated = await _engine.TranslateAsync(
+                request.SourceText, srcLang, request.TargetLanguage, ct);
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (ModelNotReadyException) { throw; }
+        catch (NotSupportedException) { throw; }
+        catch (TranslationFailedException) { throw; }
+        catch (InvalidOperationException ex)
+        {
+            throw new TranslationFailedException("Translation failed.", ex);
+        }
         var translationDuration = sw.Elapsed;
 
         ct.ThrowIfCancellationRequested();

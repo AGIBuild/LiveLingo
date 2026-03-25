@@ -64,7 +64,7 @@ public sealed class LlamaServerProcessManager : ILlamaServerProcessManager
             var startInfo = new ProcessStartInfo
             {
                 FileName = serverExe,
-                Arguments = $"-m \"{modelPath}\" -c {contextSize} --port {port} --threads {inferenceThreads}",
+                Arguments = BuildArguments(modelPath, contextSize, inferenceThreads, port),
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
@@ -152,6 +152,9 @@ public sealed class LlamaServerProcessManager : ILlamaServerProcessManager
             }
         }
     }
+
+    internal static string BuildArguments(string modelPath, int contextSize, int inferenceThreads, int port) =>
+        $"-m \"{modelPath}\" -c {contextSize} --port {port} --threads {inferenceThreads} --reasoning-format none --reasoning off";
 
     private int GetAvailablePort()
     {

@@ -1,10 +1,13 @@
 using LiveLingo.Desktop.Services.Configuration;
 using LiveLingo.Desktop.Services.LanguageCatalog;
 using LiveLingo.Desktop.Messaging;
+using LiveLingo.Desktop.Platform;
 using LiveLingo.Desktop.ViewModels;
 using CommunityToolkit.Mvvm.Messaging;
+using LiveLingo.Core;
 using LiveLingo.Core.Engines;
 using LiveLingo.Core.Models;
+using LiveLingo.Core.Processing;
 using NSubstitute;
 using UserSettings = LiveLingo.Desktop.Services.Configuration.SettingsModel;
 
@@ -91,6 +94,29 @@ public class SettingsViewModelTests
         await vm.SaveCommand.ExecuteAsync(null);
 
         Assert.True(settingsChanged);
+        Assert.Equal(AppUiRequestKind.CloseSettings, receivedKind);
+    }
+
+    [Fact]
+    public async Task SaveCommand_WhenNotDirty_OnlyClosesWithoutPersistingOrBroadcasting()
+    {
+        var messenger = new WeakReferenceMessenger();
+        var recipient = new object();
+        AppUiRequestKind? receivedKind = null;
+        var settingsChanged = false;
+        var svc = CreateSettings();
+        messenger.Register<object, AppUiRequestMessage>(recipient, (_, message) =>
+            receivedKind = message.Value.Kind);
+        messenger.Register<object, SettingsChangedMessage>(recipient, (_, _) =>
+            settingsChanged = true);
+        var vm = new SettingsViewModel(svc, messenger: messenger);
+
+        Assert.False(vm.IsDirty);
+
+        await vm.SaveCommand.ExecuteAsync(null);
+
+        svc.DidNotReceive().Replace(Arg.Any<UserSettings>());
+        Assert.False(settingsChanged);
         Assert.Equal(AppUiRequestKind.CloseSettings, receivedKind);
     }
 
@@ -248,6 +274,51 @@ public class SettingsViewModelTests
         Assert.Equal("Alt+X", vm.WorkingCopy.Hotkeys.OverlayToggle);
         Assert.Equal("ja", vm.WorkingCopy.Translation.DefaultSourceLanguage);
         Assert.Equal(8, vm.WorkingCopy.Advanced.InferenceThreads);
+    }
+
+    [Fact]
+    public void CancelCommand_AfterReset_RestoresCurrentSettingsAndClearsDirty()
+    {
+        var settings = new UserSettings
+        {
+            Hotkeys = new HotkeySettings { OverlayToggle = "Alt+X" },
+            Translation = new TranslationSettings { DefaultSourceLanguage = "ja", DefaultTargetLanguage = "zh" }
+        };
+        var svc = CreateSettings(settings);
+        var vm = new SettingsViewModel(svc);
+
+        vm.ResetCommand.Execute(null);
+        Assert.True(vm.IsDirty);
+
+        vm.CancelCommand.Execute(null);
+
+        Assert.Equal("Alt+X", vm.WorkingCopy.Hotkeys.OverlayToggle);
+        Assert.Equal("ja", vm.WorkingCopy.Translation.DefaultSourceLanguage);
+        Assert.Equal("zh", vm.WorkingCopy.Translation.DefaultTargetLanguage);
+        Assert.False(vm.IsDirty);
+    }
+
+    [Fact]
+    public async Task SaveCommand_AfterReset_PersistsDefaults()
+    {
+        var customPath = Path.Combine(Path.GetTempPath(), "custom-models");
+        var svc = CreateSettings(new UserSettings
+        {
+            Hotkeys = new HotkeySettings { OverlayToggle = "Alt+X" },
+            Translation = new TranslationSettings { DefaultSourceLanguage = "ja", DefaultTargetLanguage = "zh" },
+            Advanced = new AdvancedSettings { ModelStoragePath = customPath, InferenceThreads = 8 }
+        });
+        var modelManager = Substitute.For<IModelManager>();
+        var vm = new SettingsViewModel(svc, modelManager);
+
+        vm.ResetCommand.Execute(null);
+        await vm.SaveCommand.ExecuteAsync(null);
+
+        var defaults = new UserSettings();
+        Assert.Equal(defaults.Hotkeys.OverlayToggle, svc.Current.Hotkeys.OverlayToggle);
+        Assert.Equal(defaults.Translation.DefaultSourceLanguage, svc.Current.Translation.DefaultSourceLanguage);
+        Assert.Equal(defaults.Translation.DefaultTargetLanguage, svc.Current.Translation.DefaultTargetLanguage);
+        Assert.Equal(defaults.Advanced.InferenceThreads, svc.Current.Advanced.InferenceThreads);
     }
 
     [Theory]
@@ -664,6 +735,47 @@ public class SettingsViewModelTests
     }
 
     [Fact]
+    public async Task SaveCommand_WhenOnlyLanguagePairChanges_SelectsMatchingInstalledTranslationModel()
+    {
+        var svc = CreateSettings(new UserSettings
+        {
+            Translation = new TranslationSettings
+            {
+                DefaultSourceLanguage = "zh",
+                DefaultTargetLanguage = "en"
+            }
+        });
+        var modelManager = Substitute.For<IModelManager>();
+        modelManager.ListInstalled().Returns(
+        [
+            new InstalledModel(
+                "opus-mt-zh-en",
+                "MarianMT Chinese→English",
+                "/tmp/models/opus-mt-zh-en",
+                100,
+                ModelType.Translation,
+                DateTime.UtcNow),
+            new InstalledModel(
+                "opus-mt-en-zh",
+                "MarianMT English→Chinese",
+                "/tmp/models/opus-mt-en-zh",
+                100,
+                ModelType.Translation,
+                DateTime.UtcNow)
+        ]);
+        var vm = new SettingsViewModel(svc, modelManager, new StubTranslationEngine());
+
+        vm.WorkingCopy.Translation.DefaultSourceLanguage = "en";
+        vm.WorkingCopy.Translation.DefaultTargetLanguage = "zh";
+
+        await vm.SaveCommand.ExecuteAsync(null);
+
+        Assert.Equal("opus-mt-en-zh", svc.Current.Translation.ActiveTranslationModelId);
+        Assert.Equal("en", svc.Current.Translation.DefaultSourceLanguage);
+        Assert.Equal("zh", svc.Current.Translation.DefaultTargetLanguage);
+    }
+
+    [Fact]
     public void SelectedUILanguage_DefaultsToEnglish()
     {
         var vm = new SettingsViewModel(CreateSettings());
@@ -693,6 +805,91 @@ public class SettingsViewModelTests
         var saved = svc.Current;
 
         Assert.Equal("zh-CN", saved.UI.Language);
+    }
+
+    [Fact]
+    public async Task SaveCommand_WhenAdvancedLlmSettingChanges_RequestsLlmRetry()
+    {
+        var svc = CreateSettings(new UserSettings
+        {
+            Advanced = new AdvancedSettings { HuggingFaceToken = "old-token" }
+        });
+        var coordinator = Substitute.For<ILlmModelLoadCoordinator>();
+        var coreOptions = new CoreOptions();
+        var vm = new SettingsViewModel(
+            svc,
+            engine: new StubTranslationEngine(),
+            coreOptions: coreOptions,
+            llmCoordinator: coordinator);
+
+        vm.WorkingCopy.Advanced.HuggingFaceToken = "new-token";
+
+        await vm.SaveCommand.ExecuteAsync(null);
+
+        await coordinator.Received(1).RequestRetryPrimaryTranslationModelAsync(Arg.Any<CancellationToken>());
+        Assert.Equal("new-token", coreOptions.HuggingFaceToken);
+    }
+
+    [Fact]
+    public async Task SaveCommand_WhenTranslationModelChanges_RequestsLlmRetry()
+    {
+        var svc = CreateSettings(new UserSettings
+        {
+            Translation = new TranslationSettings { ActiveTranslationModelId = "opus-mt-zh-en" }
+        });
+        var modelManager = Substitute.For<IModelManager>();
+        modelManager.ListInstalled().Returns(
+        [
+            new InstalledModel(
+                "opus-mt-zh-en",
+                "MarianMT Chinese→English",
+                "/tmp/models/opus-mt-zh-en",
+                100,
+                ModelType.Translation,
+                DateTime.UtcNow),
+            new InstalledModel(
+                "opus-mt-en-zh",
+                "MarianMT English→Chinese",
+                "/tmp/models/opus-mt-en-zh",
+                100,
+                ModelType.Translation,
+                DateTime.UtcNow)
+        ]);
+        var coordinator = Substitute.For<ILlmModelLoadCoordinator>();
+        var coreOptions = new CoreOptions();
+        var vm = new SettingsViewModel(
+            svc,
+            modelManager,
+            new StubTranslationEngine(),
+            coreOptions: coreOptions,
+            llmCoordinator: coordinator);
+
+        vm.WorkingCopy.Translation.ActiveTranslationModelId = "opus-mt-en-zh";
+
+        await vm.SaveCommand.ExecuteAsync(null);
+
+        await coordinator.Received(1).RequestRetryPrimaryTranslationModelAsync(Arg.Any<CancellationToken>());
+        Assert.Equal("opus-mt-en-zh", coreOptions.ActiveTranslationModelId);
+    }
+
+    [Fact]
+    public async Task SaveCommand_WhenOnlyUiSettingChanges_DoesNotRequestLlmRetry()
+    {
+        var svc = CreateSettings();
+        var coordinator = Substitute.For<ILlmModelLoadCoordinator>();
+        var coreOptions = new CoreOptions();
+        var vm = new SettingsViewModel(
+            svc,
+            engine: new StubTranslationEngine(),
+            coreOptions: coreOptions,
+            llmCoordinator: coordinator);
+
+        vm.WorkingCopy.UI.Language = "zh-CN";
+
+        await vm.SaveCommand.ExecuteAsync(null);
+
+        await coordinator.DidNotReceive().RequestRetryPrimaryTranslationModelAsync(Arg.Any<CancellationToken>());
+        Assert.Equal("zh-CN", svc.Current.UI.Language);
     }
 
     [Fact]
@@ -738,5 +935,39 @@ public class SettingsViewModelTests
         var vm = new SettingsViewModel(svc);
 
         Assert.Equal("en-US", vm.WorkingCopy.UI.Language);
+    }
+
+    [Fact]
+    public void OpenAdvancedTabForTokenCommand_SelectsAdvancedTab()
+    {
+        var vm = new SettingsViewModel(CreateSettings());
+
+        vm.OpenAdvancedTabForTokenCommand.Execute(null);
+
+        Assert.Equal(3, vm.SelectedTabIndex);
+    }
+
+    [Fact]
+    public void OpenHuggingFaceTokenSettingsPageCommand_OpensTokenUrl()
+    {
+        var platform = Substitute.For<IPlatformServices>();
+        var modelManager = Substitute.For<IModelManager>();
+        var vm = new SettingsViewModel(CreateSettings(), modelManager, platformServices: platform);
+
+        vm.OpenHuggingFaceTokenSettingsPageCommand.Execute(null);
+
+        platform.Received(1).OpenUrl("https://huggingface.co/settings/tokens");
+    }
+
+    [Fact]
+    public void OpenPrimaryTranslationModelOnHuggingFaceCommand_OpensModelPage()
+    {
+        var platform = Substitute.For<IPlatformServices>();
+        var modelManager = Substitute.For<IModelManager>();
+        var vm = new SettingsViewModel(CreateSettings(), modelManager, platformServices: platform);
+
+        vm.OpenPrimaryTranslationModelOnHuggingFaceCommand.Execute(null);
+
+        platform.Received(1).OpenUrl(Arg.Is<string>(url => url.Contains("huggingface.co", StringComparison.OrdinalIgnoreCase)));
     }
 }

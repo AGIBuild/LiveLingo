@@ -116,6 +116,7 @@
   "overlay.translatedWithPost": "已翻译 ({0} + {1} 后处理)",
   "overlay.error": "错误: {0}",
   "overlay.error.targetNotConfigured": "错误: 目标语言未配置。",
+  "overlay.error.translationFailed": "翻译失败，请重试。",
   "overlay.error.unsupportedPair": "错误: 不支持的语言对 {0}→{1}。",
   "overlay.error.modelNotDownloaded": "错误: 模型未下载，请前往 设置 → 模型。",
   "overlay.postprocess.fallback": "AI 后处理模型未下载，已自动切换为仅翻译。请前往 设置 → 模型 下载。",
