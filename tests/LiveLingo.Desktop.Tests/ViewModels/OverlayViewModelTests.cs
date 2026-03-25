@@ -392,6 +392,20 @@ public class OverlayViewModelTests
     }
 
     [Fact]
+    public async Task RunPipelineAsync_ShowsFriendlyError_WhenTranslationFails()
+    {
+        _pipeline.ProcessAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+            .Returns<TranslationResult>(_ => throw new TranslationFailedException("Translation failed."));
+
+        var vm = CreateVm();
+        vm.SourceText = "test";
+        await Task.Delay(1000, TestContext.Current.CancellationToken);
+
+        Assert.Contains("Translation failed", vm.StatusText, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Error: Translation failed.", vm.StatusText, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task RunPipelineAsync_SilentOnCancellation()
     {
         _pipeline.ProcessAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
@@ -860,7 +874,7 @@ public class OverlayViewModelTests
         vm.SourceText = "test";
         await Task.Delay(1000, TestContext.Current.CancellationToken);
 
-        Assert.Contains("Model not downloaded", vm.StatusText);
+        Assert.Contains("Unsupported language pair", vm.StatusText);
         await _pipeline.Received(1)
             .ProcessAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>());
     }
@@ -1194,6 +1208,147 @@ public class OverlayViewModelTests
     {
         var vm = CreateVm();
         vm.OpenSettingsCommand.Execute(null);
+    }
+
+    [Fact]
+    public async Task PostProcessingFallbackNotice_IsShownOnlyOncePerSession()
+    {
+        var settings = new UserSettings
+        {
+            Processing = new ProcessingSettings { DefaultMode = "Summarize" }
+        };
+        _pipeline.ProcessAsync(
+                Arg.Is<TranslationRequest>(r => r.PostProcessing != null),
+                Arg.Any<CancellationToken>())
+            .Returns<TranslationResult>(_ => throw new ModelNotReadyException(
+                ModelType.PostProcessing,
+                ModelRegistry.Qwen25_15B.Id,
+                "missing",
+                "download"));
+        _pipeline.ProcessAsync(
+                Arg.Is<TranslationRequest>(r => r.PostProcessing == null),
+                Arg.Any<CancellationToken>())
+            .Returns(new TranslationResult("Result", "zh", "Result", TimeSpan.FromMilliseconds(10), null));
+
+        var vm = new OverlayViewModel(_target, _pipeline, _injector, _engine, settings, localizationService: _loc);
+
+        vm.SourceText = "第一次";
+        await Task.Delay(1000, TestContext.Current.CancellationToken);
+        var firstStatus = vm.StatusText;
+
+        vm.SourceText = "第二次";
+        await Task.Delay(1000, TestContext.Current.CancellationToken);
+        var secondStatus = vm.StatusText;
+
+        Assert.Contains("translation-only", firstStatus, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("translation-only", secondStatus, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task SettingsChangedMessage_ReappliesSettings_AndRetranslatesWithUpdatedPostProcessingMode()
+    {
+        var settings = new UserSettings
+        {
+            Translation = new TranslationSettings
+            {
+                DefaultSourceLanguage = "zh",
+                DefaultTargetLanguage = "en"
+            },
+            Processing = new ProcessingSettings { DefaultMode = "Off" }
+        };
+        var settingsService = CreateMutableSettingsService(settings);
+        var messenger = new WeakReferenceMessenger();
+
+        _pipeline.ProcessAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+            .Returns(new TranslationResult("Result", "zh", "Result", TimeSpan.FromMilliseconds(10), null));
+
+        var vm = new OverlayViewModel(
+            _target,
+            _pipeline,
+            _injector,
+            _engine,
+            settings,
+            localizationService: _loc,
+            settingsService: settingsService,
+            messenger: messenger);
+
+        vm.SourceText = "hello";
+        await Task.Delay(1000, TestContext.Current.CancellationToken);
+
+        var updated = settings.DeepClone();
+        updated.Processing.DefaultMode = "Summarize";
+        settingsService.Replace(updated);
+        messenger.Send(new SettingsChangedMessage());
+
+        await Task.Delay(1000, TestContext.Current.CancellationToken);
+
+        await _pipeline.Received().ProcessAsync(
+            Arg.Is<TranslationRequest>(r =>
+                r.SourceText == "hello" &&
+                r.PostProcessing != null &&
+                r.PostProcessing.Summarize),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ApplySettings_AfterPostProcessingFallback_RetriesPostProcessingForNewRuntimeSettings()
+    {
+        var settings = new UserSettings
+        {
+            Translation = new TranslationSettings
+            {
+                DefaultSourceLanguage = "zh",
+                DefaultTargetLanguage = "en"
+            },
+            Processing = new ProcessingSettings { DefaultMode = "Summarize" }
+        };
+
+        _pipeline.ProcessAsync(
+                Arg.Is<TranslationRequest>(r => r.TargetLanguage == "en" && r.PostProcessing != null),
+                Arg.Any<CancellationToken>())
+            .Returns<TranslationResult>(_ => throw new ModelNotReadyException(
+                ModelType.PostProcessing,
+                ModelRegistry.Qwen25_15B.Id,
+                "missing",
+                "download"));
+        _pipeline.ProcessAsync(
+                Arg.Is<TranslationRequest>(r => r.TargetLanguage == "en" && r.PostProcessing == null),
+                Arg.Any<CancellationToken>())
+            .Returns(new TranslationResult("Result", "zh", "Result", TimeSpan.FromMilliseconds(10), null));
+        _pipeline.ProcessAsync(
+                Arg.Is<TranslationRequest>(r => r.TargetLanguage == "ja" && r.PostProcessing != null),
+                Arg.Any<CancellationToken>())
+            .Returns<TranslationResult>(_ => throw new ModelNotReadyException(
+                ModelType.PostProcessing,
+                ModelRegistry.Qwen25_15B.Id,
+                "missing",
+                "download"));
+        _pipeline.ProcessAsync(
+                Arg.Is<TranslationRequest>(r => r.TargetLanguage == "ja" && r.PostProcessing == null),
+                Arg.Any<CancellationToken>())
+            .Returns(new TranslationResult("結果", "zh", "結果", TimeSpan.FromMilliseconds(10), null));
+
+        var vm = new OverlayViewModel(_target, _pipeline, _injector, _engine, settings, localizationService: _loc);
+        vm.SourceText = "hello";
+        await Task.Delay(1000, TestContext.Current.CancellationToken);
+
+        var updated = settings.DeepClone();
+        updated.Translation.DefaultTargetLanguage = "ja";
+        vm.ApplySettings(updated);
+
+        await Task.Delay(1000, TestContext.Current.CancellationToken);
+
+        await _pipeline.Received(1).ProcessAsync(
+            Arg.Is<TranslationRequest>(r => r.TargetLanguage == "en" && r.PostProcessing != null),
+            Arg.Any<CancellationToken>());
+        await _pipeline.Received(1).ProcessAsync(
+            Arg.Is<TranslationRequest>(r => r.TargetLanguage == "ja" && r.PostProcessing != null),
+            Arg.Any<CancellationToken>());
+        await _pipeline.Received(1).ProcessAsync(
+            Arg.Is<TranslationRequest>(r => r.TargetLanguage == "ja" && r.PostProcessing == null),
+            Arg.Any<CancellationToken>());
+        Assert.Contains("translation-only", vm.StatusText, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("ja", vm.TargetLanguage);
     }
 
     // --- D3: Language picker tests ---

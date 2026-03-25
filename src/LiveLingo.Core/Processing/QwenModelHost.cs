@@ -14,6 +14,7 @@ public sealed class QwenModelHost : IDisposable, ILlmModelLoadCoordinator
     private readonly ILogger<QwenModelHost> _logger;
     private readonly SemaphoreSlim _loadLock = new(1, 1);
     private readonly Timer _idleTimer;
+    private Task? _ensureServerTask;
 
     private const int IdleTimeoutMs = 300_000; // 5 minutes
 
@@ -63,6 +64,7 @@ public sealed class QwenModelHost : IDisposable, ILlmModelLoadCoordinator
             await _serverManager.StopServerAsync();
             _activeModelDescriptor = GetActiveModelDescriptor();
             ModelPath = string.Empty;
+            _ensureServerTask = null;
             _idleTimer.Change(Timeout.Infinite, Timeout.Infinite);
             _logger.LogInformation(
                 "Translation LLM reset to prefer primary model {PrimaryId} on next load.",
@@ -84,27 +86,32 @@ public sealed class QwenModelHost : IDisposable, ILlmModelLoadCoordinator
         if (_serverManager.State == ModelLoadState.Loaded && !string.IsNullOrEmpty(_serverManager.CurrentEndpointUrl))
             return _serverManager.CurrentEndpointUrl;
 
+        Task ensureTask;
         await _loadLock.WaitAsync(ct);
         try
         {
             if (_serverManager.State == ModelLoadState.Loaded && !string.IsNullOrEmpty(_serverManager.CurrentEndpointUrl))
                 return _serverManager.CurrentEndpointUrl;
 
-            try
-            {
-                await LoadPrimaryOrFallbackAsync(ct).ConfigureAwait(false);
-                _logger.LogDebug("Qwen model loaded via server: {ModelId}", _activeModelDescriptor.Id);
-                return _serverManager.CurrentEndpointUrl!;
-            }
-            catch
-            {
-                throw;
-            }
+            // Important: model download + native runtime download can take minutes and should not be cancelled
+            // just because a single overlay request was cancelled. We let the caller cancel waiting, while the
+            // background load continues and is shared by subsequent requests.
+            if (_ensureServerTask is null || _ensureServerTask.IsCompleted)
+                _ensureServerTask = LoadPrimaryOrFallbackAsync(CancellationToken.None);
+
+            ensureTask = _ensureServerTask;
         }
         finally
         {
             _loadLock.Release();
         }
+
+        await ensureTask.WaitAsync(ct).ConfigureAwait(false);
+
+        if (_serverManager.State == ModelLoadState.Loaded && !string.IsNullOrEmpty(_serverManager.CurrentEndpointUrl))
+            return _serverManager.CurrentEndpointUrl;
+
+        throw new InvalidOperationException("llama-server did not reach a ready state after load completed.");
     }
 
     private async Task LoadPrimaryOrFallbackAsync(CancellationToken ct)

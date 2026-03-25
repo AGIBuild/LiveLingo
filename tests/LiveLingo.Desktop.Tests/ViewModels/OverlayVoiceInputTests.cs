@@ -384,6 +384,56 @@ public class OverlayVoiceInputTests
         Assert.Equal("ends with space next", vm.SourceText);
     }
 
+    [Fact]
+    public async Task SuccessfulTranscription_TranslationFailure_ShowsFriendlyTranslationStatus()
+    {
+        _pipeline.ProcessAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+            .Returns<TranslationResult>(_ => throw new TranslationFailedException("Translation failed."));
+
+        var vm = CreateVm();
+        vm.VoiceState = VoiceInputState.Recording;
+
+        _coordinator.StopAndTranscribeAsync(Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(new SpeechInputResult(true, "voice text", SpeechInputErrorCode.None));
+
+        await vm.ToggleVoiceInputCommand.ExecuteAsync(null);
+        await Task.Delay(1000, TestContext.Current.CancellationToken);
+
+        Assert.Equal("voice text", vm.SourceText);
+        Assert.Contains("Translation failed", vm.StatusText, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task SuccessfulTranscription_UnsupportedPair_ShowsUnsupportedPairStatus()
+    {
+        var settings = new UserSettings
+        {
+            Translation = new LiveLingo.Desktop.Services.Configuration.TranslationSettings
+            {
+                DefaultSourceLanguage = "ja",
+                DefaultTargetLanguage = "en"
+            }
+        };
+
+        _pipeline.ProcessAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+            .Returns<TranslationResult>(_ => throw new NotSupportedException("unsupported pair"));
+
+        var vm = new OverlayViewModel(
+            Target, _pipeline, _injector, _engine, settings,
+            localizationService: _loc,
+            speechCoordinator: _coordinator);
+        vm.VoiceState = VoiceInputState.Recording;
+
+        _coordinator.StopAndTranscribeAsync(Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(new SpeechInputResult(true, "voice text", SpeechInputErrorCode.None));
+
+        await vm.ToggleVoiceInputCommand.ExecuteAsync(null);
+        await Task.Delay(1000, TestContext.Current.CancellationToken);
+
+        Assert.Equal("voice text", vm.SourceText);
+        Assert.Contains("Unsupported language pair", vm.StatusText, StringComparison.OrdinalIgnoreCase);
+    }
+
     private sealed class DeterministicTranslationEngine : ITranslationEngine
     {
         public IReadOnlyList<LanguageInfo> SupportedLanguages { get; } =

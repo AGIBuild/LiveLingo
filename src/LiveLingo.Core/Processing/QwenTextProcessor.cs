@@ -29,42 +29,15 @@ public abstract class QwenTextProcessor : ITextProcessor
             var endpoint = await _host.GetOrStartServerAsync(ct);
             var url = $"{endpoint}/v1/chat/completions";
 
-            var requestBody = new
-            {
-                messages = new[]
-                {
-                    new { role = "system", content = $"{SystemPrompt} Do not use <think> tags." },
-                    new { role = "user", content = text }
-                },
-                max_tokens = 512,
-                temperature = 0.3f,
-                top_p = 0.9f,
-                stop = new[] { "</s>", "<|im_end|>", "</think>" },
-                stream = false
-            };
+            var requestBody = LlamaServerChatRequest.CreateTextProcessor(SystemPrompt, text);
 
             var response = await _http.PostAsJsonAsync(url, requestBody, ct);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync(ct);
             using var doc = JsonDocument.Parse(json);
-            var result = doc.RootElement
-                .GetProperty("choices")[0]
-                .GetProperty("message")
-                .GetProperty("content")
-                .GetString()?.Trim() ?? string.Empty;
-
-            // Clean up <think> tags if the model still generated them
-            if (result.Contains("</think>"))
-            {
-                var parts = result.Split("</think>");
-                result = parts.Last().Trim();
-            }
-            else if (result.StartsWith("<think>"))
-            {
-                // Model generated <think> but didn't finish it
-                result = string.Empty;
-            }
+            var result = LlamaServerChatResponse.GetAssistantText(doc.RootElement);
+            result = LlamaServerChatResponse.StripQwenThinkTags(result);
 
             if (string.IsNullOrWhiteSpace(result))
             {

@@ -433,4 +433,18 @@ public class TranslationPipelineTests
         Assert.Equal("translated", result.Text);
         _readiness.DidNotReceive().EnsurePostProcessingModelReady();
     }
+
+    [Fact]
+    public async Task ProcessAsync_WrapsEngineFailure_AsTranslationFailedException()
+    {
+        _engine.TranslateAsync("src", "zh", "en", Arg.Any<CancellationToken>())
+            .Returns<string>(_ => throw new InvalidOperationException("Translation returned empty output."));
+
+        var ex = await Assert.ThrowsAsync<TranslationFailedException>(() => _pipeline.ProcessAsync(
+            new TranslationRequest("src", "zh", "en", null),
+            CancellationToken.None));
+
+        Assert.Equal("Translation failed.", ex.Message);
+        Assert.IsType<InvalidOperationException>(ex.InnerException);
+    }
 }

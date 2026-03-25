@@ -342,7 +342,7 @@ public partial class SetupWizardViewModel : ObservableObject
             CoreOptionsSync.ApplyFromSettings(workingCopy, _coreOptions, _modelManager);
         if (_llmCoordinator is not null &&
             (CoreOptionsSync.AdvancedSettingsAffectLlmLoad(advancedBefore, workingCopy.Advanced) || IsModelInstalled))
-            await _llmCoordinator.RequestRetryPrimaryTranslationModelAsync(CancellationToken.None).ConfigureAwait(false);
+            await _llmCoordinator.RequestRetryPrimaryTranslationModelAsync(CancellationToken.None);
         _messenger.Send(new SettingsChangedMessage());
         _messenger.Send(new AppUiRequestMessage(new AppUiRequest(this, AppUiRequestKind.CloseSetupWizard)));
     }

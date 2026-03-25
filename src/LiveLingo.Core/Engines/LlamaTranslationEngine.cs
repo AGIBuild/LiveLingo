@@ -29,8 +29,6 @@ public sealed class LlamaTranslationEngine : ITranslationEngine
     public IReadOnlyList<LanguageInfo> SupportedLanguages { get; } =
         Languages.Select(kv => new LanguageInfo(kv.Key, kv.Value.DisplayName)).ToList();
 
-    internal static readonly string[] StopSequences = ["</s>", "<|im_end|>", "</think>"];
-
     public LlamaTranslationEngine(QwenModelHost host, HttpClient http, ILogger<LlamaTranslationEngine> logger)
     {
         _host = host;
@@ -49,52 +47,26 @@ public sealed class LlamaTranslationEngine : ITranslationEngine
         var endpoint = await _host.GetOrStartServerAsync(ct);
         var url = $"{endpoint}/v1/chat/completions";
 
-        var systemPrompt = $"You are an expert translation engine. Your task is to translate the source text from {srcName} to {tgtName}.\n\nRules:\n1. Output ONLY the final {tgtName} translation.\n2. Do NOT output any {srcName} text.\n3. Do NOT output any explanations, conversational text, or notes.\n4. Do NOT use <think> tags or output any thought process.";
-        var userPrompt = $"Translate the following {srcName} text to {tgtName}:\n\n<source>\n{text}\n</source>";
+        var requestBody = LlamaServerChatRequest.CreateTranslation(text, srcName, tgtName);
 
-        _logger.LogDebug("Translation prompt for {Src}→{Tgt}: {Prompt}", sourceLanguage, targetLanguage, userPrompt);
-
-        var requestBody = new
-        {
-            messages = new[]
-            {
-                new { role = "system", content = systemPrompt },
-                new { role = "user", content = userPrompt }
-            },
-            max_tokens = 512,
-            temperature = 0.1f,
-            top_p = 0.95f,
-            stop = StopSequences,
-            stream = false
-        };
+        _logger.LogDebug("Translation prompt for {Src}→{Tgt}: {Prompt}", sourceLanguage, targetLanguage, requestBody.Messages[1].Content);
 
         var response = await _http.PostAsJsonAsync(url, requestBody, ct);
         response.EnsureSuccessStatusCode();
         
         var json = await response.Content.ReadAsStringAsync(ct);
         using var doc = JsonDocument.Parse(json);
-        var result = doc.RootElement
-            .GetProperty("choices")[0]
-            .GetProperty("message")
-            .GetProperty("content")
-            .GetString()?.Trim() ?? string.Empty;
-
-        // Clean up <think> tags if the model still generated them
-        if (result.Contains("</think>"))
-        {
-            var parts = result.Split("</think>");
-            result = parts.Last().Trim();
-        }
-        else if (result.StartsWith("<think>"))
-        {
-            // Model generated <think> but didn't finish it
-            result = string.Empty;
-        }
+        var result = LlamaServerChatResponse.GetAssistantText(doc.RootElement);
+        result = LlamaServerChatResponse.StripQwenThinkTags(result);
 
         if (string.IsNullOrWhiteSpace(result))
         {
-            _logger.LogWarning("Translation returned empty output for {Src}→{Tgt}", sourceLanguage, targetLanguage);
-            return text;
+            _logger.LogWarning(
+                "Translation returned empty output for {Src}→{Tgt}. {Diag}",
+                sourceLanguage,
+                targetLanguage,
+                LlamaServerChatResponse.DescribeFirstChoiceForLog(doc.RootElement));
+            throw new InvalidOperationException("Translation returned empty output.");
         }
 
         _logger.LogDebug("Translated {Src}→{Tgt}: {In} → {Out}", sourceLanguage, targetLanguage, text, result);
@@ -105,14 +77,6 @@ public sealed class LlamaTranslationEngine : ITranslationEngine
         Languages.ContainsKey(sourceLanguage) && Languages.ContainsKey(targetLanguage);
 
     public void Dispose() { }
-
-    internal static string BuildPrompt(string text, string sourceLanguage, string targetLanguage)
-    {
-        var srcName = GetLanguageName(sourceLanguage);
-        var tgtName = GetLanguageName(targetLanguage);
-        var systemPrompt = $"You are a professional translator. Translate the user's text from {srcName} to {tgtName}. Output ONLY the translated text, nothing else. Do not output any thought process or explanation. Do not use <think> tags.";
-        return $"<|im_start|>system\n{systemPrompt}<|im_end|>\n<|im_start|>user\n{text}<|im_end|>\n<|im_start|>assistant\n";
-    }
 
     private static string GetLanguageName(string code) =>
         Languages.TryGetValue(code, out var info) ? info.EnglishName : code;

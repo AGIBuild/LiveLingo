@@ -350,7 +350,7 @@ public partial class SettingsViewModel : ObservableObject
 
         if (_llmCoordinator is not null &&
             (CoreOptionsSync.AdvancedSettingsAffectLlmLoad(advancedBefore, WorkingCopy.Advanced) || translationModelChanged))
-            await _llmCoordinator.RequestRetryPrimaryTranslationModelAsync(CancellationToken.None).ConfigureAwait(false);
+            await _llmCoordinator.RequestRetryPrimaryTranslationModelAsync(CancellationToken.None);
         _messenger.Send(new SettingsChangedMessage());
         IsDirty = false;
         _messenger.Send(new AppUiRequestMessage(new AppUiRequest(this, AppUiRequestKind.CloseSettings)));
@@ -382,7 +382,13 @@ public partial class SettingsViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void Reset() => LoadFromSettings(SettingsModel.CreateDefault());
+    private void Reset()
+    {
+        var originalModelStoragePath = _originalModelStoragePath;
+        LoadFromSettings(SettingsModel.CreateDefault());
+        _originalModelStoragePath = originalModelStoragePath;
+        IsDirty = true;
+    }
 
     [RelayCommand]
     private void Cancel()

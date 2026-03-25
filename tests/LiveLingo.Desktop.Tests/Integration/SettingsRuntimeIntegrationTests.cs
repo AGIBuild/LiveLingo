@@ -1,6 +1,8 @@
 using CommunityToolkit.Mvvm.Messaging;
+using LiveLingo.Core;
 using LiveLingo.Core.Engines;
 using LiveLingo.Core.Translation;
+using LiveLingo.Desktop.Messaging;
 using LiveLingo.Desktop.Platform;
 using LiveLingo.Desktop.Services.Configuration;
 using LiveLingo.Desktop.ViewModels;
@@ -67,6 +69,52 @@ public class SettingsRuntimeIntegrationTests : IDisposable
 
         Assert.Equal("Ctrl+Shift+Y", reloaded.Current.Hotkeys.OverlayToggle);
         Assert.Equal("zh-CN", reloaded.Current.UI.Language);
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public async Task SetupWizard_OpenAdvancedAndSaveToken_UpdatesWizardRecoveryState()
+    {
+        var messenger = new WeakReferenceMessenger();
+        var settingsService = new JsonSettingsService(_settingsPath);
+        var coreOptions = new CoreOptions();
+        await settingsService.LoadAsync(TestContext.Current.CancellationToken);
+
+        var settingsVm = new SettingsViewModel(
+            settingsService,
+            engine: new TestEngine(),
+            messenger: messenger,
+            coreOptions: coreOptions);
+        var wizardVm = new SetupWizardViewModel(
+            settingsService,
+            messenger: messenger,
+            coreOptions: coreOptions);
+        var recipient = new object();
+
+        messenger.Register<object, AppUiRequestMessage>(
+            recipient,
+            (_, message) =>
+            {
+                if (message.Value.Kind != AppUiRequestKind.OpenSettings) return;
+                if (message.Value.SettingsInitialTabIndex is { } tab)
+                    settingsVm.SelectedTabIndex = tab;
+            });
+
+        Assert.False(wizardVm.HasHuggingFaceTokenConfigured);
+        Assert.True(wizardVm.ShowHuggingFaceTokenMissingCallout);
+        Assert.Equal(0, settingsVm.SelectedTabIndex);
+
+        wizardVm.OpenAdvancedForHuggingFaceCommand.Execute(null);
+
+        Assert.Equal(3, settingsVm.SelectedTabIndex);
+
+        settingsVm.WorkingCopy.Advanced.HuggingFaceToken = "hf_test_token";
+        await settingsVm.SaveCommand.ExecuteAsync(null);
+
+        Assert.Equal("hf_test_token", settingsService.Current.Advanced.HuggingFaceToken);
+        Assert.Equal("hf_test_token", coreOptions.HuggingFaceToken);
+        Assert.True(wizardVm.HasHuggingFaceTokenConfigured);
+        Assert.False(wizardVm.ShowHuggingFaceTokenMissingCallout);
     }
 
     public void Dispose()

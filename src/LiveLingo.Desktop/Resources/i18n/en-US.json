@@ -116,6 +116,7 @@
   "overlay.translatedWithPost": "Translated ({0} + {1} post)",
   "overlay.error": "Error: {0}",
   "overlay.error.targetNotConfigured": "Error: Target language is not configured.",
+  "overlay.error.translationFailed": "Translation failed. Please retry.",
   "overlay.error.unsupportedPair": "Error: Unsupported language pair {0}→{1}.",
   "overlay.error.modelNotDownloaded": "Error: Model not downloaded. Go to Settings → Models.",
   "overlay.postprocess.fallback": "AI post-processing model is not downloaded. Switched to translation-only. Download in Settings → Models.",

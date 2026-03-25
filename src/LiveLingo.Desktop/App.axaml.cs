@@ -929,10 +929,8 @@ public partial class App : Application
         await Task.Delay(2000);
 
         var loc = _serviceProvider!.GetRequiredService<ILocalizationService>();
-        var issues = new List<string>();
         var modelManager = _serviceProvider!.GetRequiredService<IModelManager>();
-        if (!IsRequiredModelReady(modelManager, settingsService.Current))
-            issues.Add(loc.T("toast.modelNotDownloaded"));
+        var issues = CollectStartupIssues(modelManager, settingsService.Current, loc);
 
         if (issues.Count == 0) return;
 
@@ -959,13 +957,28 @@ public partial class App : Application
     {
         Dispatcher.UIThread.Post(() =>
         {
-            var loc = _serviceProvider?.GetService<ILocalizationService>();
-            var message = loc is not null
-                ? loc.T("toast.qwenModelFallback", e.Primary.DisplayName, e.Fallback.DisplayName)
-                : $"{e.Primary.DisplayName} could not load; using {e.Fallback.DisplayName}.";
+            var message = BuildQwenFallbackNotificationMessage(_serviceProvider?.GetService<ILocalizationService>(), e);
             ShowNotification(message, TimeSpan.FromSeconds(12));
         });
     }
+
+    internal static List<string> CollectStartupIssues(
+        IModelManager modelManager,
+        SettingsModel settings,
+        ILocalizationService loc)
+    {
+        var issues = new List<string>();
+        if (!IsRequiredModelReady(modelManager, settings))
+            issues.Add(loc.T("toast.modelNotDownloaded"));
+        return issues;
+    }
+
+    internal static string BuildQwenFallbackNotificationMessage(
+        ILocalizationService? loc,
+        QwenModelFallbackEventArgs e) =>
+        loc is not null
+            ? loc.T("toast.qwenModelFallback", e.Primary.DisplayName, e.Fallback.DisplayName)
+            : $"{e.Primary.DisplayName} could not load; using {e.Fallback.DisplayName}.";
 
     private static Serilog.Events.LogEventLevel ParseSerilogLevel(string level) => level switch
     {

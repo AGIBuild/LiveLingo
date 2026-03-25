@@ -366,9 +366,19 @@ public partial class OverlayViewModel : ObservableObject
                 _sourceLanguage ?? "<auto>",
                 TargetLanguage);
         }
+        catch (TranslationFailedException ex)
+        {
+            StatusText = L("overlay.error.translationFailed");
+            _logger?.LogWarning(
+                ex,
+                "Translation failed after model/runtime startup. SourceLanguage={SourceLanguage}, TargetLanguage={TargetLanguage}, TextLength={TextLength}",
+                _sourceLanguage ?? "<auto>",
+                TargetLanguage,
+                text?.Length ?? 0);
+        }
         catch (NotSupportedException ex)
         {
-            StatusText = L("overlay.error.modelNotDownloaded");
+            StatusText = L("overlay.error.unsupportedPair", _sourceLanguage ?? L("overlay.language.auto"), TargetLanguage);
             _logger?.LogWarning(
                 ex,
                 "Translation pair is unavailable. SourceLanguage={SourceLanguage}, TargetLanguage={TargetLanguage}",
