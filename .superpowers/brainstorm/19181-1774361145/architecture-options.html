@@ -1,0 +1,44 @@
+
+<h2>LiveLingo 重组方向：3 个总体架构方案</h2>
+<p class="subtitle">我推荐 A：能力平台 + Provider 适配层。它最适合“多模型后端优先，并为未来云端/插件/多前端留口子”。</p>
+
+<div class="cards">
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-body">
+      <div class="label">Recommended</div>
+      <h3>A. Capability Platform + Provider Adapters</h3>
+      <p>把“翻译、后处理、STT、注入”等能力定义为稳定接口；本地/云端模型都实现 Provider 适配层；编排层只依赖 capability，不依赖具体模型。</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>优点</h4><ul><li>天然支持 Marian / llama.cpp / 云 API 并存</li><li>可逐步插件化，不必一开始做重插件系统</li><li>方便未来接 Desktop / CLI / 其他前端</li></ul></div>
+        <div class="cons"><h4>代价</h4><ul><li>前期抽象设计要求高</li><li>需要重画 Core / Application / Host 边界</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-body">
+      <h3>B. 分层单体重整</h3>
+      <p>保留现有项目主形态，只把 App / ViewModel / Engine 逻辑拆干净，先不引入 provider registry 和统一能力模型。</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>优点</h4><ul><li>落地快</li><li>迁移风险较低</li><li>适合近期只修当前问题</li></ul></div>
+        <div class="cons"><h4>代价</h4><ul><li>多模型后端扩展会再次碰边界</li><li>云端模型支持会比较别扭</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-body">
+      <h3>C. 先做完整插件宿主</h3>
+      <p>从第一天就做插件发现、清单、隔离、版本协商，让所有模型和能力都通过插件装配。</p>
+      <div class="pros-cons">
+        <div class="pros"><h4>优点</h4><ul><li>扩展性最强</li><li>第三方生态空间最大</li></ul></div>
+        <div class="cons"><h4>代价</h4><ul><li>明显过重</li><li>会拖慢主链路重构</li><li>当前阶段 YAGNI 风险高</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>我建议</h3>
+  <p><strong>选 A。</strong> 先把系统做成“平台化内核 + 内建 providers”，外部插件机制先预留协议，不在第一阶段完全做满。</p>
+</div>
