@@ -20,9 +20,18 @@ public class ServiceCollectionExtensionsTests
 
         Assert.NotNull(sp.GetService<ITranslationPipeline>());
         Assert.NotNull(sp.GetService<IModelManager>());
+        Assert.NotNull(sp.GetService<IModelCatalog>());
+        Assert.NotNull(sp.GetService<ICloudProviderRuntimeState>());
+        Assert.NotNull(sp.GetService<IModelSelector>());
         Assert.NotNull(sp.GetService<IModelReadinessService>());
+        Assert.NotNull(sp.GetService<IModelInvocationService>());
+        Assert.NotNull(sp.GetService<ICloudProviderProbeService>());
         Assert.NotNull(sp.GetService<ITranslationEngine>());
         Assert.NotNull(sp.GetService<ILanguageDetector>());
+        Assert.Contains(sp.GetServices<IModelRuntime>(), runtime => runtime.RuntimeKind == ModelRuntimeKind.LlamaServer);
+        Assert.Contains(sp.GetServices<IModelRuntime>(), runtime => runtime.RuntimeKind == ModelRuntimeKind.RemoteHttp);
+        Assert.Contains(sp.GetServices<IModelProvider>(), provider => provider.ProviderKind == ModelProviderKind.LlamaServer);
+        Assert.Contains(sp.GetServices<IModelProvider>(), provider => provider.ProviderKind == ModelProviderKind.OpenAICompatible);
         Assert.IsType<QwenModelHost>(sp.GetRequiredService<ILlmModelLoadCoordinator>());
     }
 

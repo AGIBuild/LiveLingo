@@ -10,6 +10,7 @@ public sealed class QwenModelHost : IDisposable, ILlmModelLoadCoordinator
 {
     private readonly IModelManager _modelManager;
     private readonly ILlamaServerProcessManager _serverManager;
+    private readonly IModelSelector _selector;
     private readonly CoreOptions _options;
     private readonly ILogger<QwenModelHost> _logger;
     private readonly SemaphoreSlim _loadLock = new(1, 1);
@@ -31,30 +32,28 @@ public sealed class QwenModelHost : IDisposable, ILlmModelLoadCoordinator
     public QwenModelHost(
         IModelManager modelManager,
         ILlamaServerProcessManager serverManager,
+        IModelSelector selector,
         IOptions<CoreOptions> options,
         ILogger<QwenModelHost> logger)
     {
         _modelManager = modelManager;
         _serverManager = serverManager;
+        _selector = selector;
         _options = options.Value;
         _logger = logger;
         _idleTimer = new Timer(OnIdleTimeout, null, Timeout.Infinite, Timeout.Infinite);
 
-        _activeModelDescriptor = GetActiveModelDescriptor();
+        _activeModelDescriptor = ResolvePreferredModelDescriptor(ModelTaskType.Translation);
         
         _serverManager.StateChanged += s => StateChanged?.Invoke(s);
     }
 
-    private ModelDescriptor GetActiveModelDescriptor()
-    {
-        if (!string.IsNullOrWhiteSpace(_options.ActiveTranslationModelId))
+    private ModelDescriptor ResolvePreferredModelDescriptor(ModelTaskType taskType) =>
+        taskType switch
         {
-            var byId = ModelRegistry.AllModels.FirstOrDefault(m => string.Equals(m.Id, _options.ActiveTranslationModelId, StringComparison.OrdinalIgnoreCase));
-            if (byId is not null && byId.Type == ModelType.Translation && byId.Id.StartsWith("qwen", StringComparison.OrdinalIgnoreCase))
-                return byId;
-        }
-        return ModelRegistry.Qwen35_9B;
-    }
+            ModelTaskType.PostProcessing => ResolvePreferredLocalPostProcessingProfile().Descriptor,
+            _ => ResolvePreferredLocalTranslationProfile().Descriptor
+        };
 
     public async Task RequestRetryPrimaryTranslationModelAsync(CancellationToken cancellationToken = default)
     {
@@ -62,7 +61,7 @@ public sealed class QwenModelHost : IDisposable, ILlmModelLoadCoordinator
         try
         {
             await _serverManager.StopServerAsync();
-            _activeModelDescriptor = GetActiveModelDescriptor();
+            _activeModelDescriptor = ResolvePreferredModelDescriptor(ModelTaskType.Translation);
             ModelPath = string.Empty;
             _ensureServerTask = null;
             _idleTimer.Change(Timeout.Infinite, Timeout.Infinite);
@@ -79,25 +78,57 @@ public sealed class QwenModelHost : IDisposable, ILlmModelLoadCoordinator
     /// <summary>
     /// Returns the base URL (e.g. "http://127.0.0.1:8080") of the running llama-server.
     /// </summary>
-    public async Task<string> GetOrStartServerAsync(CancellationToken ct)
+    public Task<string> GetOrStartServerAsync(CancellationToken ct) =>
+        GetOrStartServerAsync(ResolvePreferredProfile(ModelTaskType.Translation), ct);
+
+    public async Task<string> GetOrStartServerAsync(ModelTaskType taskType, CancellationToken ct)
+    {
+        var profile = ResolvePreferredProfile(taskType);
+        return await GetOrStartServerAsync(profile, ct).ConfigureAwait(false);
+    }
+
+    public async Task<string> GetOrStartServerAsync(ModelProfile profile, CancellationToken ct)
     {
         ResetIdleTimer();
+        var requestedDescriptor = profile.Descriptor;
 
-        if (_serverManager.State == ModelLoadState.Loaded && !string.IsNullOrEmpty(_serverManager.CurrentEndpointUrl))
+        if (_serverManager.State == ModelLoadState.Loaded &&
+            !string.IsNullOrEmpty(_serverManager.CurrentEndpointUrl) &&
+            string.Equals(_activeModelDescriptor.Id, requestedDescriptor.Id, StringComparison.OrdinalIgnoreCase))
+        {
             return _serverManager.CurrentEndpointUrl;
+        }
 
         Task ensureTask;
         await _loadLock.WaitAsync(ct);
         try
         {
-            if (_serverManager.State == ModelLoadState.Loaded && !string.IsNullOrEmpty(_serverManager.CurrentEndpointUrl))
+            requestedDescriptor = profile.Descriptor;
+
+            if (_serverManager.State == ModelLoadState.Loaded &&
+                !string.IsNullOrEmpty(_serverManager.CurrentEndpointUrl) &&
+                string.Equals(_activeModelDescriptor.Id, requestedDescriptor.Id, StringComparison.OrdinalIgnoreCase))
+            {
                 return _serverManager.CurrentEndpointUrl;
+            }
 
             // Important: model download + native runtime download can take minutes and should not be cancelled
             // just because a single overlay request was cancelled. We let the caller cancel waiting, while the
             // background load continues and is shared by subsequent requests.
-            if (_ensureServerTask is null || _ensureServerTask.IsCompleted)
+            if (_ensureServerTask is null || _ensureServerTask.IsCompleted ||
+                !string.Equals(_activeModelDescriptor.Id, requestedDescriptor.Id, StringComparison.OrdinalIgnoreCase))
+            {
+                if (_serverManager.State == ModelLoadState.Loaded &&
+                    !string.IsNullOrEmpty(_serverManager.CurrentEndpointUrl) &&
+                    !string.Equals(_activeModelDescriptor.Id, requestedDescriptor.Id, StringComparison.OrdinalIgnoreCase))
+                {
+                    await _serverManager.StopServerAsync();
+                }
+
+                _activeModelDescriptor = requestedDescriptor;
+                ModelPath = string.Empty;
                 _ensureServerTask = LoadPrimaryOrFallbackAsync(CancellationToken.None);
+            }
 
             ensureTask = _ensureServerTask;
         }
@@ -114,9 +145,37 @@ public sealed class QwenModelHost : IDisposable, ILlmModelLoadCoordinator
         throw new InvalidOperationException("llama-server did not reach a ready state after load completed.");
     }
 
+    private ModelProfile ResolvePreferredProfile(ModelTaskType taskType) =>
+        taskType switch
+        {
+            ModelTaskType.PostProcessing => ResolvePreferredLocalPostProcessingProfile(),
+            _ => ResolvePreferredLocalTranslationProfile()
+        };
+
+    private ModelProfile ResolvePreferredLocalTranslationProfile() =>
+        ModelSelectionPolicy.SelectTranslationProfile(
+            new StaticModelCatalog(),
+            _options.ActiveTranslationModelId,
+            "zh",
+            _options.DefaultTargetLanguage,
+            TranslationRoutingMode.LocalOnly,
+            routeUnsupportedPairsToCloud: false);
+
+    private ModelProfile ResolvePreferredLocalPostProcessingProfile() =>
+        ResolvePreferredLocalPostProcessingProfileCore();
+
+    private ModelProfile ResolvePreferredLocalPostProcessingProfileCore()
+    {
+        var preferred = _selector.SelectPostProcessingProfile();
+        if (preferred.RuntimeKind != ModelRuntimeKind.RemoteHttp)
+            return preferred;
+
+        return new StaticModelCatalog().FindById(ModelRegistry.Qwen25_15B.Id)
+            ?? ResolvePreferredLocalTranslationProfile();
+    }
+
     private async Task LoadPrimaryOrFallbackAsync(CancellationToken ct)
     {
-        _activeModelDescriptor = GetActiveModelDescriptor();
         try
         {
             await LoadModelFromActiveDescriptorAsync(ct).ConfigureAwait(false);

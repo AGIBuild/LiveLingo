@@ -1,10 +1,7 @@
-using System.Net;
-using System.Text.Json;
 using LiveLingo.Core.Models;
 using LiveLingo.Core.Processing;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using Microsoft.Extensions.Options;
 using NSubstitute;
 
 namespace LiveLingo.Core.Tests.Processing;
@@ -12,52 +9,54 @@ namespace LiveLingo.Core.Tests.Processing;
 public sealed class QwenTextProcessorTests
 {
     [Fact]
-    public async Task ProcessAsync_posts_shared_chat_request_and_parses_content_array_response()
+    public async Task ProcessAsync_builds_post_processing_invocation_request()
     {
-        string? capturedJson = null;
-        using var http = new HttpClient(new StubHandler(request =>
-        {
-            capturedJson = request.Content is null ? null : request.Content.ReadAsStringAsync().GetAwaiter().GetResult();
-            return new HttpResponseMessage(HttpStatusCode.OK)
-            {
-                Content = new StringContent("""
-                    {"choices":[{"message":{"content":[{"type":"text","text":"processed"}]}}]}
-                    """)
-            };
-        }));
+        var selector = Substitute.For<IModelSelector>();
+        var invocationService = Substitute.For<IModelInvocationService>();
+        var profile = new StaticModelCatalog().FindById(ModelRegistry.Qwen25_15B.Id)!;
+        ModelInvocationRequest? capturedRequest = null;
+        selector.SelectPostProcessingProfile().Returns(profile);
+        invocationService.InvokeAsync(Arg.Do<ModelInvocationRequest>(request => capturedRequest = request), Arg.Any<CancellationToken>())
+            .Returns(new ModelInvocationResult("processed"));
 
-        using var host = CreateLoadedHost();
-        var processor = new TestProcessor(host, http);
+        var processor = new TestProcessor(selector, invocationService);
 
         var result = await processor.ProcessAsync("raw", "en", CancellationToken.None);
 
         Assert.Equal("processed", result);
-        Assert.NotNull(capturedJson);
-
-        using var doc = JsonDocument.Parse(capturedJson!);
-        Assert.False(doc.RootElement.GetProperty("stream").GetBoolean());
-        Assert.Equal(512, doc.RootElement.GetProperty("max_tokens").GetInt32());
-        Assert.Equal(3, doc.RootElement.GetProperty("stop").GetArrayLength());
-
-        var messages = doc.RootElement.GetProperty("messages").EnumerateArray().ToArray();
-        Assert.Equal("system", messages[0].GetProperty("role").GetString());
-        Assert.Equal("Optimize the text. Do not use <think> tags.", messages[0].GetProperty("content").GetString());
-        Assert.Equal("user", messages[1].GetProperty("role").GetString());
-        Assert.Equal("raw", messages[1].GetProperty("content").GetString());
+        Assert.NotNull(capturedRequest);
+        Assert.Same(profile, capturedRequest!.Profile);
+        Assert.Equal(ModelTaskType.PostProcessing, capturedRequest.TaskType);
+        Assert.Equal(512, capturedRequest.Options.MaxTokens);
+        Assert.Equal(0.3f, capturedRequest.Options.Temperature);
+        Assert.Equal(0.9f, capturedRequest.Options.TopP);
+        Assert.Equal(ModelInvocationOptions.DefaultStopSequences, capturedRequest.Options.StopSequences);
+        Assert.False(capturedRequest.Options.Stream);
+        Assert.Collection(
+            capturedRequest.Messages,
+            system =>
+            {
+                Assert.Equal("system", system.Role);
+                Assert.Equal("Optimize the text. Do not use <think> tags.", system.Content);
+            },
+            user =>
+            {
+                Assert.Equal("user", user.Role);
+                Assert.Equal("raw", user.Content);
+            });
     }
 
     [Fact]
-    public async Task ProcessAsync_returns_original_text_when_assistant_output_is_empty()
+    public async Task ProcessAsync_returns_original_text_when_invocation_output_is_empty()
     {
-        using var http = new HttpClient(new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
-        {
-            Content = new StringContent("""
-                {"choices":[{"message":{"content":""}}]}
-                """)
-        }));
+        var selector = Substitute.For<IModelSelector>();
+        var invocationService = Substitute.For<IModelInvocationService>();
+        var profile = new StaticModelCatalog().FindById(ModelRegistry.Qwen25_15B.Id)!;
+        selector.SelectPostProcessingProfile().Returns(profile);
+        invocationService.InvokeAsync(Arg.Any<ModelInvocationRequest>(), Arg.Any<CancellationToken>())
+            .Returns(new ModelInvocationResult(""));
 
-        using var host = CreateLoadedHost();
-        var processor = new TestProcessor(host, http);
+        var processor = new TestProcessor(selector, invocationService);
 
         var result = await processor.ProcessAsync("raw", "en", CancellationToken.None);
 
@@ -65,43 +64,26 @@ public sealed class QwenTextProcessorTests
     }
 
     [Fact]
-    public async Task ProcessAsync_returns_original_text_when_transport_fails()
+    public async Task ProcessAsync_returns_original_text_when_invocation_fails()
     {
-        using var http = new HttpClient(new StubHandler(_ => throw new HttpRequestException("boom")));
+        var selector = Substitute.For<IModelSelector>();
+        var invocationService = Substitute.For<IModelInvocationService>();
+        var profile = new StaticModelCatalog().FindById(ModelRegistry.Qwen25_15B.Id)!;
+        selector.SelectPostProcessingProfile().Returns(profile);
+        invocationService.InvokeAsync(Arg.Any<ModelInvocationRequest>(), Arg.Any<CancellationToken>())
+            .Returns<Task<ModelInvocationResult>>(_ => throw new InvalidOperationException("boom"));
 
-        using var host = CreateLoadedHost();
-        var processor = new TestProcessor(host, http);
+        var processor = new TestProcessor(selector, invocationService);
 
         var result = await processor.ProcessAsync("raw", "en", CancellationToken.None);
 
         Assert.Equal("raw", result);
     }
 
-    private static QwenModelHost CreateLoadedHost()
-    {
-        var modelManager = Substitute.For<IModelManager>();
-        var serverManager = Substitute.For<ILlamaServerProcessManager>();
-        serverManager.State.Returns(ModelLoadState.Loaded);
-        serverManager.CurrentEndpointUrl.Returns("http://127.0.0.1:5050");
-        serverManager.StopServerAsync().Returns(Task.CompletedTask);
-
-        return new QwenModelHost(
-            modelManager,
-            serverManager,
-            Options.Create(new CoreOptions()),
-            NullLogger<QwenModelHost>.Instance);
-    }
-
-    private sealed class TestProcessor(QwenModelHost host, HttpClient http)
-        : QwenTextProcessor(host, http, NullLogger.Instance)
+    private sealed class TestProcessor(IModelSelector selector, IModelInvocationService invocationService)
+        : QwenTextProcessor(selector, invocationService, NullLogger.Instance)
     {
         public override string Name => "optimize";
         protected override string SystemPrompt => "Optimize the text.";
-    }
-
-    private sealed class StubHandler(Func<HttpRequestMessage, HttpResponseMessage> responder) : HttpMessageHandler
-    {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
-            Task.FromResult(responder(request));
     }
 }

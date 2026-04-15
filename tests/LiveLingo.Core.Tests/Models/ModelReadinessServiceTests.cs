@@ -1,4 +1,5 @@
 using LiveLingo.Core.Models;
+using Microsoft.Extensions.Options;
 using NSubstitute;
 
 namespace LiveLingo.Core.Tests.Models;
@@ -10,7 +11,7 @@ public class ModelReadinessServiceTests
     {
         var manager = Substitute.For<IModelManager>();
         manager.ListInstalled().Returns([]);
-        var service = new ModelReadinessService(manager);
+        var service = CreateService(manager);
 
         var ex = Assert.Throws<ModelNotReadyException>(() =>
             service.EnsureTranslationModelReady("zh", "en"));
@@ -34,7 +35,7 @@ public class ModelReadinessServiceTests
                 DateTime.UtcNow)
         ]);
         manager.HasAllExpectedLocalAssets(ModelRegistry.Qwen35_9B).Returns(false);
-        var service = new ModelReadinessService(manager);
+        var service = CreateService(manager);
 
         Assert.Throws<ModelNotReadyException>(() => service.EnsureTranslationModelReady("zh", "en"));
     }
@@ -43,12 +44,24 @@ public class ModelReadinessServiceTests
     public void EnsureTranslationModelReady_Throws_WhenPairUnknown()
     {
         var manager = Substitute.For<IModelManager>();
-        var service = new ModelReadinessService(manager);
+        var service = CreateService(manager);
 
         var ex = Assert.Throws<ModelNotReadyException>(() =>
             service.EnsureTranslationModelReady("ko", "fr"));
 
         Assert.Equal("qwen35-9b", ex.ModelId);
+    }
+
+    [Fact]
+    public void EnsureTranslationModelReady_ThrowsNotSupported_WhenNoChatProfileSupportsPair()
+    {
+        var manager = Substitute.For<IModelManager>();
+        var service = CreateService(manager);
+
+        var ex = Assert.Throws<NotSupportedException>(() =>
+            service.EnsureTranslationModelReady("zh", "it"));
+
+        Assert.Contains("zh→it", ex.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -66,7 +79,7 @@ public class ModelReadinessServiceTests
                 ModelType.PostProcessing,
                 DateTime.UtcNow)
         ]);
-        var service = new ModelReadinessService(manager);
+        var service = CreateService(manager);
 
         service.EnsurePostProcessingModelReady();
     }
@@ -86,8 +99,96 @@ public class ModelReadinessServiceTests
                 ModelType.Translation,
                 DateTime.UtcNow)
         ]);
-        var service = new ModelReadinessService(manager);
+        var service = CreateService(manager);
 
         service.EnsurePostProcessingModelReady();
+    }
+
+    [Fact]
+    public void EnsureTranslationModelReady_UsesConfiguredChatTranslationProfile()
+    {
+        var manager = Substitute.For<IModelManager>();
+        manager.ListInstalled().Returns([]);
+        var service = CreateService(manager, ModelRegistry.Qwen25_7B.Id);
+
+        var ex = Assert.Throws<ModelNotReadyException>(() =>
+            service.EnsureTranslationModelReady("zh", "en"));
+
+        Assert.Equal(ModelRegistry.Qwen25_7B.Id, ex.ModelId);
+    }
+
+    [Fact]
+    public void EnsurePostProcessingModelReady_FallsBackToDedicatedPostProcessingProfile_WhenActiveModelIsNotChatBased()
+    {
+        var manager = Substitute.For<IModelManager>();
+        manager.ListInstalled().Returns([]);
+        var service = CreateService(manager, ModelRegistry.MarianZhEn.Id);
+
+        var ex = Assert.Throws<ModelNotReadyException>(() => service.EnsurePostProcessingModelReady());
+
+        Assert.Equal(ModelRegistry.Qwen25_15B.Id, ex.ModelId);
+    }
+
+    [Fact]
+    public void EnsureTranslationModelReady_DoesNotRequireLocalAssets_ForConfiguredCloudProfile()
+    {
+        var manager = Substitute.For<IModelManager>();
+        manager.ListInstalled().Returns([]);
+        var service = CreateService(
+            manager,
+            routingMode: TranslationRoutingMode.CloudOnly,
+            cloudEnabled: true,
+            cloudBaseUrl: "https://api.openai.com/v1",
+            cloudApiKey: "sk-test",
+            cloudTranslationModelId: "gpt-4.1-mini");
+
+        service.EnsureTranslationModelReady("zh", "en");
+    }
+
+    [Fact]
+    public void EnsurePostProcessingModelReady_DoesNotRequireLocalAssets_ForConfiguredCloudProfile()
+    {
+        var manager = Substitute.For<IModelManager>();
+        manager.ListInstalled().Returns([]);
+        var service = CreateService(
+            manager,
+            routingMode: TranslationRoutingMode.PreferCloud,
+            cloudEnabled: true,
+            cloudBaseUrl: "https://api.openai.com/v1",
+            cloudApiKey: "sk-test",
+            cloudTranslationModelId: "gpt-4.1-mini",
+            cloudPostProcessingModelId: "gpt-4.1-nano");
+
+        service.EnsurePostProcessingModelReady();
+    }
+
+    private static ModelReadinessService CreateService(
+        IModelManager manager,
+        string? activeTranslationModelId = null,
+        TranslationRoutingMode routingMode = TranslationRoutingMode.PreferLocal,
+        bool routeUnsupportedPairsToCloud = false,
+        bool routePostProcessingToCloud = false,
+        bool cloudEnabled = false,
+        string? cloudBaseUrl = null,
+        string? cloudApiKey = null,
+        string? cloudTranslationModelId = null,
+        string? cloudPostProcessingModelId = null)
+    {
+        var selector = new DefaultModelSelector(
+            new StaticModelCatalog(),
+            Options.Create(new CoreOptions
+            {
+                ActiveTranslationModelId = activeTranslationModelId,
+                TranslationRoutingMode = routingMode,
+                RouteUnsupportedLanguagePairsToCloud = routeUnsupportedPairsToCloud,
+                RoutePostProcessingToCloud = routePostProcessingToCloud,
+                CloudProviderEnabled = cloudEnabled,
+                CloudProviderBaseUrl = cloudBaseUrl,
+                CloudProviderApiKey = cloudApiKey,
+                CloudTranslationModelId = cloudTranslationModelId,
+                CloudPostProcessingModelId = cloudPostProcessingModelId
+            }));
+
+        return new ModelReadinessService(manager, selector);
     }
 }

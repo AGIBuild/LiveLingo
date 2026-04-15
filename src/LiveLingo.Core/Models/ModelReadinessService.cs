@@ -1,6 +1,6 @@
 namespace LiveLingo.Core.Models;
 
-public sealed class ModelReadinessService(IModelManager modelManager) : IModelReadinessService
+public sealed class ModelReadinessService(IModelManager modelManager, IModelSelector selector) : IModelReadinessService
 {
     public bool IsInstalled(string modelId)
     {
@@ -15,29 +15,40 @@ public sealed class ModelReadinessService(IModelManager modelManager) : IModelRe
 
     public void EnsureTranslationModelReady(string sourceLanguage, string targetLanguage)
     {
-        var descriptor = ModelRegistry.FindTranslationModel(sourceLanguage, targetLanguage);
-        if (descriptor is null)
-            throw new NotSupportedException($"No translation model available for {sourceLanguage}->{targetLanguage}.");
+        var profile = selector.SelectTranslationProfile(sourceLanguage, targetLanguage);
 
-        if (IsInstalled(descriptor.Id))
+        if (profile.RuntimeKind == ModelRuntimeKind.RemoteHttp)
+            return;
+
+        if (IsInstalled(profile.Id))
             return;
 
         throw new ModelNotReadyException(
             ModelType.Translation,
-            descriptor.Id,
-            $"Translation model '{descriptor.DisplayName}' is not downloaded.",
+            profile.Id,
+            $"Translation model '{profile.DisplayName}' is not downloaded.",
             "Open Settings -> Models and download the required translation model.");
     }
 
     public void EnsurePostProcessingModelReady()
     {
-        if (IsInstalled(ModelRegistry.Qwen35_9B.Id) || IsInstalled(ModelRegistry.Qwen25_15B.Id))
+        var profile = selector.SelectPostProcessingProfile();
+        if (profile.RuntimeKind == ModelRuntimeKind.RemoteHttp)
             return;
+
+        if (IsInstalled(profile.Id))
+            return;
+
+        if (!string.Equals(profile.Id, ModelRegistry.Qwen25_15B.Id, StringComparison.OrdinalIgnoreCase) &&
+            IsInstalled(ModelRegistry.Qwen25_15B.Id))
+        {
+            return;
+        }
 
         throw new ModelNotReadyException(
             ModelType.PostProcessing,
-            ModelRegistry.Qwen25_15B.Id,
-            "No Qwen GGUF is downloaded for post-processing.",
+            profile.Id,
+            $"Model '{profile.DisplayName}' is not downloaded for post-processing.",
             "Open Settings → Models and download the primary translation model (or Qwen 2.5 1.5B as a lighter option).");
     }
 }

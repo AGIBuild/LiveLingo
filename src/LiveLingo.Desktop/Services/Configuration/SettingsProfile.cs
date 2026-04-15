@@ -1,5 +1,6 @@
 using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
+using LiveLingo.Core;
 
 namespace LiveLingo.Desktop.Services.Configuration;
 
@@ -45,6 +46,8 @@ public partial class TranslationSettings : ObservableObject
     [ObservableProperty] private string _defaultTargetLanguage = "en";
     [ObservableProperty] private string? _activeTranslationModelId;
     [ObservableProperty] private List<LanguagePair> _languagePairs = [new("zh", "en")];
+    [ObservableProperty] private ModelPolicySettings _modelPolicy = new();
+    [ObservableProperty] private CloudProviderSettings _cloudProvider = new();
 
     public TranslationSettings DeepClone()
     {
@@ -53,9 +56,51 @@ public partial class TranslationSettings : ObservableObject
             DefaultSourceLanguage = DefaultSourceLanguage,
             DefaultTargetLanguage = DefaultTargetLanguage,
             ActiveTranslationModelId = ActiveTranslationModelId,
-            LanguagePairs = LanguagePairs.Select(pair => pair.DeepClone()).ToList()
+            LanguagePairs = LanguagePairs.Select(pair => pair.DeepClone()).ToList(),
+            ModelPolicy = ModelPolicy.DeepClone(),
+            CloudProvider = CloudProvider.DeepClone()
         };
     }
+}
+
+public partial class ModelPolicySettings : ObservableObject
+{
+    [ObservableProperty] private string _routingMode = nameof(TranslationRoutingMode.PreferLocal);
+    [ObservableProperty] private bool _routeUnsupportedPairsToCloud = true;
+    [ObservableProperty] private bool _routePostProcessingToCloud;
+    [ObservableProperty] private string? _preferredLocalTranslationModelId;
+
+    public ModelPolicySettings DeepClone() => new()
+    {
+        RoutingMode = RoutingMode,
+        RouteUnsupportedPairsToCloud = RouteUnsupportedPairsToCloud,
+        RoutePostProcessingToCloud = RoutePostProcessingToCloud,
+        PreferredLocalTranslationModelId = PreferredLocalTranslationModelId
+    };
+}
+
+public partial class CloudProviderSettings : ObservableObject
+{
+    [ObservableProperty] private bool _enabled;
+    [ObservableProperty] private string _presetId = CloudProviderPresetCatalog.OpenAI.Id;
+    [ObservableProperty] private string _providerType = "OpenAICompatible";
+    [ObservableProperty] private string _baseUrl = "https://api.openai.com/v1";
+    [ObservableProperty] private string? _apiKey;
+    [ObservableProperty] private string? _apiKeySecretId;
+    [ObservableProperty] private string? _translationModelId;
+    [ObservableProperty] private string? _postProcessingModelId;
+
+    public CloudProviderSettings DeepClone() => new()
+    {
+        Enabled = Enabled,
+        PresetId = PresetId,
+        ProviderType = ProviderType,
+        BaseUrl = BaseUrl,
+        ApiKey = ApiKey,
+        ApiKeySecretId = ApiKeySecretId,
+        TranslationModelId = TranslationModelId,
+        PostProcessingModelId = PostProcessingModelId
+    };
 }
 
 public partial class LanguagePair : ObservableObject
@@ -139,6 +184,7 @@ public partial class AdvancedSettings : ObservableObject
     [ObservableProperty] private string _logLevel = "Information";
     [ObservableProperty] private string? _huggingFaceMirror;
     [ObservableProperty] private string? _huggingFaceToken;
+    [ObservableProperty] private string? _huggingFaceTokenSecretId;
 
     public AdvancedSettings DeepClone() => new()
     {
@@ -146,6 +192,7 @@ public partial class AdvancedSettings : ObservableObject
         InferenceThreads = InferenceThreads,
         LogLevel = LogLevel,
         HuggingFaceMirror = HuggingFaceMirror,
-        HuggingFaceToken = HuggingFaceToken
+        HuggingFaceToken = HuggingFaceToken,
+        HuggingFaceTokenSecretId = HuggingFaceTokenSecretId
     };
 }

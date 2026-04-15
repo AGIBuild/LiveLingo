@@ -171,6 +171,26 @@
                                     </Button>
                                 </StackPanel>
                             </Grid>
+                            <Separator Classes="themed"/>
+                            <TextBlock Classes="section" Text="{Binding TranslationSectionRouting}"/>
+                            <Grid ColumnDefinitions="130,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="10">
+                                <TextBlock Classes="label" Text="{Binding TranslationRoutingModeLabel}"/>
+                                <ComboBox Grid.Column="1" MinWidth="220"
+                                          Classes="themed"
+                                          ItemsSource="{Binding RoutingModeOptions}"
+                                          SelectedValueBinding="{Binding Value}"
+                                          SelectedValue="{Binding WorkingCopy.Translation.ModelPolicy.RoutingMode}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:SelectableOption">
+                                            <TextBlock Text="{Binding DisplayName}"/>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                                <CheckBox Grid.Row="1" Grid.Column="1"
+                                          Classes="themed"
+                                          Content="{Binding TranslationRouteUnsupportedPairsLabel}"
+                                          IsChecked="{Binding WorkingCopy.Translation.ModelPolicy.RouteUnsupportedPairsToCloud}"/>
+                            </Grid>
                         </StackPanel>
                     </ScrollViewer>
                 </TabItem>
@@ -342,6 +362,87 @@
                             </Grid>
                             <TextBlock Classes="hint"
                                        Text="{Binding AiModesHint}"/>
+                            <Separator Classes="themed"/>
+                            <TextBlock Classes="section" Text="{Binding AiSectionCloudProvider}"/>
+                            <CheckBox Classes="themed"
+                                      Content="{Binding AiCloudEnabledLabel}"
+                                      IsChecked="{Binding WorkingCopy.Translation.CloudProvider.Enabled}"/>
+                            <Grid ColumnDefinitions="130,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="10">
+                                <TextBlock Classes="label" Text="{Binding AiCloudPresetLabel}"/>
+                                <ComboBox Grid.Column="1" MinWidth="180"
+                                          Classes="themed"
+                                          ItemsSource="{Binding CloudProviderPresetOptions}"
+                                          SelectedValueBinding="{Binding Value}"
+                                          SelectedValue="{Binding WorkingCopy.Translation.CloudProvider.PresetId}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:SelectableOption">
+                                            <TextBlock Text="{Binding DisplayName}"/>
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                                <TextBlock Grid.Row="1" Classes="label" Text="{Binding AiCloudProviderLabel}"/>
+                                <TextBlock Grid.Row="1" Grid.Column="1"
+                                           VerticalAlignment="Center"
+                                           Foreground="{StaticResource FgSecondaryBrush}"
+                                           Text="{Binding AiCloudProviderValue}"/>
+                                <TextBlock Grid.Row="2" Classes="label" Text="{Binding AiCloudBaseUrlLabel}"/>
+                                <TextBox Grid.Row="2" Grid.Column="1" Classes="themed"
+                                         Text="{Binding WorkingCopy.Translation.CloudProvider.BaseUrl}"
+                                         PlaceholderText="{Binding AiCloudBaseUrlPlaceholder}"/>
+                                <TextBlock Grid.Row="3" Classes="label" Text="{Binding AiCloudApiKeyLabel}"/>
+                                <TextBox Grid.Row="3" Grid.Column="1" Classes="themed"
+                                         PasswordChar="*"
+                                         Text="{Binding WorkingCopy.Translation.CloudProvider.ApiKey, Mode=TwoWay}"/>
+                                <TextBlock Grid.Row="4" Classes="label" Text="{Binding AiCloudTranslationModelLabel}"/>
+                                <TextBox Grid.Row="4" Grid.Column="1" Classes="themed"
+                                         Text="{Binding WorkingCopy.Translation.CloudProvider.TranslationModelId}"
+                                         PlaceholderText="{Binding AiCloudTranslationModelPlaceholder}"/>
+                                <TextBlock Grid.Row="5" Classes="label" Text="{Binding AiCloudPostProcessingModelLabel}"/>
+                                <TextBox Grid.Row="5" Grid.Column="1" Classes="themed"
+                                         Text="{Binding WorkingCopy.Translation.CloudProvider.PostProcessingModelId}"
+                                         PlaceholderText="{Binding AiCloudPostProcessingModelPlaceholder}"/>
+                            </Grid>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button Classes="themed"
+                                        Content="{Binding AiCloudTestConnectionLabel}"
+                                        Command="{Binding TestCloudProviderConnectionCommand}"/>
+                                <Button Classes="themed"
+                                        Content="{Binding AiCloudFetchModelsLabel}"
+                                        Command="{Binding FetchCloudProviderModelsCommand}"/>
+                            </StackPanel>
+                            <TextBlock Classes="hint"
+                                       Text="{Binding CloudProviderStatusMessage}"
+                                       TextWrapping="Wrap"/>
+                            <StackPanel IsVisible="{Binding HasDiscoveredCloudModels}" Spacing="6">
+                                <TextBlock Classes="label" Text="{Binding AiCloudDiscoveredModelsLabel}"/>
+                                <ItemsControl ItemsSource="{Binding DiscoveredCloudModels}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:CloudProviderModelOption">
+                                            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                                                <TextBlock VerticalAlignment="Center"
+                                                           Text="{Binding Caption}"
+                                                           TextWrapping="Wrap"/>
+                                                <Button Grid.Column="1"
+                                                        Classes="themed"
+                                                        Content="{Binding $parent[Window].((vm:SettingsViewModel)DataContext).AiCloudUseTranslationLabel}"
+                                                        Command="{Binding $parent[Window].((vm:SettingsViewModel)DataContext).UseCloudTranslationModelCommand}"
+                                                        CommandParameter="{Binding Id}"/>
+                                                <Button Grid.Column="2"
+                                                        Classes="themed"
+                                                        Content="{Binding $parent[Window].((vm:SettingsViewModel)DataContext).AiCloudUsePostProcessingLabel}"
+                                                        Command="{Binding $parent[Window].((vm:SettingsViewModel)DataContext).UseCloudPostProcessingModelCommand}"
+                                                        CommandParameter="{Binding Id}"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                            <CheckBox Classes="themed"
+                                      Content="{Binding AiCloudRoutePostProcessingLabel}"
+                                      IsChecked="{Binding WorkingCopy.Translation.ModelPolicy.RoutePostProcessingToCloud}"/>
+                            <TextBlock Classes="hint"
+                                       Text="{Binding AiCloudProviderHint}"
+                                       TextWrapping="Wrap"/>
                         </StackPanel>
                     </ScrollViewer>
                 </TabItem>

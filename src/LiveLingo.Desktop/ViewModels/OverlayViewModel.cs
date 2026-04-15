@@ -7,6 +7,7 @@ using LiveLingo.Desktop.Services.Configuration;
 using LiveLingo.Desktop.Services.LanguageCatalog;
 using LiveLingo.Desktop.Services.Localization;
 using LiveLingo.Desktop.Services.Speech;
+using LiveLingo.Core;
 using LiveLingo.Core.Engines;
 using LiveLingo.Core.Models;
 using LiveLingo.Core.Processing;
@@ -31,6 +32,8 @@ public partial class OverlayViewModel : ObservableObject
     private readonly ILocalizationService? _loc;
     private readonly ISettingsService? _settingsService;
     private readonly IModelManager? _modelManager;
+    private readonly IModelCatalog _modelCatalog;
+    private readonly ICloudProviderRuntimeState _cloudProviderRuntimeState;
     private readonly ILogger<OverlayViewModel>? _logger;
     private readonly IMessenger _messenger;
     private readonly IReadOnlyList<LanguageInfo> _availableLanguages;
@@ -38,6 +41,9 @@ public partial class OverlayViewModel : ObservableObject
     private CancellationTokenSource? _pipelineCts;
     private string _postProcessMode;
     private string? _activeModelId;
+    private TranslationRoutingMode _routingMode = TranslationRoutingMode.PreferLocal;
+    private bool _routeUnsupportedPairsToCloud = true;
+    private CloudModelPreferences _cloudPreferences = new(false, null, null, null, null);
     private bool _isApplyingRuntimeSettings;
     private bool _postProcessingDisabledForSession;
     private bool _postProcessingFallbackNoticeShown;
@@ -109,7 +115,9 @@ public partial class OverlayViewModel : ObservableObject
         IModelManager? modelManager = null,
         IMessenger? messenger = null,
         ILanguageCatalog? languageCatalog = null,
-        ISpeechInputCoordinator? speechCoordinator = null)
+        ISpeechInputCoordinator? speechCoordinator = null,
+        IModelCatalog? modelCatalog = null,
+        ICloudProviderRuntimeState? cloudProviderRuntimeState = null)
     {
         _targetWindow = targetWindow;
         _pipeline = pipeline;
@@ -118,12 +126,15 @@ public partial class OverlayViewModel : ObservableObject
         _loc = localizationService;
         _settingsService = settingsService;
         _modelManager = modelManager;
+        _modelCatalog = modelCatalog ?? new StaticModelCatalog();
+        _cloudProviderRuntimeState = cloudProviderRuntimeState ?? new NullCloudProviderRuntimeState();
         _logger = logger;
         _messenger = messenger ?? WeakReferenceMessenger.Default;
         _availableLanguages = languageCatalog?.All ?? LanguageCatalog.DefaultLanguages;
         _speechCoordinator = speechCoordinator;
         _isVoiceAvailable = speechCoordinator is not null;
-        _activeModelId = settings.Translation.ActiveTranslationModelId;
+        ApplyRoutingSettings(settings);
+        _activeModelId = GetPreferredLocalModelId(settings);
         _sourceLanguage = string.IsNullOrWhiteSpace(settings.Translation.DefaultSourceLanguage)
             ? null
             : settings.Translation.DefaultSourceLanguage;
@@ -169,7 +180,9 @@ public partial class OverlayViewModel : ObservableObject
         ILocalizationService? localizationService = null,
         ILogger<OverlayViewModel>? logger = null,
         IMessenger? messenger = null,
-        ILanguageCatalog? languageCatalog = null)
+        ILanguageCatalog? languageCatalog = null,
+        IModelCatalog? modelCatalog = null,
+        ICloudProviderRuntimeState? cloudProviderRuntimeState = null)
     {
         _targetWindow = targetWindow;
         _pipeline = pipeline;
@@ -178,10 +191,14 @@ public partial class OverlayViewModel : ObservableObject
         _loc = localizationService;
         _logger = logger;
         _modelManager = null;
+        _modelCatalog = modelCatalog ?? new StaticModelCatalog();
+        _cloudProviderRuntimeState = cloudProviderRuntimeState ?? new NullCloudProviderRuntimeState();
         _messenger = messenger ?? WeakReferenceMessenger.Default;
         _availableLanguages = languageCatalog?.All ?? LanguageCatalog.DefaultLanguages;
         _targetLanguage = NormalizeTargetLanguage(targetLanguage);
-        _activeModelId = ModelRegistry.FindTranslationModel(_sourceLanguage ?? "zh", _targetLanguage)?.Id;
+        _activeModelId = ModelSelectionPolicy
+            .SelectTranslationProfile(_modelCatalog, null, _sourceLanguage ?? "zh", _targetLanguage)
+            .Id;
         _currentLangIndex = FindLanguageIndex(_targetLanguage);
         SelectedTargetLanguage = _availableLanguages.Count > 0 ? _availableLanguages[_currentLangIndex] : null;
         _postProcessMode = "Off";
@@ -525,12 +542,16 @@ public partial class OverlayViewModel : ObservableObject
         var previousTarget = TargetLanguage;
         var previousPostProcessMode = _postProcessMode;
         var previousActiveModelId = _activeModelId;
+        var previousRoutingMode = _routingMode;
+        var previousRouteUnsupportedPairsToCloud = _routeUnsupportedPairsToCloud;
+        var previousCloudSignature = BuildCloudPreferencesSignature(_cloudPreferences);
         var previousMode = Mode;
 
         _isApplyingRuntimeSettings = true;
         try
         {
-            _activeModelId = settings.Translation.ActiveTranslationModelId;
+            ApplyRoutingSettings(settings);
+            _activeModelId = GetPreferredLocalModelId(settings);
             var configuredSource = settings.Translation.DefaultSourceLanguage;
             var configuredTarget = settings.Translation.DefaultTargetLanguage;
 
@@ -567,9 +588,13 @@ public partial class OverlayViewModel : ObservableObject
                                        !string.Equals(previousTarget, TargetLanguage, StringComparison.OrdinalIgnoreCase);
         var postProcessChanged = !string.Equals(previousPostProcessMode, _postProcessMode, StringComparison.OrdinalIgnoreCase);
         var activeModelChanged = !string.Equals(previousActiveModelId, _activeModelId, StringComparison.OrdinalIgnoreCase);
+        var routingChanged = previousRoutingMode != _routingMode ||
+                             previousRouteUnsupportedPairsToCloud != _routeUnsupportedPairsToCloud ||
+                             !string.Equals(previousCloudSignature, BuildCloudPreferencesSignature(_cloudPreferences), StringComparison.Ordinal);
         var modeChanged = previousMode != Mode;
 
-        if ((translationConfigChanged || postProcessChanged || activeModelChanged || modeChanged) && !string.IsNullOrWhiteSpace(SourceText))
+        if ((translationConfigChanged || postProcessChanged || activeModelChanged || routingChanged || modeChanged) &&
+            !string.IsNullOrWhiteSpace(SourceText))
         {
             _pipelineCts?.Cancel();
             _pipelineCts = new CancellationTokenSource();
@@ -593,6 +618,7 @@ public partial class OverlayViewModel : ObservableObject
         next.Translation.ActiveTranslationModelId = ResolvePersistedActiveModelId(
             _sourceLanguage ?? next.Translation.DefaultSourceLanguage,
             TargetLanguage);
+        next.Translation.ModelPolicy.PreferredLocalTranslationModelId = next.Translation.ActiveTranslationModelId;
         next.UI.DefaultInjectionMode = Mode.ToString();
         _settingsService.Replace(next);
     }
@@ -742,36 +768,86 @@ public partial class OverlayViewModel : ObservableObject
 
     private ModelDescriptor? ResolveActiveTranslationModel(string source, string target)
     {
-        if (!string.IsNullOrWhiteSpace(_activeModelId))
+        try
         {
-            var byId = ModelRegistry.AllModels.FirstOrDefault(m => string.Equals(m.Id, _activeModelId, StringComparison.OrdinalIgnoreCase));
-            if (byId is not null)
-                return byId;
-                
-            if (_modelManager is not null)
+            return ModelSelectionPolicy.SelectTranslationProfile(
+                _modelCatalog,
+                _activeModelId,
+                source,
+                target,
+                _routingMode,
+                _routeUnsupportedPairsToCloud,
+                _cloudPreferences,
+                _cloudProviderRuntimeState.GetRoutingState(_cloudPreferences)).Descriptor;
+        }
+        catch (Exception)
+        {
+            if (ModelSelectionPolicy.FindProfileById(_modelCatalog, _activeModelId, _cloudPreferences) is { } activeProfile)
+            {
+                return activeProfile.Descriptor;
+            }
+
+            if (!string.IsNullOrWhiteSpace(_activeModelId) && _modelManager is not null)
             {
                 var installed = _modelManager.ListInstalled().FirstOrDefault(m => string.Equals(m.Id, _activeModelId, StringComparison.OrdinalIgnoreCase));
                 if (installed is not null)
                     return new ModelDescriptor(installed.Id, installed.DisplayName, "", installed.SizeBytes, installed.Type);
             }
+
+            return null;
         }
-
-        if (TryResolveTranslationPairFromModelId(_activeModelId, out var pairSource, out var pairTarget))
-            return ModelRegistry.FindTranslationModel(pairSource, pairTarget);
-
-        return ModelRegistry.FindTranslationModel(source, target);
     }
 
     private string? ResolvePersistedActiveModelId(string sourceLanguage, string targetLanguage)
     {
-        if (TryResolveTranslationPairFromModelId(_activeModelId, out _, out _))
-            return ModelRegistry.FindTranslationModel(sourceLanguage, targetLanguage)?.Id ?? _activeModelId;
-
         if (!string.IsNullOrWhiteSpace(_activeModelId))
             return _activeModelId;
 
-        return ModelRegistry.FindTranslationModel(sourceLanguage, targetLanguage)?.Id;
+        try
+        {
+            return ModelSelectionPolicy.SelectTranslationProfile(
+                _modelCatalog,
+                null,
+                sourceLanguage,
+                targetLanguage,
+                TranslationRoutingMode.LocalOnly,
+                routeUnsupportedPairsToCloud: false).Id;
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
     }
+
+    private void ApplyRoutingSettings(SettingsModel settings)
+    {
+        _routingMode = ParseRoutingMode(settings.Translation.ModelPolicy.RoutingMode);
+        _routeUnsupportedPairsToCloud = settings.Translation.ModelPolicy.RouteUnsupportedPairsToCloud;
+        _cloudPreferences = new CloudModelPreferences(
+            settings.Translation.CloudProvider.Enabled,
+            settings.Translation.CloudProvider.BaseUrl,
+            settings.Translation.CloudProvider.ApiKey,
+            settings.Translation.CloudProvider.TranslationModelId,
+            settings.Translation.CloudProvider.PostProcessingModelId);
+    }
+
+    private static string? GetPreferredLocalModelId(SettingsModel settings) =>
+        string.IsNullOrWhiteSpace(settings.Translation.ModelPolicy.PreferredLocalTranslationModelId)
+            ? settings.Translation.ActiveTranslationModelId
+            : settings.Translation.ModelPolicy.PreferredLocalTranslationModelId;
+
+    private static TranslationRoutingMode ParseRoutingMode(string? routingMode) =>
+        Enum.TryParse<TranslationRoutingMode>(routingMode, ignoreCase: true, out var parsed)
+            ? parsed
+            : TranslationRoutingMode.PreferLocal;
+
+    private static string BuildCloudPreferencesSignature(CloudModelPreferences preferences) =>
+        string.Join("|",
+            preferences.Enabled ? "1" : "0",
+            preferences.BaseUrl ?? string.Empty,
+            preferences.ApiKey ?? string.Empty,
+            preferences.TranslationModelId ?? string.Empty,
+            preferences.PostProcessingModelId ?? string.Empty);
 
     private static bool TryResolveTranslationPairFromModelId(string? modelId, out string source, out string target)
     {

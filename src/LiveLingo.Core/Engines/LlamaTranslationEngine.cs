@@ -1,14 +1,12 @@
-using System.Net.Http.Json;
-using System.Text.Json;
-using LiveLingo.Core.Processing;
+using LiveLingo.Core.Models;
 using Microsoft.Extensions.Logging;
 
 namespace LiveLingo.Core.Engines;
 
 public sealed class LlamaTranslationEngine : ITranslationEngine
 {
-    private readonly QwenModelHost _host;
-    private readonly HttpClient _http;
+    private readonly IModelSelector _selector;
+    private readonly IModelInvocationService _invocationService;
     private readonly ILogger<LlamaTranslationEngine> _logger;
 
     private static readonly Dictionary<string, (string EnglishName, string DisplayName)> Languages =
@@ -29,10 +27,13 @@ public sealed class LlamaTranslationEngine : ITranslationEngine
     public IReadOnlyList<LanguageInfo> SupportedLanguages { get; } =
         Languages.Select(kv => new LanguageInfo(kv.Key, kv.Value.DisplayName)).ToList();
 
-    public LlamaTranslationEngine(QwenModelHost host, HttpClient http, ILogger<LlamaTranslationEngine> logger)
+    public LlamaTranslationEngine(
+        IModelSelector selector,
+        IModelInvocationService invocationService,
+        ILogger<LlamaTranslationEngine> logger)
     {
-        _host = host;
-        _http = http;
+        _selector = selector;
+        _invocationService = invocationService;
         _logger = logger;
     }
 
@@ -43,29 +44,35 @@ public sealed class LlamaTranslationEngine : ITranslationEngine
 
         var srcName = GetLanguageName(sourceLanguage);
         var tgtName = GetLanguageName(targetLanguage);
+        var profile = _selector.SelectTranslationProfile(sourceLanguage, targetLanguage);
+        var request = new ModelInvocationRequest(
+            profile,
+            ModelTaskType.Translation,
+            [
+                new ModelChatMessage(
+                    "system",
+                    $"You are an expert translation engine. Your task is to translate the source text from {srcName} to {tgtName}.\n\n" +
+                    "Rules:\n" +
+                    $"1. Output ONLY the final {tgtName} translation.\n" +
+                    $"2. Do NOT output any {srcName} text.\n" +
+                    "3. Do NOT output any explanations, conversational text, or notes.\n" +
+                    "4. Do not use <think> tags or output any thought process."),
+                new ModelChatMessage(
+                    "user",
+                    $"Translate the following {srcName} text to {tgtName}:\n\n<source>\n{text}\n</source>")
+            ],
+            ModelInvocationOptions.CreateTranslationDefaults());
 
-        var endpoint = await _host.GetOrStartServerAsync(ct);
-        var url = $"{endpoint}/v1/chat/completions";
+        _logger.LogDebug(
+            "Translation prompt for {Src}→{Tgt}: {Prompt}",
+            sourceLanguage,
+            targetLanguage,
+            request.Messages[1].Content);
 
-        var requestBody = LlamaServerChatRequest.CreateTranslation(text, srcName, tgtName);
-
-        _logger.LogDebug("Translation prompt for {Src}→{Tgt}: {Prompt}", sourceLanguage, targetLanguage, requestBody.Messages[1].Content);
-
-        var response = await _http.PostAsJsonAsync(url, requestBody, ct);
-        response.EnsureSuccessStatusCode();
-        
-        var json = await response.Content.ReadAsStringAsync(ct);
-        using var doc = JsonDocument.Parse(json);
-        var result = LlamaServerChatResponse.GetAssistantText(doc.RootElement);
-        result = LlamaServerChatResponse.StripQwenThinkTags(result);
+        var result = (await _invocationService.InvokeAsync(request, ct).ConfigureAwait(false)).Text;
 
         if (string.IsNullOrWhiteSpace(result))
         {
-            _logger.LogWarning(
-                "Translation returned empty output for {Src}→{Tgt}. {Diag}",
-                sourceLanguage,
-                targetLanguage,
-                LlamaServerChatResponse.DescribeFirstChoiceForLog(doc.RootElement));
             throw new InvalidOperationException("Translation returned empty output.");
         }
 

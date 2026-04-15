@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using LiveLingo.Desktop.Messaging;
 using LiveLingo.Desktop.Platform;
+using LiveLingo.Desktop.Services.Cloud;
 using LiveLingo.Desktop.Services.Configuration;
 using LiveLingo.Desktop.Services.LanguageCatalog;
 using LiveLingo.Desktop.Services.Localization;
@@ -22,7 +23,9 @@ public partial class SettingsViewModel : ObservableObject
     private readonly IModelManager? _modelManager;
     private readonly CoreOptions? _coreOptions;
     private readonly ILlmModelLoadCoordinator? _llmCoordinator;
+    private readonly ICloudProviderRuntimeState _cloudProviderRuntimeState;
     private readonly IPlatformServices? _platformServices;
+    private readonly ISecretStore _secretStore;
     private readonly ILogger? _logger;
     private readonly IMessenger _messenger;
     private readonly ILocalizationService? _loc;
@@ -30,12 +33,17 @@ public partial class SettingsViewModel : ObservableObject
     private string? _originalModelStoragePath;
     private bool _isLoadingWorkingCopy;
     private bool _isSyncingTranslationSelection;
+    private bool _isApplyingCloudPreset;
+    private bool _isInferringCloudPreset;
 
     [ObservableProperty] private SettingsModel _workingCopy = SettingsModel.CreateDefault();
     [ObservableProperty] private bool _isDirty;
     [ObservableProperty] private string? _migrationError;
     [ObservableProperty] private bool _showPermissionSection;
     [ObservableProperty] private int _selectedTabIndex;
+    [ObservableProperty] private bool _isTestingCloudProvider;
+    [ObservableProperty] private bool _isFetchingCloudModels;
+    [ObservableProperty] private string? _cloudProviderStatusMessage;
 
     public static IReadOnlyList<string> InjectionModes { get; } = ["PasteAndSend", "PasteOnly"];
     public static IReadOnlyList<string> PostProcessModes { get; } = ["Off", "Summarize", "Optimize", "Colloquialize"];
@@ -43,6 +51,8 @@ public partial class SettingsViewModel : ObservableObject
     public IReadOnlyList<SelectableOption> InjectionModeOptions { get; private set; } = [];
     public IReadOnlyList<SelectableOption> PostProcessModeOptions { get; private set; } = [];
     public IReadOnlyList<SelectableOption> LogLevelOptions { get; private set; } = [];
+    public IReadOnlyList<SelectableOption> RoutingModeOptions { get; private set; } = [];
+    public IReadOnlyList<SelectableOption> CloudProviderPresetOptions { get; private set; } = [];
     public static IReadOnlyList<UILanguageOption> UILanguages { get; } =
         [new("en-US", "English"), new("zh-CN", "简体中文")];
     public string GeneralSectionHotkeys => L("settings.general.hotkeys", "Hotkeys");
@@ -55,9 +65,14 @@ public partial class SettingsViewModel : ObservableObject
     public string GeneralSectionLanguage => L("settings.general.language", "Language");
     public string GeneralUiLanguageLabel => L("settings.general.uiLanguage", "UI Language:");
     public string TranslationSectionDefaultPair => L("settings.translation.defaultPair", "Default Language Pair");
+    public string TranslationSectionRouting => L("settings.translation.routing", "Routing Policy");
     public string TranslationSourceLabel => L("settings.translation.source", "Source Language:");
     public string TranslationTargetLabel => L("settings.translation.target", "Target Language:");
-    public string TranslationActiveModelLabel => L("settings.translation.activeModel", "Active Model:");
+    public string TranslationActiveModelLabel => L("settings.translation.activeModel", "Preferred Local Model:");
+    public string TranslationRoutingModeLabel => L("settings.translation.routingMode", "Routing Mode:");
+    public string TranslationRouteUnsupportedPairsLabel => L(
+        "settings.translation.routeUnsupportedPairs",
+        "Route unsupported language pairs to cloud");
     public string TranslationRefreshModelsTooltip => L("settings.translation.refreshModels", "Refresh translation models");
     public string TranslationNoInstalledModelsHint => L(
         "settings.translation.noInstalledModelsHint",
@@ -97,10 +112,35 @@ public partial class SettingsViewModel : ObservableObject
     public string AiSectionPostProcessing => L("settings.ai.postProcessing", "Post-Processing");
     public string AiDefaultModeLabel => L("settings.ai.defaultMode", "Default Mode:");
     public string AiModesHint => L("settings.ai.modesHint", "Summarize · Optimize · Colloquialize");
+    public string AiSectionCloudProvider => L("settings.ai.cloudProvider", "Cloud Provider");
+    public string AiCloudEnabledLabel => L("settings.ai.cloudEnabled", "Enable Cloud Provider");
+    public string AiCloudPresetLabel => L("settings.ai.cloudPreset", "Preset:");
+    public string AiCloudProviderLabel => L("settings.ai.cloudProviderType", "Provider:");
+    public string AiCloudProviderValue => L("settings.ai.cloudProviderValue", "OpenAI-compatible Chat API");
+    public string AiCloudBaseUrlLabel => L("settings.ai.cloudBaseUrl", "Base URL:");
+    public string AiCloudBaseUrlPlaceholder => GetSelectedCloudProviderPreset().BaseUrl;
+    public string AiCloudApiKeyLabel => L("settings.ai.cloudApiKey", "API Key:");
+    public string AiCloudTranslationModelLabel => L("settings.ai.cloudTranslationModel", "Translation Model:");
+    public string AiCloudTranslationModelPlaceholder => GetSelectedCloudProviderPreset().TranslationModelPlaceholder;
+    public string AiCloudPostProcessingModelLabel => L("settings.ai.cloudPostModel", "Post-Processing Model:");
+    public string AiCloudPostProcessingModelPlaceholder => GetSelectedCloudProviderPreset().PostProcessingModelPlaceholder;
+    public string AiCloudTestConnectionLabel => L("settings.ai.cloudTestConnection", "Test Connection");
+    public string AiCloudFetchModelsLabel => L("settings.ai.cloudFetchModels", "Fetch Models");
+    public string AiCloudDiscoveredModelsLabel => L("settings.ai.cloudDiscoveredModels", "Discovered Models");
+    public string AiCloudUseTranslationLabel => L("settings.ai.cloudUseTranslation", "Use for Translation");
+    public string AiCloudUsePostProcessingLabel => L("settings.ai.cloudUsePost", "Use for Post-Processing");
+    public string AiCloudRoutePostProcessingLabel => L(
+        "settings.ai.cloudRoutePost",
+        "Route post-processing to cloud");
+    public string AiCloudProviderHint => L(
+        "settings.ai.cloudHint",
+        "Use an OpenAI-compatible endpoint such as OpenAI, OpenRouter, or a compatible gateway. Base URL usually ends with /v1.");
 
     public IReadOnlyList<LanguageInfo> AvailableLanguages { get; }
     public ObservableCollection<ModelItemViewModel> Models { get; }
     public ObservableCollection<TranslationModelOption> AvailableTranslationModels { get; }
+    public ObservableCollection<CloudProviderModelOption> DiscoveredCloudModels { get; }
+    public bool HasDiscoveredCloudModels => DiscoveredCloudModels.Count > 0;
 
     public SettingsViewModel(
         ISettingsService settings,
@@ -112,13 +152,17 @@ public partial class SettingsViewModel : ObservableObject
         ILanguageCatalog? languageCatalog = null,
         CoreOptions? coreOptions = null,
         ILlmModelLoadCoordinator? llmCoordinator = null,
-        IPlatformServices? platformServices = null)
+        IPlatformServices? platformServices = null,
+        ISecretStore? secretStore = null,
+        ICloudProviderRuntimeState? cloudProviderRuntimeState = null)
     {
         _settings = settings;
         _modelManager = modelManager;
         _coreOptions = coreOptions;
         _llmCoordinator = llmCoordinator;
+        _cloudProviderRuntimeState = cloudProviderRuntimeState ?? new NullCloudProviderRuntimeState();
         _platformServices = platformServices;
+        _secretStore = secretStore ?? new InMemorySecretStore();
         _logger = logger;
         _messenger = messenger ?? WeakReferenceMessenger.Default;
         _loc = localizationService;
@@ -126,6 +170,7 @@ public partial class SettingsViewModel : ObservableObject
         InitializeLocalizedOptions();
         AvailableLanguages = _languageCatalog.All;
         AvailableTranslationModels = new ObservableCollection<TranslationModelOption>();
+        DiscoveredCloudModels = new ObservableCollection<CloudProviderModelOption>();
         Models = ModelItemViewModel.CreateAll(modelManager, localizationService, platformServices);
         HookWorkingCopy(WorkingCopy);
         HookModelItemChanges();
@@ -141,20 +186,25 @@ public partial class SettingsViewModel : ObservableObject
         ILocalizationService? localizationService = null,
         ILanguageCatalog? languageCatalog = null,
         CoreOptions? coreOptions = null,
-        ILlmModelLoadCoordinator? llmCoordinator = null)
+        ILlmModelLoadCoordinator? llmCoordinator = null,
+        ISecretStore? secretStore = null,
+        ICloudProviderRuntimeState? cloudProviderRuntimeState = null)
     {
         _settings = settings;
         _modelManager = null;
         _logger = null;
         _coreOptions = coreOptions;
         _llmCoordinator = llmCoordinator;
+        _cloudProviderRuntimeState = cloudProviderRuntimeState ?? new NullCloudProviderRuntimeState();
         _platformServices = null;
+        _secretStore = secretStore ?? new InMemorySecretStore();
         _messenger = messenger ?? WeakReferenceMessenger.Default;
         _loc = localizationService;
         _languageCatalog = languageCatalog ?? new LanguageCatalog();
         InitializeLocalizedOptions();
         AvailableLanguages = _languageCatalog.All;
         AvailableTranslationModels = new ObservableCollection<TranslationModelOption>();
+        DiscoveredCloudModels = new ObservableCollection<CloudProviderModelOption>();
         Models = [];
         HookWorkingCopy(WorkingCopy);
         RefreshTranslationModelsInternal();
@@ -205,6 +255,8 @@ public partial class SettingsViewModel : ObservableObject
     {
         HookGroup(model.Hotkeys, OnWorkingCopyNestedChanged);
         HookGroup(model.Translation, OnWorkingCopyNestedChanged);
+        HookGroup(model.Translation.ModelPolicy, OnWorkingCopyNestedChanged);
+        HookGroup(model.Translation.CloudProvider, OnWorkingCopyNestedChanged);
         HookGroup(model.Processing, OnWorkingCopyNestedChanged);
         HookGroup(model.UI, OnWorkingCopyNestedChanged);
         HookGroup(model.Update, OnWorkingCopyNestedChanged);
@@ -215,6 +267,8 @@ public partial class SettingsViewModel : ObservableObject
     {
         UnhookGroup(model.Hotkeys, OnWorkingCopyNestedChanged);
         UnhookGroup(model.Translation, OnWorkingCopyNestedChanged);
+        UnhookGroup(model.Translation.ModelPolicy, OnWorkingCopyNestedChanged);
+        UnhookGroup(model.Translation.CloudProvider, OnWorkingCopyNestedChanged);
         UnhookGroup(model.Processing, OnWorkingCopyNestedChanged);
         UnhookGroup(model.UI, OnWorkingCopyNestedChanged);
         UnhookGroup(model.Update, OnWorkingCopyNestedChanged);
@@ -243,6 +297,21 @@ public partial class SettingsViewModel : ObservableObject
             else if (e.PropertyName is nameof(TranslationSettings.DefaultSourceLanguage) or nameof(TranslationSettings.DefaultTargetLanguage))
                 SyncModelSelectionFromLanguagePair(translation.DefaultSourceLanguage, translation.DefaultTargetLanguage);
         }
+        else if (sender is CloudProviderSettings cloudProvider)
+        {
+            if (e.PropertyName == nameof(CloudProviderSettings.PresetId))
+                ApplyCloudProviderPreset(cloudProvider);
+            else if (e.PropertyName == nameof(CloudProviderSettings.BaseUrl))
+                SyncCloudProviderPresetFromBaseUrl(cloudProvider);
+
+            if (e.PropertyName is nameof(CloudProviderSettings.PresetId)
+                or nameof(CloudProviderSettings.BaseUrl)
+                or nameof(CloudProviderSettings.ApiKey))
+            {
+                ClearDiscoveredCloudModels();
+                CloudProviderStatusMessage = null;
+            }
+        }
 
         MarkDirtyIfNeeded();
     }
@@ -259,6 +328,7 @@ public partial class SettingsViewModel : ObservableObject
         try
         {
             var clone = source.DeepClone();
+            NormalizeTranslationSettings(clone.Translation);
             var selectedModel = ResolveInitialTranslationModel(clone.Translation);
             if (selectedModel is { Type: ModelType.Translation } &&
                 !string.IsNullOrWhiteSpace(selectedModel.SourceLanguage) &&
@@ -276,10 +346,14 @@ public partial class SettingsViewModel : ObservableObject
                 clone.Translation.ActiveTranslationModelId = null;
             }
 
+            clone.Translation.ModelPolicy.PreferredLocalTranslationModelId = clone.Translation.ActiveTranslationModelId;
+
             if (!UILanguages.Any(l => string.Equals(l.Code, clone.UI.Language, StringComparison.OrdinalIgnoreCase)))
                 clone.UI.Language = UILanguages[0].Code;
 
             WorkingCopy = clone;
+            RaiseCloudProviderPresentationChanged();
+            ApplyCloudProviderRuntimeSnapshot(_cloudProviderRuntimeState.Current, clone);
             _originalModelStoragePath = clone.Advanced.ModelStoragePath;
             IsDirty = false;
         }
@@ -342,6 +416,10 @@ public partial class SettingsViewModel : ObservableObject
             WorkingCopy.Translation.ActiveTranslationModelId = matched?.Id;
         }
 
+        WorkingCopy.Translation.ModelPolicy.PreferredLocalTranslationModelId =
+            WorkingCopy.Translation.ActiveTranslationModelId;
+
+        await SettingsSecretCoordinator.PersistSecretsAsync(WorkingCopy, _secretStore, CancellationToken.None);
         _settings.Replace(WorkingCopy);
         if (_coreOptions is not null)
             CoreOptionsSync.ApplyFromSettings(WorkingCopy, _coreOptions, _modelManager);
@@ -372,6 +450,58 @@ public partial class SettingsViewModel : ObservableObject
     [RelayCommand]
     private void OpenHuggingFaceTokenSettingsPage() =>
         _platformServices?.OpenUrl("https://huggingface.co/settings/tokens");
+
+    [RelayCommand]
+    private async Task TestCloudProviderConnectionAsync()
+    {
+        IsTestingCloudProvider = true;
+        try
+        {
+            var snapshot = await _cloudProviderRuntimeState.RefreshAsync(
+                CreateCloudProviderPreferences(),
+                CancellationToken.None);
+            ApplyCloudProviderRuntimeSnapshot(snapshot);
+        }
+        finally
+        {
+            IsTestingCloudProvider = false;
+        }
+    }
+
+    [RelayCommand]
+    private async Task FetchCloudProviderModelsAsync()
+    {
+        IsFetchingCloudModels = true;
+        try
+        {
+            var snapshot = await _cloudProviderRuntimeState.RefreshAsync(
+                CreateCloudProviderPreferences(),
+                CancellationToken.None);
+            ApplyCloudProviderRuntimeSnapshot(snapshot);
+        }
+        finally
+        {
+            IsFetchingCloudModels = false;
+        }
+    }
+
+    [RelayCommand]
+    private void UseCloudTranslationModel(string? modelId)
+    {
+        if (string.IsNullOrWhiteSpace(modelId))
+            return;
+
+        WorkingCopy.Translation.CloudProvider.TranslationModelId = modelId;
+    }
+
+    [RelayCommand]
+    private void UseCloudPostProcessingModel(string? modelId)
+    {
+        if (string.IsNullOrWhiteSpace(modelId))
+            return;
+
+        WorkingCopy.Translation.CloudProvider.PostProcessingModelId = modelId;
+    }
 
     [RelayCommand]
     private void OpenPrimaryTranslationModelOnHuggingFace()
@@ -459,6 +589,88 @@ public partial class SettingsViewModel : ObservableObject
             m.Type == ModelType.Translation &&
             string.Equals(m.SourceLanguage, translation.DefaultSourceLanguage, StringComparison.OrdinalIgnoreCase) &&
             string.Equals(m.TargetLanguage, translation.DefaultTargetLanguage, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static void NormalizeTranslationSettings(TranslationSettings translation)
+    {
+        translation.ModelPolicy ??= new ModelPolicySettings();
+        translation.CloudProvider ??= new CloudProviderSettings();
+
+        if (string.IsNullOrWhiteSpace(translation.ModelPolicy.RoutingMode))
+            translation.ModelPolicy.RoutingMode = nameof(TranslationRoutingMode.PreferLocal);
+        if (string.IsNullOrWhiteSpace(translation.CloudProvider.PresetId))
+            translation.CloudProvider.PresetId = CloudProviderPresetCatalog.InferFromBaseUrl(translation.CloudProvider.BaseUrl).Id;
+        if (string.IsNullOrWhiteSpace(translation.CloudProvider.ProviderType))
+            translation.CloudProvider.ProviderType = "OpenAICompatible";
+        if (string.IsNullOrWhiteSpace(translation.CloudProvider.BaseUrl))
+            translation.CloudProvider.BaseUrl = "https://api.openai.com/v1";
+        else
+            translation.CloudProvider.PresetId = CloudProviderPresetCatalog.InferFromBaseUrl(translation.CloudProvider.BaseUrl).Id;
+
+        if (string.IsNullOrWhiteSpace(translation.ModelPolicy.PreferredLocalTranslationModelId))
+            translation.ModelPolicy.PreferredLocalTranslationModelId = translation.ActiveTranslationModelId;
+        else if (string.IsNullOrWhiteSpace(translation.ActiveTranslationModelId))
+            translation.ActiveTranslationModelId = translation.ModelPolicy.PreferredLocalTranslationModelId;
+    }
+
+    private void ApplyCloudProviderPreset(CloudProviderSettings cloudProvider)
+    {
+        if (_isApplyingCloudPreset || _isInferringCloudPreset)
+        {
+            RaiseCloudProviderPresentationChanged();
+            return;
+        }
+
+        var preset = CloudProviderPresetCatalog.FindById(cloudProvider.PresetId);
+        RaiseCloudProviderPresentationChanged();
+        if (string.Equals(preset.Id, CloudProviderPresetCatalog.Custom.Id, StringComparison.OrdinalIgnoreCase))
+            return;
+
+        _isApplyingCloudPreset = true;
+        try
+        {
+            cloudProvider.ProviderType = "OpenAICompatible";
+            cloudProvider.BaseUrl = preset.BaseUrl;
+            cloudProvider.TranslationModelId = preset.TranslationModelPlaceholder;
+            cloudProvider.PostProcessingModelId = preset.PostProcessingModelPlaceholder;
+        }
+        finally
+        {
+            _isApplyingCloudPreset = false;
+        }
+
+        RaiseCloudProviderPresentationChanged();
+    }
+
+    private void SyncCloudProviderPresetFromBaseUrl(CloudProviderSettings cloudProvider)
+    {
+        RaiseCloudProviderPresentationChanged();
+        if (_isApplyingCloudPreset)
+            return;
+
+        var inferredPresetId = CloudProviderPresetCatalog.InferFromBaseUrl(cloudProvider.BaseUrl).Id;
+        if (string.Equals(cloudProvider.PresetId, inferredPresetId, StringComparison.OrdinalIgnoreCase))
+            return;
+
+        _isInferringCloudPreset = true;
+        try
+        {
+            cloudProvider.PresetId = inferredPresetId;
+        }
+        finally
+        {
+            _isInferringCloudPreset = false;
+        }
+    }
+
+    private CloudProviderPreset GetSelectedCloudProviderPreset() =>
+        CloudProviderPresetCatalog.FindById(WorkingCopy.Translation.CloudProvider.PresetId);
+
+    private void RaiseCloudProviderPresentationChanged()
+    {
+        OnPropertyChanged(nameof(AiCloudBaseUrlPlaceholder));
+        OnPropertyChanged(nameof(AiCloudTranslationModelPlaceholder));
+        OnPropertyChanged(nameof(AiCloudPostProcessingModelPlaceholder));
     }
 
     private void HookModelItemChanges()
@@ -573,6 +785,18 @@ public partial class SettingsViewModel : ObservableObject
             new SelectableOption("Colloquialize", L("settings.postMode.colloquialize", "Colloquialize"))
         ];
 
+        RoutingModeOptions =
+        [
+            new SelectableOption(nameof(TranslationRoutingMode.LocalOnly), L("settings.routing.localOnly", "Local Only")),
+            new SelectableOption(nameof(TranslationRoutingMode.PreferLocal), L("settings.routing.preferLocal", "Prefer Local")),
+            new SelectableOption(nameof(TranslationRoutingMode.PreferCloud), L("settings.routing.preferCloud", "Prefer Cloud")),
+            new SelectableOption(nameof(TranslationRoutingMode.CloudOnly), L("settings.routing.cloudOnly", "Cloud Only"))
+        ];
+
+        CloudProviderPresetOptions = CloudProviderPresetCatalog.All
+            .Select(preset => new SelectableOption(preset.Id, GetCloudProviderPresetDisplayName(preset)))
+            .ToArray();
+
         LogLevelOptions =
         [
             new SelectableOption("Verbose", L("settings.logLevel.verbose", "Verbose")),
@@ -589,6 +813,51 @@ public partial class SettingsViewModel : ObservableObject
             : type == ModelType.PostProcessing
                 ? L("settings.translation.pair.postProcessing", "Post-processing")
                 : type.ToString();
+
+    private CloudModelPreferences CreateCloudProviderPreferences(SettingsModel? settings = null) =>
+        CoreOptionsSync.CreateCloudModelPreferences(settings ?? WorkingCopy);
+
+    private void ApplyCloudProviderRuntimeSnapshot(
+        CloudProviderRuntimeSnapshot? snapshot,
+        SettingsModel? settings = null)
+    {
+        if (snapshot is null)
+        {
+            ClearDiscoveredCloudModels();
+            CloudProviderStatusMessage = null;
+            return;
+        }
+
+        var targetSettings = settings ?? WorkingCopy;
+        if (!snapshot.Matches(CreateCloudProviderPreferences(targetSettings)))
+        {
+            ClearDiscoveredCloudModels();
+            CloudProviderStatusMessage = null;
+            return;
+        }
+
+        DiscoveredCloudModels.Clear();
+        foreach (var model in snapshot.Models)
+            DiscoveredCloudModels.Add(new CloudProviderModelOption(model.Id, model.OwnedBy));
+        OnPropertyChanged(nameof(HasDiscoveredCloudModels));
+        CloudProviderStatusMessage = CloudProviderRuntimePresentation.BuildSettingsStatusMessage(_loc, targetSettings, snapshot);
+    }
+
+    private void ClearDiscoveredCloudModels()
+    {
+        DiscoveredCloudModels.Clear();
+        OnPropertyChanged(nameof(HasDiscoveredCloudModels));
+    }
+
+    private string GetCloudProviderPresetDisplayName(CloudProviderPreset preset) =>
+        preset.Id switch
+        {
+            "Custom" => L("settings.ai.cloudPreset.custom", "Custom"),
+            "OpenAI" => L("settings.ai.cloudPreset.openai", "OpenAI"),
+            "OpenRouter" => L("settings.ai.cloudPreset.openrouter", "OpenRouter"),
+            "Groq" => L("settings.ai.cloudPreset.groq", "Groq"),
+            _ => preset.DisplayName
+        };
 
     private string L(string key, string fallback) => _loc?.T(key) ?? fallback;
     private string L(string key, string fallback, params object[] args) => _loc?.T(key, args) ?? string.Format(fallback, args);
@@ -613,4 +882,10 @@ public record TranslationModelOption(
 public record SelectableOption(string Value, string DisplayName)
 {
     public override string ToString() => DisplayName;
+}
+
+public record CloudProviderModelOption(string Id, string? OwnedBy)
+{
+    public string Caption => string.IsNullOrWhiteSpace(OwnedBy) ? Id : $"{Id} · {OwnedBy}";
+    public override string ToString() => Caption;
 }

@@ -20,7 +20,9 @@ public sealed class QwenModelHostTests : IDisposable
     {
         var modelManager = Substitute.For<IModelManager>();
         var serverManager = Substitute.For<ILlamaServerProcessManager>();
+        var selector = Substitute.For<IModelSelector>();
         var logger = Substitute.For<ILogger<QwenModelHost>>();
+        var catalog = new StaticModelCatalog();
 
         var modelDir = Path.Combine(_tempDir, ModelRegistry.Qwen35_9B.Id);
         Directory.CreateDirectory(modelDir);
@@ -31,6 +33,10 @@ public sealed class QwenModelHostTests : IDisposable
         modelManager.GetModelDirectory(ModelRegistry.Qwen35_9B.Id).Returns(modelDir);
         modelManager.EnsureModelAsync(Arg.Any<ModelDescriptor>(), Arg.Any<IProgress<ModelDownloadProgress>?>(), Arg.Any<CancellationToken>())
             .Returns(Task.CompletedTask);
+        selector.SelectTranslationProfile(Arg.Any<string>(), Arg.Any<string>())
+            .Returns(catalog.FindById(ModelRegistry.Qwen35_9B.Id)!);
+        selector.SelectPostProcessingProfile()
+            .Returns(catalog.FindById(ModelRegistry.Qwen25_15B.Id)!);
 
         var startupEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var allowStartupToFinish = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -52,6 +58,7 @@ public sealed class QwenModelHostTests : IDisposable
         using var host = new QwenModelHost(
             modelManager,
             serverManager,
+            selector,
             Options.Create(new CoreOptions { ModelStoragePath = _tempDir }),
             logger);
 
@@ -73,6 +80,115 @@ public sealed class QwenModelHostTests : IDisposable
             .EnsureModelAsync(Arg.Any<ModelDescriptor>(), Arg.Any<IProgress<ModelDownloadProgress>?>(), Arg.Any<CancellationToken>());
         await serverManager.Received(1)
             .EnsureServerRunningAsync(Arg.Any<string>(), 4096, Arg.Any<int>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task GetOrStartServerAsync_uses_post_processing_profile_when_requested()
+    {
+        var modelManager = Substitute.For<IModelManager>();
+        var serverManager = Substitute.For<ILlamaServerProcessManager>();
+        var selector = Substitute.For<IModelSelector>();
+        var logger = Substitute.For<ILogger<QwenModelHost>>();
+        var catalog = new StaticModelCatalog();
+
+        var postModelDir = Path.Combine(_tempDir, ModelRegistry.Qwen25_15B.Id);
+        Directory.CreateDirectory(postModelDir);
+        await File.WriteAllTextAsync(
+            Path.Combine(postModelDir, "qwen2.5-1.5b-instruct-q4_k_m.gguf"),
+            "stub");
+
+        modelManager.GetModelDirectory(ModelRegistry.Qwen25_15B.Id).Returns(postModelDir);
+        modelManager.EnsureModelAsync(Arg.Any<ModelDescriptor>(), Arg.Any<IProgress<ModelDownloadProgress>?>(), Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+
+        selector.SelectTranslationProfile(Arg.Any<string>(), Arg.Any<string>())
+            .Returns(catalog.FindById(ModelRegistry.Qwen35_9B.Id)!);
+        selector.SelectPostProcessingProfile()
+            .Returns(catalog.FindById(ModelRegistry.Qwen25_15B.Id)!);
+
+        var state = ModelLoadState.Unloaded;
+        string? endpoint = null;
+        serverManager.State.Returns(_ => state);
+        serverManager.CurrentEndpointUrl.Returns(_ => endpoint);
+        serverManager.StopServerAsync().Returns(Task.CompletedTask);
+        serverManager.EnsureServerRunningAsync(Arg.Any<string>(), 4096, Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                endpoint = "http://127.0.0.1:50124";
+                state = ModelLoadState.Loaded;
+                return Task.CompletedTask;
+            });
+
+        using var host = new QwenModelHost(
+            modelManager,
+            serverManager,
+            selector,
+            Options.Create(new CoreOptions { ModelStoragePath = _tempDir }),
+            logger);
+
+        var readyEndpoint = await host.GetOrStartServerAsync(ModelTaskType.PostProcessing, CancellationToken.None);
+
+        Assert.Equal("http://127.0.0.1:50124", readyEndpoint);
+        await modelManager.Received(1)
+            .EnsureModelAsync(
+                Arg.Is<ModelDescriptor>(m => m.Id == ModelRegistry.Qwen25_15B.Id),
+                Arg.Any<IProgress<ModelDownloadProgress>?>(),
+                Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task GetOrStartServerAsync_uses_requested_translation_profile_descriptor()
+    {
+        var modelManager = Substitute.For<IModelManager>();
+        var serverManager = Substitute.For<ILlamaServerProcessManager>();
+        var selector = Substitute.For<IModelSelector>();
+        var logger = Substitute.For<ILogger<QwenModelHost>>();
+        var catalog = new StaticModelCatalog();
+
+        var translationProfile = catalog.FindById(ModelRegistry.Qwen25_7B.Id)!;
+        var translationModelDir = Path.Combine(_tempDir, ModelRegistry.Qwen25_7B.Id);
+        Directory.CreateDirectory(translationModelDir);
+        await File.WriteAllTextAsync(
+            Path.Combine(translationModelDir, "qwen2.5-7b-instruct-q4_k_m.gguf"),
+            "stub");
+
+        modelManager.GetModelDirectory(ModelRegistry.Qwen25_7B.Id).Returns(translationModelDir);
+        modelManager.EnsureModelAsync(Arg.Any<ModelDescriptor>(), Arg.Any<IProgress<ModelDownloadProgress>?>(), Arg.Any<CancellationToken>())
+            .Returns(Task.CompletedTask);
+
+        selector.SelectTranslationProfile(Arg.Any<string>(), Arg.Any<string>())
+            .Returns(catalog.FindById(ModelRegistry.Qwen35_9B.Id)!);
+        selector.SelectPostProcessingProfile()
+            .Returns(catalog.FindById(ModelRegistry.Qwen25_15B.Id)!);
+
+        var state = ModelLoadState.Unloaded;
+        string? endpoint = null;
+        serverManager.State.Returns(_ => state);
+        serverManager.CurrentEndpointUrl.Returns(_ => endpoint);
+        serverManager.StopServerAsync().Returns(Task.CompletedTask);
+        serverManager.EnsureServerRunningAsync(Arg.Any<string>(), 4096, Arg.Any<int>(), Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                endpoint = "http://127.0.0.1:50125";
+                state = ModelLoadState.Loaded;
+                return Task.CompletedTask;
+            });
+
+        using var host = new QwenModelHost(
+            modelManager,
+            serverManager,
+            selector,
+            Options.Create(new CoreOptions { ModelStoragePath = _tempDir }),
+            logger);
+
+        var readyEndpoint = await host.GetOrStartServerAsync(translationProfile, CancellationToken.None);
+
+        Assert.Equal("http://127.0.0.1:50125", readyEndpoint);
+        await modelManager.Received(1)
+            .EnsureModelAsync(
+                Arg.Is<ModelDescriptor>(m => m.Id == ModelRegistry.Qwen25_7B.Id),
+                Arg.Any<IProgress<ModelDownloadProgress>?>(),
+                Arg.Any<CancellationToken>());
     }
 
     public void Dispose()

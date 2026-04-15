@@ -25,6 +25,7 @@ public partial class SetupWizardViewModel : ObservableObject
     private readonly CoreOptions? _coreOptions;
     private readonly ILlmModelLoadCoordinator? _llmCoordinator;
     private readonly IPlatformServices? _platform;
+    private readonly IModelCatalog _modelCatalog;
     private CancellationTokenSource? _downloadCts;
 
     [ObservableProperty] private int _currentStep;
@@ -106,13 +107,15 @@ public partial class SetupWizardViewModel : ObservableObject
         IClipboardService? clipboard = null,
         CoreOptions? coreOptions = null,
         ILlmModelLoadCoordinator? llmCoordinator = null,
-        IPlatformServices? platformServices = null)
+        IPlatformServices? platformServices = null,
+        IModelCatalog? modelCatalog = null)
     {
         _settings = settings;
         _modelManager = modelManager;
         _coreOptions = coreOptions;
         _llmCoordinator = llmCoordinator;
         _platform = platformServices;
+        _modelCatalog = modelCatalog ?? new StaticModelCatalog();
         _messenger = messenger ?? WeakReferenceMessenger.Default;
         _logger = logger;
         _localization = localization;
@@ -334,7 +337,9 @@ public partial class SetupWizardViewModel : ObservableObject
         workingCopy.Translation.DefaultSourceLanguage = SourceLanguage;
         workingCopy.Translation.DefaultTargetLanguage = TargetLanguage;
         workingCopy.Translation.ActiveTranslationModelId =
-            ModelRegistry.FindTranslationModel(SourceLanguage, TargetLanguage)?.Id;
+            ModelSelectionPolicy.SelectTranslationProfile(_modelCatalog, null, SourceLanguage, TargetLanguage).Id;
+        workingCopy.Translation.ModelPolicy.PreferredLocalTranslationModelId =
+            workingCopy.Translation.ActiveTranslationModelId;
         workingCopy.Translation.LanguagePairs = [new LanguagePair(SourceLanguage, TargetLanguage)];
 
         _settings.Replace(workingCopy);
