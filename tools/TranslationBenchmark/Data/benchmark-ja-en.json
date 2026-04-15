@@ -1,0 +1,122 @@
+[
+  {
+    "id": "ja-en-01",
+    "domain": "daily",
+    "source": "今日は少し遅れますので、先に始めておいてください。",
+    "reference": "I'll be a little late today, so please go ahead and start without me."
+  },
+  {
+    "id": "ja-en-02",
+    "domain": "daily",
+    "source": "この近くにおすすめのランチスポットはありますか？",
+    "reference": "Do you have any recommendations for a good lunch spot around here?"
+  },
+  {
+    "id": "ja-en-03",
+    "domain": "daily",
+    "source": "明日の会議の資料を事前に共有していただけますか？",
+    "reference": "Could you share the materials for tomorrow's meeting in advance?"
+  },
+  {
+    "id": "ja-en-04",
+    "domain": "daily",
+    "source": "週末は家族と一緒に映画を見に行く予定です。",
+    "reference": "I'm planning to go see a movie with my family this weekend."
+  },
+  {
+    "id": "ja-en-05",
+    "domain": "daily",
+    "source": "お体の具合はいかがですか？早くよくなるといいですね。",
+    "reference": "How are you feeling? I hope you get better soon."
+  },
+  {
+    "id": "ja-en-06",
+    "domain": "news",
+    "source": "政府は経済対策として追加の補助金支給を発表した。",
+    "reference": "The government announced additional subsidy payments as an economic stimulus measure."
+  },
+  {
+    "id": "ja-en-07",
+    "domain": "news",
+    "source": "今年の夏は記録的な猛暑が続いており、熱中症に注意が必要だ。",
+    "reference": "This summer has seen record-breaking heat waves, and people are urged to watch out for heatstroke."
+  },
+  {
+    "id": "ja-en-08",
+    "domain": "news",
+    "source": "国内最大手の自動車メーカーが電動車両の新モデルを発表した。",
+    "reference": "The country's largest automaker unveiled a new model of electric vehicle."
+  },
+  {
+    "id": "ja-en-09",
+    "domain": "news",
+    "source": "研究者らは新たなワクチンの臨床試験を開始したと発表した。",
+    "reference": "Researchers announced the start of clinical trials for a new vaccine."
+  },
+  {
+    "id": "ja-en-10",
+    "domain": "news",
+    "source": "先月の貿易収支は輸出の増加により黒字に転じた。",
+    "reference": "Last month's trade balance swung to a surplus due to an increase in exports."
+  },
+  {
+    "id": "ja-en-11",
+    "domain": "technical",
+    "source": "このAPIはRESTful設計に準拠しており、JSON形式でデータをやり取りします。",
+    "reference": "This API conforms to RESTful design principles and exchanges data in JSON format."
+  },
+  {
+    "id": "ja-en-12",
+    "domain": "technical",
+    "source": "サーバーのメモリ使用量が上限に達したため、プロセスが強制終了されました。",
+    "reference": "The process was forcibly terminated because the server's memory usage reached its limit."
+  },
+  {
+    "id": "ja-en-13",
+    "domain": "technical",
+    "source": "マイクロサービスアーキテクチャにより、各コンポーネントを独立してスケールできます。",
+    "reference": "The microservices architecture allows each component to be scaled independently."
+  },
+  {
+    "id": "ja-en-14",
+    "domain": "technical",
+    "source": "機械学習モデルの精度向上には、より多様な学習データが必要です。",
+    "reference": "Improving the accuracy of machine learning models requires more diverse training data."
+  },
+  {
+    "id": "ja-en-15",
+    "domain": "technical",
+    "source": "セキュリティ監査の結果、SQLインジェクションの脆弱性が発見されました。",
+    "reference": "A security audit revealed a SQL injection vulnerability."
+  },
+  {
+    "id": "ja-en-16",
+    "domain": "formal",
+    "source": "本契約に基づくすべての紛争は、東京地方裁判所を管轄裁判所とする。",
+    "reference": "All disputes arising under this agreement shall be subject to the jurisdiction of the Tokyo District Court."
+  },
+  {
+    "id": "ja-en-17",
+    "domain": "formal",
+    "source": "ご応募いただいた件につきましては、慎重に検討した上でご連絡いたします。",
+    "reference": "Regarding your application, we will contact you after careful consideration."
+  },
+  {
+    "id": "ja-en-18",
+    "domain": "colloquial",
+    "source": "あの映画、思ったよりずっと面白かった！",
+    "reference": "That movie was way more interesting than I expected!"
+  },
+  {
+    "id": "ja-en-19",
+    "domain": "colloquial",
+    "source": "最近仕事が忙しくて、全然休めていないんだよね。",
+    "reference": "Work has been so busy lately that I haven't been able to rest at all."
+  },
+  {
+    "id": "ja-en-20",
+    "domain": "colloquial",
+    "source": "もうちょっとで終わるから、もう少しだけ待ってて。",
+    "reference": "I'm almost done, so just wait a little longer."
+  }
+]

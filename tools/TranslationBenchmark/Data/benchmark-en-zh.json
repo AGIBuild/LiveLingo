@@ -1,0 +1,122 @@
+[
+  {
+    "id": "en-zh-01",
+    "domain": "daily",
+    "source": "Could you please turn off the lights before you leave?",
+    "reference": "离开前请关掉电灯。"
+  },
+  {
+    "id": "en-zh-02",
+    "domain": "daily",
+    "source": "I'm running a bit late; please start without me.",
+    "reference": "我会晚一点到，请不要等我，先开始吧。"
+  },
+  {
+    "id": "en-zh-03",
+    "domain": "daily",
+    "source": "The meeting has been rescheduled to 3 PM on Thursday.",
+    "reference": "会议已改期至周四下午三点。"
+  },
+  {
+    "id": "en-zh-04",
+    "domain": "daily",
+    "source": "Do you have any recommendations for a good coffee shop nearby?",
+    "reference": "你有什么附近好咖啡馆的推荐吗？"
+  },
+  {
+    "id": "en-zh-05",
+    "domain": "daily",
+    "source": "I haven't seen you in ages! How have you been?",
+    "reference": "好久不见！你最近怎么样？"
+  },
+  {
+    "id": "en-zh-06",
+    "domain": "news",
+    "source": "The central bank raised interest rates by 25 basis points to combat rising inflation.",
+    "reference": "央行将利率上调25个基点，以应对不断上涨的通货膨胀。"
+  },
+  {
+    "id": "en-zh-07",
+    "domain": "news",
+    "source": "Authorities warned residents to evacuate the coastal areas ahead of the approaching typhoon.",
+    "reference": "当局警告居民在台风来临前撤离沿海地区。"
+  },
+  {
+    "id": "en-zh-08",
+    "domain": "news",
+    "source": "The startup secured $50 million in Series B funding to expand its operations globally.",
+    "reference": "这家初创公司获得了5000万美元B轮融资，以在全球扩展业务。"
+  },
+  {
+    "id": "en-zh-09",
+    "domain": "news",
+    "source": "Scientists have discovered a new species of deep-sea fish in the Pacific Ocean.",
+    "reference": "科学家在太平洋发现了一种新的深海鱼类。"
+  },
+  {
+    "id": "en-zh-10",
+    "domain": "news",
+    "source": "The trade agreement between the two nations is expected to boost bilateral commerce by 20 percent.",
+    "reference": "两国之间的贸易协议预计将使双边贸易增长20%。"
+  },
+  {
+    "id": "en-zh-11",
+    "domain": "technical",
+    "source": "Containerization using Docker ensures consistent environments across development and production.",
+    "reference": "使用Docker进行容器化可以确保开发环境和生产环境保持一致。"
+  },
+  {
+    "id": "en-zh-12",
+    "domain": "technical",
+    "source": "The API endpoint accepts JSON payloads and returns responses with HTTP status codes.",
+    "reference": "API端点接受JSON格式的请求体，并通过HTTP状态码返回响应。"
+  },
+  {
+    "id": "en-zh-13",
+    "domain": "technical",
+    "source": "Implement retry logic with exponential backoff to handle transient network failures gracefully.",
+    "reference": "实现带有指数退避的重试逻辑，以优雅地处理瞬态网络故障。"
+  },
+  {
+    "id": "en-zh-14",
+    "domain": "technical",
+    "source": "The unit tests achieved 92% code coverage, with the remaining gaps in legacy error-handling paths.",
+    "reference": "单元测试达到了92%的代码覆盖率，剩余未覆盖部分集中在遗留的错误处理路径上。"
+  },
+  {
+    "id": "en-zh-15",
+    "domain": "technical",
+    "source": "The machine learning model achieved an F1 score of 0.94 on the validation dataset.",
+    "reference": "该机器学习模型在验证数据集上取得了0.94的F1分数。"
+  },
+  {
+    "id": "en-zh-16",
+    "domain": "formal",
+    "source": "We hereby confirm receipt of your application and will review it within five business days.",
+    "reference": "我们特此确认已收到您的申请，并将在五个工作日内进行审核。"
+  },
+  {
+    "id": "en-zh-17",
+    "domain": "formal",
+    "source": "The parties agree to resolve any disputes through binding arbitration under the laws of this jurisdiction.",
+    "reference": "各方同意依据本司法管辖区的法律，通过具有约束力的仲裁解决任何争议。"
+  },
+  {
+    "id": "en-zh-18",
+    "domain": "colloquial",
+    "source": "I totally blanked on the answer during the exam — it was so frustrating.",
+    "reference": "我在考试时完全想不起答案来，真的太沮丧了。"
+  },
+  {
+    "id": "en-zh-19",
+    "domain": "colloquial",
+    "source": "Let's just grab something quick to eat; I'm not that hungry anyway.",
+    "reference": "我们随便吃点就行，反正我也不是很饿。"
+  },
+  {
+    "id": "en-zh-20",
+    "domain": "colloquial",
+    "source": "That new show everyone's talking about is actually pretty decent.",
+    "reference": "大家都在谈论的那部新剧其实还不错。"
+  }
+]

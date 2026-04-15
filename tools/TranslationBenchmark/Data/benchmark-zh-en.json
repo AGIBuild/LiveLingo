@@ -1,0 +1,122 @@
+[
+  {
+    "id": "zh-en-01",
+    "domain": "daily",
+    "source": "今天天气真不错，适合出去散步。",
+    "reference": "The weather is really nice today, perfect for going for a walk."
+  },
+  {
+    "id": "zh-en-02",
+    "domain": "daily",
+    "source": "你能帮我把这份文件发给客户吗？",
+    "reference": "Could you help me send this document to the client?"
+  },
+  {
+    "id": "zh-en-03",
+    "domain": "daily",
+    "source": "这家餐厅的菜品非常丰富，价格也很实惠。",
+    "reference": "This restaurant has a very diverse menu and the prices are quite affordable."
+  },
+  {
+    "id": "zh-en-04",
+    "domain": "daily",
+    "source": "我昨晚没睡好，今天有点疲惫。",
+    "reference": "I didn't sleep well last night and I'm feeling a bit tired today."
+  },
+  {
+    "id": "zh-en-05",
+    "domain": "daily",
+    "source": "下周五我们需要提交项目报告。",
+    "reference": "We need to submit the project report next Friday."
+  },
+  {
+    "id": "zh-en-06",
+    "domain": "news",
+    "source": "经济学家预测，今年全球经济增长率将达到百分之三点二。",
+    "reference": "Economists predict that global economic growth will reach 3.2 percent this year."
+  },
+  {
+    "id": "zh-en-07",
+    "domain": "news",
+    "source": "该公司宣布将在未来两年内裁员约五千人。",
+    "reference": "The company announced it will lay off approximately five thousand employees over the next two years."
+  },
+  {
+    "id": "zh-en-08",
+    "domain": "news",
+    "source": "两国领导人在峰会上就气候变化问题达成重要共识。",
+    "reference": "The leaders of the two countries reached an important consensus on climate change at the summit."
+  },
+  {
+    "id": "zh-en-09",
+    "domain": "news",
+    "source": "新研究表明，定期运动可以显著降低患心脏病的风险。",
+    "reference": "A new study suggests that regular exercise can significantly reduce the risk of developing heart disease."
+  },
+  {
+    "id": "zh-en-10",
+    "domain": "news",
+    "source": "政府宣布将投入大量资金用于改善农村地区的基础设施。",
+    "reference": "The government announced it will invest significant funds to improve infrastructure in rural areas."
+  },
+  {
+    "id": "zh-en-11",
+    "domain": "technical",
+    "source": "该算法的时间复杂度为O(n log n)，适用于大规模数据集。",
+    "reference": "The algorithm has a time complexity of O(n log n), making it suitable for large-scale datasets."
+  },
+  {
+    "id": "zh-en-12",
+    "domain": "technical",
+    "source": "请确保在部署前完成所有单元测试并解决代码审查中发现的问题。",
+    "reference": "Please ensure all unit tests are completed and issues identified in the code review are resolved before deployment."
+  },
+  {
+    "id": "zh-en-13",
+    "domain": "technical",
+    "source": "该系统支持水平扩展，可以根据负载动态调整服务器数量。",
+    "reference": "The system supports horizontal scaling and can dynamically adjust the number of servers based on load."
+  },
+  {
+    "id": "zh-en-14",
+    "domain": "technical",
+    "source": "内存泄漏问题已定位到第三方库的回调函数中，正在协调修复。",
+    "reference": "The memory leak issue has been traced to a callback function in a third-party library and a fix is being coordinated."
+  },
+  {
+    "id": "zh-en-15",
+    "domain": "technical",
+    "source": "数据库连接池的最大连接数建议设置为CPU核心数的两到四倍。",
+    "reference": "It is recommended to set the maximum connection pool size to two to four times the number of CPU cores."
+  },
+  {
+    "id": "zh-en-16",
+    "domain": "formal",
+    "source": "兹证明该证书持有人已完成本课程的全部学习要求。",
+    "reference": "This is to certify that the certificate holder has completed all learning requirements of this course."
+  },
+  {
+    "id": "zh-en-17",
+    "domain": "formal",
+    "source": "根据合同第五条规定，乙方应在收到通知后三十日内完成交付。",
+    "reference": "According to Article 5 of the contract, Party B shall complete delivery within thirty days of receiving notice."
+  },
+  {
+    "id": "zh-en-18",
+    "domain": "colloquial",
+    "source": "这道题真的太难了，我完全不知道从哪里下手。",
+    "reference": "This problem is really too difficult; I have absolutely no idea where to start."
+  },
+  {
+    "id": "zh-en-19",
+    "domain": "colloquial",
+    "source": "那部电影还不错，但结局有点让人失望。",
+    "reference": "That movie was pretty good, but the ending was a bit disappointing."
+  },
+  {
+    "id": "zh-en-20",
+    "domain": "colloquial",
+    "source": "你最近忙什么呢？好久不见了。",
+    "reference": "What have you been up to lately? It's been a long time."
+  }
+]
