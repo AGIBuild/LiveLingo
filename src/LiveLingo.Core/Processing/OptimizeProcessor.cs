@@ -1,3 +1,4 @@
+using LiveLingo.Core.Models;
 using Microsoft.Extensions.Logging;
 
 namespace LiveLingo.Core.Processing;
@@ -9,6 +10,9 @@ public sealed class OptimizeProcessor : QwenTextProcessor
     protected override string SystemPrompt =>
         "You are a text editor. Improve the grammar, clarity, and readability of the given text while preserving the meaning. Output ONLY the improved text, no explanations.";
 
-    public OptimizeProcessor(QwenModelHost host, HttpClient http, ILogger<OptimizeProcessor> logger)
-        : base(host, http, logger) { }
+    public OptimizeProcessor(
+        IModelSelector selector,
+        IModelInvocationService invocationService,
+        ILogger<OptimizeProcessor> logger)
+        : base(selector, invocationService, logger) { }
 }

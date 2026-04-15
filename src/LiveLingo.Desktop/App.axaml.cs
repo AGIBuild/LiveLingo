@@ -11,6 +11,7 @@ using LiveLingo.Desktop.Messaging;
 using LiveLingo.Desktop.Platform;
 using LiveLingo.Desktop.Platform.Windows;
 using LiveLingo.Desktop.Platform.macOS;
+using LiveLingo.Desktop.Services.Cloud;
 using LiveLingo.Desktop.Services.Configuration;
 using LiveLingo.Desktop.Services.LanguageCatalog;
 using LiveLingo.Desktop.Services.Localization;
@@ -81,16 +82,11 @@ public partial class App : Application
         });
         services.AddLiveLingoCore(opts =>
         {
-            if (!string.IsNullOrEmpty(userSettings.Advanced.ModelStoragePath))
-                opts.ModelStoragePath = userSettings.Advanced.ModelStoragePath;
-            opts.DefaultTargetLanguage = userSettings.Translation.DefaultTargetLanguage;
-            opts.ActiveTranslationModelId = userSettings.Translation.ActiveTranslationModelId;
-            opts.InferenceThreads = userSettings.Advanced.InferenceThreads;
-            opts.HuggingFaceMirror = userSettings.Advanced.HuggingFaceMirror;
-            opts.HuggingFaceToken = userSettings.Advanced.HuggingFaceToken;
+            CoreOptionsSync.ApplyFromSettings(userSettings, opts);
         });
         services.AddSingleton<ISettingsService>(settingsService);
         services.AddSingleton<IMessenger>(_ => WeakReferenceMessenger.Default);
+        services.AddSingleton<ICloudProviderRuntimeState, CloudProviderRuntimeStateService>();
 
         services.AddSingleton<ILocalizationService>(sp =>
         {
@@ -101,9 +97,19 @@ public partial class App : Application
         services.AddSingleton<ILanguageCatalog, LanguageCatalog>();
 
         if (OperatingSystem.IsWindows())
+        {
             services.AddSingleton<IPlatformServices, WindowsPlatformServices>();
+            services.AddSingleton<ISecretStore, WindowsCredentialSecretStore>();
+        }
         else if (OperatingSystem.IsMacOS())
+        {
             services.AddSingleton<IPlatformServices, MacPlatformServices>();
+            services.AddSingleton<ISecretStore, MacKeychainSecretStore>();
+        }
+        else
+        {
+            services.AddSingleton<ISecretStore, InMemorySecretStore>();
+        }
 
         services.AddSingleton<IAudioCaptureService>(sp =>
             sp.GetService<IPlatformServices>()?.AudioCapture ?? new StubAudioCaptureService());
@@ -111,6 +117,10 @@ public partial class App : Application
 
         _serviceProvider = services.BuildServiceProvider();
         _messenger = _serviceProvider.GetRequiredService<IMessenger>();
+        var secretStore = _serviceProvider.GetRequiredService<ISecretStore>();
+        if (await SettingsSecretCoordinator.MigrateAndHydrateAsync(userSettings, secretStore))
+            await settingsService.SaveAsync();
+        SyncCoreOptionsFromSettings(_serviceProvider, userSettings);
         _serviceProvider.GetRequiredService<QwenModelHost>().ModelLoadFallbackApplied += OnQwenModelLoadFallbackApplied;
         _messenger.Register<App, AppUiRequestMessage>(this, static (recipient, message) =>
             Dispatcher.UIThread.Post(() => recipient.HandleAppUiRequest(message)));
@@ -153,6 +163,7 @@ public partial class App : Application
                     Dispatcher.UIThread.Post(() =>
                     {
                         var latest = settingsService.Current;
+                        SyncCoreOptionsFromSettings(_serviceProvider, latest);
                         ApplyRuntimeSettings(platform, latest);
                         BroadcastSettingsChanged();
                     });
@@ -174,6 +185,15 @@ public partial class App : Application
             ToolTipText = _serviceProvider?.GetService<ILocalizationService>()?.T("app.name") ?? "LiveLingo"
         };
         BuildTrayMenu(desktop, platform, settingsService);
+    }
+
+    internal static void SyncCoreOptionsFromSettings(IServiceProvider? serviceProvider, SettingsModel latest)
+    {
+        if (serviceProvider?.GetService(typeof(CoreOptions)) is not CoreOptions coreOptions)
+            return;
+
+        var modelManager = serviceProvider.GetService(typeof(IModelManager)) as IModelManager;
+        CoreOptionsSync.ApplyFromSettings(latest, coreOptions, modelManager);
     }
 
     private void BuildTrayMenu(
@@ -256,9 +276,11 @@ public partial class App : Application
         var engine = _serviceProvider!.GetRequiredService<ITranslationEngine>();
         var loc = _serviceProvider!.GetRequiredService<ILocalizationService>();
         var languageCatalog = _serviceProvider!.GetRequiredService<ILanguageCatalog>();
-        var coreOptions = _serviceProvider.GetRequiredService<CoreOptions>();
-        var llmCoordinator = _serviceProvider.GetRequiredService<ILlmModelLoadCoordinator>();
-        var platform = _serviceProvider.GetRequiredService<IPlatformServices>();
+        var coreOptions = _serviceProvider!.GetRequiredService<CoreOptions>();
+        var llmCoordinator = _serviceProvider!.GetRequiredService<ILlmModelLoadCoordinator>();
+        var cloudProviderRuntimeState = _serviceProvider!.GetRequiredService<ICloudProviderRuntimeState>();
+        var platform = _serviceProvider!.GetRequiredService<IPlatformServices>();
+        var secretStore = _serviceProvider!.GetRequiredService<ISecretStore>();
         var vm = new SettingsViewModel(
             settingsService,
             modelManager,
@@ -268,7 +290,9 @@ public partial class App : Application
             languageCatalog: languageCatalog,
             coreOptions: coreOptions,
             llmCoordinator: llmCoordinator,
-            platformServices: platform);
+            platformServices: platform,
+            secretStore: secretStore,
+            cloudProviderRuntimeState: cloudProviderRuntimeState);
         if (initialTabIndex is { } idx)
             vm.SelectedTabIndex = idx;
         var subscribedUi = vm.WorkingCopy.UI;
@@ -737,6 +761,7 @@ public partial class App : Application
         var overlayLogger = _serviceProvider!.GetRequiredService<ILogger<OverlayViewModel>>();
         var clipboard = platform.Clipboard;
         var speechCoordinator = _serviceProvider!.GetService<ISpeechInputCoordinator>();
+        var cloudProviderRuntimeState = _serviceProvider!.GetRequiredService<ICloudProviderRuntimeState>();
         var vm = new OverlayViewModel(
             target,
             pipeline,
@@ -750,7 +775,8 @@ public partial class App : Application
             modelManager,
             _messenger,
             languageCatalog,
-            speechCoordinator);
+            speechCoordinator,
+            cloudProviderRuntimeState: cloudProviderRuntimeState);
         _activeOverlay = new OverlayWindow(vm);
         var uiSettings = settingsService.Current.UI;
         _activeOverlay.ApplyAutoSizingDefaults();
@@ -797,8 +823,8 @@ public partial class App : Application
         }
 
         var coreOptions = _serviceProvider!.GetRequiredService<CoreOptions>();
-        var llmCoordinator = _serviceProvider.GetRequiredService<ILlmModelLoadCoordinator>();
-        var platform = _serviceProvider.GetRequiredService<IPlatformServices>();
+        var llmCoordinator = _serviceProvider!.GetRequiredService<ILlmModelLoadCoordinator>();
+        var platform = _serviceProvider!.GetRequiredService<IPlatformServices>();
         var wizardVm = new SetupWizardViewModel(
             settingsService,
             modelManager,
@@ -930,7 +956,10 @@ public partial class App : Application
 
         var loc = _serviceProvider!.GetRequiredService<ILocalizationService>();
         var modelManager = _serviceProvider!.GetRequiredService<IModelManager>();
-        var issues = CollectStartupIssues(modelManager, settingsService.Current, loc);
+        var cloudRuntimeState = _serviceProvider!.GetRequiredService<ICloudProviderRuntimeState>();
+        var cloudSnapshot = await cloudRuntimeState.RefreshAsync(
+            CoreOptionsSync.CreateCloudModelPreferences(settingsService.Current));
+        var issues = CollectStartupIssues(modelManager, settingsService.Current, loc, cloudSnapshot);
 
         if (issues.Count == 0) return;
 
@@ -965,11 +994,15 @@ public partial class App : Application
     internal static List<string> CollectStartupIssues(
         IModelManager modelManager,
         SettingsModel settings,
-        ILocalizationService loc)
+        ILocalizationService loc,
+        CloudProviderRuntimeSnapshot cloudSnapshot)
     {
         var issues = new List<string>();
         if (!IsRequiredModelReady(modelManager, settings))
             issues.Add(loc.T("toast.modelNotDownloaded"));
+        var cloudMessage = CloudProviderRuntimePresentation.BuildStartupIssueMessage(loc, settings, cloudSnapshot);
+        if (!string.IsNullOrWhiteSpace(cloudMessage))
+            issues.Add(cloudMessage);
         return issues;
     }
 

@@ -13,6 +13,7 @@ namespace LiveLingo.Desktop.Tests.Integration;
 public class VoiceInputIntegrationTests
 {
     private readonly IModelManager _modelManager = Substitute.For<IModelManager>();
+    private static CancellationToken TestCt => TestContext.Current.CancellationToken;
 
     private static readonly ModelDescriptor SttModel =
         ModelRegistry.AllModels.First(m => m.Type == ModelType.SpeechToText);
@@ -29,11 +30,11 @@ public class VoiceInputIntegrationTests
         var states = new List<VoiceInputState>();
         coordinator.StateChanged += s => states.Add(s);
 
-        var startResult = await coordinator.StartRecordingAsync();
+        var startResult = await coordinator.StartRecordingAsync(ct: TestCt);
         Assert.True(startResult.Success);
         Assert.Equal(VoiceInputState.Recording, coordinator.State);
 
-        var stopResult = await coordinator.StopAndTranscribeAsync();
+        var stopResult = await coordinator.StopAndTranscribeAsync(ct: TestCt);
         Assert.True(stopResult.Success);
         Assert.Equal("hello world", stopResult.Text);
         Assert.Equal(VoiceInputState.Idle, coordinator.State);
@@ -53,13 +54,13 @@ public class VoiceInputIntegrationTests
 
         using var coordinator = new SpeechInputCoordinator(audio, stt, _modelManager, new StubVoiceActivityDetector());
 
-        var denied = await coordinator.StartRecordingAsync();
+        var denied = await coordinator.StartRecordingAsync(ct: TestCt);
         Assert.False(denied.Success);
         Assert.Equal(SpeechInputErrorCode.PermissionDenied, denied.ErrorCode);
         Assert.Equal(VoiceInputState.Error, coordinator.State);
 
         audio.PermissionState = MicrophonePermissionState.Granted;
-        var granted = await coordinator.StartRecordingAsync();
+        var granted = await coordinator.StartRecordingAsync(ct: TestCt);
         Assert.True(granted.Success);
         Assert.Equal(VoiceInputState.Recording, coordinator.State);
     }
@@ -74,18 +75,18 @@ public class VoiceInputIntegrationTests
 
         using var coordinator = new SpeechInputCoordinator(audio, stt, _modelManager, new StubVoiceActivityDetector());
 
-        var missing = await coordinator.StartRecordingAsync();
+        var missing = await coordinator.StartRecordingAsync(ct: TestCt);
         Assert.False(missing.Success);
         Assert.Equal(SpeechInputErrorCode.ModelMissing, missing.ErrorCode);
 
         SetupSttModelInstalled();
-        var ensured = await coordinator.EnsureSttModelAsync();
+        var ensured = await coordinator.EnsureSttModelAsync(ct: TestCt);
         Assert.True(ensured.Success);
 
-        var started = await coordinator.StartRecordingAsync();
+        var started = await coordinator.StartRecordingAsync(ct: TestCt);
         Assert.True(started.Success);
 
-        var stopped = await coordinator.StopAndTranscribeAsync();
+        var stopped = await coordinator.StopAndTranscribeAsync(ct: TestCt);
         Assert.Equal("transcribed", stopped.Text);
     }
 
@@ -98,13 +99,13 @@ public class VoiceInputIntegrationTests
         SetupSttModelInstalled();
 
         using var coordinator = new SpeechInputCoordinator(audio, stt, _modelManager, new StubVoiceActivityDetector());
-        await coordinator.StartRecordingAsync();
+        await coordinator.StartRecordingAsync(ct: TestCt);
         Assert.Equal(VoiceInputState.Recording, coordinator.State);
 
         coordinator.CancelCurrent();
         Assert.Equal(VoiceInputState.Idle, coordinator.State);
 
-        var stopAfterCancel = await coordinator.StopAndTranscribeAsync();
+        var stopAfterCancel = await coordinator.StopAndTranscribeAsync(ct: TestCt);
         Assert.False(stopAfterCancel.Success);
         Assert.Equal(SpeechInputErrorCode.NotRecording, stopAfterCancel.ErrorCode);
     }
@@ -118,13 +119,13 @@ public class VoiceInputIntegrationTests
         SetupSttModelInstalled();
 
         using var coordinator = new SpeechInputCoordinator(audio, stt, _modelManager, new StubVoiceActivityDetector());
-        await coordinator.StartRecordingAsync();
+        await coordinator.StartRecordingAsync(ct: TestCt);
         coordinator.CancelCurrent();
 
-        var again = await coordinator.StartRecordingAsync();
+        var again = await coordinator.StartRecordingAsync(ct: TestCt);
         Assert.True(again.Success);
 
-        var result = await coordinator.StopAndTranscribeAsync();
+        var result = await coordinator.StopAndTranscribeAsync(ct: TestCt);
         Assert.True(result.Success);
         Assert.Equal("second try", result.Text);
     }
@@ -138,18 +139,18 @@ public class VoiceInputIntegrationTests
         SetupSttModelInstalled();
 
         using var coordinator = new SpeechInputCoordinator(audio, stt, _modelManager, new StubVoiceActivityDetector());
-        await coordinator.StartRecordingAsync();
-        var failed = await coordinator.StopAndTranscribeAsync();
+        await coordinator.StartRecordingAsync(ct: TestCt);
+        var failed = await coordinator.StopAndTranscribeAsync(ct: TestCt);
 
         Assert.False(failed.Success);
         Assert.Equal(SpeechInputErrorCode.TranscriptionFailed, failed.ErrorCode);
         Assert.Equal(VoiceInputState.Error, coordinator.State);
 
         stt.ShouldFail = false;
-        var retryStart = await coordinator.StartRecordingAsync();
+        var retryStart = await coordinator.StartRecordingAsync(ct: TestCt);
         Assert.True(retryStart.Success);
 
-        var retryStop = await coordinator.StopAndTranscribeAsync();
+        var retryStop = await coordinator.StopAndTranscribeAsync(ct: TestCt);
         Assert.True(retryStop.Success);
         Assert.Equal("ok", retryStop.Text);
     }
@@ -163,10 +164,10 @@ public class VoiceInputIntegrationTests
         SetupSttModelInstalled();
 
         using var coordinator = new SpeechInputCoordinator(audio, stt, _modelManager, new StubVoiceActivityDetector());
-        var first = await coordinator.StartRecordingAsync();
+        var first = await coordinator.StartRecordingAsync(ct: TestCt);
         Assert.True(first.Success);
 
-        var second = await coordinator.StartRecordingAsync();
+        var second = await coordinator.StartRecordingAsync(ct: TestCt);
         Assert.False(second.Success);
         Assert.Equal(SpeechInputErrorCode.AlreadyRecording, second.ErrorCode);
 
@@ -182,7 +183,7 @@ public class VoiceInputIntegrationTests
         SetupSttModelInstalled();
 
         using var coordinator = new SpeechInputCoordinator(audio, stt, _modelManager, new StubVoiceActivityDetector());
-        var result = await coordinator.StopAndTranscribeAsync();
+        var result = await coordinator.StopAndTranscribeAsync(ct: TestCt);
 
         Assert.False(result.Success);
         Assert.Equal(SpeechInputErrorCode.NotRecording, result.ErrorCode);
@@ -198,7 +199,7 @@ public class VoiceInputIntegrationTests
         SetupSttModelInstalled();
 
         using var coordinator = new SpeechInputCoordinator(audio, stt, _modelManager, new StubVoiceActivityDetector());
-        var result = await coordinator.StartRecordingAsync();
+        var result = await coordinator.StartRecordingAsync(ct: TestCt);
 
         Assert.False(result.Success);
         Assert.Equal(SpeechInputErrorCode.PlatformNotSupported, result.ErrorCode);
@@ -216,7 +217,7 @@ public class VoiceInputIntegrationTests
             .Returns<Task>(_ => throw new HttpRequestException("network error"));
 
         using var coordinator = new SpeechInputCoordinator(audio, stt, _modelManager, new StubVoiceActivityDetector());
-        var result = await coordinator.EnsureSttModelAsync();
+        var result = await coordinator.EnsureSttModelAsync(ct: TestCt);
 
         Assert.False(result.Success);
         Assert.Contains("network error", result.ErrorMessage);
@@ -266,7 +267,7 @@ public class VoiceInputIntegrationTests
         var progress = new Progress<float>(v => reported.Add(v));
 
         using var coordinator = new SpeechInputCoordinator(audio, stt, _modelManager, new StubVoiceActivityDetector());
-        var result = await coordinator.EnsureSttModelAsync(progress);
+        var result = await coordinator.EnsureSttModelAsync(progress, TestCt);
 
         Assert.True(result.Success);
     }
@@ -284,9 +285,9 @@ public class VoiceInputIntegrationTests
         for (var i = 0; i < 3; i++)
         {
             Assert.Equal(VoiceInputState.Idle, coordinator.State);
-            await coordinator.StartRecordingAsync();
+            await coordinator.StartRecordingAsync(ct: TestCt);
             Assert.Equal(VoiceInputState.Recording, coordinator.State);
-            var result = await coordinator.StopAndTranscribeAsync();
+            var result = await coordinator.StopAndTranscribeAsync(ct: TestCt);
             Assert.True(result.Success);
             Assert.Equal("session", result.Text);
             Assert.Equal(VoiceInputState.Idle, coordinator.State);
@@ -302,7 +303,7 @@ public class VoiceInputIntegrationTests
         SetupSttModelInstalled();
 
         var coordinator = new SpeechInputCoordinator(audio, stt, _modelManager, new StubVoiceActivityDetector());
-        await coordinator.StartRecordingAsync(ct: TestContext.Current.CancellationToken);
+        await coordinator.StartRecordingAsync(ct: TestCt);
         Assert.Equal(VoiceInputState.Recording, coordinator.State);
 
         coordinator.Dispose();

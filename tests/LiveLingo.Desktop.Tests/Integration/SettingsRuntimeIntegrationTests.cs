@@ -1,11 +1,13 @@
 using CommunityToolkit.Mvvm.Messaging;
 using LiveLingo.Core;
 using LiveLingo.Core.Engines;
+using LiveLingo.Core.Models;
 using LiveLingo.Core.Translation;
 using LiveLingo.Desktop.Messaging;
 using LiveLingo.Desktop.Platform;
 using LiveLingo.Desktop.Services.Configuration;
 using LiveLingo.Desktop.ViewModels;
+using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 
 namespace LiveLingo.Desktop.Tests.Integration;
@@ -115,6 +117,48 @@ public class SettingsRuntimeIntegrationTests : IDisposable
         Assert.Equal("hf_test_token", coreOptions.HuggingFaceToken);
         Assert.True(wizardVm.HasHuggingFaceTokenConfigured);
         Assert.False(wizardVm.ShowHuggingFaceTokenMissingCallout);
+    }
+
+    [Fact]
+    [Trait("Category", "Integration")]
+    public void SyncCoreOptionsFromSettings_UpdatesLiveCoreOptionsFromPersistedSettings()
+    {
+        var services = new ServiceCollection();
+        var coreOptions = new CoreOptions();
+        var modelManager = Substitute.For<IModelManager>();
+        services.AddSingleton(coreOptions);
+        services.AddSingleton(modelManager);
+        using var provider = services.BuildServiceProvider();
+
+        var settings = SettingsModel.CreateDefault();
+        settings.Translation.DefaultTargetLanguage = "ja";
+        settings.Translation.ActiveTranslationModelId = ModelRegistry.Qwen25_7B.Id;
+        settings.Translation.ModelPolicy.RoutingMode = nameof(TranslationRoutingMode.PreferCloud);
+        settings.Translation.ModelPolicy.RouteUnsupportedPairsToCloud = true;
+        settings.Translation.ModelPolicy.RoutePostProcessingToCloud = true;
+        settings.Translation.CloudProvider.Enabled = true;
+        settings.Translation.CloudProvider.BaseUrl = "https://api.openai.com/v1";
+        settings.Translation.CloudProvider.ApiKey = "sk-test";
+        settings.Translation.CloudProvider.TranslationModelId = "gpt-4.1-mini";
+        settings.Translation.CloudProvider.PostProcessingModelId = "gpt-4.1-nano";
+        settings.Advanced.HuggingFaceToken = "hf_test_token";
+        settings.Advanced.InferenceThreads = 6;
+
+        App.SyncCoreOptionsFromSettings(provider, settings);
+
+        Assert.Equal("ja", coreOptions.DefaultTargetLanguage);
+        Assert.Equal(ModelRegistry.Qwen25_7B.Id, coreOptions.ActiveTranslationModelId);
+        Assert.Equal(TranslationRoutingMode.PreferCloud, coreOptions.TranslationRoutingMode);
+        Assert.True(coreOptions.RouteUnsupportedLanguagePairsToCloud);
+        Assert.True(coreOptions.RoutePostProcessingToCloud);
+        Assert.True(coreOptions.CloudProviderEnabled);
+        Assert.Equal("https://api.openai.com/v1", coreOptions.CloudProviderBaseUrl);
+        Assert.Equal("sk-test", coreOptions.CloudProviderApiKey);
+        Assert.Equal("gpt-4.1-mini", coreOptions.CloudTranslationModelId);
+        Assert.Equal("gpt-4.1-nano", coreOptions.CloudPostProcessingModelId);
+        Assert.Equal("hf_test_token", coreOptions.HuggingFaceToken);
+        Assert.Equal(6, coreOptions.InferenceThreads);
+        modelManager.Received(1).ResetHuggingfaceTransportFallback();
     }
 
     public void Dispose()

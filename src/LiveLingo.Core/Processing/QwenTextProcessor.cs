@@ -1,22 +1,24 @@
-using System.Net.Http.Json;
-using System.Text.Json;
+using LiveLingo.Core.Models;
 using Microsoft.Extensions.Logging;
 
 namespace LiveLingo.Core.Processing;
 
 public abstract class QwenTextProcessor : ITextProcessor
 {
-    private readonly QwenModelHost _host;
-    private readonly HttpClient _http;
+    private readonly IModelSelector _selector;
+    private readonly IModelInvocationService _invocationService;
     private readonly ILogger _logger;
 
     public abstract string Name { get; }
     protected abstract string SystemPrompt { get; }
 
-    protected QwenTextProcessor(QwenModelHost host, HttpClient http, ILogger logger)
+    protected QwenTextProcessor(
+        IModelSelector selector,
+        IModelInvocationService invocationService,
+        ILogger logger)
     {
-        _host = host;
-        _http = http;
+        _selector = selector;
+        _invocationService = invocationService;
         _logger = logger;
     }
 
@@ -26,18 +28,17 @@ public abstract class QwenTextProcessor : ITextProcessor
 
         try
         {
-            var endpoint = await _host.GetOrStartServerAsync(ct);
-            var url = $"{endpoint}/v1/chat/completions";
+            var profile = _selector.SelectPostProcessingProfile();
+            var request = new ModelInvocationRequest(
+                profile,
+                ModelTaskType.PostProcessing,
+                [
+                    new ModelChatMessage("system", $"{SystemPrompt} Do not use <think> tags."),
+                    new ModelChatMessage("user", text)
+                ],
+                ModelInvocationOptions.CreateTextProcessingDefaults());
 
-            var requestBody = LlamaServerChatRequest.CreateTextProcessor(SystemPrompt, text);
-
-            var response = await _http.PostAsJsonAsync(url, requestBody, ct);
-            response.EnsureSuccessStatusCode();
-
-            var json = await response.Content.ReadAsStringAsync(ct);
-            using var doc = JsonDocument.Parse(json);
-            var result = LlamaServerChatResponse.GetAssistantText(doc.RootElement);
-            result = LlamaServerChatResponse.StripQwenThinkTags(result);
+            var result = (await _invocationService.InvokeAsync(request, ct).ConfigureAwait(false)).Text;
 
             if (string.IsNullOrWhiteSpace(result))
             {

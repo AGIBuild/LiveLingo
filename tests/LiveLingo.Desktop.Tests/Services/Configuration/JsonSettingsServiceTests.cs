@@ -113,6 +113,26 @@ public class JsonSettingsServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task Replace_StripsSecretsFromPersistedJson()
+    {
+        var svc = new JsonSettingsService(_settingsPath);
+        await svc.LoadAsync(TestContext.Current.CancellationToken);
+        var replacement = svc.CloneCurrent();
+        replacement.Translation.CloudProvider.ApiKey = "sk-secret";
+        replacement.Translation.CloudProvider.ApiKeySecretId = "cloud-slot";
+        replacement.Advanced.HuggingFaceToken = "hf-secret";
+        replacement.Advanced.HuggingFaceTokenSecretId = "hf-slot";
+
+        svc.Replace(replacement);
+
+        var json = await File.ReadAllTextAsync(_settingsPath, TestContext.Current.CancellationToken);
+        Assert.DoesNotContain("sk-secret", json, StringComparison.Ordinal);
+        Assert.DoesNotContain("hf-secret", json, StringComparison.Ordinal);
+        Assert.Contains("cloud-slot", json, StringComparison.Ordinal);
+        Assert.Contains("hf-slot", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task LoadAsync_DeserializesCustomValues()
     {
         var json = """

@@ -12,6 +12,7 @@ public class SpeechInputCoordinatorTests
     private readonly ISpeechToTextEngine _sttEngine = Substitute.For<ISpeechToTextEngine>();
     private readonly IModelManager _modelManager = Substitute.For<IModelManager>();
     private readonly IVoiceActivityDetector _vadDetector = Substitute.For<IVoiceActivityDetector>();
+    private static CancellationToken TestCt => TestContext.Current.CancellationToken;
 
     private SpeechInputCoordinator CreateCoordinator() =>
         new(_audioCapture, _sttEngine, _modelManager, _vadDetector);
@@ -23,7 +24,7 @@ public class SpeechInputCoordinatorTests
             .Returns(MicrophonePermissionState.Denied);
 
         var coordinator = CreateCoordinator();
-        var result = await coordinator.StartRecordingAsync();
+        var result = await coordinator.StartRecordingAsync(ct: TestCt);
 
         Assert.False(result.Success);
         Assert.Equal(SpeechInputErrorCode.PermissionDenied, result.ErrorCode);
@@ -37,7 +38,7 @@ public class SpeechInputCoordinatorTests
         SetupSttModelInstalled();
 
         var coordinator = CreateCoordinator();
-        var result = await coordinator.StartRecordingAsync();
+        var result = await coordinator.StartRecordingAsync(ct: TestCt);
 
         Assert.True(result.Success);
         Assert.Equal(VoiceInputState.Recording, coordinator.State);
@@ -51,9 +52,9 @@ public class SpeechInputCoordinatorTests
         SetupSttModelInstalled();
 
         var coordinator = CreateCoordinator();
-        await coordinator.StartRecordingAsync();
+        await coordinator.StartRecordingAsync(ct: TestCt);
 
-        var result = await coordinator.StartRecordingAsync();
+        var result = await coordinator.StartRecordingAsync(ct: TestCt);
         Assert.False(result.Success);
         Assert.Equal(SpeechInputErrorCode.AlreadyRecording, result.ErrorCode);
     }
@@ -62,7 +63,7 @@ public class SpeechInputCoordinatorTests
     public async Task StopAndTranscribe_NotRecording_ReturnsError()
     {
         var coordinator = CreateCoordinator();
-        var result = await coordinator.StopAndTranscribeAsync();
+        var result = await coordinator.StopAndTranscribeAsync(ct: TestCt);
 
         Assert.False(result.Success);
         Assert.Equal(SpeechInputErrorCode.NotRecording, result.ErrorCode);
@@ -80,8 +81,8 @@ public class SpeechInputCoordinatorTests
             .Returns(new SpeechTranscriptionResult("hello", "en", 0.95f));
 
         var coordinator = CreateCoordinator();
-        await coordinator.StartRecordingAsync();
-        var result = await coordinator.StopAndTranscribeAsync();
+        await coordinator.StartRecordingAsync(ct: TestCt);
+        var result = await coordinator.StopAndTranscribeAsync(ct: TestCt);
 
         Assert.True(result.Success);
         Assert.Equal("hello", result.Text);
@@ -100,8 +101,8 @@ public class SpeechInputCoordinatorTests
             .Returns<SpeechTranscriptionResult>(_ => throw new InvalidOperationException("decode error"));
 
         var coordinator = CreateCoordinator();
-        await coordinator.StartRecordingAsync();
-        var result = await coordinator.StopAndTranscribeAsync();
+        await coordinator.StartRecordingAsync(ct: TestCt);
+        var result = await coordinator.StopAndTranscribeAsync(ct: TestCt);
 
         Assert.False(result.Success);
         Assert.Equal(SpeechInputErrorCode.TranscriptionFailed, result.ErrorCode);
@@ -115,7 +116,7 @@ public class SpeechInputCoordinatorTests
         _modelManager.ListInstalled().Returns(new List<InstalledModel>());
 
         var coordinator = CreateCoordinator();
-        var result = await coordinator.StartRecordingAsync();
+        var result = await coordinator.StartRecordingAsync(ct: TestCt);
 
         if (ModelRegistry.AllModels.Any(m => m.Type == ModelType.SpeechToText))
         {
@@ -152,8 +153,8 @@ public class SpeechInputCoordinatorTests
         var states = new List<VoiceInputState>();
         coordinator.StateChanged += s => states.Add(s);
 
-        await coordinator.StartRecordingAsync();
-        await coordinator.StopAndTranscribeAsync();
+        await coordinator.StartRecordingAsync(ct: TestCt);
+        await coordinator.StopAndTranscribeAsync(ct: TestCt);
 
         Assert.Contains(VoiceInputState.Recording, states);
         Assert.Contains(VoiceInputState.Transcribing, states);
@@ -169,7 +170,7 @@ public class SpeechInputCoordinatorTests
             .Returns<Task>(_ => throw new PlatformNotSupportedException());
 
         var coordinator = CreateCoordinator();
-        var result = await coordinator.StartRecordingAsync();
+        var result = await coordinator.StartRecordingAsync(ct: TestCt);
 
         Assert.False(result.Success);
         Assert.Equal(SpeechInputErrorCode.PlatformNotSupported, result.ErrorCode);
@@ -187,12 +188,12 @@ public class SpeechInputCoordinatorTests
         _sttEngine.TranscribeAsync(audio, Arg.Any<string?>(), Arg.Any<CancellationToken>()).Returns(tcs.Task);
 
         var coordinator = CreateCoordinator();
-        await coordinator.StartRecordingAsync();
+        await coordinator.StartRecordingAsync(ct: TestCt);
 
-        var stopTask = coordinator.StopAndTranscribeAsync();
+        var stopTask = coordinator.StopAndTranscribeAsync(ct: TestCt);
         Assert.Equal(VoiceInputState.Transcribing, coordinator.State);
 
-        var duringTranscribe = await coordinator.StartRecordingAsync();
+        var duringTranscribe = await coordinator.StartRecordingAsync(ct: TestCt);
         Assert.False(duringTranscribe.Success);
         Assert.Equal(SpeechInputErrorCode.AlreadyRecording, duringTranscribe.ErrorCode);
 
@@ -209,7 +210,7 @@ public class SpeechInputCoordinatorTests
         SetupSttModelInstalled();
 
         var coordinator = CreateCoordinator();
-        var result = await coordinator.StartRecordingAsync();
+        var result = await coordinator.StartRecordingAsync(ct: TestCt);
 
         Assert.False(result.Success);
         Assert.Equal(SpeechInputErrorCode.PermissionDenied, result.ErrorCode);
@@ -224,7 +225,7 @@ public class SpeechInputCoordinatorTests
             .Returns<Task>(_ => throw new IOException("device busy"));
 
         var coordinator = CreateCoordinator();
-        var result = await coordinator.StartRecordingAsync();
+        var result = await coordinator.StartRecordingAsync(ct: TestCt);
 
         Assert.False(result.Success);
         Assert.Contains("device busy", result.ErrorMessage);
@@ -243,8 +244,8 @@ public class SpeechInputCoordinatorTests
             .Returns(new SpeechTranscriptionResult("", "en", 0.1f));
 
         var coordinator = CreateCoordinator();
-        await coordinator.StartRecordingAsync();
-        var result = await coordinator.StopAndTranscribeAsync();
+        await coordinator.StartRecordingAsync(ct: TestCt);
+        var result = await coordinator.StopAndTranscribeAsync(ct: TestCt);
 
         Assert.True(result.Success);
         Assert.Equal("", result.Text);
@@ -257,7 +258,7 @@ public class SpeechInputCoordinatorTests
         // This test validates the code path for when no STT model is defined.
         // Since we know WhisperBase is registered, we only verify the return
         // type matches the happy path (EnsureModelAsync is called).
-        var result = await coordinator.EnsureSttModelAsync();
+        var result = await coordinator.EnsureSttModelAsync(ct: TestCt);
         Assert.True(result.Success);
     }
 
@@ -274,13 +275,13 @@ public class SpeechInputCoordinatorTests
             .Returns(tcs.Task);
 
         var coordinator = CreateCoordinator();
-        await coordinator.StartRecordingAsync();
-        var stopTask = coordinator.StopAndTranscribeAsync();
+        await coordinator.StartRecordingAsync(ct: TestCt);
+        var stopTask = coordinator.StopAndTranscribeAsync(ct: TestCt);
 
         coordinator.CancelCurrent();
         Assert.Equal(VoiceInputState.Idle, coordinator.State);
 
-        tcs.SetCanceled();
+        tcs.SetCanceled(TestCt);
         var result = await stopTask;
         Assert.False(result.Success);
     }

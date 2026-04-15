@@ -18,7 +18,7 @@ public class MarianOnnxEngineTests
     public void SupportsLanguagePair_ReturnsFalse_ForUnknownPair()
     {
         var engine = CreateEngine();
-        Assert.True(engine.SupportsLanguagePair("ko", "fr"));
+        Assert.False(engine.SupportsLanguagePair("ko", "fr"));
     }
 
     [Fact]
@@ -26,8 +26,7 @@ public class MarianOnnxEngineTests
     {
         var engine = CreateEngine();
 
-        // With the default fallback to Qwen35_9B, the engine will actually try to load Qwen35_9B and fail due to directory not found instead of NotSupportedException.
-        await Assert.ThrowsAsync<DirectoryNotFoundException>(
+        await Assert.ThrowsAsync<NotSupportedException>(
             () => engine.TranslateAsync("hello", "ko", "fr", CancellationToken.None));
     }
 
@@ -49,11 +48,11 @@ public class MarianOnnxEngineTests
         var tempDir = Path.Combine(Path.GetTempPath(), $"marian-test-{Guid.NewGuid()}");
         Directory.CreateDirectory(tempDir);
 
-        modelManager.GetModelDirectory(ModelRegistry.Qwen35_9B.Id).Returns(tempDir);
+        modelManager.GetModelDirectory(ModelRegistry.MarianZhEn.Id).Returns(tempDir);
         modelManager.EnsureModelAsync(Arg.Any<ModelDescriptor>(), Arg.Any<IProgress<ModelDownloadProgress>?>(), Arg.Any<CancellationToken>())
             .Returns(Task.CompletedTask);
 
-        var engine = new MarianOnnxEngine(modelManager, Substitute.For<ILogger<MarianOnnxEngine>>());
+        var engine = new MarianOnnxEngine(modelManager, new StaticModelCatalog(), Substitute.For<ILogger<MarianOnnxEngine>>());
 
         await Assert.ThrowsAsync<FileNotFoundException>(
             () => engine.TranslateAsync("你好", "zh", "en", CancellationToken.None));
@@ -76,6 +75,6 @@ public class MarianOnnxEngineTests
         var modelManager = Substitute.For<IModelManager>();
         modelManager.GetModelDirectory(Arg.Any<string>())
             .Returns(call => Path.Combine(Path.GetTempPath(), call.ArgAt<string>(0)));
-        return new MarianOnnxEngine(modelManager, Substitute.For<ILogger<MarianOnnxEngine>>());
+        return new MarianOnnxEngine(modelManager, new StaticModelCatalog(), Substitute.For<ILogger<MarianOnnxEngine>>());
     }
 }

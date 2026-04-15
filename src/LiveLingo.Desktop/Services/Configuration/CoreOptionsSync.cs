@@ -30,7 +30,26 @@ public static class CoreOptionsSync
         }
 
         target.DefaultTargetLanguage = settings.Translation.DefaultTargetLanguage;
-        target.ActiveTranslationModelId = settings.Translation.ActiveTranslationModelId;
+        target.ActiveTranslationModelId =
+            string.IsNullOrWhiteSpace(settings.Translation.ModelPolicy.PreferredLocalTranslationModelId)
+                ? settings.Translation.ActiveTranslationModelId
+                : settings.Translation.ModelPolicy.PreferredLocalTranslationModelId?.Trim();
+        target.TranslationRoutingMode = ParseRoutingMode(settings.Translation.ModelPolicy.RoutingMode);
+        target.RouteUnsupportedLanguagePairsToCloud = settings.Translation.ModelPolicy.RouteUnsupportedPairsToCloud;
+        target.RoutePostProcessingToCloud = settings.Translation.ModelPolicy.RoutePostProcessingToCloud;
+        target.CloudProviderEnabled = settings.Translation.CloudProvider.Enabled;
+        target.CloudProviderBaseUrl = string.IsNullOrWhiteSpace(settings.Translation.CloudProvider.BaseUrl)
+            ? null
+            : settings.Translation.CloudProvider.BaseUrl.Trim();
+        target.CloudProviderApiKey = string.IsNullOrWhiteSpace(settings.Translation.CloudProvider.ApiKey)
+            ? null
+            : settings.Translation.CloudProvider.ApiKey.Trim();
+        target.CloudTranslationModelId = string.IsNullOrWhiteSpace(settings.Translation.CloudProvider.TranslationModelId)
+            ? null
+            : settings.Translation.CloudProvider.TranslationModelId.Trim();
+        target.CloudPostProcessingModelId = string.IsNullOrWhiteSpace(settings.Translation.CloudProvider.PostProcessingModelId)
+            ? null
+            : settings.Translation.CloudProvider.PostProcessingModelId.Trim();
         target.InferenceThreads = settings.Advanced.InferenceThreads;
         target.HuggingFaceMirror = string.IsNullOrWhiteSpace(settings.Advanced.HuggingFaceMirror)
             ? null
@@ -54,6 +73,22 @@ public static class CoreOptionsSync
         || !string.Equals(before.HuggingFaceMirror ?? "", after.HuggingFaceMirror ?? "", StringComparison.OrdinalIgnoreCase)
         || !string.Equals(before.HuggingFaceToken ?? "", after.HuggingFaceToken ?? "", StringComparison.Ordinal);
 
+    public static CloudModelPreferences CreateCloudModelPreferences(SettingsModel settings) =>
+        new(
+            settings.Translation.CloudProvider.Enabled,
+            string.IsNullOrWhiteSpace(settings.Translation.CloudProvider.BaseUrl)
+                ? null
+                : settings.Translation.CloudProvider.BaseUrl.Trim(),
+            string.IsNullOrWhiteSpace(settings.Translation.CloudProvider.ApiKey)
+                ? null
+                : settings.Translation.CloudProvider.ApiKey.Trim(),
+            string.IsNullOrWhiteSpace(settings.Translation.CloudProvider.TranslationModelId)
+                ? null
+                : settings.Translation.CloudProvider.TranslationModelId.Trim(),
+            string.IsNullOrWhiteSpace(settings.Translation.CloudProvider.PostProcessingModelId)
+                ? null
+                : settings.Translation.CloudProvider.PostProcessingModelId.Trim());
+
     public static string NormalizePathForCompare(string? path)
     {
         if (string.IsNullOrWhiteSpace(path))
@@ -69,4 +104,9 @@ public static class CoreOptionsSync
             return trimmed;
         }
     }
+
+    private static TranslationRoutingMode ParseRoutingMode(string? routingMode) =>
+        Enum.TryParse<TranslationRoutingMode>(routingMode, ignoreCase: true, out var parsed)
+            ? parsed
+            : TranslationRoutingMode.PreferLocal;
 }

@@ -1,5 +1,6 @@
 using LiveLingo.Desktop.Services.Configuration;
 using LiveLingo.Desktop.Services.LanguageCatalog;
+using LiveLingo.Desktop.Services.Localization;
 using LiveLingo.Desktop.Messaging;
 using LiveLingo.Desktop.Platform;
 using LiveLingo.Desktop.ViewModels;
@@ -233,6 +234,159 @@ public class SettingsViewModelTests
     }
 
     [Fact]
+    public void Constructor_LoadsHybridRoutingSettings()
+    {
+        var settings = new UserSettings
+        {
+            Translation = new TranslationSettings
+            {
+                ModelPolicy = new ModelPolicySettings
+                {
+                    RoutingMode = nameof(TranslationRoutingMode.PreferCloud),
+                    RouteUnsupportedPairsToCloud = true,
+                    RoutePostProcessingToCloud = true,
+                    PreferredLocalTranslationModelId = "opus-mt-zh-en"
+                },
+                CloudProvider = new CloudProviderSettings
+                {
+                    Enabled = true,
+                    BaseUrl = "https://api.openai.com/v1",
+                    ApiKey = "sk-test",
+                    TranslationModelId = "gpt-4.1-mini",
+                    PostProcessingModelId = "gpt-4.1-nano"
+                }
+            }
+        };
+
+        var vm = new SettingsViewModel(CreateSettings(settings));
+
+        Assert.Equal(nameof(TranslationRoutingMode.PreferCloud), vm.WorkingCopy.Translation.ModelPolicy.RoutingMode);
+        Assert.True(vm.WorkingCopy.Translation.ModelPolicy.RouteUnsupportedPairsToCloud);
+        Assert.True(vm.WorkingCopy.Translation.ModelPolicy.RoutePostProcessingToCloud);
+        Assert.True(vm.WorkingCopy.Translation.CloudProvider.Enabled);
+        Assert.Equal("https://api.openai.com/v1", vm.WorkingCopy.Translation.CloudProvider.BaseUrl);
+        Assert.Equal("gpt-4.1-mini", vm.WorkingCopy.Translation.CloudProvider.TranslationModelId);
+        Assert.Equal("gpt-4.1-nano", vm.WorkingCopy.Translation.CloudProvider.PostProcessingModelId);
+    }
+
+    [Fact]
+    public async Task SaveCommand_PersistsHybridRoutingSettings()
+    {
+        var svc = CreateSettings();
+        var vm = new SettingsViewModel(svc);
+
+        vm.WorkingCopy.Translation.ModelPolicy.RoutingMode = nameof(TranslationRoutingMode.PreferCloud);
+        vm.WorkingCopy.Translation.ModelPolicy.RouteUnsupportedPairsToCloud = true;
+        vm.WorkingCopy.Translation.ModelPolicy.RoutePostProcessingToCloud = true;
+        vm.WorkingCopy.Translation.CloudProvider.Enabled = true;
+        vm.WorkingCopy.Translation.CloudProvider.BaseUrl = "https://api.openai.com/v1";
+        vm.WorkingCopy.Translation.CloudProvider.ApiKey = "sk-test";
+        vm.WorkingCopy.Translation.CloudProvider.TranslationModelId = "gpt-4.1-mini";
+        vm.WorkingCopy.Translation.CloudProvider.PostProcessingModelId = "gpt-4.1-nano";
+
+        await vm.SaveCommand.ExecuteAsync(null);
+
+        Assert.Equal(nameof(TranslationRoutingMode.PreferCloud), svc.Current.Translation.ModelPolicy.RoutingMode);
+        Assert.True(svc.Current.Translation.ModelPolicy.RouteUnsupportedPairsToCloud);
+        Assert.True(svc.Current.Translation.ModelPolicy.RoutePostProcessingToCloud);
+        Assert.True(svc.Current.Translation.CloudProvider.Enabled);
+        Assert.Equal("https://api.openai.com/v1", svc.Current.Translation.CloudProvider.BaseUrl);
+        Assert.Equal("sk-test", svc.Current.Translation.CloudProvider.ApiKey);
+        Assert.Equal("gpt-4.1-mini", svc.Current.Translation.CloudProvider.TranslationModelId);
+        Assert.Equal("gpt-4.1-nano", svc.Current.Translation.CloudProvider.PostProcessingModelId);
+    }
+
+    [Fact]
+    public void CloudProviderPresetChange_AppliesPresetDefaults()
+    {
+        var vm = new SettingsViewModel(CreateSettings());
+
+        vm.WorkingCopy.Translation.CloudProvider.PresetId = CloudProviderPresetCatalog.OpenRouter.Id;
+
+        Assert.Equal("https://openrouter.ai/api/v1", vm.WorkingCopy.Translation.CloudProvider.BaseUrl);
+        Assert.Equal("openai/gpt-4.1-mini", vm.WorkingCopy.Translation.CloudProvider.TranslationModelId);
+        Assert.Equal("openai/gpt-4.1-nano", vm.WorkingCopy.Translation.CloudProvider.PostProcessingModelId);
+    }
+
+    [Fact]
+    public void CloudProviderBaseUrlChange_ToUnknownGateway_SetsPresetToCustom()
+    {
+        var vm = new SettingsViewModel(CreateSettings());
+        vm.WorkingCopy.Translation.CloudProvider.PresetId = CloudProviderPresetCatalog.OpenAI.Id;
+
+        vm.WorkingCopy.Translation.CloudProvider.BaseUrl = "https://llm.example.com/v1";
+
+        Assert.Equal(CloudProviderPresetCatalog.Custom.Id, vm.WorkingCopy.Translation.CloudProvider.PresetId);
+    }
+
+    [Fact]
+    public void Constructor_InfersPresetFromExistingBaseUrl()
+    {
+        var settings = new UserSettings
+        {
+            Translation = new TranslationSettings
+            {
+                CloudProvider = new CloudProviderSettings
+                {
+                    BaseUrl = "https://api.groq.com/openai/v1",
+                    TranslationModelId = "llama-3.3-70b-versatile"
+                }
+            }
+        };
+
+        var vm = new SettingsViewModel(CreateSettings(settings));
+
+        Assert.Equal(CloudProviderPresetCatalog.Groq.Id, vm.WorkingCopy.Translation.CloudProvider.PresetId);
+    }
+
+    [Fact]
+    public void Constructor_LoadsCachedCloudProviderRuntimeState()
+    {
+        var settings = new UserSettings
+        {
+            Translation = new TranslationSettings
+            {
+                CloudProvider = new CloudProviderSettings
+                {
+                    Enabled = true,
+                    BaseUrl = "https://api.openai.com/v1",
+                    ApiKey = "sk-test",
+                    TranslationModelId = "gpt-4.1-mini",
+                    PostProcessingModelId = "gpt-4.1"
+                }
+            }
+        };
+        var snapshot = new CloudProviderRuntimeSnapshot(
+            CloudProviderConfigurationFingerprint.Create(new CloudModelPreferences(
+                true,
+                "https://api.openai.com/v1",
+                "sk-test",
+                "gpt-4.1-mini",
+                "gpt-4.1")),
+            CloudProviderRuntimeStatus.Healthy,
+            CloudProviderValidationMode.ModelCatalog,
+            "Connection succeeded. 2 models available.",
+            DateTimeOffset.Parse("2026-04-15T10:00:00Z"),
+            DateTimeOffset.Parse("2026-04-16T10:00:00Z"),
+            [
+                new CloudProviderModelInfo("gpt-4.1-mini", "openai"),
+                new CloudProviderModelInfo("gpt-4.1", "openai")
+            ]);
+        var runtimeState = new TestCloudProviderRuntimeState(snapshot);
+        var vm = new SettingsViewModel(
+            CreateSettings(settings),
+            engine: new StubTranslationEngine(),
+            cloudProviderRuntimeState: runtimeState);
+
+        Assert.Equal("Connection succeeded. 2 models available.", vm.CloudProviderStatusMessage);
+        Assert.True(vm.HasDiscoveredCloudModels);
+        Assert.Collection(
+            vm.DiscoveredCloudModels,
+            first => Assert.Equal("gpt-4.1-mini", first.Id),
+            second => Assert.Equal("gpt-4.1", second.Id));
+    }
+
+    [Fact]
     public void ResetCommand_RestoresAllDefaults()
     {
         var settings = new UserSettings
@@ -340,6 +494,17 @@ public class SettingsViewModelTests
             case "InferenceThreads": vm.WorkingCopy.Advanced.InferenceThreads = 4; break;
             case "LogLevel": vm.WorkingCopy.Advanced.LogLevel = "Debug"; break;
         }
+
+        Assert.True(vm.IsDirty);
+    }
+
+    [Fact]
+    public void CloudProviderPropertyChange_SetsDirty()
+    {
+        var vm = new SettingsViewModel(CreateSettings());
+        Assert.False(vm.IsDirty);
+
+        vm.WorkingCopy.Translation.CloudProvider.TranslationModelId = "gpt-4.1-mini";
 
         Assert.True(vm.IsDirty);
     }
@@ -893,6 +1058,139 @@ public class SettingsViewModelTests
     }
 
     [Fact]
+    public async Task TestCloudProviderConnectionCommand_UpdatesStatusMessage()
+    {
+        var runtimeState = Substitute.For<ICloudProviderRuntimeState>();
+        runtimeState.RefreshAsync(Arg.Any<CloudModelPreferences>(), Arg.Any<CancellationToken>())
+            .Returns(new CloudProviderRuntimeSnapshot(
+                CloudProviderConfigurationFingerprint.Create(new CloudModelPreferences(
+                    true,
+                    "https://api.openai.com/v1",
+                    "sk-test",
+                    null,
+                    null)),
+                CloudProviderRuntimeStatus.Healthy,
+                CloudProviderValidationMode.ModelCatalog,
+                "Connection succeeded. 3 models available.",
+                DateTimeOffset.UtcNow,
+                DateTimeOffset.UtcNow.AddHours(1),
+                [
+                    new CloudProviderModelInfo("gpt-4.1-mini", "openai"),
+                    new CloudProviderModelInfo("gpt-4.1", "openai"),
+                    new CloudProviderModelInfo("gpt-4.1-nano", "openai")
+                ]));
+        var vm = new SettingsViewModel(
+            CreateSettings(),
+            engine: new StubTranslationEngine(),
+            cloudProviderRuntimeState: runtimeState);
+        vm.WorkingCopy.Translation.CloudProvider.Enabled = true;
+        vm.WorkingCopy.Translation.CloudProvider.BaseUrl = "https://api.openai.com/v1";
+        vm.WorkingCopy.Translation.CloudProvider.ApiKey = "sk-test";
+
+        await vm.TestCloudProviderConnectionCommand.ExecuteAsync(null);
+
+        Assert.Equal("Connection succeeded. 3 models available.", vm.CloudProviderStatusMessage);
+        await runtimeState.Received(1).RefreshAsync(
+            Arg.Is<CloudModelPreferences>(preferences =>
+                preferences.BaseUrl == "https://api.openai.com/v1" &&
+                preferences.ApiKey == "sk-test"),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task FetchCloudProviderModelsCommand_LoadsDiscoveredModels()
+    {
+        var runtimeState = Substitute.For<ICloudProviderRuntimeState>();
+        runtimeState.RefreshAsync(Arg.Any<CloudModelPreferences>(), Arg.Any<CancellationToken>())
+            .Returns(new CloudProviderRuntimeSnapshot(
+                CloudProviderConfigurationFingerprint.Create(new CloudModelPreferences(
+                    true,
+                    "https://api.openai.com/v1",
+                    "sk-test",
+                    null,
+                    null)),
+                CloudProviderRuntimeStatus.Healthy,
+                CloudProviderValidationMode.ModelCatalog,
+                "Loaded 2 models.",
+                DateTimeOffset.UtcNow,
+                DateTimeOffset.UtcNow.AddHours(1),
+                [
+                    new CloudProviderModelInfo("gpt-4.1-mini", "openai"),
+                    new CloudProviderModelInfo("gemini-2.5-flash", "openrouter")
+                ]));
+        var vm = new SettingsViewModel(
+            CreateSettings(),
+            engine: new StubTranslationEngine(),
+            cloudProviderRuntimeState: runtimeState);
+        vm.WorkingCopy.Translation.CloudProvider.Enabled = true;
+        vm.WorkingCopy.Translation.CloudProvider.BaseUrl = "https://api.openai.com/v1";
+        vm.WorkingCopy.Translation.CloudProvider.ApiKey = "sk-test";
+
+        await vm.FetchCloudProviderModelsCommand.ExecuteAsync(null);
+
+        Assert.True(vm.HasDiscoveredCloudModels);
+        Assert.Collection(
+            vm.DiscoveredCloudModels,
+            first => Assert.Equal("gpt-4.1-mini", first.Id),
+            second => Assert.Equal("gemini-2.5-flash", second.Id));
+        Assert.Contains("2", vm.CloudProviderStatusMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Constructor_WhenDirectProbeValidated_ShowsCapabilityAwareStatusMessage()
+    {
+        var settings = new UserSettings
+        {
+            Translation = new TranslationSettings
+            {
+                ModelPolicy = new ModelPolicySettings
+                {
+                    RoutePostProcessingToCloud = true
+                },
+                CloudProvider = new CloudProviderSettings
+                {
+                    Enabled = true,
+                    BaseUrl = "https://gateway.example.com/v1",
+                    ApiKey = "sk-test",
+                    TranslationModelId = "gpt-4.1-mini",
+                    PostProcessingModelId = "gpt-4.1"
+                }
+            }
+        };
+        var snapshot = new CloudProviderRuntimeSnapshot(
+            CloudProviderConfigurationFingerprint.Create(CoreOptionsSync.CreateCloudModelPreferences(settings)),
+            CloudProviderRuntimeStatus.Healthy,
+            CloudProviderValidationMode.DirectModelProbe,
+            "Connection succeeded.",
+            DateTimeOffset.Parse("2026-04-15T10:00:00Z"),
+            DateTimeOffset.Parse("2026-04-16T10:00:00Z"),
+            []);
+        var runtimeState = new TestCloudProviderRuntimeState(snapshot);
+        var vm = new SettingsViewModel(
+            CreateSettings(settings),
+            engine: new StubTranslationEngine(),
+            localizationService: new LocalizationService(),
+            cloudProviderRuntimeState: runtimeState);
+
+        Assert.Contains("does not expose a model list", vm.CloudProviderStatusMessage, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("gpt-4.1-mini", vm.CloudProviderStatusMessage, StringComparison.Ordinal);
+        Assert.Contains("gpt-4.1", vm.CloudProviderStatusMessage, StringComparison.Ordinal);
+        Assert.Contains("prevalidated", vm.CloudProviderStatusMessage, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void UseCloudTranslationModelCommand_AssignsSelectedModel()
+    {
+        var vm = new SettingsViewModel(CreateSettings(), engine: new StubTranslationEngine());
+
+        vm.UseCloudTranslationModelCommand.Execute("gpt-4.1-mini");
+        vm.UseCloudPostProcessingModelCommand.Execute("gpt-4.1");
+
+        Assert.Equal("gpt-4.1-mini", vm.WorkingCopy.Translation.CloudProvider.TranslationModelId);
+        Assert.Equal("gpt-4.1", vm.WorkingCopy.Translation.CloudProvider.PostProcessingModelId);
+    }
+
+    [Fact]
     public void UILanguages_ContainsExpectedOptions()
     {
         Assert.Equal(2, SettingsViewModel.UILanguages.Count);
@@ -969,5 +1267,19 @@ public class SettingsViewModelTests
         vm.OpenPrimaryTranslationModelOnHuggingFaceCommand.Execute(null);
 
         platform.Received(1).OpenUrl(Arg.Is<string>(url => url.Contains("huggingface.co", StringComparison.OrdinalIgnoreCase)));
+    }
+
+    private sealed class TestCloudProviderRuntimeState(CloudProviderRuntimeSnapshot snapshot) : ICloudProviderRuntimeState
+    {
+        public CloudProviderRuntimeSnapshot Current => snapshot;
+        public event Action<CloudProviderRuntimeSnapshot>? Changed
+        {
+            add { }
+            remove { }
+        }
+        public CloudProviderRoutingState GetRoutingState(CloudModelPreferences? preferences) =>
+            new(false, false, null, new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+        public Task<CloudProviderRuntimeSnapshot> RefreshAsync(CloudModelPreferences? preferences, CancellationToken ct = default) =>
+            Task.FromResult(snapshot);
     }
 }

@@ -152,7 +152,7 @@ public sealed class JsonSettingsService : ISettingsService
         if (!string.IsNullOrEmpty(dir))
             Directory.CreateDirectory(dir);
 
-        var json = JsonSerializer.Serialize(_current, JsonOptions);
+        var json = JsonSerializer.Serialize(SettingsSecretCoordinator.CreatePersistableSnapshot(_current), JsonOptions);
         var tempPath = $"{_filePath}.tmp";
         File.WriteAllText(tempPath, json);
         File.Move(tempPath, _filePath, true);

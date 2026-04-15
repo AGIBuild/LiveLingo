@@ -13,24 +13,21 @@ namespace LiveLingo.Core.Engines;
 public sealed class MarianOnnxEngine : ITranslationEngine
 {
     private readonly IModelManager _modelManager;
+    private readonly IModelCatalog _catalog;
     private readonly ILogger<MarianOnnxEngine> _logger;
     private readonly ConcurrentDictionary<string, ModelSession> _sessions = new();
     private readonly SemaphoreSlim _loadLock = new(1, 1);
 
     public IReadOnlyList<LanguageInfo> SupportedLanguages { get; }
 
-    public MarianOnnxEngine(IModelManager modelManager, ILogger<MarianOnnxEngine> logger)
+    public MarianOnnxEngine(IModelManager modelManager, IModelCatalog catalog, ILogger<MarianOnnxEngine> logger)
     {
         _modelManager = modelManager;
+        _catalog = catalog;
         _logger = logger;
-        SupportedLanguages = ModelRegistry.TranslationModels
-            .SelectMany(m =>
-            {
-                var parts = m.Id.Replace("opus-mt-", "").Split('-');
-                return parts.Length == 2
-                    ? [parts[0], parts[1]]
-                    : Array.Empty<string>();
-            })
+        SupportedLanguages = _catalog.GetProfiles(ModelTaskType.Translation)
+            .Where(p => p.ExecutionKind == ModelExecutionKind.OnnxTranslation)
+            .SelectMany(p => p.Languages)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Select(code => new LanguageInfo(code, code))
             .ToList();
@@ -41,7 +38,7 @@ public sealed class MarianOnnxEngine : ITranslationEngine
     {
         ct.ThrowIfCancellationRequested();
 
-        var descriptor = ModelRegistry.FindTranslationModel(sourceLanguage, targetLanguage);
+        var descriptor = ResolveDescriptor(sourceLanguage, targetLanguage);
         if (descriptor is null)
             throw new NotSupportedException(
                 $"No translation model available for {sourceLanguage}→{targetLanguage}");
@@ -52,7 +49,19 @@ public sealed class MarianOnnxEngine : ITranslationEngine
     }
 
     public bool SupportsLanguagePair(string sourceLanguage, string targetLanguage) =>
-        ModelRegistry.FindTranslationModel(sourceLanguage, targetLanguage) is not null;
+        ResolveDescriptor(sourceLanguage, targetLanguage) is not null;
+
+    private ModelDescriptor? ResolveDescriptor(string sourceLanguage, string targetLanguage)
+    {
+        var profile = _catalog.GetProfiles(ModelTaskType.Translation)
+            .FirstOrDefault(p =>
+                p.ExecutionKind == ModelExecutionKind.OnnxTranslation &&
+                p.Languages.Count >= 2 &&
+                string.Equals(p.Languages[0], sourceLanguage, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(p.Languages[1], targetLanguage, StringComparison.OrdinalIgnoreCase));
+
+        return profile?.Descriptor;
+    }
 
     private async Task<ModelSession> GetOrCreateSessionAsync(ModelDescriptor descriptor, CancellationToken ct)
     {

@@ -31,7 +31,7 @@ public sealed class MarianTranslationProbeTests
 
         using var http = new HttpClient();
         var modelManager = new ModelManager(options, http, NullLogger<ModelManager>.Instance);
-        using var engine = new MarianOnnxEngine(modelManager, NullLogger<MarianOnnxEngine>.Instance);
+        using var engine = new MarianOnnxEngine(modelManager, new StaticModelCatalog(), NullLogger<MarianOnnxEngine>.Instance);
 
         var translated = await engine.TranslateAsync(sourceText, "zh", "en", CancellationToken.None);
         Assert.False(string.IsNullOrWhiteSpace(translated));
@@ -64,7 +64,7 @@ public sealed class MarianTranslationProbeTests
 
         using var http = new HttpClient();
         var modelManager = new ModelManager(options, http, NullLogger<ModelManager>.Instance);
-        using var engine = new MarianOnnxEngine(modelManager, NullLogger<MarianOnnxEngine>.Instance);
+        using var engine = new MarianOnnxEngine(modelManager, new StaticModelCatalog(), NullLogger<MarianOnnxEngine>.Instance);
 
         foreach (var (sourceText, expectedContains) in cases)
         {

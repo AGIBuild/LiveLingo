@@ -110,6 +110,13 @@
   "settings.ai.postProcessing": "Post-Processing",
   "settings.ai.defaultMode": "Default Mode:",
   "settings.ai.modesHint": "Summarize · Optimize · Colloquialize",
+  "cloud.status.catalogHealthy": "Connection succeeded. {0} models available.",
+  "cloud.status.catalogEmpty": "Connected, but the provider returned no models.",
+  "cloud.status.directHealthy": "Connected. This provider does not expose a model list, so LiveLingo validated translation model '{0}' directly.",
+  "cloud.status.directHealthyWithPost": "Connected. This provider does not expose a model list, so LiveLingo validated translation model '{0}' directly. Cloud post-processing model '{1}' could not be prevalidated.",
+  "cloud.status.directUnavailable": "Connection failed. This provider does not expose a model list, and direct validation of translation model '{0}' failed: {1}",
+  "cloud.status.invalidConfiguration": "Cloud provider configuration is incomplete. Set base URL, API key, and a translation model in Settings.",
+  "cloud.status.unavailable": "Cloud provider validation failed.",
 
   "overlay.translating": "Translating...",
   "overlay.translated": "Translated ({0})",

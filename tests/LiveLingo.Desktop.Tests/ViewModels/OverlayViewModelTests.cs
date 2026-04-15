@@ -5,6 +5,7 @@ using LiveLingo.Desktop.Services.LanguageCatalog;
 using LiveLingo.Desktop.Services.Localization;
 using LiveLingo.Desktop.ViewModels;
 using CommunityToolkit.Mvvm.Messaging;
+using LiveLingo.Core;
 using LiveLingo.Core.Engines;
 using LiveLingo.Core.Models;
 using LiveLingo.Core.Translation;
@@ -16,6 +17,7 @@ namespace LiveLingo.Desktop.Tests.ViewModels;
 public class OverlayViewModelTests
 {
     private static readonly IReadOnlyList<LanguageInfo> CatalogLanguages = LanguageCatalog.DefaultLanguages;
+    private static CancellationToken TestCt => TestContext.Current.CancellationToken;
     private readonly TargetWindowInfo _target = new(1, 2, "slack", "Slack", 0, 0, 1920, 1080);
     private readonly ITranslationPipeline _pipeline;
     private readonly ITextInjector _injector;
@@ -128,7 +130,7 @@ public class OverlayViewModelTests
         var vm = CreateVm();
         vm.TranslatedText = string.Empty;
 
-        await vm.InjectAsync();
+        await vm.InjectAsync(TestCt);
 
         await _injector.DidNotReceive()
             .InjectAsync(Arg.Any<TargetWindowInfo>(), Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<CancellationToken>());
@@ -140,7 +142,7 @@ public class OverlayViewModelTests
         var vm = CreateVm();
         vm.TranslatedText = "Hello";
 
-        await vm.InjectAsync();
+        await vm.InjectAsync(TestCt);
 
         await _injector.Received(1)
             .InjectAsync(_target, "Hello", vm.AutoSend, Arg.Any<CancellationToken>());
@@ -236,6 +238,75 @@ public class OverlayViewModelTests
     }
 
     [Fact]
+    public void Constructor_WithCloudRouting_ShowsCloudModelLabel()
+    {
+        var settings = new UserSettings
+        {
+            Translation = new TranslationSettings
+            {
+                DefaultSourceLanguage = "zh",
+                DefaultTargetLanguage = "en",
+                ModelPolicy = new ModelPolicySettings
+                {
+                    RoutingMode = nameof(TranslationRoutingMode.PreferCloud)
+                },
+                CloudProvider = new CloudProviderSettings
+                {
+                    Enabled = true,
+                    BaseUrl = "https://api.openai.com/v1",
+                    ApiKey = "sk-test",
+                    TranslationModelId = "gpt-4.1-mini"
+                }
+            }
+        };
+
+        var vm = new OverlayViewModel(_target, _pipeline, _injector, _engine, settings, localizationService: _loc);
+
+        Assert.Contains("Cloud gpt-4.1-mini", vm.ActiveModelLabel);
+    }
+
+    [Fact]
+    public void Constructor_WithCloudRoutingAndFailedRuntimeValidation_ShowsLocalFallbackModelLabel()
+    {
+        var settings = new UserSettings
+        {
+            Translation = new TranslationSettings
+            {
+                DefaultSourceLanguage = "zh",
+                DefaultTargetLanguage = "en",
+                ModelPolicy = new ModelPolicySettings
+                {
+                    RoutingMode = nameof(TranslationRoutingMode.PreferCloud)
+                },
+                CloudProvider = new CloudProviderSettings
+                {
+                    Enabled = true,
+                    BaseUrl = "https://api.openai.com/v1",
+                    ApiKey = "sk-test",
+                    TranslationModelId = "gpt-4.1-mini"
+                }
+            }
+        };
+        var runtimeState = new TestCloudProviderRuntimeState(
+            new CloudProviderRoutingState(
+                HasValidation: true,
+                IsHealthy: false,
+                Message: "Cloud provider is unreachable.",
+                AvailableModelIds: new HashSet<string>(StringComparer.OrdinalIgnoreCase)));
+
+        var vm = new OverlayViewModel(
+            _target,
+            _pipeline,
+            _injector,
+            _engine,
+            settings,
+            localizationService: _loc,
+            cloudProviderRuntimeState: runtimeState);
+
+        Assert.Contains("Qwen3.5-9B", vm.ActiveModelLabel);
+    }
+
+    [Fact]
     public void ApplySettings_WithTranslationActiveModel_UpdatesLanguagePair()
     {
         var initial = new UserSettings
@@ -304,7 +375,7 @@ public class OverlayViewModelTests
         var vm = CreateVm();
         vm.TranslatedText = "   ";
 
-        await vm.InjectAsync();
+        await vm.InjectAsync(TestCt);
 
         await _injector.DidNotReceive()
             .InjectAsync(Arg.Any<TargetWindowInfo>(), Arg.Any<string>(), Arg.Any<bool>(), Arg.Any<CancellationToken>());
@@ -318,7 +389,7 @@ public class OverlayViewModelTests
             vm.ToggleModeCommand.Execute(null);
         vm.TranslatedText = "text";
 
-        await vm.InjectAsync();
+        await vm.InjectAsync(TestCt);
 
         await _injector.Received(1)
             .InjectAsync(_target, "text", true, Arg.Any<CancellationToken>());
@@ -332,7 +403,7 @@ public class OverlayViewModelTests
             vm.ToggleModeCommand.Execute(null);
         vm.TranslatedText = "text";
 
-        await vm.InjectAsync();
+        await vm.InjectAsync(TestCt);
 
         await _injector.Received(1)
             .InjectAsync(_target, "text", false, Arg.Any<CancellationToken>());
@@ -1394,5 +1465,18 @@ public class OverlayViewModelTests
         public Task<string> TranslateAsync(string text, string src, string tgt, CancellationToken ct) => Task.FromResult(text);
         public bool SupportsLanguagePair(string src, string tgt) => false;
         public void Dispose() { }
+    }
+
+    private sealed class TestCloudProviderRuntimeState(CloudProviderRoutingState routingState) : ICloudProviderRuntimeState
+    {
+        public CloudProviderRuntimeSnapshot Current => CloudProviderRuntimeSnapshot.Unknown;
+        public event Action<CloudProviderRuntimeSnapshot>? Changed
+        {
+            add { }
+            remove { }
+        }
+        public CloudProviderRoutingState GetRoutingState(CloudModelPreferences? preferences) => routingState;
+        public Task<CloudProviderRuntimeSnapshot> RefreshAsync(CloudModelPreferences? preferences, CancellationToken ct = default) =>
+            Task.FromResult(Current);
     }
 }

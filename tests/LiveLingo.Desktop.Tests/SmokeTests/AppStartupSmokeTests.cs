@@ -846,10 +846,61 @@ public class AppStartupSmokeTests
         mm.HasAllExpectedLocalAssets(Arg.Any<ModelDescriptor>()).Returns(false);
         var loc = new LocalizationService();
 
-        var issues = App.CollectStartupIssues(mm, new UserSettings(), loc);
+        var issues = App.CollectStartupIssues(mm, new UserSettings(), loc, CloudProviderRuntimeSnapshot.Unknown);
 
         Assert.Single(issues);
         Assert.Contains("model", issues[0], StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void CollectStartupIssues_ReportsCloudProviderIssue_WhenCloudRoutingValidatedAsUnavailable()
+    {
+        var mm = CreateModelManager(requiredModelsInstalled: true);
+        var loc = new LocalizationService();
+        var settings = new UserSettings();
+        settings.Translation.ModelPolicy.RoutingMode = nameof(TranslationRoutingMode.CloudOnly);
+        settings.Translation.CloudProvider.Enabled = true;
+        settings.Translation.CloudProvider.BaseUrl = "https://api.openai.com/v1";
+        settings.Translation.CloudProvider.TranslationModelId = "gpt-4.1-mini";
+        var snapshot = new CloudProviderRuntimeSnapshot(
+            "fingerprint",
+            CloudProviderRuntimeStatus.Unavailable,
+            CloudProviderValidationMode.ModelCatalog,
+            "Cloud provider is unreachable.",
+            DateTimeOffset.Parse("2026-04-15T10:00:00Z"),
+            DateTimeOffset.Parse("2026-04-15T10:05:00Z"),
+            []);
+
+        var issues = App.CollectStartupIssues(mm, settings, loc, snapshot);
+
+        Assert.Contains(issues, issue => issue.Contains("Cloud provider is unreachable.", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void CollectStartupIssues_ReportsDirectProbeAdvisory_WhenCloudPostProcessingCannotBePrevalidated()
+    {
+        var mm = CreateModelManager(requiredModelsInstalled: true);
+        var loc = new LocalizationService();
+        var settings = new UserSettings();
+        settings.Translation.ModelPolicy.RoutingMode = nameof(TranslationRoutingMode.PreferCloud);
+        settings.Translation.ModelPolicy.RoutePostProcessingToCloud = true;
+        settings.Translation.CloudProvider.Enabled = true;
+        settings.Translation.CloudProvider.BaseUrl = "https://gateway.example.com/v1";
+        settings.Translation.CloudProvider.TranslationModelId = "gpt-4.1-mini";
+        settings.Translation.CloudProvider.PostProcessingModelId = "gpt-4.1";
+        var snapshot = new CloudProviderRuntimeSnapshot(
+            "fingerprint",
+            CloudProviderRuntimeStatus.Healthy,
+            CloudProviderValidationMode.DirectModelProbe,
+            "Connection succeeded.",
+            DateTimeOffset.Parse("2026-04-15T10:00:00Z"),
+            DateTimeOffset.Parse("2026-04-15T10:05:00Z"),
+            []);
+
+        var issues = App.CollectStartupIssues(mm, settings, loc, snapshot);
+
+        Assert.Contains(issues, issue => issue.Contains("does not expose a model list", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(issues, issue => issue.Contains("gpt-4.1", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -892,6 +943,9 @@ public class AppStartupSmokeTests
         services.AddSingleton<ILanguageCatalog, LanguageCatalog>();
         services.AddSingleton(new CoreOptions());
         services.AddSingleton(Substitute.For<ILlmModelLoadCoordinator>());
+        services.AddSingleton<ISecretStore>(new InMemorySecretStore());
+        services.AddSingleton(Substitute.For<ICloudProviderProbeService>());
+        services.AddSingleton(Substitute.For<ICloudProviderRuntimeState>());
         services.AddSingleton(platform);
         services.AddSingleton<IMessenger>(_ => new WeakReferenceMessenger());
         return services.BuildServiceProvider();
