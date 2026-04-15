@@ -7,38 +7,64 @@ public class ModelRegistryTests
     [Fact]
     public void TranslationModels_ContainsExpectedModels()
     {
-        Assert.Equal(5, ModelRegistry.TranslationModels.Count);
+        Assert.Equal(7, ModelRegistry.TranslationModels.Count);
+        Assert.Contains(ModelRegistry.Gemma4_12B, ModelRegistry.TranslationModels);
+        Assert.Contains(ModelRegistry.Gemma4_4B, ModelRegistry.TranslationModels);
+        Assert.Contains(ModelRegistry.Qwen35_9B, ModelRegistry.TranslationModels);
+        Assert.Contains(ModelRegistry.Qwen25_7B, ModelRegistry.TranslationModels);
         Assert.Contains(ModelRegistry.MarianZhEn, ModelRegistry.TranslationModels);
         Assert.Contains(ModelRegistry.MarianEnZh, ModelRegistry.TranslationModels);
         Assert.Contains(ModelRegistry.MarianJaEn, ModelRegistry.TranslationModels);
-        Assert.Contains(ModelRegistry.Qwen35_9B, ModelRegistry.TranslationModels);
-        Assert.Contains(ModelRegistry.Qwen25_7B, ModelRegistry.TranslationModels);
     }
 
     [Fact]
-    public void RequiredModels_ContainsDefaultQwenPairOnly()
+    public void RequiredModels_DefaultsToGemma4_12B()
     {
         Assert.NotEmpty(ModelRegistry.RequiredModels);
-        Assert.Contains(ModelRegistry.Qwen35_9B, ModelRegistry.RequiredModels);
+        Assert.Contains(ModelRegistry.Gemma4_12B, ModelRegistry.RequiredModels);
         Assert.DoesNotContain(ModelRegistry.FastTextLid, ModelRegistry.RequiredModels);
         Assert.DoesNotContain(ModelRegistry.Qwen25_15B, ModelRegistry.RequiredModels);
     }
 
     [Fact]
-    public void OptionalModels_ContainsQwen()
+    public void Gemma4_12B_HasLoadFailureFallback_ToGemma4_4B()
     {
+        Assert.Same(ModelRegistry.Gemma4_4B, ModelRegistry.Gemma4_12B.LoadFailureFallback);
+    }
+
+    [Fact]
+    public void Gemma4_Models_HaveGemmaChatTemplate()
+    {
+        Assert.Equal(LocalModelChatTemplate.Gemma, ModelRegistry.Gemma4_12B.ChatTemplate);
+        Assert.Equal(LocalModelChatTemplate.Gemma, ModelRegistry.Gemma4_4B.ChatTemplate);
+    }
+
+    [Fact]
+    public void QwenModels_HaveQwenChatTemplate()
+    {
+        Assert.Equal(LocalModelChatTemplate.Qwen, ModelRegistry.Qwen35_9B.ChatTemplate);
+        Assert.Equal(LocalModelChatTemplate.Qwen, ModelRegistry.Qwen25_7B.ChatTemplate);
+        Assert.Equal(LocalModelChatTemplate.Qwen, ModelRegistry.Qwen25_15B.ChatTemplate);
+    }
+
+    [Fact]
+    public void OptionalModels_ContainsGemma4_4B_And_Qwen()
+    {
+        Assert.Contains(ModelRegistry.Gemma4_4B, ModelRegistry.OptionalModels);
         Assert.Contains(ModelRegistry.Qwen25_15B, ModelRegistry.OptionalModels);
     }
 
     [Fact]
     public void AllModels_ContainsAll()
     {
-        Assert.Equal(9, ModelRegistry.AllModels.Count);
-        Assert.Contains(ModelRegistry.MarianZhEn, ModelRegistry.AllModels);
-        Assert.Contains(ModelRegistry.FastTextLid, ModelRegistry.AllModels);
-        Assert.Contains(ModelRegistry.Qwen25_15B, ModelRegistry.AllModels);
+        Assert.Equal(11, ModelRegistry.AllModels.Count);
+        Assert.Contains(ModelRegistry.Gemma4_12B, ModelRegistry.AllModels);
+        Assert.Contains(ModelRegistry.Gemma4_4B, ModelRegistry.AllModels);
         Assert.Contains(ModelRegistry.Qwen35_9B, ModelRegistry.AllModels);
         Assert.Contains(ModelRegistry.Qwen25_7B, ModelRegistry.AllModels);
+        Assert.Contains(ModelRegistry.Qwen25_15B, ModelRegistry.AllModels);
+        Assert.Contains(ModelRegistry.MarianZhEn, ModelRegistry.AllModels);
+        Assert.Contains(ModelRegistry.FastTextLid, ModelRegistry.AllModels);
         Assert.Contains(ModelRegistry.WhisperBase, ModelRegistry.AllModels);
         Assert.Contains(ModelRegistry.SileroVad, ModelRegistry.AllModels);
     }
@@ -57,9 +83,9 @@ public class ModelRegistryTests
     }
 
     [Theory]
-    [InlineData("zh", "en", "qwen35-9b")]
-    [InlineData("en", "zh", "qwen35-9b")]
-    [InlineData("ja", "en", "qwen35-9b")]
+    [InlineData("zh", "en", "gemma4-12b")]
+    [InlineData("en", "zh", "gemma4-12b")]
+    [InlineData("ja", "en", "gemma4-12b")]
     public void FindTranslationModel_FindsCorrectModel(string src, string tgt, string expectedId)
     {
         var model = ModelRegistry.FindTranslationModel(src, tgt);
@@ -110,18 +136,14 @@ public class ModelRegistryTests
     public void AllModels_HaveNonEmptyUrls()
     {
         foreach (var model in ModelRegistry.AllModels)
-        {
             Assert.False(string.IsNullOrWhiteSpace(model.DownloadUrl));
-        }
     }
 
     [Fact]
     public void AllModels_HavePositiveSize()
     {
         foreach (var model in ModelRegistry.AllModels)
-        {
             Assert.True(model.SizeBytes > 0);
-        }
     }
 
     [Fact]
@@ -156,6 +178,8 @@ public class ModelRegistryTests
     [InlineData("opus-mt-en-zh", "MarianMT English\u2192Chinese")]
     [InlineData("opus-mt-ja-en", "MarianMT Japanese\u2192English")]
     [InlineData("lid.176.ftz", "FastText Language Detection")]
+    [InlineData("gemma4-12b", "Gemma 4 12B (GGUF Q4_K_M)")]
+    [InlineData("gemma4-4b", "Gemma 4 4B (GGUF Q4_K_M)")]
     [InlineData("qwen25-1.5b", "Qwen2.5-1.5B-Instruct (GGUF Q4_K_M)")]
     [InlineData("qwen35-9b", "Qwen3.5-9B Abliterated (GGUF Q4_K_M)")]
     public void Model_HasExpectedIdAndDisplayName(string expectedId, string expectedName)

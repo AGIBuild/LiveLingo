@@ -121,7 +121,7 @@ public partial class App : Application
         if (await SettingsSecretCoordinator.MigrateAndHydrateAsync(userSettings, secretStore))
             await settingsService.SaveAsync();
         SyncCoreOptionsFromSettings(_serviceProvider, userSettings);
-        _serviceProvider.GetRequiredService<QwenModelHost>().ModelLoadFallbackApplied += OnQwenModelLoadFallbackApplied;
+        _serviceProvider.GetRequiredService<LocalLlamaModelHost>().ModelLoadFallbackApplied += OnLocalModelLoadFallbackApplied;
         _messenger.Register<App, AppUiRequestMessage>(this, static (recipient, message) =>
             Dispatcher.UIThread.Post(() => recipient.HandleAppUiRequest(message)));
 
@@ -982,11 +982,11 @@ public partial class App : Application
         toast.Show();
     }
 
-    private void OnQwenModelLoadFallbackApplied(object? sender, QwenModelFallbackEventArgs e)
+    private void OnLocalModelLoadFallbackApplied(object? sender, LocalModelFallbackEventArgs e)
     {
         Dispatcher.UIThread.Post(() =>
         {
-            var message = BuildQwenFallbackNotificationMessage(_serviceProvider?.GetService<ILocalizationService>(), e);
+            var message = BuildLocalModelFallbackNotificationMessage(_serviceProvider?.GetService<ILocalizationService>(), e);
             ShowNotification(message, TimeSpan.FromSeconds(12));
         });
     }
@@ -1006,12 +1006,18 @@ public partial class App : Application
         return issues;
     }
 
+    internal static string BuildLocalModelFallbackNotificationMessage(
+        ILocalizationService? loc,
+        LocalModelFallbackEventArgs e) =>
+        loc is not null
+            ? loc.T("toast.localModelFallback", e.Primary.DisplayName, e.Fallback.DisplayName)
+            : $"{e.Primary.DisplayName} could not load; using {e.Fallback.DisplayName}.";
+
+    // Keep old name for AppStartupSmokeTests compatibility; delegates to the new method.
     internal static string BuildQwenFallbackNotificationMessage(
         ILocalizationService? loc,
-        QwenModelFallbackEventArgs e) =>
-        loc is not null
-            ? loc.T("toast.qwenModelFallback", e.Primary.DisplayName, e.Fallback.DisplayName)
-            : $"{e.Primary.DisplayName} could not load; using {e.Fallback.DisplayName}.";
+        LocalModelFallbackEventArgs e) =>
+        BuildLocalModelFallbackNotificationMessage(loc, e);
 
     private static Serilog.Events.LogEventLevel ParseSerilogLevel(string level) => level switch
     {

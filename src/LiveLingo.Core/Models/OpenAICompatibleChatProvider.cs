@@ -45,7 +45,7 @@ public sealed class OpenAICompatibleChatProvider(
         var json = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
         using var doc = JsonDocument.Parse(json);
         var result = LlamaServerChatResponse.GetAssistantText(doc.RootElement);
-        result = LlamaServerChatResponse.StripQwenThinkTags(result);
+        result = LlamaServerChatResponse.ApplyTemplatePostProcessing(result, request.Profile.Descriptor.ChatTemplate);
 
         if (!string.IsNullOrWhiteSpace(result))
             return new ModelInvocationResult(result);

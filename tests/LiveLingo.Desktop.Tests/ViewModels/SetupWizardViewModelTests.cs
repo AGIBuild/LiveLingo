@@ -419,7 +419,7 @@ public class SetupWizardViewModelTests
 
         await vm.CopyUrlCommand.ExecuteAsync(null);
 
-        await clipboard.Received(1).SetTextAsync(ModelRegistry.Qwen35_9B.DownloadUrl, Arg.Any<CancellationToken>());
+        await clipboard.Received(1).SetTextAsync(ModelRegistry.Gemma4_12B.DownloadUrl, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -430,7 +430,7 @@ public class SetupWizardViewModelTests
 
         vm.OpenRequiredModelOnHuggingFaceCommand.Execute(null);
 
-        platform.Received(1).OpenUrl("https://huggingface.co/Abhiray/Qwen3.5-9B-abliterated-GGUF");
+        platform.Received(1).OpenUrl("https://huggingface.co/bartowski/google_gemma-4-12b-it-GGUF");
     }
 
     [Fact]

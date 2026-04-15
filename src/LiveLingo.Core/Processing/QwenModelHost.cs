@@ -6,13 +6,17 @@ namespace LiveLingo.Core.Processing;
 
 public enum ModelLoadState { Unloaded, Loading, Loaded }
 
-public sealed class QwenModelHost : IDisposable, ILlmModelLoadCoordinator
+/// <summary>
+/// Manages the lifecycle of a local llama-server process for any GGUF-backed model
+/// (Gemma, Qwen, Llama, Mistral, …). Not model-family-specific.
+/// </summary>
+public sealed class LocalLlamaModelHost : IDisposable, ILlmModelLoadCoordinator
 {
     private readonly IModelManager _modelManager;
     private readonly ILlamaServerProcessManager _serverManager;
     private readonly IModelSelector _selector;
     private readonly CoreOptions _options;
-    private readonly ILogger<QwenModelHost> _logger;
+    private readonly ILogger<LocalLlamaModelHost> _logger;
     private readonly SemaphoreSlim _loadLock = new(1, 1);
     private readonly Timer _idleTimer;
     private Task? _ensureServerTask;
@@ -27,14 +31,14 @@ public sealed class QwenModelHost : IDisposable, ILlmModelLoadCoordinator
     public ModelDescriptor ActiveModelDescriptor => _activeModelDescriptor;
 
     public event Action<ModelLoadState>? StateChanged;
-    public event EventHandler<QwenModelFallbackEventArgs>? ModelLoadFallbackApplied;
+    public event EventHandler<LocalModelFallbackEventArgs>? ModelLoadFallbackApplied;
 
-    public QwenModelHost(
+    public LocalLlamaModelHost(
         IModelManager modelManager,
         ILlamaServerProcessManager serverManager,
         IModelSelector selector,
         IOptions<CoreOptions> options,
-        ILogger<QwenModelHost> logger)
+        ILogger<LocalLlamaModelHost> logger)
     {
         _modelManager = modelManager;
         _serverManager = serverManager;
@@ -170,6 +174,7 @@ public sealed class QwenModelHost : IDisposable, ILlmModelLoadCoordinator
         if (preferred.RuntimeKind != ModelRuntimeKind.RemoteHttp)
             return preferred;
 
+        // Fall back to the smallest available local post-processing model.
         return new StaticModelCatalog().FindById(ModelRegistry.Qwen25_15B.Id)
             ?? ResolvePreferredLocalTranslationProfile();
     }
@@ -201,7 +206,7 @@ public sealed class QwenModelHost : IDisposable, ILlmModelLoadCoordinator
 
             ModelLoadFallbackApplied?.Invoke(
                 this,
-                new QwenModelFallbackEventArgs { Primary = primary, Fallback = fallback });
+                new LocalModelFallbackEventArgs { Primary = primary, Fallback = fallback });
         }
     }
 
@@ -246,7 +251,7 @@ public sealed class QwenModelHost : IDisposable, ILlmModelLoadCoordinator
                 ? $" Expected file '{expected}' is missing (remove stale .gguf files in the model folder or use Settings → Models to repair)."
                 : " Download the model from Settings → Models.";
             throw new FileNotFoundException(
-                $"Qwen GGUF not found for '{_activeModelDescriptor.DisplayName}'.{hint}",
+                $"GGUF not found for '{_activeModelDescriptor.DisplayName}'.{hint}",
                 string.IsNullOrWhiteSpace(ModelPath) ? Path.Combine(modelDir, "*.gguf") : ModelPath);
         }
 
@@ -270,7 +275,7 @@ public sealed class QwenModelHost : IDisposable, ILlmModelLoadCoordinator
             _logger.LogError(
                 ex,
                 "llama-server failed to load GGUF at {ModelPath} (sizeBytes={SizeBytes}). " +
-                "Unsupported or multimodal GGUFs often fail here; use a text instruct model matching this app registry.",
+                "Unsupported or multimodal GGUFs often fail here. Use a text-instruct GGUF matching this app registry.",
                 ModelPath,
                 sizeBytes);
             throw;

@@ -39,8 +39,10 @@ public sealed class ModelReadinessService(IModelManager modelManager, IModelSele
         if (IsInstalled(profile.Id))
             return;
 
-        if (!string.Equals(profile.Id, ModelRegistry.Qwen25_15B.Id, StringComparison.OrdinalIgnoreCase) &&
-            IsInstalled(ModelRegistry.Qwen25_15B.Id))
+        // Allow any smaller local post-processing fallback to satisfy the check.
+        var smallFallbackId = ModelRegistry.Qwen25_15B.Id;
+        if (!string.Equals(profile.Id, smallFallbackId, StringComparison.OrdinalIgnoreCase) &&
+            IsInstalled(smallFallbackId))
         {
             return;
         }
@@ -49,6 +51,6 @@ public sealed class ModelReadinessService(IModelManager modelManager, IModelSele
             ModelType.PostProcessing,
             profile.Id,
             $"Model '{profile.DisplayName}' is not downloaded for post-processing.",
-            "Open Settings → Models and download the primary translation model (or Qwen 2.5 1.5B as a lighter option).");
+            "Open Settings → Models and download the required AI model.");
     }
 }

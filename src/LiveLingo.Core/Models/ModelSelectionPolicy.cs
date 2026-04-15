@@ -128,7 +128,8 @@ public static class ModelSelectionPolicy
             return active;
         }
 
-        var fallback = catalog.FindById(ModelRegistry.Qwen35_9B.Id)
+        var fallback = catalog.FindById(ModelRegistry.Gemma4_12B.Id)
+            ?? catalog.FindById(ModelRegistry.Qwen35_9B.Id)
             ?? throw new InvalidOperationException("Default translation profile is missing from the model catalog.");
 
         return SupportsLanguagePair(fallback, sourceLanguage, targetLanguage)

@@ -32,7 +32,7 @@ public class ServiceCollectionExtensionsTests
         Assert.Contains(sp.GetServices<IModelRuntime>(), runtime => runtime.RuntimeKind == ModelRuntimeKind.RemoteHttp);
         Assert.Contains(sp.GetServices<IModelProvider>(), provider => provider.ProviderKind == ModelProviderKind.LlamaServer);
         Assert.Contains(sp.GetServices<IModelProvider>(), provider => provider.ProviderKind == ModelProviderKind.OpenAICompatible);
-        Assert.IsType<QwenModelHost>(sp.GetRequiredService<ILlmModelLoadCoordinator>());
+        Assert.IsType<LocalLlamaModelHost>(sp.GetRequiredService<ILlmModelLoadCoordinator>());
     }
 
     [Fact]

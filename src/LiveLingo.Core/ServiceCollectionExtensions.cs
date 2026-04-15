@@ -71,9 +71,9 @@ public static class ServiceCollectionExtensions
             });
         services.AddSingleton<INativeRuntimeUpdater>(sp => sp.GetRequiredService<NativeRuntimeUpdater>());
         services.AddSingleton<ILlamaServerProcessManager, LlamaServerProcessManager>();
-        services.AddSingleton<QwenModelHost>();
-        services.AddSingleton<ILlmModelLoadCoordinator>(sp => sp.GetRequiredService<QwenModelHost>());
-        services.AddSingleton<IModelRuntime, LlamaServerRuntime>();
+        services.AddSingleton<LocalLlamaModelHost>();
+        services.AddSingleton<ILlmModelLoadCoordinator>(sp => sp.GetRequiredService<LocalLlamaModelHost>());
+        services.AddSingleton<IModelRuntime>(sp => new LlamaServerRuntime(sp.GetRequiredService<LocalLlamaModelHost>()));
         services.AddSingleton<IModelRuntime, RemoteHttpRuntime>();
         services.AddHttpClient<LlamaServerChatProvider>();
         services.AddHttpClient<OpenAICompatibleChatProvider>();

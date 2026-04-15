@@ -66,18 +66,49 @@ public static class ModelRegistry
         938_013,
         ModelType.LanguageDetection);
 
+    // ── Gemma 4 ─────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Lightweight fallback (4 B, ~3 GB). Used when Gemma 4 12B cannot load on the device.
+    /// </summary>
+    public static readonly ModelDescriptor Gemma4_4B = new(
+        "gemma4-4b",
+        "Gemma 4 4B (GGUF Q4_K_M)",
+        "https://huggingface.co/bartowski/google_gemma-4-4b-it-GGUF/resolve/main/google_gemma-4-4b-it-Q4_K_M.gguf",
+        2_640_000_000,
+        ModelType.Translation)
+    {
+        ChatTemplate = LocalModelChatTemplate.Gemma,
+    };
+
+    /// <summary>
+    /// Primary translation GGUF (12 B). Falls back to <see cref="Gemma4_4B"/> on low-RAM devices.
+    /// </summary>
+    public static readonly ModelDescriptor Gemma4_12B = new(
+        "gemma4-12b",
+        "Gemma 4 12B (GGUF Q4_K_M)",
+        "https://huggingface.co/bartowski/google_gemma-4-12b-it-GGUF/resolve/main/google_gemma-4-12b-it-Q4_K_M.gguf",
+        7_270_000_000,
+        ModelType.Translation)
+    {
+        ChatTemplate = LocalModelChatTemplate.Gemma,
+        LoadFailureFallback = Gemma4_4B,
+    };
+
+    // ── Qwen (retained for existing installs and post-processing) ────────────
+
     public static readonly ModelDescriptor Qwen25_15B = new(
         "qwen25-1.5b",
         "Qwen2.5-1.5B-Instruct (GGUF Q4_K_M)",
         "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf",
         1_117_320_736,
-        ModelType.PostProcessing);
+        ModelType.PostProcessing)
+    {
+        ChatTemplate = LocalModelChatTemplate.Qwen,
+    };
 
     /// <summary>
-    /// Primary translation GGUF. Folder id remains <c>qwen35-9b</c> for existing installs.
-    /// Uses <see href="https://huggingface.co/Abhiray/Qwen3.5-9B-abliterated-GGUF">Abhiray</see> text-generation
-    /// Q4_K_M. This model uses the new 'qwen35' hybrid Mamba architecture.
-    /// It requires a newer llama.cpp native binary than what LLamaSharp 0.26.0 bundles.
+    /// Kept for users who had Qwen3.5-9B installed; new installs default to Gemma 4 12B.
     /// </summary>
     public static readonly ModelDescriptor Qwen35_9B = new(
         "qwen35-9b",
@@ -86,6 +117,7 @@ public static class ModelRegistry
         5_627_044_704,
         ModelType.Translation)
     {
+        ChatTemplate = LocalModelChatTemplate.Qwen,
         LoadFailureFallback = Qwen25_15B,
     };
 
@@ -96,14 +128,15 @@ public static class ModelRegistry
         4_683_074_240,
         ModelType.Translation)
     {
+        ChatTemplate = LocalModelChatTemplate.Qwen,
         LoadFailureFallback = Qwen25_15B,
     };
 
     public static IReadOnlyList<ModelDescriptor> TranslationModels { get; } =
-        [Qwen35_9B, Qwen25_7B, MarianZhEn, MarianEnZh, MarianJaEn];
+        [Gemma4_12B, Gemma4_4B, Qwen35_9B, Qwen25_7B, MarianZhEn, MarianEnZh, MarianJaEn];
 
     public static IReadOnlyList<ModelDescriptor> RequiredModels { get; } =
-        [Qwen35_9B];
+        [Gemma4_12B];
 
     public static readonly ModelDescriptor WhisperBase = new(
         "whisper-base",
@@ -120,21 +153,20 @@ public static class ModelRegistry
         ModelType.VoiceActivityDetection);
 
     public static IReadOnlyList<ModelDescriptor> OptionalModels { get; } =
-        [Qwen25_15B, WhisperBase, SileroVad];
+        [Gemma4_4B, Qwen25_15B, WhisperBase, SileroVad];
 
     public static IReadOnlyList<ModelDescriptor> AllModels { get; } =
-        [Qwen35_9B, Qwen25_7B, MarianZhEn, MarianEnZh, MarianJaEn, FastTextLid, Qwen25_15B, WhisperBase, SileroVad];
+    [
+        Gemma4_12B, Gemma4_4B,
+        Qwen35_9B, Qwen25_7B,
+        MarianZhEn, MarianEnZh, MarianJaEn,
+        FastTextLid, Qwen25_15B, WhisperBase, SileroVad
+    ];
 
-    public static ModelDescriptor? FindTranslationModel(string sourceLanguage, string targetLanguage)
-    {
-        // Primary translation engine (see Qwen35_9B descriptor comment).
-        return Qwen35_9B;
-    }
+    public static ModelDescriptor? FindTranslationModel(string sourceLanguage, string targetLanguage) =>
+        Gemma4_12B;
 
     public static IReadOnlyList<ModelDescriptor> GetRequiredModelsForLanguagePair(
         string? sourceLanguage,
-        string? targetLanguage)
-    {
-        return [Qwen35_9B];
-    }
+        string? targetLanguage) => [Gemma4_12B];
 }

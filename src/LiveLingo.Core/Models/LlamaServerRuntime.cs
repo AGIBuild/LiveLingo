@@ -2,7 +2,7 @@ using LiveLingo.Core.Processing;
 
 namespace LiveLingo.Core.Models;
 
-public sealed class LlamaServerRuntime(QwenModelHost host) : IModelRuntime
+public sealed class LlamaServerRuntime(LocalLlamaModelHost host) : IModelRuntime
 {
     public ModelRuntimeKind RuntimeKind => ModelRuntimeKind.LlamaServer;
 
