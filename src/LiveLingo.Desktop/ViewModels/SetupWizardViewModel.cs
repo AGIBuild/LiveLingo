@@ -70,7 +70,7 @@ public partial class SetupWizardViewModel : ObservableObject
     public string Step2Description => T(
         "wizard.step2.description",
         "LiveLingo requires the baseline translation model for your selected language pair. This is a one-time download.");
-    public string Step2CardTitle => T("wizard.step2.card.title", "Qwen3.5 9B");
+    public string Step2CardTitle => T("wizard.step2.card.title", GetPrimaryRequiredModelDisplayName());
     public string Step2CardSubtitle => T("wizard.step2.card.subtitle", "Baseline translation model (required)");
     public string Step2DownloadButton => T("wizard.step2.downloadButton", "Download");
     public string Step2ReadyLabel => T("wizard.step2.ready", "✓ Ready");
@@ -300,7 +300,7 @@ public partial class SetupWizardViewModel : ObservableObject
         catch (Exception ex)
         {
             HasError = true;
-            DownloadStatus = T("wizard.download.error", "Download failed. You can download it manually from https://huggingface.co/Qwen and place it in the models directory.", ex.Message);
+            DownloadStatus = T("wizard.download.error", "Download failed. You can download it manually from Hugging Face and place it in the models directory.", ex.Message);
             _logger?.LogError(ex, "Setup wizard model download failed.");
         }
         finally
@@ -354,6 +354,11 @@ public partial class SetupWizardViewModel : ObservableObject
 
     private IReadOnlyList<ModelDescriptor> GetRequiredModelsForCurrentPair() =>
         ModelRegistry.GetRequiredModelsForLanguagePair(SourceLanguage, TargetLanguage);
+
+    private static string GetPrimaryRequiredModelDisplayName() =>
+        ModelRegistry.RequiredModels.Count > 0
+            ? ModelRegistry.RequiredModels[0].DisplayName
+            : "Translation Model";
 
     private void RefreshModelInstalledState()
     {

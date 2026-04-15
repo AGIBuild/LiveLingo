@@ -904,20 +904,20 @@ public class AppStartupSmokeTests
     }
 
     [Fact]
-    public void BuildQwenFallbackNotificationMessage_UsesLocalizationWhenAvailable()
+    public void BuildLocalModelFallbackNotificationMessage_UsesLocalizationWhenAvailable()
     {
         var loc = new LocalizationService();
 
-        var message = App.BuildQwenFallbackNotificationMessage(
+        var message = App.BuildLocalModelFallbackNotificationMessage(
             loc,
-            new QwenModelFallbackEventArgs
+            new LocalModelFallbackEventArgs
             {
-                Primary = ModelRegistry.Qwen35_9B,
-                Fallback = ModelRegistry.Qwen25_15B
+                Primary = ModelRegistry.Gemma4_12B,
+                Fallback = ModelRegistry.Gemma4_4B
             });
 
-        Assert.Contains(ModelRegistry.Qwen35_9B.DisplayName, message);
-        Assert.Contains(ModelRegistry.Qwen25_15B.DisplayName, message);
+        Assert.Contains(ModelRegistry.Gemma4_12B.DisplayName, message);
+        Assert.Contains(ModelRegistry.Gemma4_4B.DisplayName, message);
         Assert.DoesNotContain("could not load; using", message, StringComparison.OrdinalIgnoreCase);
     }
 

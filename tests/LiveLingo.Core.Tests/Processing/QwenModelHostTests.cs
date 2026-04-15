@@ -6,11 +6,11 @@ using NSubstitute;
 
 namespace LiveLingo.Core.Tests.Processing;
 
-public sealed class QwenModelHostTests : IDisposable
+public sealed class LocalLlamaModelHostTests : IDisposable
 {
     private readonly string _tempDir = Path.Combine(Path.GetTempPath(), $"LiveLingo.QwenHost.{Guid.NewGuid():N}");
 
-    public QwenModelHostTests()
+    public LocalLlamaModelHostTests()
     {
         Directory.CreateDirectory(_tempDir);
     }
@@ -21,7 +21,7 @@ public sealed class QwenModelHostTests : IDisposable
         var modelManager = Substitute.For<IModelManager>();
         var serverManager = Substitute.For<ILlamaServerProcessManager>();
         var selector = Substitute.For<IModelSelector>();
-        var logger = Substitute.For<ILogger<QwenModelHost>>();
+        var logger = Substitute.For<ILogger<LocalLlamaModelHost>>();
         var catalog = new StaticModelCatalog();
 
         var modelDir = Path.Combine(_tempDir, ModelRegistry.Qwen35_9B.Id);
@@ -55,7 +55,7 @@ public sealed class QwenModelHostTests : IDisposable
                 state = ModelLoadState.Loaded;
             });
 
-        using var host = new QwenModelHost(
+        using var host = new LocalLlamaModelHost(
             modelManager,
             serverManager,
             selector,
@@ -88,7 +88,7 @@ public sealed class QwenModelHostTests : IDisposable
         var modelManager = Substitute.For<IModelManager>();
         var serverManager = Substitute.For<ILlamaServerProcessManager>();
         var selector = Substitute.For<IModelSelector>();
-        var logger = Substitute.For<ILogger<QwenModelHost>>();
+        var logger = Substitute.For<ILogger<LocalLlamaModelHost>>();
         var catalog = new StaticModelCatalog();
 
         var postModelDir = Path.Combine(_tempDir, ModelRegistry.Qwen25_15B.Id);
@@ -119,7 +119,7 @@ public sealed class QwenModelHostTests : IDisposable
                 return Task.CompletedTask;
             });
 
-        using var host = new QwenModelHost(
+        using var host = new LocalLlamaModelHost(
             modelManager,
             serverManager,
             selector,
@@ -142,7 +142,7 @@ public sealed class QwenModelHostTests : IDisposable
         var modelManager = Substitute.For<IModelManager>();
         var serverManager = Substitute.For<ILlamaServerProcessManager>();
         var selector = Substitute.For<IModelSelector>();
-        var logger = Substitute.For<ILogger<QwenModelHost>>();
+        var logger = Substitute.For<ILogger<LocalLlamaModelHost>>();
         var catalog = new StaticModelCatalog();
 
         var translationProfile = catalog.FindById(ModelRegistry.Qwen25_7B.Id)!;
@@ -174,7 +174,7 @@ public sealed class QwenModelHostTests : IDisposable
                 return Task.CompletedTask;
             });
 
-        using var host = new QwenModelHost(
+        using var host = new LocalLlamaModelHost(
             modelManager,
             serverManager,
             selector,

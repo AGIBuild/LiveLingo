@@ -22,7 +22,7 @@ public sealed class DefaultModelSelectorTests
 
         var profile = selector.SelectTranslationProfile("en", "zh");
 
-        Assert.Equal(ModelRegistry.Qwen35_9B.Id, profile.Id);
+        Assert.Equal(ModelRegistry.Gemma4_12B.Id, profile.Id);
     }
 
     [Fact]
@@ -125,7 +125,7 @@ public sealed class DefaultModelSelectorTests
 
         var profile = selector.SelectTranslationProfile("zh", "en");
 
-        Assert.Equal(ModelRegistry.Qwen35_9B.Id, profile.Id);
+        Assert.Equal(ModelRegistry.Gemma4_12B.Id, profile.Id);
     }
 
     [Fact]

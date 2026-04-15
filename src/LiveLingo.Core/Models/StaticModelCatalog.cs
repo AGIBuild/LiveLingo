@@ -37,7 +37,7 @@ public sealed class StaticModelCatalog : IModelCatalog
 
         return descriptor.Type switch
         {
-            ModelType.Translation when descriptor.Id.StartsWith("qwen", StringComparison.OrdinalIgnoreCase) =>
+            ModelType.Translation when IsLocalLlamaModel(descriptor) =>
                 new ModelProfile(
                     descriptor.Id,
                     descriptor.DisplayName,
@@ -48,7 +48,7 @@ public sealed class StaticModelCatalog : IModelCatalog
                     LlamaSupportedLanguages,
                     descriptor),
 
-            ModelType.PostProcessing when descriptor.Id.StartsWith("qwen", StringComparison.OrdinalIgnoreCase) =>
+            ModelType.PostProcessing when IsLocalLlamaModel(descriptor) =>
                 new ModelProfile(
                     descriptor.Id,
                     descriptor.DisplayName,
@@ -103,4 +103,12 @@ public sealed class StaticModelCatalog : IModelCatalog
                 descriptor)
         };
     }
+
+    /// <summary>
+    /// Returns true for any GGUF-backed model that runs through llama-server
+    /// (Gemma, Qwen, Llama, Mistral, …). Excludes Marian ONNX and other dedicated runtimes.
+    /// </summary>
+    private static bool IsLocalLlamaModel(ModelDescriptor descriptor) =>
+        descriptor.ChatTemplate != LocalModelChatTemplate.Generic
+        || descriptor.DownloadUrl.EndsWith(".gguf", StringComparison.OrdinalIgnoreCase);
 }

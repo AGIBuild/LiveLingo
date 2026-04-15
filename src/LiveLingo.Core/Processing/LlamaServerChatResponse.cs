@@ -1,11 +1,11 @@
 using System.Text.Json;
+using LiveLingo.Core.Models;
 
 namespace LiveLingo.Core.Processing;
 
 /// <summary>
 /// Parses non-streaming <c>/v1/chat/completions</c> responses from llama-server.
-/// Qwen3 and similar templates may split output into <c>reasoning_content</c> vs <c>content</c>
-/// depending on <c>--reasoning-format</c>; this helper reads both.
+/// Handles per-template quirks (Qwen think tags, Gemma start-of-turn markers, …).
 /// </summary>
 public static class LlamaServerChatResponse
 {
@@ -105,6 +105,14 @@ public static class LlamaServerChatResponse
             JsonValueKind.Null => "null",
             _ => e.ValueKind.ToString()
         };
+
+    /// <summary>
+    /// Applies template-specific post-processing to strip reasoning artifacts
+    /// (e.g. Qwen think tags). For <see cref="LocalModelChatTemplate.Generic"/> and
+    /// <see cref="LocalModelChatTemplate.Gemma"/> returns the text unchanged.
+    /// </summary>
+    public static string ApplyTemplatePostProcessing(string result, LocalModelChatTemplate template) =>
+        template == LocalModelChatTemplate.Qwen ? StripQwenThinkTags(result) : result;
 
     /// <summary>
     /// Keeps text after the last closing think tag when present. If there is an opening

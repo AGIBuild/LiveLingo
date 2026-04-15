@@ -234,7 +234,7 @@ public class OverlayViewModelTests
         };
         var vm = new OverlayViewModel(_target, _pipeline, _injector, _engine, settings, localizationService: _loc);
 
-        Assert.Contains("Qwen3.5-9B", vm.ActiveModelLabel);
+        Assert.Contains("Gemma 4 12B", vm.ActiveModelLabel);
     }
 
     [Fact]
@@ -303,7 +303,7 @@ public class OverlayViewModelTests
             localizationService: _loc,
             cloudProviderRuntimeState: runtimeState);
 
-        Assert.Contains("Qwen3.5-9B", vm.ActiveModelLabel);
+        Assert.Contains("Gemma 4 12B", vm.ActiveModelLabel);
     }
 
     [Fact]
