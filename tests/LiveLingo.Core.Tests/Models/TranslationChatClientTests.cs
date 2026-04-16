@@ -16,7 +16,7 @@ public sealed class TranslationChatClientTests
         var invocationService = Substitute.For<IModelInvocationService>();
 
         ModelInvocationRequest? capturedRequest = null;
-        selector.SelectTranslationProfile("zh", "en").Returns(LocalProfile);
+        selector.SelectTranslationProfile("zh", "en", Arg.Any<TranslationRoutingContext?>()).Returns(LocalProfile);
         invocationService
             .InvokeAsync(Arg.Do<ModelInvocationRequest>(r => capturedRequest = r), Arg.Any<CancellationToken>())
             .Returns(new ModelInvocationResult("Hello world"));
@@ -44,6 +44,43 @@ public sealed class TranslationChatClientTests
         Assert.Same(LocalProfile, capturedRequest!.Profile);
         Assert.Equal(ModelTaskType.Translation, capturedRequest.TaskType);
         Assert.Equal(2, capturedRequest.Messages.Count);
+    }
+
+    [Fact]
+    public async Task GetResponseAsync_rebuilds_template_messages_when_sourceText_provided()
+    {
+        var selector = Substitute.For<IModelSelector>();
+        var invocationService = Substitute.For<IModelInvocationService>();
+
+        ModelInvocationRequest? capturedRequest = null;
+        selector.SelectTranslationProfile("zh", "en", Arg.Any<TranslationRoutingContext?>()).Returns(LocalProfile);
+        invocationService
+            .InvokeAsync(Arg.Do<ModelInvocationRequest>(r => capturedRequest = r), Arg.Any<CancellationToken>())
+            .Returns(new ModelInvocationResult("result"));
+
+        var client = new TranslationChatClient(selector, invocationService);
+        var options = new ChatOptions
+        {
+            AdditionalProperties = new AdditionalPropertiesDictionary
+            {
+                ["sourceLang"] = "zh",
+                ["targetLang"] = "en",
+                ["sourceText"] = "你好",
+                ["sourceLangName"] = "Chinese",
+                ["targetLangName"] = "English"
+            }
+        };
+
+        // Incoming messages are the canonical cache-key messages (Default template)
+        await client.GetResponseAsync(
+            [new ChatMessage(ChatRole.System, "cache-key-system"), new ChatMessage(ChatRole.User, "cache-key-user")],
+            options, CancellationToken.None);
+
+        // TranslationChatClient should have rebuilt using Gemma template (LocalProfile uses Gemma4_12B)
+        Assert.NotNull(capturedRequest);
+        Assert.Contains("Begin your response immediately", capturedRequest!.Messages[0].Content,
+            StringComparison.Ordinal); // Gemma template
+        Assert.Contains("你好", capturedRequest.Messages[1].Content, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -1,4 +1,5 @@
 using LiveLingo.Core.Models;
+using LiveLingo.Core.Translation;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 
@@ -9,8 +10,13 @@ namespace LiveLingo.Core.Engines;
 /// The pipeline is assembled in DI (from outer to inner):
 ///   LoggingChatClient → DistributedCachingChatClient → TranslationChatClient
 ///
-/// Same-text / same-language-pair requests return from the in-memory cache
-/// without hitting the model again.
+/// Message layout:
+/// • The messages passed to <see cref="IChatClient"/> use the Default template
+///   and serve as the stable cache key for <see cref="DistributedCachingChatClient"/>.
+/// • <see cref="TranslationChatClient"/> rebuilds model-specific messages
+///   from <c>AdditionalProperties["sourceText"]</c> using
+///   <see cref="TranslationPromptBuilder"/> before calling the actual model,
+///   so the optimal prompt is always used for inference.
 /// </summary>
 public sealed class LlamaTranslationEngine : ITranslationEngine
 {
@@ -49,18 +55,12 @@ public sealed class LlamaTranslationEngine : ITranslationEngine
         var srcName = GetLanguageName(sourceLanguage);
         var tgtName = GetLanguageName(targetLanguage);
 
-        var messages = new List<ChatMessage>
-        {
-            new(ChatRole.System,
-                $"You are an expert translation engine. Your task is to translate the source text from {srcName} to {tgtName}.\n\n" +
-                "Rules:\n" +
-                $"1. Output ONLY the final {tgtName} translation.\n" +
-                $"2. Do NOT output any {srcName} text.\n" +
-                "3. Do NOT output any explanations, conversational text, or notes.\n" +
-                "4. Do not use <think> tags or output any thought process."),
-            new(ChatRole.User,
-                $"Translate the following {srcName} text to {tgtName}:\n\n<source>\n{text}\n</source>")
-        };
+        // Canonical Default-template messages → stable cache key for DistributedCachingChatClient.
+        // TranslationChatClient will replace these with the model-optimal variant before invocation.
+        var defaultMessages = TranslationPromptBuilder.BuildDefault(text, srcName, tgtName);
+        var chatMessages = defaultMessages
+            .Select(m => new ChatMessage(new ChatRole(m.Role), m.Content))
+            .ToList();
 
         var defaults = ModelInvocationOptions.CreateTranslationDefaults();
         var options = new ChatOptions
@@ -69,16 +69,21 @@ public sealed class LlamaTranslationEngine : ITranslationEngine
             MaxOutputTokens = defaults.MaxTokens,
             AdditionalProperties = new AdditionalPropertiesDictionary
             {
+                // Routing context
                 ["sourceLang"] = sourceLanguage,
                 ["targetLang"] = targetLanguage,
                 ["taskType"] = nameof(ModelTaskType.Translation),
-                ["textLength"] = text.Length
+                ["textLength"] = text.Length,
+                // Prompt-template context (TranslationChatClient rebuilds messages from these)
+                ["sourceText"] = text,
+                ["sourceLangName"] = srcName,
+                ["targetLangName"] = tgtName
             }
         };
 
-        _logger.LogDebug("Translation prompt for {Src}→{Tgt}: {Prompt}", sourceLanguage, targetLanguage, messages[1].Text);
+        _logger.LogDebug("Translation prompt for {Src}→{Tgt}: {Prompt}", sourceLanguage, targetLanguage, chatMessages[1].Text);
 
-        var response = await _chatClient.GetResponseAsync(messages, options, ct).ConfigureAwait(false);
+        var response = await _chatClient.GetResponseAsync(chatMessages, options, ct).ConfigureAwait(false);
         var result = response.Text?.Trim();
 
         if (string.IsNullOrWhiteSpace(result))
