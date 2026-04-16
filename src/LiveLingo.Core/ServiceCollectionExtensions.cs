@@ -4,6 +4,8 @@ using LiveLingo.Core.Models;
 using LiveLingo.Core.Processing;
 using LiveLingo.Core.Speech;
 using LiveLingo.Core.Translation;
+using Microsoft.Extensions.AI;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http.Resilience;
 using Microsoft.Extensions.Options;
@@ -104,6 +106,16 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IModelProvider>(sp => sp.GetRequiredService<OpenAICompatibleChatProvider>());
         services.AddSingleton<ICloudProviderProbeService>(sp => sp.GetRequiredService<OpenAICompatibleProbeService>());
         services.AddSingleton<IModelInvocationService, DefaultModelInvocationService>();
+
+        // MEA IChatClient pipeline:
+        //   LoggingChatClient → DistributedCachingChatClient → TranslationChatClient
+        // Same source-text + language-pair requests return from cache without hitting the model.
+        services.AddDistributedMemoryCache();
+        services.AddChatClient(sp => new TranslationChatClient(
+                sp.GetRequiredService<IModelSelector>(),
+                sp.GetRequiredService<IModelInvocationService>()))
+            .UseDistributedCache()
+            .UseLogging();
 
         services.AddSingleton<ITranslationEngine, LlamaTranslationEngine>();
         services.AddSingleton<ITextProcessor, SummarizeProcessor>();

@@ -18,7 +18,10 @@ public sealed class DefaultModelSelector : IModelSelector
         _cloudRuntimeState = cloudRuntimeState ?? new NullCloudProviderRuntimeState();
     }
 
-    public ModelProfile SelectTranslationProfile(string sourceLanguage, string targetLanguage) =>
+    public ModelProfile SelectTranslationProfile(
+        string sourceLanguage,
+        string targetLanguage,
+        TranslationRoutingContext? context = null) =>
         ModelSelectionPolicy.SelectTranslationProfile(
             _catalog,
             _options.ActiveTranslationModelId,
@@ -27,7 +30,8 @@ public sealed class DefaultModelSelector : IModelSelector
             _options.TranslationRoutingMode,
             _options.RouteUnsupportedLanguagePairsToCloud,
             CreateCloudPreferences(),
-            _cloudRuntimeState.GetRoutingState(CreateCloudPreferences()));
+            _cloudRuntimeState.GetRoutingState(CreateCloudPreferences()),
+            context);
 
     public ModelProfile SelectPostProcessingProfile() =>
         ModelSelectionPolicy.SelectPostProcessingProfile(

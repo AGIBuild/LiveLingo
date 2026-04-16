@@ -1,62 +1,54 @@
 using LiveLingo.Core.Engines;
 using LiveLingo.Core.Models;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging.Abstractions;
-using NSubstitute;
 
 namespace LiveLingo.Core.Tests.Engines;
 
 public sealed class LlamaTranslationEngineTests
 {
     [Fact]
-    public async Task TranslateAsync_builds_translation_invocation_request()
+    public async Task TranslateAsync_sends_correct_messages_to_chat_client()
     {
-        var selector = Substitute.For<IModelSelector>();
-        var invocationService = Substitute.For<IModelInvocationService>();
-        var profile = new StaticModelCatalog().FindById(ModelRegistry.Qwen35_9B.Id)!;
-        ModelInvocationRequest? capturedRequest = null;
-        selector.SelectTranslationProfile("zh", "en").Returns(profile);
-        invocationService.InvokeAsync(Arg.Do<ModelInvocationRequest>(request => capturedRequest = request), Arg.Any<CancellationToken>())
-            .Returns(new ModelInvocationResult("Hello world"));
-
-        var engine = new LlamaTranslationEngine(selector, invocationService, NullLogger<LlamaTranslationEngine>.Instance);
+        var fake = new FakeChatClient("Hello world");
+        var engine = new LlamaTranslationEngine(fake, NullLogger<LlamaTranslationEngine>.Instance);
 
         var translated = await engine.TranslateAsync("你好世界", "zh", "en", CancellationToken.None);
 
         Assert.Equal("Hello world", translated);
-        Assert.NotNull(capturedRequest);
-        Assert.Same(profile, capturedRequest!.Profile);
-        Assert.Equal(ModelTaskType.Translation, capturedRequest.TaskType);
-        Assert.Equal(512, capturedRequest.Options.MaxTokens);
-        Assert.Equal(0.1f, capturedRequest.Options.Temperature);
-        Assert.Equal(0.95f, capturedRequest.Options.TopP);
-        Assert.Equal(ModelInvocationOptions.DefaultStopSequences, capturedRequest.Options.StopSequences);
-        Assert.False(capturedRequest.Options.Stream);
-        Assert.Collection(
-            capturedRequest.Messages,
-            system =>
-            {
-                Assert.Equal("system", system.Role);
-                Assert.Contains("translate the source text from Chinese to English", system.Content, StringComparison.OrdinalIgnoreCase);
-                Assert.Contains("Do not use <think> tags", system.Content, StringComparison.Ordinal);
-            },
-            user =>
-            {
-                Assert.Equal("user", user.Role);
-                Assert.Contains("<source>\n你好世界\n</source>", user.Content, StringComparison.Ordinal);
-            });
+        Assert.NotNull(fake.CapturedMessages);
+
+        var system = fake.CapturedMessages![0];
+        Assert.Equal(ChatRole.System, system.Role);
+        Assert.Contains("translate the source text from Chinese to English", system.Text, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Do not use <think> tags", system.Text, StringComparison.Ordinal);
+
+        var user = fake.CapturedMessages[1];
+        Assert.Equal(ChatRole.User, user.Role);
+        Assert.Contains("<source>\n你好世界\n</source>", user.Text, StringComparison.Ordinal);
     }
 
     [Fact]
-    public async Task TranslateAsync_throws_when_invocation_output_is_empty()
+    public async Task TranslateAsync_passes_routing_hints_via_additional_properties()
     {
-        var selector = Substitute.For<IModelSelector>();
-        var invocationService = Substitute.For<IModelInvocationService>();
-        var profile = new StaticModelCatalog().FindById(ModelRegistry.Qwen35_9B.Id)!;
-        selector.SelectTranslationProfile("zh", "en").Returns(profile);
-        invocationService.InvokeAsync(Arg.Any<ModelInvocationRequest>(), Arg.Any<CancellationToken>())
-            .Returns(new ModelInvocationResult(""));
+        var fake = new FakeChatClient("ok");
+        var engine = new LlamaTranslationEngine(fake, NullLogger<LlamaTranslationEngine>.Instance);
 
-        var engine = new LlamaTranslationEngine(selector, invocationService, NullLogger<LlamaTranslationEngine>.Instance);
+        await engine.TranslateAsync("test", "zh", "en", CancellationToken.None);
+
+        var props = fake.CapturedOptions?.AdditionalProperties;
+        Assert.NotNull(props);
+        Assert.Equal("zh", props!["sourceLang"]);
+        Assert.Equal("en", props["targetLang"]);
+        Assert.Equal("Translation", props["taskType"]);
+        Assert.Equal(4, (int)props["textLength"]!);
+    }
+
+    [Fact]
+    public async Task TranslateAsync_throws_when_response_is_empty()
+    {
+        var fake = new FakeChatClient("   ");
+        var engine = new LlamaTranslationEngine(fake, NullLogger<LlamaTranslationEngine>.Instance);
 
         await Assert.ThrowsAsync<InvalidOperationException>(() =>
             engine.TranslateAsync("你好世界", "zh", "en", CancellationToken.None));
@@ -68,10 +60,34 @@ public sealed class LlamaTranslationEngineTests
     [InlineData("zh", "it", false)]
     public void SupportsLanguagePair_matches_registry(string sourceLanguage, string targetLanguage, bool expected)
     {
-        var selector = Substitute.For<IModelSelector>();
-        var invocationService = Substitute.For<IModelInvocationService>();
-        var engine = new LlamaTranslationEngine(selector, invocationService, NullLogger<LlamaTranslationEngine>.Instance);
-
+        var engine = new LlamaTranslationEngine(new FakeChatClient(""), NullLogger<LlamaTranslationEngine>.Instance);
         Assert.Equal(expected, engine.SupportsLanguagePair(sourceLanguage, targetLanguage));
+    }
+
+    private sealed class FakeChatClient(string responseText) : IChatClient
+    {
+        public IList<ChatMessage>? CapturedMessages { get; private set; }
+        public ChatOptions? CapturedOptions { get; private set; }
+
+        public ChatClientMetadata Metadata { get; } = new("fake");
+        public object? GetService(Type serviceType, object? serviceKey = null) => null;
+
+        public Task<ChatResponse> GetResponseAsync(
+            IEnumerable<ChatMessage> chatMessages,
+            ChatOptions? options = null,
+            CancellationToken cancellationToken = default)
+        {
+            CapturedMessages = chatMessages.ToList();
+            CapturedOptions = options;
+            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, responseText)));
+        }
+
+        public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<ChatMessage> chatMessages,
+            ChatOptions? options = null,
+            CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+
+        public void Dispose() { }
     }
 }

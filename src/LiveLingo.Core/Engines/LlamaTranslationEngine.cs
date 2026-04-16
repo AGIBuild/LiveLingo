@@ -1,12 +1,20 @@
 using LiveLingo.Core.Models;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 
 namespace LiveLingo.Core.Engines;
 
+/// <summary>
+/// Translation engine backed by the MEA <see cref="IChatClient"/> pipeline.
+/// The pipeline is assembled in DI (from outer to inner):
+///   LoggingChatClient → DistributedCachingChatClient → TranslationChatClient
+///
+/// Same-text / same-language-pair requests return from the in-memory cache
+/// without hitting the model again.
+/// </summary>
 public sealed class LlamaTranslationEngine : ITranslationEngine
 {
-    private readonly IModelSelector _selector;
-    private readonly IModelInvocationService _invocationService;
+    private readonly IChatClient _chatClient;
     private readonly ILogger<LlamaTranslationEngine> _logger;
 
     private static readonly Dictionary<string, (string EnglishName, string DisplayName)> Languages =
@@ -27,13 +35,9 @@ public sealed class LlamaTranslationEngine : ITranslationEngine
     public IReadOnlyList<LanguageInfo> SupportedLanguages { get; } =
         Languages.Select(kv => new LanguageInfo(kv.Key, kv.Value.DisplayName)).ToList();
 
-    public LlamaTranslationEngine(
-        IModelSelector selector,
-        IModelInvocationService invocationService,
-        ILogger<LlamaTranslationEngine> logger)
+    public LlamaTranslationEngine(IChatClient chatClient, ILogger<LlamaTranslationEngine> logger)
     {
-        _selector = selector;
-        _invocationService = invocationService;
+        _chatClient = chatClient;
         _logger = logger;
     }
 
@@ -44,37 +48,41 @@ public sealed class LlamaTranslationEngine : ITranslationEngine
 
         var srcName = GetLanguageName(sourceLanguage);
         var tgtName = GetLanguageName(targetLanguage);
-        var profile = _selector.SelectTranslationProfile(sourceLanguage, targetLanguage);
-        var request = new ModelInvocationRequest(
-            profile,
-            ModelTaskType.Translation,
-            [
-                new ModelChatMessage(
-                    "system",
-                    $"You are an expert translation engine. Your task is to translate the source text from {srcName} to {tgtName}.\n\n" +
-                    "Rules:\n" +
-                    $"1. Output ONLY the final {tgtName} translation.\n" +
-                    $"2. Do NOT output any {srcName} text.\n" +
-                    "3. Do NOT output any explanations, conversational text, or notes.\n" +
-                    "4. Do not use <think> tags or output any thought process."),
-                new ModelChatMessage(
-                    "user",
-                    $"Translate the following {srcName} text to {tgtName}:\n\n<source>\n{text}\n</source>")
-            ],
-            ModelInvocationOptions.CreateTranslationDefaults());
 
-        _logger.LogDebug(
-            "Translation prompt for {Src}→{Tgt}: {Prompt}",
-            sourceLanguage,
-            targetLanguage,
-            request.Messages[1].Content);
+        var messages = new List<ChatMessage>
+        {
+            new(ChatRole.System,
+                $"You are an expert translation engine. Your task is to translate the source text from {srcName} to {tgtName}.\n\n" +
+                "Rules:\n" +
+                $"1. Output ONLY the final {tgtName} translation.\n" +
+                $"2. Do NOT output any {srcName} text.\n" +
+                "3. Do NOT output any explanations, conversational text, or notes.\n" +
+                "4. Do not use <think> tags or output any thought process."),
+            new(ChatRole.User,
+                $"Translate the following {srcName} text to {tgtName}:\n\n<source>\n{text}\n</source>")
+        };
 
-        var result = (await _invocationService.InvokeAsync(request, ct).ConfigureAwait(false)).Text;
+        var defaults = ModelInvocationOptions.CreateTranslationDefaults();
+        var options = new ChatOptions
+        {
+            Temperature = defaults.Temperature,
+            MaxOutputTokens = defaults.MaxTokens,
+            AdditionalProperties = new AdditionalPropertiesDictionary
+            {
+                ["sourceLang"] = sourceLanguage,
+                ["targetLang"] = targetLanguage,
+                ["taskType"] = nameof(ModelTaskType.Translation),
+                ["textLength"] = text.Length
+            }
+        };
+
+        _logger.LogDebug("Translation prompt for {Src}→{Tgt}: {Prompt}", sourceLanguage, targetLanguage, messages[1].Text);
+
+        var response = await _chatClient.GetResponseAsync(messages, options, ct).ConfigureAwait(false);
+        var result = response.Text?.Trim();
 
         if (string.IsNullOrWhiteSpace(result))
-        {
             throw new InvalidOperationException("Translation returned empty output.");
-        }
 
         _logger.LogDebug("Translated {Src}→{Tgt}: {In} → {Out}", sourceLanguage, targetLanguage, text, result);
         return result;
@@ -83,7 +91,7 @@ public sealed class LlamaTranslationEngine : ITranslationEngine
     public bool SupportsLanguagePair(string sourceLanguage, string targetLanguage) =>
         Languages.ContainsKey(sourceLanguage) && Languages.ContainsKey(targetLanguage);
 
-    public void Dispose() { }
+    public void Dispose() => _chatClient.Dispose();
 
     private static string GetLanguageName(string code) =>
         Languages.TryGetValue(code, out var info) ? info.EnglishName : code;

@@ -21,16 +21,20 @@ public static class ModelSelectionPolicy
         TranslationRoutingMode routingMode = TranslationRoutingMode.PreferLocal,
         bool routeUnsupportedPairsToCloud = true,
         CloudModelPreferences? cloud = null,
-        CloudProviderRoutingState? runtimeState = null)
+        CloudProviderRoutingState? runtimeState = null,
+        TranslationRoutingContext? context = null)
     {
+        // Content-aware escalation: long texts / rare language pairs / high-quality mode
+        // promote PreferLocal → PreferCloud when a cloud provider is configured.
+        var effectiveMode = ApplyContextEscalation(routingMode, context);
         string? cloudError = null;
 
-        if (routingMode == TranslationRoutingMode.CloudOnly)
+        if (effectiveMode == TranslationRoutingMode.CloudOnly)
         {
             return GetRequiredCloudProfile(ModelTaskType.Translation, cloud, runtimeState);
         }
 
-        if (routingMode == TranslationRoutingMode.PreferCloud &&
+        if (effectiveMode == TranslationRoutingMode.PreferCloud &&
             TryCreateCloudProfile(ModelTaskType.Translation, cloud, runtimeState, out var preferredCloud, out cloudError))
         {
             return preferredCloud;
@@ -40,7 +44,7 @@ public static class ModelSelectionPolicy
         if (local is not null)
             return local;
 
-        var shouldFallbackToCloud = routingMode == TranslationRoutingMode.PreferCloud || routeUnsupportedPairsToCloud;
+        var shouldFallbackToCloud = effectiveMode == TranslationRoutingMode.PreferCloud || routeUnsupportedPairsToCloud;
         if (shouldFallbackToCloud &&
             TryCreateCloudProfile(ModelTaskType.Translation, cloud, runtimeState, out var fallbackCloud, out cloudError))
         {
@@ -51,6 +55,24 @@ public static class ModelSelectionPolicy
             throw new InvalidOperationException(cloudError ?? "Cloud translation provider is not configured.");
 
         throw new NotSupportedException($"No chat translation model available for {sourceLanguage}→{targetLanguage}.");
+    }
+
+    /// <summary>
+    /// Applies content-aware routing escalation on top of the user's preference.
+    /// <see cref="TranslationRoutingMode.LocalOnly"/> and
+    /// <see cref="TranslationRoutingMode.CloudOnly"/> are never overridden.
+    /// </summary>
+    private static TranslationRoutingMode ApplyContextEscalation(
+        TranslationRoutingMode mode,
+        TranslationRoutingContext? context)
+    {
+        if (context is null) return mode;
+        if (mode is TranslationRoutingMode.LocalOnly or TranslationRoutingMode.CloudOnly) return mode;
+
+        if (context.TextLength > 600 || context.IsRareLanguagePair || context.IsHighQualityMode)
+            return TranslationRoutingMode.PreferCloud;
+
+        return mode;
     }
 
     public static ModelProfile SelectPostProcessingProfile(
