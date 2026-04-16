@@ -1269,6 +1269,65 @@ public class SettingsViewModelTests
         platform.Received(1).OpenUrl(Arg.Is<string>(url => url.Contains("huggingface.co", StringComparison.OrdinalIgnoreCase)));
     }
 
+    [Fact]
+    public void LocalModelStatusMessage_IsNull_WhenUnloaded()
+    {
+        var localState = new FakeLocalModelRuntimeState(ModelLoadState.Unloaded, null);
+        var vm = new SettingsViewModel(CreateSettings(), localModelRuntimeState: localState);
+
+        Assert.Null(vm.LocalModelStatusMessage);
+    }
+
+    [Fact]
+    public void LocalModelStatusMessage_ShowsModelName_WhenLoaded()
+    {
+        var descriptor = ModelRegistry.Gemma4_12B;
+        var localState = new FakeLocalModelRuntimeState(ModelLoadState.Loaded, descriptor);
+        var vm = new SettingsViewModel(CreateSettings(), localModelRuntimeState: localState);
+
+        Assert.NotNull(vm.LocalModelStatusMessage);
+        Assert.Contains(descriptor.DisplayName, vm.LocalModelStatusMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void LocalModelStatusMessage_Updates_WhenStateChanges()
+    {
+        var descriptor = ModelRegistry.Gemma4_12B;
+        var localState = new FakeLocalModelRuntimeState(ModelLoadState.Unloaded, null);
+        var vm = new SettingsViewModel(CreateSettings(), localModelRuntimeState: localState);
+
+        Assert.Null(vm.LocalModelStatusMessage);
+
+        localState.SimulateStateChange(ModelLoadState.Loading, descriptor);
+        Assert.NotNull(vm.LocalModelStatusMessage);
+        Assert.Contains(descriptor.DisplayName, vm.LocalModelStatusMessage, StringComparison.Ordinal);
+
+        localState.SimulateStateChange(ModelLoadState.Loaded, descriptor);
+        Assert.NotNull(vm.LocalModelStatusMessage);
+        Assert.Contains(descriptor.DisplayName, vm.LocalModelStatusMessage, StringComparison.Ordinal);
+
+        localState.SimulateStateChange(ModelLoadState.Unloaded, null);
+        Assert.Null(vm.LocalModelStatusMessage);
+    }
+
+    private sealed class FakeLocalModelRuntimeState(ModelLoadState initialState, ModelDescriptor? initialDescriptor)
+        : ILocalModelRuntimeState
+    {
+        private ModelLoadState _state = initialState;
+        private ModelDescriptor? _descriptor = initialDescriptor;
+
+        public ModelLoadState State => _state;
+        public ModelDescriptor? ActiveModelDescriptor => _descriptor;
+        public event Action<ModelLoadState>? StateChanged;
+
+        public void SimulateStateChange(ModelLoadState newState, ModelDescriptor? descriptor)
+        {
+            _state = newState;
+            _descriptor = descriptor;
+            StateChanged?.Invoke(newState);
+        }
+    }
+
     private sealed class TestCloudProviderRuntimeState(CloudProviderRuntimeSnapshot snapshot) : ICloudProviderRuntimeState
     {
         public CloudProviderRuntimeSnapshot Current => snapshot;

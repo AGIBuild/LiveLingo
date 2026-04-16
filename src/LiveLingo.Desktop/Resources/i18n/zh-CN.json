@@ -117,6 +117,9 @@
   "cloud.status.directUnavailable": "连接失败。该 provider 不提供模型列表，且翻译模型“{0}”的直连校验失败：{1}",
   "cloud.status.invalidConfiguration": "云端 provider 配置不完整。请在设置中填写 Base URL、API Key 和翻译模型。",
   "cloud.status.unavailable": "云端 provider 校验失败。",
+  "localModel.status.model": "模型",
+  "localModel.status.loading": "正在加载 {0}……",
+  "localModel.status.ready": "✓ {0} 已就绪。",
 
   "overlay.translating": "翻译中...",
   "overlay.translated": "已翻译 ({0})",

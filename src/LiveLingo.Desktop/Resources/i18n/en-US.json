@@ -117,6 +117,9 @@
   "cloud.status.directUnavailable": "Connection failed. This provider does not expose a model list, and direct validation of translation model '{0}' failed: {1}",
   "cloud.status.invalidConfiguration": "Cloud provider configuration is incomplete. Set base URL, API key, and a translation model in Settings.",
   "cloud.status.unavailable": "Cloud provider validation failed.",
+  "localModel.status.model": "model",
+  "localModel.status.loading": "Loading {0}…",
+  "localModel.status.ready": "✓ {0} is loaded and ready.",
 
   "overlay.translating": "Translating...",
   "overlay.translated": "Translated ({0})",
