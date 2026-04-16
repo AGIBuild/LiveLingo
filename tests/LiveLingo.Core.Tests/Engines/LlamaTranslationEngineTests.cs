@@ -8,7 +8,7 @@ namespace LiveLingo.Core.Tests.Engines;
 public sealed class LlamaTranslationEngineTests
 {
     [Fact]
-    public async Task TranslateAsync_sends_correct_messages_to_chat_client()
+    public async Task TranslateAsync_sends_default_template_messages_as_cache_key()
     {
         var fake = new FakeChatClient("Hello world");
         var engine = new LlamaTranslationEngine(fake, NullLogger<LlamaTranslationEngine>.Instance);
@@ -18,6 +18,7 @@ public sealed class LlamaTranslationEngineTests
         Assert.Equal("Hello world", translated);
         Assert.NotNull(fake.CapturedMessages);
 
+        // Default template messages used as cache key
         var system = fake.CapturedMessages![0];
         Assert.Equal(ChatRole.System, system.Role);
         Assert.Contains("translate the source text from Chinese to English", system.Text, StringComparison.OrdinalIgnoreCase);
@@ -29,7 +30,7 @@ public sealed class LlamaTranslationEngineTests
     }
 
     [Fact]
-    public async Task TranslateAsync_passes_routing_hints_via_additional_properties()
+    public async Task TranslateAsync_passes_routing_and_prompt_hints_via_additional_properties()
     {
         var fake = new FakeChatClient("ok");
         var engine = new LlamaTranslationEngine(fake, NullLogger<LlamaTranslationEngine>.Instance);
@@ -42,6 +43,10 @@ public sealed class LlamaTranslationEngineTests
         Assert.Equal("en", props["targetLang"]);
         Assert.Equal("Translation", props["taskType"]);
         Assert.Equal(4, (int)props["textLength"]!);
+        // Prompt-template context
+        Assert.Equal("test", props["sourceText"]);
+        Assert.Equal("Chinese", props["sourceLangName"]);
+        Assert.Equal("English", props["targetLangName"]);
     }
 
     [Fact]

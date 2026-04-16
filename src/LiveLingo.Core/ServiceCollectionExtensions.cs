@@ -6,6 +6,7 @@ using LiveLingo.Core.Speech;
 using LiveLingo.Core.Translation;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http.Resilience;
 using Microsoft.Extensions.Options;
@@ -78,8 +79,44 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ILocalModelRuntimeState>(sp => sp.GetRequiredService<LocalLlamaModelHost>());
         services.AddSingleton<IModelRuntime>(sp => new LlamaServerRuntime(sp.GetRequiredService<LocalLlamaModelHost>()));
         services.AddSingleton<IModelRuntime, RemoteHttpRuntime>();
-        services.AddHttpClient<LlamaServerChatProvider>();
-        services.AddHttpClient<OpenAICompatibleChatProvider>();
+        // Translation inference HttpClients get resilience:
+        //   - Local llama-server: 1 retry (transient server hiccup), 120 s per-request timeout
+        //   - Cloud provider:     2 retries with exponential back-off, 60 s per-request timeout
+        services.AddHttpClient<LlamaServerChatProvider>()
+            .AddResilienceHandler("llama-translation", pipeline =>
+            {
+                pipeline.AddRetry(new HttpRetryStrategyOptions
+                {
+                    MaxRetryAttempts = 1,
+                    BackoffType = DelayBackoffType.Constant,
+                    Delay = TimeSpan.FromMilliseconds(500),
+                    ShouldHandle = args => ValueTask.FromResult(
+                        args.Outcome.Exception is HttpRequestException or IOException or TaskCanceledException ||
+                        args.Outcome.Result is { IsSuccessStatusCode: false,
+                            StatusCode: System.Net.HttpStatusCode.ServiceUnavailable
+                                or System.Net.HttpStatusCode.GatewayTimeout })
+                });
+                pipeline.AddTimeout(TimeSpan.FromSeconds(120));
+            });
+        services.AddHttpClient<OpenAICompatibleChatProvider>()
+            .AddResilienceHandler("cloud-translation", pipeline =>
+            {
+                pipeline.AddRetry(new HttpRetryStrategyOptions
+                {
+                    MaxRetryAttempts = 2,
+                    BackoffType = DelayBackoffType.Exponential,
+                    Delay = TimeSpan.FromMilliseconds(500),
+                    ShouldHandle = args => ValueTask.FromResult(
+                        args.Outcome.Exception is HttpRequestException or IOException or TaskCanceledException or TimeoutRejectedException ||
+                        args.Outcome.Result is { IsSuccessStatusCode: false,
+                            StatusCode: System.Net.HttpStatusCode.RequestTimeout
+                                or System.Net.HttpStatusCode.TooManyRequests
+                                or System.Net.HttpStatusCode.BadGateway
+                                or System.Net.HttpStatusCode.ServiceUnavailable
+                                or System.Net.HttpStatusCode.GatewayTimeout })
+                });
+                pipeline.AddTimeout(TimeSpan.FromSeconds(60));
+            });
         services.AddHttpClient<OpenAICompatibleProbeService>()
             .AddResilienceHandler("cloud-provider-probe", pipeline =>
             {
@@ -113,7 +150,8 @@ public static class ServiceCollectionExtensions
         services.AddDistributedMemoryCache();
         services.AddChatClient(sp => new TranslationChatClient(
                 sp.GetRequiredService<IModelSelector>(),
-                sp.GetRequiredService<IModelInvocationService>()))
+                sp.GetRequiredService<IModelInvocationService>(),
+                sp.GetService<ILogger<TranslationChatClient>>()))
             .UseDistributedCache()
             .UseLogging();
 
