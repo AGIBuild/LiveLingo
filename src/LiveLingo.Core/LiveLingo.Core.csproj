@@ -11,6 +11,9 @@
     <ProjectReference Include="..\LiveLingo.HfGguf\LiveLingo.HfGguf.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.AI" Version="10.5.0" />
+    <PackageReference Include="Microsoft.Extensions.AI.Abstractions" Version="10.5.0" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="10.0.6" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="11.0.0-preview.1.26104.118" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="11.0.0-preview.1.26104.118" />
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.3.0" />
