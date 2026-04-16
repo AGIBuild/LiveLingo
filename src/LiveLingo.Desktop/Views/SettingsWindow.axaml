@@ -190,6 +190,11 @@
                                           Classes="themed"
                                           Content="{Binding TranslationRouteUnsupportedPairsLabel}"
                                           IsChecked="{Binding WorkingCopy.Translation.ModelPolicy.RouteUnsupportedPairsToCloud}"/>
+                                <TextBlock Grid.Row="2" Grid.Column="1"
+                                           Classes="hint"
+                                           TextWrapping="Wrap"
+                                           Text="{Binding LocalModelStatusMessage}"
+                                           IsVisible="{Binding LocalModelStatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
                             </Grid>
                         </StackPanel>
                     </ScrollViewer>

@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
 using LiveLingo.Desktop.Messaging;
 using LiveLingo.Desktop.Platform;
+using LiveLingo.Desktop.Services;
 using LiveLingo.Desktop.Services.Cloud;
 using LiveLingo.Desktop.Services.Configuration;
 using LiveLingo.Desktop.Services.LanguageCatalog;
@@ -24,6 +25,7 @@ public partial class SettingsViewModel : ObservableObject
     private readonly CoreOptions? _coreOptions;
     private readonly ILlmModelLoadCoordinator? _llmCoordinator;
     private readonly ICloudProviderRuntimeState _cloudProviderRuntimeState;
+    private readonly ILocalModelRuntimeState _localModelRuntimeState;
     private readonly IPlatformServices? _platformServices;
     private readonly ISecretStore _secretStore;
     private readonly ILogger? _logger;
@@ -44,6 +46,7 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private bool _isTestingCloudProvider;
     [ObservableProperty] private bool _isFetchingCloudModels;
     [ObservableProperty] private string? _cloudProviderStatusMessage;
+    [ObservableProperty] private string? _localModelStatusMessage;
 
     public static IReadOnlyList<string> InjectionModes { get; } = ["PasteAndSend", "PasteOnly"];
     public static IReadOnlyList<string> PostProcessModes { get; } = ["Off", "Summarize", "Optimize", "Colloquialize"];
@@ -154,13 +157,17 @@ public partial class SettingsViewModel : ObservableObject
         ILlmModelLoadCoordinator? llmCoordinator = null,
         IPlatformServices? platformServices = null,
         ISecretStore? secretStore = null,
-        ICloudProviderRuntimeState? cloudProviderRuntimeState = null)
+        ICloudProviderRuntimeState? cloudProviderRuntimeState = null,
+        ILocalModelRuntimeState? localModelRuntimeState = null)
     {
         _settings = settings;
         _modelManager = modelManager;
         _coreOptions = coreOptions;
         _llmCoordinator = llmCoordinator;
         _cloudProviderRuntimeState = cloudProviderRuntimeState ?? new NullCloudProviderRuntimeState();
+        _localModelRuntimeState = localModelRuntimeState ?? new NullLocalModelRuntimeState();
+        _localModelRuntimeState.StateChanged += state => LocalModelStatusMessage =
+            LocalModelRuntimePresentation.BuildSettingsStatusMessage(_loc, state, _localModelRuntimeState.ActiveModelDescriptor);
         _platformServices = platformServices;
         _secretStore = secretStore ?? new InMemorySecretStore();
         _logger = logger;
@@ -188,7 +195,8 @@ public partial class SettingsViewModel : ObservableObject
         CoreOptions? coreOptions = null,
         ILlmModelLoadCoordinator? llmCoordinator = null,
         ISecretStore? secretStore = null,
-        ICloudProviderRuntimeState? cloudProviderRuntimeState = null)
+        ICloudProviderRuntimeState? cloudProviderRuntimeState = null,
+        ILocalModelRuntimeState? localModelRuntimeState = null)
     {
         _settings = settings;
         _modelManager = null;
@@ -196,6 +204,9 @@ public partial class SettingsViewModel : ObservableObject
         _coreOptions = coreOptions;
         _llmCoordinator = llmCoordinator;
         _cloudProviderRuntimeState = cloudProviderRuntimeState ?? new NullCloudProviderRuntimeState();
+        _localModelRuntimeState = localModelRuntimeState ?? new NullLocalModelRuntimeState();
+        _localModelRuntimeState.StateChanged += state => LocalModelStatusMessage =
+            LocalModelRuntimePresentation.BuildSettingsStatusMessage(_loc, state, _localModelRuntimeState.ActiveModelDescriptor);
         _platformServices = null;
         _secretStore = secretStore ?? new InMemorySecretStore();
         _messenger = messenger ?? WeakReferenceMessenger.Default;
@@ -354,6 +365,8 @@ public partial class SettingsViewModel : ObservableObject
             WorkingCopy = clone;
             RaiseCloudProviderPresentationChanged();
             ApplyCloudProviderRuntimeSnapshot(_cloudProviderRuntimeState.Current, clone);
+            LocalModelStatusMessage = LocalModelRuntimePresentation.BuildSettingsStatusMessage(
+                _loc, _localModelRuntimeState.State, _localModelRuntimeState.ActiveModelDescriptor);
             _originalModelStoragePath = clone.Advanced.ModelStoragePath;
             IsDirty = false;
         }

@@ -73,6 +73,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ILlamaServerProcessManager, LlamaServerProcessManager>();
         services.AddSingleton<LocalLlamaModelHost>();
         services.AddSingleton<ILlmModelLoadCoordinator>(sp => sp.GetRequiredService<LocalLlamaModelHost>());
+        services.AddSingleton<ILocalModelRuntimeState>(sp => sp.GetRequiredService<LocalLlamaModelHost>());
         services.AddSingleton<IModelRuntime>(sp => new LlamaServerRuntime(sp.GetRequiredService<LocalLlamaModelHost>()));
         services.AddSingleton<IModelRuntime, RemoteHttpRuntime>();
         services.AddHttpClient<LlamaServerChatProvider>();

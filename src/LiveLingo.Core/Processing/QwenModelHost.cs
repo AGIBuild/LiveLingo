@@ -10,7 +10,7 @@ public enum ModelLoadState { Unloaded, Loading, Loaded }
 /// Manages the lifecycle of a local llama-server process for any GGUF-backed model
 /// (Gemma, Qwen, Llama, Mistral, …). Not model-family-specific.
 /// </summary>
-public sealed class LocalLlamaModelHost : IDisposable, ILlmModelLoadCoordinator
+public sealed class LocalLlamaModelHost : IDisposable, ILlmModelLoadCoordinator, ILocalModelRuntimeState
 {
     private readonly IModelManager _modelManager;
     private readonly ILlamaServerProcessManager _serverManager;
