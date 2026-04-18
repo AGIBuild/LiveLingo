@@ -230,23 +230,18 @@ public sealed class TextSegmenter
 
         // 2. Sentence-end punctuation:
         //    - CJK marks (。！？…) always split — no trailing space in CJK text.
-        //    - Latin marks (.!?) only split when followed by whitespace or end-of-input
-        //      to avoid splitting abbreviations (U.S.A) or decimals (3.14).
+        //    - Latin marks (.!?) use the same IsLatinSentenceBoundary heuristic as the
+        //      atomic-sentence pass, so abbreviations (U.S.A) and decimals (3.14) are
+        //      never picked as a break point and both code paths stay consistent.
         for (var i = end - 1; i > start; i--)
         {
             if (Array.IndexOf(CjkSentenceEndChars, text[i]) >= 0)
                 return (i + 1, SegmentBreak.Sentence);
 
-            if (Array.IndexOf(LatinSentenceEndChars, text[i]) >= 0)
+            if (Array.IndexOf(LatinSentenceEndChars, text[i]) >= 0 &&
+                IsLatinSentenceBoundary(text, i))
             {
-                var afterPunct = i + 1;
-                if (afterPunct >= text.Length ||
-                    text[afterPunct] == ' ' ||
-                    text[afterPunct] == '\n' ||
-                    text[afterPunct] == '\r')
-                {
-                    return (afterPunct, SegmentBreak.Sentence);
-                }
+                return (i + 1, SegmentBreak.Sentence);
             }
         }
 
