@@ -1,0 +1,27 @@
+{
+  "stryker-config": {
+    "project": "LiveLingo.Core.csproj",
+    "reporters": [
+      "html",
+      "cleartext",
+      "progress"
+    ],
+    "thresholds": {
+      "high": 80,
+      "low": 60,
+      "break": 0
+    },
+    "mutate": [
+      "**/Translation/**/*.cs",
+      "!**/Translation/ITranslationPipeline.cs",
+      "!**/Translation/GlossaryEntry.cs",
+      "!**/Translation/TranslationRequest.cs",
+      "!**/Translation/TranslationResult.cs",
+      "!**/Translation/TranslationLifecycleEvent.cs",
+      "!**/Translation/TranslationFailedException.cs"
+    ],
+    "mutation-level": "Standard",
+    "verbosity": "info",
+    "concurrency": 4
+  }
+}

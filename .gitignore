@@ -421,6 +421,10 @@ FodyWeavers.xsd
 # Code coverage reports
 coverage-report/
 
+# Stryker mutation testing output
+**/StrykerOutput/
+stryker-run.log
+
 # Nuke temp
 .nuke/temp/
 .DS_Store
