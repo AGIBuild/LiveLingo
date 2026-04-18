@@ -141,8 +141,10 @@ public sealed class TranslationPipeline : ITranslationPipeline
         {
             if (prev.HasValue)
             {
-                var separator = prev.Value.BreakAfter == SegmentBreak.Paragraph ? "\n\n" : " ";
-                yield return new TranslationDelta(separator);
+                var separator = TextSegmenter.JoinSeparatorFor(
+                    prev.Value.BreakAfter, request.TargetLanguage);
+                if (separator.Length > 0)
+                    yield return new TranslationDelta(separator);
             }
 
             await foreach (var delta in _engine.TranslateStreamingAsync(
@@ -173,10 +175,7 @@ public sealed class TranslationPipeline : ITranslationPipeline
             builder.Append(partial);
 
             if (i < segments.Count - 1)
-            {
-                var prevBreak = segment.BreakAfter;
-                builder.Append(prevBreak == SegmentBreak.Paragraph ? "\n\n" : " ");
-            }
+                builder.Append(TextSegmenter.JoinSeparatorFor(segment.BreakAfter, targetLang));
         }
         return builder.ToString();
     }

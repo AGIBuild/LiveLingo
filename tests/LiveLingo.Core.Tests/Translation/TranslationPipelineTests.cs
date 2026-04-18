@@ -486,4 +486,22 @@ public class TranslationPipelineTests
 
         Assert.Equal("第一句。\n\n第二句。", result.Text);
     }
+
+    [Fact]
+    public async Task ProcessAsync_MultiSentenceCjkTarget_JoinsWithoutExtraSpace()
+    {
+        // CJK targets already carry a full-width gap after their sentence-end
+        // punctuation, so the segment re-assembler must not inject a space.
+        const string source = "Hi. Bye.";
+
+        _engine.TranslateAsync("Hi.", "en", "zh", Arg.Any<CancellationToken>())
+            .Returns("你好。");
+        _engine.TranslateAsync("Bye.", "en", "zh", Arg.Any<CancellationToken>())
+            .Returns("再见。");
+
+        var result = await _pipeline.ProcessAsync(
+            new TranslationRequest(source, "en", "zh", null), CancellationToken.None);
+
+        Assert.Equal("你好。再见。", result.Text);
+    }
 }
