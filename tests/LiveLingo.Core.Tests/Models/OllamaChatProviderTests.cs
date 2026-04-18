@@ -57,6 +57,37 @@ public sealed class OllamaChatProviderTests
     }
 
     [Fact]
+    public async Task InvokeStreamingAsync_ConcurrentCallsShareHttpClient_WithoutRace()
+    {
+        // Regression guard for the earlier HttpClient.BaseAddress-binding race:
+        // a singleton OllamaChatProvider shares one HttpClient between concurrent
+        // translations, so the previous "null-check then assign BaseAddress"
+        // pattern could throw from HttpClient internals once the first request
+        // had been dispatched. The rewritten provider uses the session endpoint
+        // directly, so firing many concurrent streams against the same instance
+        // must complete cleanly without mutating shared state.
+        var handler = new FakeHandler(_ => CreateResponse(
+            """
+            {"model":"gemma3:4b","created_at":"2026-04-17T00:00:00Z","message":{"role":"assistant","content":"ok"},"done":false}
+            {"model":"gemma3:4b","created_at":"2026-04-17T00:00:00Z","message":{"role":"assistant","content":""},"done":true,"done_reason":"stop"}
+
+            """));
+        var provider = CreateProvider(handler);
+
+        async Task<string> RunOnce()
+        {
+            var sb = new StringBuilder();
+            await foreach (var d in provider.InvokeStreamingAsync(
+                               CreateSession(), CreateRequest(), CancellationToken.None))
+                sb.Append(d);
+            return sb.ToString();
+        }
+
+        var results = await Task.WhenAll(Enumerable.Range(0, 8).Select(_ => RunOnce()));
+        Assert.All(results, r => Assert.Equal("ok", r));
+    }
+
+    [Fact]
     public async Task InvokeAsync_Throws_WhenStreamProducesNoContent()
     {
         var handler = new FakeHandler(_ => CreateResponse(
