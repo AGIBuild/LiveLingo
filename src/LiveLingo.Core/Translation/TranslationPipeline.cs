@@ -37,43 +37,23 @@ public sealed class TranslationPipeline : ITranslationPipeline
     public async Task<TranslationResult> ProcessAsync(
         TranslationRequest request, CancellationToken ct)
     {
-        var srcLang = request.SourceLanguage;
-        if (string.IsNullOrEmpty(srcLang))
-        {
-            var detection = await _detector.DetectAsync(request.SourceText, ct);
-            srcLang = detection.Language;
-
-            if (detection.Confidence < 0.6f)
-                _logger.LogWarning(
-                    "Low-confidence language detection: {Lang} ({Conf:P0}) – result may be unreliable.",
-                    detection.Language, detection.Confidence);
-            else
-                _logger.LogDebug("Detected language: {Lang} ({Conf:P0})",
-                    detection.Language, detection.Confidence);
-        }
-
-        if (srcLang == request.TargetLanguage)
+        var prep = await PrepareAsync(request, ct).ConfigureAwait(false);
+        if (prep.IsIdentity)
         {
             return new TranslationResult(
-                request.SourceText, srcLang, request.SourceText,
+                request.SourceText, prep.SourceLanguage, request.SourceText,
                 TimeSpan.Zero, null);
         }
 
-        ct.ThrowIfCancellationRequested();
-
-        _modelReadiness.EnsureTranslationModelReady(srcLang, request.TargetLanguage);
         if (request.PostProcessing is not null)
             _modelReadiness.EnsurePostProcessingModelReady();
 
-        var segments = _segmenter.Segment(request.SourceText);
         var sw = Stopwatch.StartNew();
         string translated;
         try
         {
-            translated = segments.Count <= 1
-                ? await _engine.TranslateAsync(
-                    request.SourceText, srcLang, request.TargetLanguage, ct)
-                : await TranslateSegmentsAsync(segments, srcLang, request.TargetLanguage, ct);
+            translated = await TranslateUnitsAsync(
+                prep, request.TargetLanguage, ct).ConfigureAwait(false);
         }
         catch (OperationCanceledException) { throw; }
         catch (ModelNotReadyException) { throw; }
@@ -102,13 +82,53 @@ public sealed class TranslationPipeline : ITranslationPipeline
         }
 
         return new TranslationResult(
-            finalText, srcLang, translated,
+            finalText, prep.SourceLanguage, translated,
             translationDuration, postDuration);
     }
 
     public async IAsyncEnumerable<TranslationDelta> ProcessStreamingAsync(
         TranslationRequest request,
         [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        var prep = await PrepareAsync(request, ct).ConfigureAwait(false);
+        if (prep.IsIdentity)
+        {
+            yield return new TranslationDelta(request.SourceText);
+            yield break;
+        }
+
+        TranslationUnit? prev = null;
+        foreach (var unit in prep.Units)
+        {
+            if (prev is { } p)
+            {
+                var separator = TextSegmenter.JoinSeparatorFor(
+                    p.BreakAfter, request.TargetLanguage);
+                if (separator.Length > 0)
+                    yield return new TranslationDelta(separator);
+            }
+
+            await foreach (var delta in _engine.TranslateStreamingAsync(
+                               unit.SourceText, prep.SourceLanguage, request.TargetLanguage, ct)
+                               .ConfigureAwait(false))
+            {
+                yield return delta;
+            }
+
+            prev = unit;
+        }
+    }
+
+    /// <summary>
+    /// Shared front-half of both <see cref="ProcessAsync"/> and
+    /// <see cref="ProcessStreamingAsync"/>: detect language when absent,
+    /// short-circuit identity translations, enforce translation-model
+    /// readiness, and plan segments + units. Post-processing readiness is
+    /// deliberately NOT checked here because streaming does not run the
+    /// post-processing stage.
+    /// </summary>
+    private async Task<PreparedRequest> PrepareAsync(
+        TranslationRequest request, CancellationToken ct)
     {
         var srcLang = request.SourceLanguage;
         if (string.IsNullOrEmpty(srcLang))
@@ -126,58 +146,83 @@ public sealed class TranslationPipeline : ITranslationPipeline
         }
 
         if (srcLang == request.TargetLanguage)
-        {
-            yield return new TranslationDelta(request.SourceText);
-            yield break;
-        }
+            return PreparedRequest.Identity(srcLang);
 
         ct.ThrowIfCancellationRequested();
         _modelReadiness.EnsureTranslationModelReady(srcLang, request.TargetLanguage);
 
         var segments = _segmenter.Segment(request.SourceText);
-        TextSegment? prev = null;
-
-        foreach (var segment in segments)
-        {
-            if (prev.HasValue)
-            {
-                var separator = TextSegmenter.JoinSeparatorFor(
-                    prev.Value.BreakAfter, request.TargetLanguage);
-                if (separator.Length > 0)
-                    yield return new TranslationDelta(separator);
-            }
-
-            await foreach (var delta in _engine.TranslateStreamingAsync(
-                               segment.Text, srcLang, request.TargetLanguage, ct).ConfigureAwait(false))
-            {
-                yield return delta;
-            }
-
-            prev = segment;
-        }
+        var units = _segmenter.PlanUnits(segments);
+        return new PreparedRequest(false, srcLang, segments, units);
     }
 
-    private async Task<string> TranslateSegmentsAsync(
-        IReadOnlyList<TextSegment> segments,
-        string srcLang,
-        string targetLang,
-        CancellationToken ct)
+    /// <summary>
+    /// Translates each unit in one engine call, splits the response on '\n'
+    /// to recover per-segment fragments, and reassembles the final output
+    /// using the reassembly separators declared by the segmenter. When the
+    /// engine fails to preserve the unit's internal line count (common when
+    /// small local LLMs reformat short multi-line inputs), the entire unit
+    /// output is attributed to the first fragment so content is never lost.
+    /// </summary>
+    private async Task<string> TranslateUnitsAsync(
+        PreparedRequest prep, string targetLang, CancellationToken ct)
     {
-        var builder = new StringBuilder();
-        for (var i = 0; i < segments.Count; i++)
+        var fragmentOutputs = new string[prep.Segments.Count];
+
+        foreach (var unit in prep.Units)
         {
             ct.ThrowIfCancellationRequested();
+            var raw = await _engine.TranslateAsync(
+                unit.SourceText, prep.SourceLanguage, targetLang, ct).ConfigureAwait(false);
+            AssignUnitOutput(fragmentOutputs, unit, raw);
+        }
 
-            var segment = segments[i];
-            var partial = await _engine.TranslateAsync(
-                segment.Text, srcLang, targetLang, ct);
-
-            builder.Append(partial);
-
-            if (i < segments.Count - 1)
-                builder.Append(TextSegmenter.JoinSeparatorFor(segment.BreakAfter, targetLang));
+        var builder = new StringBuilder();
+        for (var i = 0; i < prep.Segments.Count; i++)
+        {
+            builder.Append(fragmentOutputs[i]);
+            if (i < prep.Segments.Count - 1)
+                builder.Append(TextSegmenter.JoinSeparatorFor(
+                    prep.Segments[i].BreakAfter, targetLang));
         }
         return builder.ToString();
+    }
+
+    private static void AssignUnitOutput(
+        string[] fragmentOutputs, TranslationUnit unit, string raw)
+    {
+        if (unit.SegmentCount == 1)
+        {
+            fragmentOutputs[unit.FirstSegmentIndex] = raw;
+            return;
+        }
+
+        var parts = raw.Split('\n');
+        if (parts.Length == unit.SegmentCount)
+        {
+            for (var k = 0; k < unit.SegmentCount; k++)
+                fragmentOutputs[unit.FirstSegmentIndex + k] = parts[k];
+            return;
+        }
+
+        // Engine did not honour the requested newline layout. Keep every
+        // character the model produced on the first fragment and leave the
+        // rest blank – the reassembler will still insert Line separators,
+        // so the user sees "<full translation>\n" (trailing newline trimmed
+        // by the caller) instead of silently losing text.
+        fragmentOutputs[unit.FirstSegmentIndex] = raw;
+        for (var k = 1; k < unit.SegmentCount; k++)
+            fragmentOutputs[unit.FirstSegmentIndex + k] = string.Empty;
+    }
+
+    private readonly record struct PreparedRequest(
+        bool IsIdentity,
+        string SourceLanguage,
+        IReadOnlyList<TextSegment> Segments,
+        IReadOnlyList<TranslationUnit> Units)
+    {
+        public static PreparedRequest Identity(string sourceLanguage) =>
+            new(true, sourceLanguage, [], []);
     }
 
     private IEnumerable<ITextProcessor> SelectProcessors(ProcessingOptions opts)

@@ -510,36 +510,80 @@ public class TranslationPipelineTests
     [Fact]
     public async Task ProcessAsync_SingleNewlineBetweenLines_PreservesNewlineInOutput()
     {
-        // The old pipeline collapsed user-authored line breaks into spaces
-        // (for Latin targets) or joined lines directly (for CJK targets),
-        // so lyrics / bullet lists lost their layout when translated.
+        // Two line-connected segments are merged into one translation unit so
+        // the engine sees the full semantic context. The unit output is split
+        // back on '\n' to recover per-line fragments before reassembly.
         const string source = "first line\nsecond line";
 
-        _engine.TranslateAsync("first line", "en", "zh", Arg.Any<CancellationToken>())
-            .Returns("第一行");
-        _engine.TranslateAsync("second line", "en", "zh", Arg.Any<CancellationToken>())
-            .Returns("第二行");
+        _engine.TranslateAsync("first line\nsecond line", "en", "zh", Arg.Any<CancellationToken>())
+            .Returns("第一行\n第二行");
 
         var result = await _pipeline.ProcessAsync(
             new TranslationRequest(source, "en", "zh", null), CancellationToken.None);
 
         Assert.Equal("第一行\n第二行", result.Text);
+        await _engine.Received(1).TranslateAsync(
+            "first line\nsecond line", "en", "zh", Arg.Any<CancellationToken>());
     }
 
     [Fact]
     public async Task ProcessAsync_MixedLineAndParagraphBreaks_PreservesBoth()
     {
-        // "a\nb\n\nc" must translate to "{a}\n{b}\n\n{c}" – a hard wrap
-        // between a/b and a paragraph break between b/c.
+        // "alpha\nbeta\n\ngamma" groups alpha+beta into a single unit
+        // (Line break, neither ends with a sentence mark) and keeps gamma
+        // as its own unit across the paragraph break.
         const string source = "alpha\nbeta\n\ngamma";
 
-        _engine.TranslateAsync("alpha", "en", "zh", Arg.Any<CancellationToken>()).Returns("甲");
-        _engine.TranslateAsync("beta", "en", "zh", Arg.Any<CancellationToken>()).Returns("乙");
-        _engine.TranslateAsync("gamma", "en", "zh", Arg.Any<CancellationToken>()).Returns("丙");
+        _engine.TranslateAsync("alpha\nbeta", "en", "zh", Arg.Any<CancellationToken>())
+            .Returns("甲\n乙");
+        _engine.TranslateAsync("gamma", "en", "zh", Arg.Any<CancellationToken>())
+            .Returns("丙");
 
         var result = await _pipeline.ProcessAsync(
             new TranslationRequest(source, "en", "zh", null), CancellationToken.None);
 
         Assert.Equal("甲\n乙\n\n丙", result.Text);
+        await _engine.Received(1).TranslateAsync("alpha\nbeta", "en", "zh", Arg.Any<CancellationToken>());
+        await _engine.Received(1).TranslateAsync("gamma", "en", "zh", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ProcessAsync_LineTerminatedBySentenceMark_StaysIndependent()
+    {
+        // "Hello.\nWorld." – the first line ends with '.', so the planner
+        // must NOT merge it with the next line. Each line is its own unit
+        // and its own engine call.
+        const string source = "Hello.\nWorld.";
+
+        _engine.TranslateAsync("Hello.", "en", "zh", Arg.Any<CancellationToken>())
+            .Returns("你好。");
+        _engine.TranslateAsync("World.", "en", "zh", Arg.Any<CancellationToken>())
+            .Returns("世界。");
+
+        var result = await _pipeline.ProcessAsync(
+            new TranslationRequest(source, "en", "zh", null), CancellationToken.None);
+
+        Assert.Equal("你好。\n世界。", result.Text);
+        await _engine.DidNotReceive().TranslateAsync(
+            "Hello.\nWorld.", "en", "zh", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ProcessAsync_UnitOutputMissingNewlines_FallsBackWithoutLosingContent()
+    {
+        // When a small local LLM rewrites "alpha\nbeta" as one line, we must
+        // not silently drop the second fragment. Content is attributed to
+        // the first fragment; the Line separator still renders so the user
+        // sees the translation (with a trailing newline, trimmed by the UI
+        // layer) instead of an empty second line.
+        const string source = "alpha\nbeta";
+
+        _engine.TranslateAsync("alpha\nbeta", "en", "zh", Arg.Any<CancellationToken>())
+            .Returns("甲乙");  // LLM merged the two lines
+
+        var result = await _pipeline.ProcessAsync(
+            new TranslationRequest(source, "en", "zh", null), CancellationToken.None);
+
+        Assert.Equal("甲乙\n", result.Text);
     }
 }

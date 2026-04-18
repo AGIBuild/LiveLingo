@@ -1,3 +1,5 @@
+using System.Text;
+
 namespace LiveLingo.Core.Translation;
 
 /// <summary>
@@ -80,6 +82,92 @@ public sealed class TextSegmenter
             SegmentBreak.Line => "\n",
             _ => IsCjkTarget(targetLanguage) ? string.Empty : " "
         };
+    }
+
+    /// <summary>
+    /// Groups adjacent segments connected by a <see cref="SegmentBreak.Line"/>
+    /// into a single translation unit so multi-line semantic content (poems,
+    /// wrapped sentences, bullet lists) is translated as one cohesive prompt
+    /// instead of being fragmented per line. Segments separated by
+    /// <see cref="SegmentBreak.Sentence"/> / <see cref="SegmentBreak.Paragraph"/>
+    /// / <see cref="SegmentBreak.None"/> remain independent units — this is
+    /// the existing atomic-sentence guarantee that prevents local LLMs from
+    /// dropping trailing clauses.
+    ///
+    /// A line that already ends with a sentence-end mark (.!?。！？…) is
+    /// considered a complete thought and is NOT merged with the next line,
+    /// because there the line break is usually layout/style rather than a
+    /// continuation of the same clause.
+    /// </summary>
+    public IReadOnlyList<TranslationUnit> PlanUnits(
+        IReadOnlyList<TextSegment> segments,
+        int maxCharsPerUnit = DefaultMaxCharsPerSegment)
+    {
+        if (segments.Count == 0) return [];
+
+        var units = new List<TranslationUnit>();
+        var unitStart = 0;
+        var unitLength = 0;
+
+        for (var i = 0; i < segments.Count; i++)
+        {
+            var seg = segments[i];
+            // 1 char budget is reserved for the embedded '\n' that joins this
+            // fragment to the previous one inside the same unit.
+            unitLength = i == unitStart
+                ? seg.Text.Length
+                : unitLength + 1 + seg.Text.Length;
+
+            var isLast = i == segments.Count - 1;
+            var canExtend =
+                !isLast &&
+                seg.BreakAfter == SegmentBreak.Line &&
+                !EndsWithSentenceMark(seg.Text) &&
+                unitLength + 1 + segments[i + 1].Text.Length <= maxCharsPerUnit;
+
+            if (!canExtend)
+            {
+                units.Add(new TranslationUnit(
+                    BuildUnitSource(segments, unitStart, i),
+                    unitStart,
+                    i - unitStart + 1,
+                    seg.BreakAfter));
+                unitStart = i + 1;
+                unitLength = 0;
+            }
+        }
+
+        return units;
+    }
+
+    private static string BuildUnitSource(
+        IReadOnlyList<TextSegment> segments, int start, int end)
+    {
+        if (start == end) return segments[start].Text;
+
+        var sb = new StringBuilder();
+        for (var i = start; i <= end; i++)
+        {
+            if (i > start) sb.Append('\n');
+            sb.Append(segments[i].Text);
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// True when <paramref name="text"/> ends with a sentence-terminating mark
+    /// (after trimming trailing whitespace). Intentionally does not apply the
+    /// Latin abbreviation heuristic – a line that ends in "." is treated as a
+    /// complete thought for unit-planning purposes even if it is actually an
+    /// abbreviation like "Dr." (rare enough to accept as the trade-off).
+    /// </summary>
+    internal static bool EndsWithSentenceMark(string text)
+    {
+        var span = text.AsSpan().TrimEnd();
+        if (span.IsEmpty) return false;
+        var last = span[^1];
+        return Array.IndexOf(CjkSentenceEndChars, last) >= 0 ||
+               Array.IndexOf(LatinSentenceEndChars, last) >= 0;
     }
 
     private static bool IsCjkTarget(string? lang)
@@ -375,3 +463,22 @@ public enum SegmentBreak
 
 /// <summary>A segment of source text with metadata about the boundary after it.</summary>
 public readonly record struct TextSegment(string Text, SegmentBreak BreakAfter);
+
+/// <summary>
+/// One translation call's worth of source. A unit covers one or more adjacent
+/// <see cref="TextSegment"/>s that were joined by <see cref="SegmentBreak.Line"/>
+/// so they can be translated together while still letting the pipeline recover
+/// per-segment outputs by splitting the model's response on newline.
+/// </summary>
+/// <param name="SourceText">Text to send to the translation engine. Internal
+/// fragments are joined with a literal '\n' so the engine can preserve layout.</param>
+/// <param name="FirstSegmentIndex">Index into the segment list of the first
+/// segment covered by this unit.</param>
+/// <param name="SegmentCount">Number of segments covered by this unit (≥ 1).</param>
+/// <param name="BreakAfter">The break kind following the unit's last fragment –
+/// used by the reassembler to pick the separator between adjacent units.</param>
+public readonly record struct TranslationUnit(
+    string SourceText,
+    int FirstSegmentIndex,
+    int SegmentCount,
+    SegmentBreak BreakAfter);
