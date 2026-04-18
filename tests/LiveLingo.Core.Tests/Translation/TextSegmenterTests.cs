@@ -521,4 +521,21 @@ public class TextSegmenterTests
     {
         Assert.Equal(expected, TextSegmenter.CountSentenceEndings(text));
     }
+
+    // --- ExpandSentences break-kind contract ---
+
+    [Fact]
+    public void Segment_MultiSentenceLine_LastSentenceCarriesNoneBreak_NotSentence()
+    {
+        // Two-sentence line; the inner ExpandSentences must stamp the last
+        // sentence with SegmentBreak.None so the line-level break (Line/None)
+        // can override it. If the conditional collapsed to always-Sentence,
+        // the last segment would carry Sentence which a single-line input
+        // (no trailing line/paragraph break) directly exposes.
+        var result = _segmenter.Segment("First. Second.");
+
+        Assert.Equal(2, result.Count);
+        Assert.Equal(SegmentBreak.Sentence, result[0].BreakAfter);
+        Assert.Equal(SegmentBreak.None, result[1].BreakAfter);
+    }
 }
