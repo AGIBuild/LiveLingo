@@ -72,10 +72,22 @@ public class ScriptBasedDetectorTests
     }
 
     [Fact]
-    public async Task DetectAsync_Confidence_Is08()
+    public async Task DetectAsync_Confidence_IsDynamic_AboveThreshold()
     {
-        var result = await _detector.DetectAsync("Hello", CancellationToken.None);
-        Assert.Equal(0.8f, result.Confidence);
+        // Pure Latin text → dominant script clearly present → confidence ≥ 0.6
+        var result = await _detector.DetectAsync("Hello world this is English", CancellationToken.None);
+        Assert.True(result.Confidence >= 0.6f, $"Expected confidence ≥ 0.6, got {result.Confidence}");
+    }
+
+    [Theory]
+    [InlineData("你好世界这是中文内容需要多一些字符", 0.80f)]    // dense CJK → high confidence
+    [InlineData("こんにちは世界ありがとう日本語テスト", 0.80f)]  // hiragana + CJK → high confidence
+    [InlineData("Привет мир это русский язык текст", 0.80f)]     // dense Cyrillic → high confidence
+    public async Task DetectAsync_DenseScript_ConfidenceHigherThanThreshold(string text, float minConfidence)
+    {
+        var result = await _detector.DetectAsync(text, CancellationToken.None);
+        Assert.True(result.Confidence >= minConfidence,
+            $"Expected confidence ≥ {minConfidence} for '{text}', got {result.Confidence}");
     }
 
     [Fact]
@@ -105,6 +117,29 @@ public class ScriptBasedDetectorTests
     {
         var d = new ScriptBasedDetector();
         d.Dispose();
+    }
+
+    // --- Latin language disambiguation ---
+
+    [Theory]
+    [InlineData("Le soleil brille sur les champs de la France et des pays francophones", "fr")]
+    [InlineData("Der Hund und die Katze sind nicht in der Schule mit den anderen Tieren", "de")]
+    [InlineData("El sol brilla sobre los campos de España con los colores del verano", "es")]
+    [InlineData("The quick brown fox jumps over the lazy dog and all the other animals", "en")]
+    public async Task DetectAsync_LatinLanguages_AreDistinguishedFromEnglish(string text, string expectedLang)
+    {
+        var result = await _detector.DetectAsync(text, CancellationToken.None);
+        Assert.Equal(expectedLang, result.Language);
+    }
+
+    [Fact]
+    public async Task DetectAsync_MixedScriptText_HasLowConfidence()
+    {
+        // Exactly 3 Latin + 3 CJK → neither dominates (ratio = 0.5 each, *2 == total, not >)
+        // → falls through to low-confidence fallback (0.40)
+        var result = await _detector.DetectAsync("abc 一二三", CancellationToken.None);
+        Assert.True(result.Confidence <= 0.6f,
+            $"Expected low confidence for equal-split mixed-script text, got {result.Confidence}");
     }
 
     // --- Boundary value tests to kill equality/range mutations ---

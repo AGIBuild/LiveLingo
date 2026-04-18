@@ -128,4 +128,82 @@ public class LocalizationServiceTests
         var result = sut.T("tray.settings");
         Assert.Equal("设置", result);
     }
+
+    [Fact]
+    public void TryT_ReturnsTrueAndValue_WhenKeyExists()
+    {
+        var sut = CreateService(enUs: new() { ["a"] = "A" });
+
+        Assert.True(sut.TryT("a", out var value));
+        Assert.Equal("A", value);
+    }
+
+    [Fact]
+    public void TryT_ReturnsFalseAndEmpty_WhenKeyMissingEverywhere()
+    {
+        var sut = CreateService(enUs: new());
+
+        Assert.False(sut.TryT("missing", out var value));
+        Assert.Equal(string.Empty, value);
+    }
+
+    [Fact]
+    public void TryT_FallsBackToEnUS_WhenMissingInActiveCulture()
+    {
+        var sut = CreateService(enUs: new() { ["k"] = "english" }, zhCn: new());
+        sut.SetCulture("zh-CN");
+
+        Assert.True(sut.TryT("k", out var value));
+        Assert.Equal("english", value);
+    }
+
+    [Fact]
+    public void AllKnownSettingsKeys_AreCoveredByDefaultResources()
+    {
+        // Guards against regressions where SettingsViewModel adds a new T("settings.xxx")
+        // without populating the matching entry in en-US.json / zh-CN.json.
+        var sut = new LocalizationService();
+        string[] criticalKeys =
+        [
+            "settings.translation.routing",
+            "settings.translation.routingMode",
+            "settings.translation.routeUnsupportedPairs",
+            "settings.routing.localOnly",
+            "settings.routing.preferLocal",
+            "settings.routing.preferCloud",
+            "settings.routing.cloudOnly",
+            "settings.ai.cloudProvider",
+            "settings.ai.cloudEnabled",
+            "settings.ai.cloudPreset",
+            "settings.ai.cloudPreset.custom",
+            "settings.ai.cloudPreset.openai",
+            "settings.ai.cloudPreset.openrouter",
+            "settings.ai.cloudPreset.groq",
+            "settings.ai.cloudProviderType",
+            "settings.ai.cloudProviderValue",
+            "settings.ai.cloudBaseUrl",
+            "settings.ai.cloudApiKey",
+            "settings.ai.cloudTranslationModel",
+            "settings.ai.cloudPostModel",
+            "settings.ai.cloudTestConnection",
+            "settings.ai.cloudFetchModels",
+            "settings.ai.cloudDiscoveredModels",
+            "settings.ai.cloudUseTranslation",
+            "settings.ai.cloudUsePost",
+            "settings.ai.cloudRoutePost",
+            "settings.ai.cloudHint"
+        ];
+        foreach (var key in criticalKeys)
+        {
+            Assert.True(sut.TryT(key, out var value), $"en-US missing key: {key}");
+            Assert.NotEqual(string.Empty, value);
+        }
+
+        sut.SetCulture("zh-CN");
+        foreach (var key in criticalKeys)
+        {
+            Assert.True(sut.TryT(key, out var value), $"zh-CN missing key: {key}");
+            Assert.NotEqual(string.Empty, value);
+        }
+    }
 }

@@ -5,6 +5,13 @@ using NSubstitute;
 
 namespace LiveLingo.Desktop.Tests.ViewModels;
 
+/// <summary>
+/// Behavioural tests for the thin, coordinator-driven <see cref="ModelItemViewModel"/>.
+/// The VM no longer owns any <see cref="System.Threading.CancellationTokenSource"/>;
+/// download / cancel / delete commands must delegate to <see cref="IModelDownloadCoordinator"/>
+/// and <see cref="IModelManager"/>. State flips happen purely via
+/// <see cref="IModelDownloadCoordinator.StateChanged"/>.
+/// </summary>
 public class ModelItemViewModelTests
 {
     private static readonly ModelDescriptor TestDescriptor = new(
@@ -12,11 +19,31 @@ public class ModelItemViewModelTests
         "https://example.com/model.bin",
         104_857_600, ModelType.Translation);
 
+    private static ModelItemViewModel Build(
+        ModelDescriptor? descriptor = null,
+        IModelManager? modelManager = null,
+        IModelDownloadCoordinator? coordinator = null,
+        IPlatformServices? platform = null,
+        ModelDownloadStatus initialStatus = ModelDownloadStatus.Idle)
+    {
+        descriptor ??= TestDescriptor;
+        modelManager ??= Substitute.For<IModelManager>();
+        if (coordinator is null)
+        {
+            var sub = Substitute.For<IModelDownloadCoordinator>();
+            sub.GetState(descriptor.Id).Returns(new ModelDownloadState(
+                descriptor.Id, initialStatus,
+                initialStatus == ModelDownloadStatus.Installed ? 100 : 0,
+                null));
+            coordinator = sub;
+        }
+        return new ModelItemViewModel(descriptor, modelManager, coordinator, platformServices: platform, uiContext: null);
+    }
+
     [Fact]
     public void Properties_ReflectDescriptor()
     {
-        var mm = Substitute.For<IModelManager>();
-        var vm = new ModelItemViewModel(TestDescriptor, mm, isInstalled: false);
+        var vm = Build();
 
         Assert.Equal("test-model", vm.Id);
         Assert.Equal("Test Model", vm.DisplayName);
@@ -24,20 +51,77 @@ public class ModelItemViewModelTests
         Assert.Equal("100 MB", vm.SizeText);
         Assert.False(vm.IsInstalled);
         Assert.False(vm.IsDownloading);
+        Assert.True(vm.ShowDownloadButton);
     }
 
     [Fact]
-    public async Task DownloadAsync_Success_SetsInstalled()
+    public void InitialState_Installed_ReflectsInInstalledFlag()
     {
-        var mm = Substitute.For<IModelManager>();
-        mm.EnsureModelAsync(Arg.Any<ModelDescriptor>(),
-            Arg.Any<IProgress<ModelDownloadProgress>?>(),
-            Arg.Any<CancellationToken>())
-            .Returns(Task.CompletedTask);
+        var vm = Build(initialStatus: ModelDownloadStatus.Installed);
 
-        var vm = new ModelItemViewModel(TestDescriptor, mm, isInstalled: false);
+        Assert.True(vm.IsInstalled);
+        Assert.False(vm.ShowDownloadButton);
+    }
+
+    [Fact]
+    public async Task DownloadCommand_DelegatesToCoordinator()
+    {
+        var coord = Substitute.For<IModelDownloadCoordinator>();
+        coord.GetState(Arg.Any<string>()).Returns(new ModelDownloadState("test-model", ModelDownloadStatus.Idle, 0, null));
+        coord.StartAsync(Arg.Any<ModelDescriptor>()).Returns(Task.CompletedTask);
+
+        var vm = Build(coordinator: coord);
 
         await vm.DownloadCommand.ExecuteAsync(null);
+
+        await coord.Received(1).StartAsync(TestDescriptor);
+    }
+
+    [Fact]
+    public async Task DownloadCommand_NoOpWhenAlreadyInstalled()
+    {
+        var coord = Substitute.For<IModelDownloadCoordinator>();
+        coord.GetState(Arg.Any<string>()).Returns(new ModelDownloadState("test-model", ModelDownloadStatus.Installed, 100, null));
+
+        var vm = Build(coordinator: coord, initialStatus: ModelDownloadStatus.Installed);
+        await vm.DownloadCommand.ExecuteAsync(null);
+
+        await coord.DidNotReceive().StartAsync(Arg.Any<ModelDescriptor>());
+    }
+
+    [Fact]
+    public void CancelDownloadCommand_ForwardsToCoordinator()
+    {
+        var coord = Substitute.For<IModelDownloadCoordinator>();
+        coord.GetState(Arg.Any<string>()).Returns(new ModelDownloadState("test-model", ModelDownloadStatus.Idle, 0, null));
+
+        var vm = Build(coordinator: coord);
+        vm.CancelDownloadCommand.Execute(null);
+
+        coord.Received(1).Cancel("test-model");
+    }
+
+    [Fact]
+    public void StateChanged_Downloading_UpdatesFlags()
+    {
+        var coord = new StubCoordinator("test-model", ModelDownloadStatus.Idle);
+        var vm = Build(coordinator: coord);
+
+        coord.Raise(new ModelDownloadState("test-model", ModelDownloadStatus.Downloading, 42, null));
+
+        Assert.True(vm.IsDownloading);
+        Assert.False(vm.IsInstalled);
+        Assert.False(vm.ShowDownloadButton);
+        Assert.Equal(42, vm.DownloadProgress);
+    }
+
+    [Fact]
+    public void StateChanged_Installed_MarksInstalled()
+    {
+        var coord = new StubCoordinator("test-model", ModelDownloadStatus.Idle);
+        var vm = Build(coordinator: coord);
+
+        coord.Raise(new ModelDownloadState("test-model", ModelDownloadStatus.Installed, 100, null));
 
         Assert.True(vm.IsInstalled);
         Assert.False(vm.IsDownloading);
@@ -45,134 +129,76 @@ public class ModelItemViewModelTests
     }
 
     [Fact]
-    public async Task DownloadAsync_Error_SetsErrorMessage()
+    public void StateChanged_Cancelled_SetsLocalizedMessage()
     {
-        var mm = Substitute.For<IModelManager>();
-        mm.EnsureModelAsync(Arg.Any<ModelDescriptor>(),
-            Arg.Any<IProgress<ModelDownloadProgress>?>(),
-            Arg.Any<CancellationToken>())
-            .Returns<Task>(_ => throw new InvalidOperationException("network fail"));
+        var coord = new StubCoordinator("test-model", ModelDownloadStatus.Downloading);
+        var vm = Build(coordinator: coord);
 
-        var vm = new ModelItemViewModel(TestDescriptor, mm, isInstalled: false);
+        coord.Raise(new ModelDownloadState("test-model", ModelDownloadStatus.Cancelled, 20, null));
 
-        await vm.DownloadCommand.ExecuteAsync(null);
+        Assert.Equal("Cancelled", vm.ErrorMessage);
+        Assert.False(vm.IsDownloading);
+    }
+
+    [Fact]
+    public void StateChanged_FailedWithAuthCode_MapsToLocalizedHint()
+    {
+        var coord = new StubCoordinator("test-model", ModelDownloadStatus.Downloading);
+        var vm = Build(coordinator: coord);
+
+        coord.Raise(new ModelDownloadState(
+            "test-model", ModelDownloadStatus.Failed, 0, ModelDownloadErrorCodes.HuggingFaceAuthorization));
+
+        Assert.Contains("Access denied by Hugging Face", vm.ErrorMessage);
+    }
+
+    [Fact]
+    public void StateChanged_FailedWithMessage_SurfacesRawMessage()
+    {
+        var coord = new StubCoordinator("test-model", ModelDownloadStatus.Downloading);
+        var vm = Build(coordinator: coord);
+
+        coord.Raise(new ModelDownloadState("test-model", ModelDownloadStatus.Failed, 0, "network fail"));
+
+        Assert.Equal("network fail", vm.ErrorMessage);
+    }
+
+    [Fact]
+    public void StateChanged_ForOtherModel_Ignored()
+    {
+        var coord = new StubCoordinator("test-model", ModelDownloadStatus.Idle);
+        var vm = Build(coordinator: coord);
+
+        coord.Raise(new ModelDownloadState("other-model", ModelDownloadStatus.Installed, 100, null));
 
         Assert.False(vm.IsInstalled);
         Assert.False(vm.IsDownloading);
-        Assert.Contains("network fail", vm.ErrorMessage);
     }
 
     [Fact]
-    public async Task DownloadAsync_Cancelled_SetsMessage()
+    public void Dispose_UnsubscribesFromStateChanged()
     {
-        var mm = Substitute.For<IModelManager>();
-        mm.EnsureModelAsync(Arg.Any<ModelDescriptor>(),
-            Arg.Any<IProgress<ModelDownloadProgress>?>(),
-            Arg.Any<CancellationToken>())
-            .Returns<Task>(_ => throw new OperationCanceledException());
+        var coord = new StubCoordinator("test-model", ModelDownloadStatus.Idle);
+        var vm = Build(coordinator: coord);
 
-        var vm = new ModelItemViewModel(TestDescriptor, mm, isInstalled: false);
+        vm.Dispose();
+        coord.Raise(new ModelDownloadState("test-model", ModelDownloadStatus.Installed, 100, null));
 
-        await vm.DownloadCommand.ExecuteAsync(null);
-
-        Assert.Equal("Cancelled", vm.ErrorMessage);
-        Assert.False(vm.IsDownloading);
+        Assert.False(vm.IsInstalled);
     }
 
     [Fact]
-    public async Task DownloadAsync_SkipsWhenAlreadyInstalled()
+    public async Task DeleteAsync_Success_NotifiesCoordinator()
     {
         var mm = Substitute.For<IModelManager>();
-        var vm = new ModelItemViewModel(TestDescriptor, mm, isInstalled: true);
+        var coord = Substitute.For<IModelDownloadCoordinator>();
+        coord.GetState("test-model").Returns(new ModelDownloadState("test-model", ModelDownloadStatus.Installed, 100, null));
 
-        await vm.DownloadCommand.ExecuteAsync(null);
-
-        await mm.DidNotReceive().EnsureModelAsync(
-            Arg.Any<ModelDescriptor>(),
-            Arg.Any<IProgress<ModelDownloadProgress>?>(),
-            Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task DownloadAsync_SkipsWhenAlreadyDownloading()
-    {
-        var mm = Substitute.For<IModelManager>();
-        var tcs = new TaskCompletionSource();
-        mm.EnsureModelAsync(Arg.Any<ModelDescriptor>(),
-                Arg.Any<IProgress<ModelDownloadProgress>?>(),
-                Arg.Any<CancellationToken>())
-            .Returns(_ => tcs.Task);
-
-        var vm = new ModelItemViewModel(TestDescriptor, mm, isInstalled: false);
-
-        var first = vm.DownloadCommand.ExecuteAsync(null);
-        await Task.Delay(50, TestContext.Current.CancellationToken);
-        await vm.DownloadCommand.ExecuteAsync(null);
-        tcs.SetResult();
-        await first;
-
-        await mm.Received(1).EnsureModelAsync(
-            Arg.Any<ModelDescriptor>(),
-            Arg.Any<IProgress<ModelDownloadProgress>?>(),
-            Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task CancelDownload_CancelsRunningDownload()
-    {
-        var mm = Substitute.For<IModelManager>();
-        mm.EnsureModelAsync(
-                Arg.Any<ModelDescriptor>(),
-                Arg.Any<IProgress<ModelDownloadProgress>?>(),
-                Arg.Any<CancellationToken>())
-            .Returns(async call =>
-            {
-                var ct = call.ArgAt<CancellationToken>(2);
-                await Task.Delay(3000, ct);
-            });
-
-        var vm = new ModelItemViewModel(TestDescriptor, mm, isInstalled: false);
-
-        var run = vm.DownloadCommand.ExecuteAsync(null);
-        await Task.Delay(80, TestContext.Current.CancellationToken);
-        vm.CancelDownloadCommand.Execute(null);
-        await run;
-
-        Assert.Equal("Cancelled", vm.ErrorMessage);
-        Assert.False(vm.IsDownloading);
-    }
-
-    [Fact]
-    public void CancelDownload_NoActiveDownload_DoesNotThrow()
-    {
-        var mm = Substitute.For<IModelManager>();
-        var vm = new ModelItemViewModel(TestDescriptor, mm, isInstalled: false);
-
-        vm.CancelDownloadCommand.Execute(null);
-    }
-
-    [Fact]
-    public async Task DeleteAsync_Success_ClearsInstalled()
-    {
-        var mm = Substitute.For<IModelManager>();
-        var vm = new ModelItemViewModel(TestDescriptor, mm, isInstalled: true);
-
+        var vm = new ModelItemViewModel(TestDescriptor, mm, coord, uiContext: null);
         await vm.DeleteCommand.ExecuteAsync(null);
 
-        Assert.False(vm.IsInstalled);
         await mm.Received(1).DeleteModelAsync("test-model", Arg.Any<CancellationToken>());
-    }
-
-    [Fact]
-    public async Task DeleteAsync_SkipsWhenNotInstalled()
-    {
-        var mm = Substitute.For<IModelManager>();
-        var vm = new ModelItemViewModel(TestDescriptor, mm, isInstalled: false);
-
-        await vm.DeleteCommand.ExecuteAsync(null);
-
-        await mm.DidNotReceive().DeleteModelAsync(
-            Arg.Any<string>(), Arg.Any<CancellationToken>());
+        coord.Received(1).NotifyDeleted("test-model");
     }
 
     [Fact]
@@ -181,28 +207,27 @@ public class ModelItemViewModelTests
         var mm = Substitute.For<IModelManager>();
         mm.DeleteModelAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns<Task>(_ => throw new InvalidOperationException("delete failed"));
-        var vm = new ModelItemViewModel(TestDescriptor, mm, isInstalled: true);
+        var coord = Substitute.For<IModelDownloadCoordinator>();
+        coord.GetState("test-model").Returns(new ModelDownloadState("test-model", ModelDownloadStatus.Installed, 100, null));
 
+        var vm = new ModelItemViewModel(TestDescriptor, mm, coord, uiContext: null);
         await vm.DeleteCommand.ExecuteAsync(null);
 
         Assert.Contains("delete failed", vm.ErrorMessage);
-        Assert.True(vm.IsInstalled);
     }
 
     [Fact]
     public void ShowOpenOnHuggingFace_TrueWhenPlatformAndHfResolveUrl()
     {
         var platform = Substitute.For<IPlatformServices>();
-        var mm = Substitute.For<IModelManager>();
-        var vm = new ModelItemViewModel(ModelRegistry.Qwen35_9B, mm, false, platformServices: platform);
+        var vm = Build(descriptor: ModelRegistry.Qwen35_9B, platform: platform);
         Assert.True(vm.ShowOpenOnHuggingFace);
     }
 
     [Fact]
     public void ShowOpenOnHuggingFace_FalseWithoutPlatform()
     {
-        var mm = Substitute.For<IModelManager>();
-        var vm = new ModelItemViewModel(ModelRegistry.Qwen35_9B, mm, false);
+        var vm = Build(descriptor: ModelRegistry.Qwen35_9B);
         Assert.False(vm.ShowOpenOnHuggingFace);
     }
 
@@ -210,8 +235,7 @@ public class ModelItemViewModelTests
     public void OpenOnHuggingFace_InvokesPlatformWithModelCardUrl()
     {
         var platform = Substitute.For<IPlatformServices>();
-        var mm = Substitute.For<IModelManager>();
-        var vm = new ModelItemViewModel(ModelRegistry.Qwen35_9B, mm, false, platformServices: platform);
+        var vm = Build(descriptor: ModelRegistry.Qwen35_9B, platform: platform);
         vm.OpenOnHuggingFaceCommand.Execute(null);
         platform.Received(1).OpenUrl("https://huggingface.co/Abhiray/Qwen3.5-9B-abliterated-GGUF");
     }
@@ -222,26 +246,9 @@ public class ModelItemViewModelTests
         var mm = Substitute.For<IModelManager>();
         mm.ListInstalled().Returns([]);
 
-        var models = ModelItemViewModel.CreateAll(mm);
+        var models = ModelItemViewModel.CreateAll(mm, NullModelDownloadCoordinator.Instance);
 
         Assert.Equal(ModelRegistry.AllModels.Count, models.Count);
-    }
-
-    [Fact]
-    public void CreateAll_MarksInstalledModels()
-    {
-        var mm = Substitute.For<IModelManager>();
-        mm.ListInstalled().Returns([
-            new InstalledModel("lid.176.ftz", "FastText", "/path", 917_391,
-                ModelType.LanguageDetection, DateTime.UtcNow)
-        ]);
-
-        var models = ModelItemViewModel.CreateAll(mm);
-        var fastText = models.First(m => m.Id == "lid.176.ftz");
-        var marian = models.First(m => m.Id == "opus-mt-zh-en");
-
-        Assert.True(fastText.IsInstalled);
-        Assert.False(marian.IsInstalled);
     }
 
     [Theory]
@@ -253,8 +260,7 @@ public class ModelItemViewModelTests
     public void SizeText_FormatsCorrectly(long bytes, string expected)
     {
         var descriptor = new ModelDescriptor("t", "T", "https://x", bytes, ModelType.Translation);
-        var mm = Substitute.For<IModelManager>();
-        var vm = new ModelItemViewModel(descriptor, mm, false);
+        var vm = Build(descriptor: descriptor);
 
         Assert.Equal(expected, vm.SizeText);
     }
@@ -266,9 +272,34 @@ public class ModelItemViewModelTests
     public void TypeLabel_MatchesModelType(ModelType type, string expected)
     {
         var descriptor = new ModelDescriptor("t", "T", "https://x", 1024, type);
-        var mm = Substitute.For<IModelManager>();
-        var vm = new ModelItemViewModel(descriptor, mm, false);
+        var vm = Build(descriptor: descriptor);
 
         Assert.Equal(expected, vm.TypeLabel);
+    }
+
+    private sealed class StubCoordinator : IModelDownloadCoordinator
+    {
+        private ModelDownloadState _state;
+
+        public StubCoordinator(string modelId, ModelDownloadStatus initial)
+        {
+            _state = new ModelDownloadState(modelId, initial, 0, null);
+        }
+
+        public event Action<ModelDownloadState>? StateChanged;
+
+        public ModelDownloadState GetState(string modelId) => _state;
+
+        public Task StartAsync(ModelDescriptor descriptor) => Task.CompletedTask;
+
+        public void Cancel(string modelId) { }
+
+        public void NotifyDeleted(string modelId) { }
+
+        public void Raise(ModelDownloadState state)
+        {
+            _state = state;
+            StateChanged?.Invoke(state);
+        }
     }
 }

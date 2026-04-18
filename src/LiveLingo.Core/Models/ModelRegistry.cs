@@ -69,30 +69,32 @@ public static class ModelRegistry
     // ── Gemma 4 ─────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Lightweight fallback (4 B, ~3 GB). Used when Gemma 4 12B cannot load on the device.
+    /// Matryoshka effective-4B fallback (~5.4 GB). Used when the 26B MoE cannot load on the device.
     /// </summary>
-    public static readonly ModelDescriptor Gemma4_4B = new(
-        "gemma4-4b",
-        "Gemma 4 4B (GGUF Q4_K_M)",
-        "https://huggingface.co/bartowski/google_gemma-4-4b-it-GGUF/resolve/main/google_gemma-4-4b-it-Q4_K_M.gguf",
-        2_640_000_000,
+    public static readonly ModelDescriptor Gemma4_E4B = new(
+        "gemma4-e4b",
+        "Gemma 4 E4B (GGUF Q4_K_M)",
+        "https://huggingface.co/bartowski/google_gemma-4-E4B-it-GGUF/resolve/main/google_gemma-4-E4B-it-Q4_K_M.gguf",
+        5_405_167_904,
         ModelType.Translation)
     {
         ChatTemplate = LocalModelChatTemplate.Gemma,
     };
 
     /// <summary>
-    /// Primary translation GGUF (12 B). Falls back to <see cref="Gemma4_4B"/> on low-RAM devices.
+    /// Primary translation GGUF: Gemma 4 26B Mixture-of-Experts with 4B activated parameters
+    /// (~17 GB on disk, ~4B inference cost). Falls back to <see cref="Gemma4_E4B"/> on low-RAM devices.
+    /// MoE gives ~26B-class translation quality at ~4B-class latency — ideal for real-time captions.
     /// </summary>
-    public static readonly ModelDescriptor Gemma4_12B = new(
-        "gemma4-12b",
-        "Gemma 4 12B (GGUF Q4_K_M)",
-        "https://huggingface.co/bartowski/google_gemma-4-12b-it-GGUF/resolve/main/google_gemma-4-12b-it-Q4_K_M.gguf",
-        7_270_000_000,
+    public static readonly ModelDescriptor Gemma4_26B_A4B = new(
+        "gemma4-26b-a4b",
+        "Gemma 4 26B-A4B MoE (GGUF Q4_K_M)",
+        "https://huggingface.co/bartowski/google_gemma-4-26B-A4B-it-GGUF/resolve/main/google_gemma-4-26B-A4B-it-Q4_K_M.gguf",
+        17_035_037_632,
         ModelType.Translation)
     {
         ChatTemplate = LocalModelChatTemplate.Gemma,
-        LoadFailureFallback = Gemma4_4B,
+        LoadFailureFallback = Gemma4_E4B,
     };
 
     // ── Qwen (retained for existing installs and post-processing) ────────────
@@ -108,7 +110,7 @@ public static class ModelRegistry
     };
 
     /// <summary>
-    /// Kept for users who had Qwen3.5-9B installed; new installs default to Gemma 4 12B.
+    /// Kept for users who had Qwen3.5-9B installed; new installs default to Gemma 4 26B-A4B MoE.
     /// </summary>
     public static readonly ModelDescriptor Qwen35_9B = new(
         "qwen35-9b",
@@ -133,10 +135,10 @@ public static class ModelRegistry
     };
 
     public static IReadOnlyList<ModelDescriptor> TranslationModels { get; } =
-        [Gemma4_12B, Gemma4_4B, Qwen35_9B, Qwen25_7B, MarianZhEn, MarianEnZh, MarianJaEn];
+        [Gemma4_26B_A4B, Gemma4_E4B, Qwen35_9B, Qwen25_7B, MarianZhEn, MarianEnZh, MarianJaEn];
 
     public static IReadOnlyList<ModelDescriptor> RequiredModels { get; } =
-        [Gemma4_12B];
+        [Gemma4_26B_A4B];
 
     public static readonly ModelDescriptor WhisperBase = new(
         "whisper-base",
@@ -153,20 +155,20 @@ public static class ModelRegistry
         ModelType.VoiceActivityDetection);
 
     public static IReadOnlyList<ModelDescriptor> OptionalModels { get; } =
-        [Gemma4_4B, Qwen25_15B, WhisperBase, SileroVad];
+        [Gemma4_E4B, Qwen25_15B, WhisperBase, SileroVad];
 
     public static IReadOnlyList<ModelDescriptor> AllModels { get; } =
     [
-        Gemma4_12B, Gemma4_4B,
+        Gemma4_26B_A4B, Gemma4_E4B,
         Qwen35_9B, Qwen25_7B,
         MarianZhEn, MarianEnZh, MarianJaEn,
         FastTextLid, Qwen25_15B, WhisperBase, SileroVad
     ];
 
     public static ModelDescriptor? FindTranslationModel(string sourceLanguage, string targetLanguage) =>
-        Gemma4_12B;
+        Gemma4_26B_A4B;
 
     public static IReadOnlyList<ModelDescriptor> GetRequiredModelsForLanguagePair(
         string? sourceLanguage,
-        string? targetLanguage) => [Gemma4_12B];
+        string? targetLanguage) => [Gemma4_26B_A4B];
 }

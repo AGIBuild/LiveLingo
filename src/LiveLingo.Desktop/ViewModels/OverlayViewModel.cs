@@ -326,6 +326,16 @@ public partial class OverlayViewModel : ObservableObject
             if (_postProcessingDisabledForSession)
                 postProcessing = null;
 
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+
+            // Use streaming for translation-only requests; fall back to ProcessAsync when
+            // post-processing is also needed (streaming and post-processing don't compose).
+            if (postProcessing is null)
+            {
+                await RunStreamingPipelineAsync(text, sw, ct);
+                return;
+            }
+
             var degradedToTranslationOnly = false;
             var showFallbackNotice = false;
             TranslationResult result;
@@ -335,7 +345,6 @@ public partial class OverlayViewModel : ObservableObject
                     new TranslationRequest(text, _sourceLanguage, TargetLanguage, postProcessing), ct);
             }
             catch (ModelNotReadyException ex) when (
-                postProcessing is not null &&
                 ex.ModelType == ModelType.PostProcessing)
             {
                 _postProcessingDisabledForSession = true;
@@ -410,6 +419,43 @@ public partial class OverlayViewModel : ObservableObject
         {
             IsTranslating = false;
         }
+    }
+
+    private async Task RunStreamingPipelineAsync(
+        string text, System.Diagnostics.Stopwatch sw, CancellationToken ct)
+    {
+        var translatedBuilder = new System.Text.StringBuilder();
+
+        try
+        {
+            await foreach (var delta in _pipeline.ProcessStreamingAsync(
+                               new TranslationRequest(text, _sourceLanguage, TargetLanguage, null), ct)
+                           .ConfigureAwait(false))
+            {
+                if (delta.IsReplacement)
+                {
+                    translatedBuilder.Clear();
+                    translatedBuilder.Append(delta.Text);
+                }
+                else
+                {
+                    translatedBuilder.Append(delta.Text);
+                }
+
+                // Push partial text to the UI on every delta.
+                TranslatedText = translatedBuilder.ToString().Trim();
+            }
+
+            StatusText = L("overlay.translated", $"{sw.Elapsed.TotalMilliseconds:0}ms");
+        }
+        catch (ModelNotReadyException ex)
+        {
+            StatusText = L("overlay.error.modelNotDownloaded");
+            _logger?.LogInformation(
+                "Streaming translation failed: model not ready. ModelType={ModelType}, ModelId={ModelId}",
+                ex.ModelType, ex.ModelId);
+        }
+        catch (OperationCanceledException) { }
     }
 
     [RelayCommand]

@@ -79,6 +79,16 @@ public class TranslationRoutingIntegrationTests
             return Task.FromResult($"[{sourceLanguage}->{targetLanguage}] {text}");
         }
 
+        public async IAsyncEnumerable<TranslationDelta> TranslateStreamingAsync(
+            string text, string sourceLanguage, string targetLanguage,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+        {
+            ct.ThrowIfCancellationRequested();
+            await Task.CompletedTask;
+            CallCount++;
+            yield return new TranslationDelta($"[{sourceLanguage}->{targetLanguage}] {text}");
+        }
+
         public bool SupportsLanguagePair(string sourceLanguage, string targetLanguage)
             => string.Equals(sourceLanguage, "zh", StringComparison.OrdinalIgnoreCase) &&
                string.Equals(targetLanguage, "en", StringComparison.OrdinalIgnoreCase);

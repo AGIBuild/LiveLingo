@@ -447,4 +447,43 @@ public class TranslationPipelineTests
         Assert.Equal("Translation failed.", ex.Message);
         Assert.IsType<InvalidOperationException>(ex.InnerException);
     }
+
+    // --- Multi-sentence segmentation (regression) ---
+
+    [Fact]
+    public async Task ProcessAsync_MultiSentenceShortText_TranslatesEachSentenceIndependently()
+    {
+        // Regression: "你好啊，胆小鬼。 你是不是不知道我是谁？" used to be one
+        // prompt to the engine, allowing the model to drop the second clause.
+        // Pipeline now segments per sentence and joins the results.
+        const string source = "你好啊，胆小鬼。 你是不是不知道我是谁？";
+
+        _engine.TranslateAsync("你好啊，胆小鬼。", "zh", "en", Arg.Any<CancellationToken>())
+            .Returns("Hello, coward.");
+        _engine.TranslateAsync("你是不是不知道我是谁？", "zh", "en", Arg.Any<CancellationToken>())
+            .Returns("Don't you know who I am?");
+
+        var result = await _pipeline.ProcessAsync(
+            new TranslationRequest(source, "zh", "en", null), CancellationToken.None);
+
+        Assert.Equal("Hello, coward. Don't you know who I am?", result.Text);
+        await _engine.Received(1).TranslateAsync("你好啊，胆小鬼。", "zh", "en", Arg.Any<CancellationToken>());
+        await _engine.Received(1).TranslateAsync("你是不是不知道我是谁？", "zh", "en", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ProcessAsync_MultiSentenceAcrossParagraphs_JoinsWithDoubleNewline()
+    {
+        const string source = "First sentence.\n\nSecond sentence.";
+
+        _engine.TranslateAsync("First sentence.", "en", "zh", Arg.Any<CancellationToken>())
+            .Returns("第一句。");
+        _engine.TranslateAsync("Second sentence.", "en", "zh", Arg.Any<CancellationToken>())
+            .Returns("第二句。");
+
+        var result = await _pipeline.ProcessAsync(
+            new TranslationRequest(source, "en", "zh", null), CancellationToken.None);
+
+        Assert.Equal("第一句。\n\n第二句。", result.Text);
+    }
 }

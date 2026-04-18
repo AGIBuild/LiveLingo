@@ -1,5 +1,6 @@
 using LiveLingo.Core;
 using LiveLingo.Core.Models;
+using LiveLingo.Core.Translation;
 
 namespace LiveLingo.Desktop.Services.Configuration;
 
@@ -50,6 +51,18 @@ public static class CoreOptionsSync
         target.CloudPostProcessingModelId = string.IsNullOrWhiteSpace(settings.Translation.CloudProvider.PostProcessingModelId)
             ? null
             : settings.Translation.CloudProvider.PostProcessingModelId.Trim();
+
+        target.OllamaEnabled = settings.Translation.OllamaProvider.Enabled;
+        target.OllamaBaseUrl = string.IsNullOrWhiteSpace(settings.Translation.OllamaProvider.BaseUrl)
+            ? "http://localhost:11434"
+            : settings.Translation.OllamaProvider.BaseUrl.Trim();
+        target.OllamaTranslationModelId = string.IsNullOrWhiteSpace(settings.Translation.OllamaProvider.TranslationModelId)
+            ? null
+            : settings.Translation.OllamaProvider.TranslationModelId.Trim();
+        target.OllamaPostProcessingModelId = string.IsNullOrWhiteSpace(settings.Translation.OllamaProvider.PostProcessingModelId)
+            ? null
+            : settings.Translation.OllamaProvider.PostProcessingModelId.Trim();
+
         target.InferenceThreads = settings.Advanced.InferenceThreads;
         target.HuggingFaceMirror = string.IsNullOrWhiteSpace(settings.Advanced.HuggingFaceMirror)
             ? null
@@ -57,6 +70,15 @@ public static class CoreOptionsSync
         target.HuggingFaceToken = string.IsNullOrWhiteSpace(settings.Advanced.HuggingFaceToken)
             ? null
             : settings.Advanced.HuggingFaceToken.Trim();
+
+        target.Glossary = settings.Translation.Glossary
+            .Where(e => !string.IsNullOrWhiteSpace(e.SourceTerm) && !string.IsNullOrWhiteSpace(e.TargetTerm))
+            .Select(e => new GlossaryEntry(
+                e.SourceTerm.Trim(),
+                e.TargetTerm.Trim(),
+                string.IsNullOrWhiteSpace(e.SourceLanguage) ? null : e.SourceLanguage.Trim(),
+                string.IsNullOrWhiteSpace(e.TargetLanguage) ? null : e.TargetLanguage.Trim()))
+            .ToArray();
 
         modelManager?.ResetHuggingfaceTransportFallback();
     }

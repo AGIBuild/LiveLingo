@@ -419,7 +419,7 @@ public class SetupWizardViewModelTests
 
         await vm.CopyUrlCommand.ExecuteAsync(null);
 
-        await clipboard.Received(1).SetTextAsync(ModelRegistry.Gemma4_12B.DownloadUrl, Arg.Any<CancellationToken>());
+        await clipboard.Received(1).SetTextAsync(ModelRegistry.Gemma4_26B_A4B.DownloadUrl, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -430,7 +430,7 @@ public class SetupWizardViewModelTests
 
         vm.OpenRequiredModelOnHuggingFaceCommand.Execute(null);
 
-        platform.Received(1).OpenUrl("https://huggingface.co/bartowski/google_gemma-4-12b-it-GGUF");
+        platform.Received(1).OpenUrl("https://huggingface.co/bartowski/google_gemma-4-26B-A4B-it-GGUF");
     }
 
     [Fact]

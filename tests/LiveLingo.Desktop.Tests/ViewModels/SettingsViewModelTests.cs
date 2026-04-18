@@ -1281,7 +1281,7 @@ public class SettingsViewModelTests
     [Fact]
     public void LocalModelStatusMessage_ShowsModelName_WhenLoaded()
     {
-        var descriptor = ModelRegistry.Gemma4_12B;
+        var descriptor = ModelRegistry.Gemma4_26B_A4B;
         var localState = new FakeLocalModelRuntimeState(ModelLoadState.Loaded, descriptor);
         var vm = new SettingsViewModel(CreateSettings(), localModelRuntimeState: localState);
 
@@ -1292,7 +1292,7 @@ public class SettingsViewModelTests
     [Fact]
     public void LocalModelStatusMessage_Updates_WhenStateChanges()
     {
-        var descriptor = ModelRegistry.Gemma4_12B;
+        var descriptor = ModelRegistry.Gemma4_26B_A4B;
         var localState = new FakeLocalModelRuntimeState(ModelLoadState.Unloaded, null);
         var vm = new SettingsViewModel(CreateSettings(), localModelRuntimeState: localState);
 
@@ -1340,5 +1340,103 @@ public class SettingsViewModelTests
             new(false, false, null, new HashSet<string>(StringComparer.OrdinalIgnoreCase));
         public Task<CloudProviderRuntimeSnapshot> RefreshAsync(CloudModelPreferences? preferences, CancellationToken ct = default) =>
             Task.FromResult(snapshot);
+    }
+
+    [Fact]
+    public async Task TestOllamaProviderConnection_PopulatesDiscoveredModelsOnSuccess()
+    {
+        var probe = Substitute.For<IOllamaProbeService>();
+        probe.TestConnectionAsync(Arg.Any<OllamaProbeRequest>(), Arg.Any<CancellationToken>())
+            .Returns(new OllamaConnectionResult(true, "ok", 2));
+        probe.GetModelCatalogAsync(Arg.Any<OllamaProbeRequest>(), Arg.Any<CancellationToken>())
+            .Returns(new OllamaModelCatalogResult(
+            [
+                new OllamaModelInfo("gemma3:4b", 4_200_000_000, null, null),
+                new OllamaModelInfo("qwen3:4b", 3_000_000_000, null, null)
+            ]));
+        var settings = new UserSettings();
+        settings.Translation.OllamaProvider.Enabled = true;
+        settings.Translation.OllamaProvider.BaseUrl = "http://localhost:11434";
+        var vm = new SettingsViewModel(CreateSettings(settings), ollamaProbeService: probe);
+
+        await vm.TestOllamaProviderConnectionCommand.ExecuteAsync(null);
+
+        Assert.False(vm.IsTestingOllamaProvider);
+        Assert.Equal("ok", vm.OllamaProviderStatusMessage);
+        Assert.True(vm.HasDiscoveredOllamaModels);
+        Assert.Equal(2, vm.DiscoveredOllamaModels.Count);
+        Assert.Equal("gemma3:4b", vm.DiscoveredOllamaModels[0].Id);
+    }
+
+    [Fact]
+    public async Task TestOllamaProviderConnection_ClearsModelsOnFailure()
+    {
+        var probe = Substitute.For<IOllamaProbeService>();
+        probe.TestConnectionAsync(Arg.Any<OllamaProbeRequest>(), Arg.Any<CancellationToken>())
+            .Returns(new OllamaConnectionResult(false, "Connection refused"));
+        var settings = new UserSettings();
+        settings.Translation.OllamaProvider.BaseUrl = "http://localhost:11434";
+        var vm = new SettingsViewModel(CreateSettings(settings), ollamaProbeService: probe);
+
+        await vm.TestOllamaProviderConnectionCommand.ExecuteAsync(null);
+
+        Assert.Equal("Connection refused", vm.OllamaProviderStatusMessage);
+        Assert.False(vm.HasDiscoveredOllamaModels);
+        await probe.DidNotReceive().GetModelCatalogAsync(Arg.Any<OllamaProbeRequest>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task TestOllamaProviderConnection_RejectsEmptyBaseUrl()
+    {
+        var probe = Substitute.For<IOllamaProbeService>();
+        var settings = new UserSettings();
+        settings.Translation.OllamaProvider.BaseUrl = "   ";
+        var vm = new SettingsViewModel(CreateSettings(settings), ollamaProbeService: probe);
+
+        await vm.TestOllamaProviderConnectionCommand.ExecuteAsync(null);
+
+        Assert.NotNull(vm.OllamaProviderStatusMessage);
+        Assert.Contains("required", vm.OllamaProviderStatusMessage, StringComparison.OrdinalIgnoreCase);
+        await probe.DidNotReceive().TestConnectionAsync(Arg.Any<OllamaProbeRequest>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public void UseOllamaTranslationModel_UpdatesWorkingCopy()
+    {
+        var vm = new SettingsViewModel(CreateSettings());
+
+        vm.UseOllamaTranslationModelCommand.Execute("gemma3:4b");
+
+        Assert.Equal("gemma3:4b", vm.WorkingCopy.Translation.OllamaProvider.TranslationModelId);
+    }
+
+    [Fact]
+    public void UseOllamaPostProcessingModel_UpdatesWorkingCopy()
+    {
+        var vm = new SettingsViewModel(CreateSettings());
+
+        vm.UseOllamaPostProcessingModelCommand.Execute("qwen3:4b");
+
+        Assert.Equal("qwen3:4b", vm.WorkingCopy.Translation.OllamaProvider.PostProcessingModelId);
+    }
+
+    [Fact]
+    public async Task OllamaBaseUrlChange_ClearsDiscoveredModels()
+    {
+        var probe = Substitute.For<IOllamaProbeService>();
+        probe.TestConnectionAsync(Arg.Any<OllamaProbeRequest>(), Arg.Any<CancellationToken>())
+            .Returns(new OllamaConnectionResult(true, "ok", 1));
+        probe.GetModelCatalogAsync(Arg.Any<OllamaProbeRequest>(), Arg.Any<CancellationToken>())
+            .Returns(new OllamaModelCatalogResult([new OllamaModelInfo("gemma3:4b", 1, null, null)]));
+        var settings = new UserSettings();
+        settings.Translation.OllamaProvider.BaseUrl = "http://localhost:11434";
+        var vm = new SettingsViewModel(CreateSettings(settings), ollamaProbeService: probe);
+        await vm.TestOllamaProviderConnectionCommand.ExecuteAsync(null);
+        Assert.True(vm.HasDiscoveredOllamaModels);
+
+        vm.WorkingCopy.Translation.OllamaProvider.BaseUrl = "http://remote:11434";
+
+        Assert.False(vm.HasDiscoveredOllamaModels);
+        Assert.Null(vm.OllamaProviderStatusMessage);
     }
 }

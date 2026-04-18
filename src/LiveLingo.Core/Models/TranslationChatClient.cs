@@ -1,3 +1,6 @@
+using System.Runtime.CompilerServices;
+using System.Text;
+using LiveLingo.Core.Processing;
 using LiveLingo.Core.Translation;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
@@ -27,15 +30,21 @@ public sealed class TranslationChatClient : IChatClient
 {
     private readonly IModelSelector _selector;
     private readonly IModelInvocationService _invocationService;
+    private readonly ITranslationInvoker _translationInvoker;
+    private readonly ITranslationGlossary? _glossary;
     private readonly ILogger<TranslationChatClient>? _logger;
 
     public TranslationChatClient(
         IModelSelector selector,
         IModelInvocationService invocationService,
+        ITranslationInvoker translationInvoker,
+        ITranslationGlossary? glossary = null,
         ILogger<TranslationChatClient>? logger = null)
     {
         _selector = selector;
         _invocationService = invocationService;
+        _translationInvoker = translationInvoker;
+        _glossary = glossary;
         _logger = logger;
     }
 
@@ -49,94 +58,157 @@ public sealed class TranslationChatClient : IChatClient
         CancellationToken cancellationToken = default)
     {
         var (src, tgt, taskType, routingContext) = ExtractRoutingContext(options);
+        var invocationOptions = BuildInvocationOptions(options, stream: false);
 
-        var profile = taskType == ModelTaskType.PostProcessing
-            ? _selector.SelectPostProcessingProfile()
-            : _selector.SelectTranslationProfile(src, tgt, routingContext);
+        // Post-processing does not currently use runtime fallback — the selector already
+        // applies routing policy and post-processing has its own cloud flag.
+        if (taskType == ModelTaskType.PostProcessing)
+        {
+            var ppProfile = _selector.SelectPostProcessingProfile();
+            var ppMessages = BuildMessages(chatMessages, options, ppProfile, _glossary);
+            var ppRequest = new ModelInvocationRequest(ppProfile, taskType, ppMessages, invocationOptions);
+            var ppResult = await _invocationService.InvokeAsync(ppRequest, cancellationToken).ConfigureAwait(false);
+            return new ChatResponse(new ChatMessage(ChatRole.Assistant, ppResult.Text)) { ModelId = ppProfile.Id };
+        }
 
+        var plan = _selector.BuildTranslationRoutePlan(src, tgt, routingContext);
+        var sourceText = GetAdditionalString(options, "sourceText");
+        var qualityGuard = BuildQualityGuard(sourceText, src, tgt);
+
+        var outcome = await _translationInvoker.InvokeAsync(
+            plan,
+            candidate => new ModelInvocationRequest(
+                candidate.Profile,
+                taskType,
+                BuildMessages(chatMessages, options, candidate.Profile, _glossary),
+                invocationOptions),
+            qualityGuard,
+            cancellationToken).ConfigureAwait(false);
+
+        return new ChatResponse(new ChatMessage(ChatRole.Assistant, outcome.Text))
+        {
+            ModelId = outcome.Candidate.Profile.Id
+        };
+    }
+
+    /// <summary>
+    /// Streams translation tokens from the underlying model.
+    ///
+    /// Strategy by chat template:
+    /// • <see cref="LocalModelChatTemplate.Qwen"/>: buffers the entire response
+    ///   (Qwen outputs a &lt;think&gt; reasoning preamble that must be stripped before
+    ///   any text is forwarded to the UI), then yields the stripped result as a
+    ///   single <see cref="ChatResponseUpdate"/>.
+    /// • All other templates: yields raw deltas as they arrive, applying quality guard
+    ///   on the assembled result; if the guard fails the cloud result replaces the stream.
+    /// </summary>
+    public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
+        IEnumerable<ChatMessage> chatMessages,
+        ChatOptions? options = null,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        var (src, tgt, taskType, routingContext) = ExtractRoutingContext(options);
+        var invocationOptions = BuildInvocationOptions(options, stream: true);
+
+        // Post-processing streams directly without fallback orchestration.
+        if (taskType == ModelTaskType.PostProcessing)
+        {
+            var ppProfile = _selector.SelectPostProcessingProfile();
+            var ppMessages = BuildMessages(chatMessages, options, ppProfile, _glossary);
+            var ppRequest = new ModelInvocationRequest(ppProfile, taskType, ppMessages, invocationOptions);
+            await foreach (var delta in _invocationService.InvokeStreamingAsync(ppRequest, cancellationToken)
+                               .ConfigureAwait(false))
+            {
+                if (!string.IsNullOrEmpty(delta))
+                    yield return new ChatResponseUpdate(ChatRole.Assistant, delta) { ModelId = ppProfile.Id };
+            }
+            yield break;
+        }
+
+        var plan = _selector.BuildTranslationRoutePlan(src, tgt, routingContext);
+
+        // Qwen requires buffered think-tag stripping; if the primary is Qwen we fall
+        // back to a non-streaming invocation path (same plan, same fallback semantics)
+        // and emit the cleaned output as a single update. Non-Qwen primaries stream.
+        if (plan.Primary.Profile.Descriptor.ChatTemplate == LocalModelChatTemplate.Qwen)
+        {
+            var bufferedOptions = invocationOptions with { Stream = false };
+            var bufferedOutcome = await _translationInvoker.InvokeAsync(
+                plan,
+                candidate => new ModelInvocationRequest(
+                    candidate.Profile,
+                    taskType,
+                    BuildMessages(chatMessages, options, candidate.Profile, _glossary),
+                    bufferedOptions),
+                BuildQualityGuard(GetAdditionalString(options, "sourceText"), src, tgt),
+                cancellationToken).ConfigureAwait(false);
+
+            var cleaned = LlamaServerChatResponse.StripQwenThinkTags(bufferedOutcome.Text).Trim();
+            if (!string.IsNullOrEmpty(cleaned))
+            {
+                yield return new ChatResponseUpdate(ChatRole.Assistant, cleaned)
+                {
+                    ModelId = bufferedOutcome.Candidate.Profile.Id
+                };
+            }
+            yield break;
+        }
+
+        await foreach (var update in _translationInvoker.InvokeStreamingAsync(
+                           plan,
+                           candidate => new ModelInvocationRequest(
+                               candidate.Profile,
+                               taskType,
+                               BuildMessages(chatMessages, options, candidate.Profile, _glossary),
+                               invocationOptions),
+                           BuildQualityGuard(GetAdditionalString(options, "sourceText"), src, tgt),
+                           cancellationToken).ConfigureAwait(false))
+        {
+            var chatUpdate = new ChatResponseUpdate(ChatRole.Assistant, update.Delta)
+            {
+                ModelId = update.Candidate.Profile.Id
+            };
+            if (update.ReplaceAll)
+            {
+                chatUpdate.AdditionalProperties = new AdditionalPropertiesDictionary
+                {
+                    ["replaceAll"] = true
+                };
+            }
+            yield return chatUpdate;
+        }
+    }
+
+    public void Dispose() { }
+
+    private static ModelInvocationOptions BuildInvocationOptions(ChatOptions? options, bool stream)
+    {
         var defaults = ModelInvocationOptions.CreateTranslationDefaults();
-        var invocationOptions = new ModelInvocationOptions(
+        return new ModelInvocationOptions(
             options?.MaxOutputTokens ?? defaults.MaxTokens,
             (float)(options?.Temperature ?? defaults.Temperature),
             defaults.TopP,
             defaults.StopSequences,
-            false);
-
-        // Use model-optimal prompt if sourceText is provided; otherwise forward caller messages.
-        var messages = BuildMessages(chatMessages, options, profile);
-        var request = new ModelInvocationRequest(profile, taskType, messages, invocationOptions);
-
-        var result = await _invocationService.InvokeAsync(request, cancellationToken).ConfigureAwait(false);
-
-        // Quality guard: check output against source text; escalate to cloud on failure.
-        if (taskType == ModelTaskType.Translation)
-        {
-            var sourceText = GetAdditionalString(options, "sourceText");
-            if (!string.IsNullOrEmpty(sourceText))
-            {
-                var qc = TranslationQualityGuard.Check(sourceText, result.Text, src, tgt);
-                if (!qc.IsAcceptable)
-                {
-                    _logger?.LogWarning(
-                        "Quality guard rejected local translation for {Src}→{Tgt}: {Reason}. Auto-escalating to cloud.",
-                        src, tgt, qc.FailureReason);
-
-                    var cloudResult = await TryRetryWithCloudAsync(
-                        chatMessages, options, taskType, invocationOptions, src, tgt, cancellationToken)
-                        .ConfigureAwait(false);
-
-                    if (cloudResult is not null)
-                        return cloudResult;
-
-                    // Cloud unavailable – return local result with a warning annotation.
-                    _logger?.LogWarning("Cloud escalation unavailable; returning local result despite quality check failure.");
-                }
-            }
-        }
-
-        return new ChatResponse(new ChatMessage(ChatRole.Assistant, result.Text)) { ModelId = profile.Id };
+            stream);
     }
 
-    public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
-        IEnumerable<ChatMessage> chatMessages,
-        ChatOptions? options = null,
-        CancellationToken cancellationToken = default) =>
-        throw new NotSupportedException("Streaming is not yet supported by TranslationChatClient.");
-
-    public void Dispose() { }
-
-    private async Task<ChatResponse?> TryRetryWithCloudAsync(
-        IEnumerable<ChatMessage> chatMessages,
-        ChatOptions? options,
-        ModelTaskType taskType,
-        ModelInvocationOptions invocationOptions,
-        string src,
-        string tgt,
-        CancellationToken cancellationToken)
+    private TranslationQualityAssertion? BuildQualityGuard(string? sourceText, string src, string tgt)
     {
-        try
+        if (string.IsNullOrEmpty(sourceText)) return null;
+
+        return translated =>
         {
-            // Force cloud escalation via IsHighQualityMode
-            var cloudContext = new TranslationRoutingContext(
-                TextLength: GetAdditionalInt(options, "textLength"),
-                IsHighQualityMode: true);
-            var cloudProfile = _selector.SelectTranslationProfile(src, tgt, cloudContext);
-
-            if (cloudProfile.RuntimeKind == ModelRuntimeKind.LlamaServer)
-                return null; // No cloud profile available
-
-            var cloudMessages = BuildMessages(chatMessages, options, cloudProfile);
-            var cloudRequest = new ModelInvocationRequest(cloudProfile, taskType, cloudMessages, invocationOptions);
-            var cloudResult = await _invocationService.InvokeAsync(cloudRequest, cancellationToken).ConfigureAwait(false);
-
-            _logger?.LogInformation("Quality guard escalation succeeded using cloud profile {Id}.", cloudProfile.Id);
-            return new ChatResponse(new ChatMessage(ChatRole.Assistant, cloudResult.Text)) { ModelId = cloudProfile.Id };
-        }
-        catch (Exception ex)
-        {
-            _logger?.LogWarning(ex, "Quality guard cloud escalation failed.");
-            return null;
-        }
+            var cleaned = (translated ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(cleaned)) return true;
+            var qc = TranslationQualityGuard.Check(sourceText, cleaned, src, tgt);
+            if (!qc.IsAcceptable)
+            {
+                _logger?.LogWarning(
+                    "Quality guard rejected translation for {Src}→{Tgt}: {Reason}.",
+                    src, tgt, qc.FailureReason);
+            }
+            return qc.IsAcceptable;
+        };
     }
 
     private static string? GetAdditionalString(ChatOptions? options, string key)
@@ -154,7 +226,8 @@ public sealed class TranslationChatClient : IChatClient
     private static IReadOnlyList<ModelChatMessage> BuildMessages(
         IEnumerable<ChatMessage> incomingMessages,
         ChatOptions? options,
-        ModelProfile profile)
+        ModelProfile profile,
+        ITranslationGlossary? glossary)
     {
         var props = options?.AdditionalProperties;
 
@@ -164,9 +237,13 @@ public sealed class TranslationChatClient : IChatClient
         {
             var srcName = props.TryGetValue("sourceLangName", out var sn) == true ? sn as string ?? "Chinese" : "Chinese";
             var tgtName = props.TryGetValue("targetLangName", out var tn) == true ? tn as string ?? "English" : "English";
+            var srcLang = props.TryGetValue("sourceLang", out var sl) == true ? sl as string ?? "zh" : "zh";
+            var tgtLang = props.TryGetValue("targetLang", out var tl) == true ? tl as string ?? "en" : "en";
+
+            var hints = glossary?.GetRelevantEntries(sourceText, srcLang, tgtLang);
 
             return TranslationPromptBuilder.Build(
-                sourceText, srcName, tgtName, profile.Descriptor.ChatTemplate);
+                sourceText, srcName, tgtName, profile.Descriptor.ChatTemplate, hints);
         }
 
         // Fallback: convert incoming MEA messages as-is.

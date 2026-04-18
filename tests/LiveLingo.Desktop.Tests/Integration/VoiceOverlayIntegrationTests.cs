@@ -36,8 +36,8 @@ public class VoiceOverlayIntegrationTests
         var audio = new FakeAudioCapture();
         var stt = new FakeStt("hello from mic");
         SetupSttModelInstalled();
-        _pipeline.ProcessAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
-            .Returns(new TranslationResult("translated", "zh", "translated", TimeSpan.FromMilliseconds(5), null));
+        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+            .Returns(_ => SingleDeltaAsync("translated"));
 
         using var coordinator = new SpeechInputCoordinator(audio, stt, _modelManager, new StubVoiceActivityDetector());
         var vm = CreateVm(coordinator);
@@ -54,7 +54,7 @@ public class VoiceOverlayIntegrationTests
         Assert.Equal(VoiceInputState.Idle, vm.VoiceState);
 
         await Task.Delay(1000, TestContext.Current.CancellationToken);
-        await _pipeline.Received().ProcessAsync(
+        _pipeline.Received().ProcessStreamingAsync(
             Arg.Is<TranslationRequest>(r => r.SourceText == "hello from mic"),
             Arg.Any<CancellationToken>());
     }
@@ -164,8 +164,8 @@ public class VoiceOverlayIntegrationTests
         var stt = new FakeStt("voice text");
         SetupSttModelInstalled();
 
-        _pipeline.ProcessAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
-            .Returns(new TranslationResult("translated", "zh", "translated", TimeSpan.FromMilliseconds(5), null));
+        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+            .Returns(_ => SingleDeltaAsync("translated"));
 
         using var coordinator = new SpeechInputCoordinator(audio, stt, _modelManager, new StubVoiceActivityDetector());
         var vm = CreateVm(coordinator);
@@ -261,7 +261,24 @@ public class VoiceOverlayIntegrationTests
         public Task<string> TranslateAsync(string text, string sourceLanguage, string targetLanguage, CancellationToken ct)
             => Task.FromResult($"[{sourceLanguage}\u2192{targetLanguage}] {text}");
 
+        public async IAsyncEnumerable<TranslationDelta> TranslateStreamingAsync(
+            string text, string sourceLanguage, string targetLanguage,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+        {
+            await Task.CompletedTask;
+            yield return new TranslationDelta($"[{sourceLanguage}\u2192{targetLanguage}] {text}");
+        }
+
         public bool SupportsLanguagePair(string sourceLanguage, string targetLanguage) => true;
         public void Dispose() { }
+    }
+
+    private static async IAsyncEnumerable<TranslationDelta> SingleDeltaAsync(
+        string text,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        await Task.CompletedTask;
+        yield return new TranslationDelta(text);
     }
 }

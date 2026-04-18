@@ -13,7 +13,7 @@ public enum LocalModelChatTemplate
     /// <summary>Qwen series (Qwen2.x / Qwen3.x): may emit &lt;think&gt;…&lt;/think&gt; blocks.</summary>
     Qwen,
 
-    /// <summary>Google Gemma series (Gemma 2 / Gemma 4): uses &lt;start_of_turn&gt; chat format.</summary>
+    /// <summary>Google Gemma series (Gemma 2 / Gemma 3 / Gemma 4): uses &lt;start_of_turn&gt; chat format.</summary>
     Gemma,
 }
 
