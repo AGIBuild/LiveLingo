@@ -9,6 +9,7 @@
     <Project Path="tests/LiveLingo.Desktop.Tests/LiveLingo.Desktop.Tests.csproj" />
     <Project Path="tests/LiveLingo.Core.Tests/LiveLingo.Core.Tests.csproj" />
     <Project Path="tests/LiveLingo.HfGguf.Tests/LiveLingo.HfGguf.Tests.csproj" />
+    <Project Path="tests/TranslationBenchmark.Tests/TranslationBenchmark.Tests.csproj" />
   </Folder>
   <Folder Name="/tools/">
     <Project Path="tools/TranslationBenchmark/TranslationBenchmark.csproj" />

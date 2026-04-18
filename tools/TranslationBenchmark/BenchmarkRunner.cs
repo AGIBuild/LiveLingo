@@ -16,15 +16,18 @@ public sealed class BenchmarkRunner
     private readonly IReadOnlyList<ModelEndpointConfig> _models;
     private readonly ModelEndpointConfig? _judgeConfig;
     private readonly bool _verbose;
+    private readonly int _warmup;
 
     public BenchmarkRunner(
         IReadOnlyList<ModelEndpointConfig> models,
         ModelEndpointConfig? judgeConfig,
-        bool verbose = false)
+        bool verbose = false,
+        int warmup = 0)
     {
         _models = models;
         _judgeConfig = judgeConfig;
         _verbose = verbose;
+        _warmup = Math.Max(0, warmup);
     }
 
     public async Task<IReadOnlyList<ModelBenchmarkResult>> RunAsync(CancellationToken ct = default)
@@ -39,16 +42,16 @@ public sealed class BenchmarkRunner
             foreach (var modelConfig in _models)
             {
                 if (ct.IsCancellationRequested) break;
-                Console.WriteLine($"\n  Model: {modelConfig.Name}");
+                var header = $"{modelConfig.Name} · {modelConfig.PromptVariant}{(modelConfig.Streaming ? " · stream" : "")}";
+                Console.WriteLine($"\n  Model: {header}");
 
                 var caseResults = await RunModelOnCasesAsync(
                     modelConfig, cases, srcLang, tgtLang, ct).ConfigureAwait(false);
 
-                results.Add(new ModelBenchmarkResult(modelConfig.Name, pairLabel, caseResults));
+                results.Add(new ModelBenchmarkResult(
+                    modelConfig.Name, modelConfig.PromptVariant, pairLabel, caseResults));
 
-                var success = caseResults.Count(r => r.IsSuccess);
-                var avgBleu = caseResults.Where(r => r.IsSuccess).Select(r => r.BleuScore).DefaultIfEmpty(0).Average();
-                Console.WriteLine($"    ✓ {success}/{cases.Count} | avg BLEU = {avgBleu:F3} | avg {caseResults.Where(r => r.IsSuccess).Select(r => (double)r.ElapsedMs).DefaultIfEmpty(0).Average():F0}ms");
+                PrintModelSummary(caseResults, cases.Count);
             }
         }
 
@@ -63,6 +66,22 @@ public sealed class BenchmarkRunner
         using var client = new TranslationClient(config);
         using var judge = _judgeConfig is not null ? new LlmJudge(_judgeConfig) : null;
 
+        // Warm-up: run first N cases without recording, to shed JIT / model-load noise.
+        for (var w = 0; w < Math.Min(_warmup, cases.Count); w++)
+        {
+            if (ct.IsCancellationRequested) return results;
+            try
+            {
+                _ = await client.TranslateAsync(cases[w].Source, srcLang, tgtLang, ct).ConfigureAwait(false);
+                if (_verbose)
+                    Console.WriteLine($"    [warmup {w + 1}/{_warmup}] ok");
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                Console.WriteLine($"    [warmup {w + 1}/{_warmup}] {ex.Message}");
+            }
+        }
+
         foreach (var c in cases)
         {
             if (ct.IsCancellationRequested) break;
@@ -71,31 +90,54 @@ public sealed class BenchmarkRunner
                 if (_verbose)
                     Console.Write($"    [{c.Id}] translating... ");
 
-                var (translation, elapsed) = await client.TranslateAsync(c.Source, srcLang, tgtLang, ct)
+                var call = await client.TranslateAsync(c.Source, srcLang, tgtLang, ct)
                     .ConfigureAwait(false);
 
-                var bleu = BleuScorer.Score(translation, c.Reference);
+                var bleu = BleuScorer.Score(call.Translation, c.Reference);
                 double? judgeScore = null;
 
                 if (judge is not null)
-                    judgeScore = await judge.JudgeAsync(c.Source, translation, srcLang, tgtLang, ct)
+                    judgeScore = await judge.JudgeAsync(c.Source, call.Translation, srcLang, tgtLang, ct)
                         .ConfigureAwait(false);
 
                 results.Add(new CaseResult(c.Id, c.Domain, c.Source, c.Reference,
-                    translation, bleu, judgeScore, elapsed));
+                    call.Translation, bleu, judgeScore, call.ElapsedMs, call.FirstTokenMs));
 
                 if (_verbose)
-                    Console.WriteLine($"BLEU={bleu:F3}{(judgeScore.HasValue ? $" Judge={judgeScore:F1}" : "")} ({elapsed}ms)");
+                {
+                    var ftt = call.FirstTokenMs is { } ft ? $" ttf={ft}ms" : "";
+                    Console.WriteLine($"BLEU={bleu:F3}{(judgeScore.HasValue ? $" Judge={judgeScore:F1}" : "")} ({call.ElapsedMs}ms{ftt})");
+                }
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 Console.WriteLine($"    [{c.Id}] ERROR: {ex.Message}");
                 results.Add(new CaseResult(c.Id, c.Domain, c.Source, c.Reference,
-                    "", 0, null, 0, ex.Message));
+                    "", 0, null, 0, FirstTokenMs: null, Error: ex.Message));
             }
         }
 
         return results;
+    }
+
+    private static void PrintModelSummary(List<CaseResult> caseResults, int totalCases)
+    {
+        var ok = caseResults.Where(r => r.IsSuccess).ToList();
+        if (ok.Count == 0)
+        {
+            Console.WriteLine($"    ✗ 0/{totalCases}");
+            return;
+        }
+
+        var avgBleu = ok.Select(r => r.BleuScore).Average();
+        var avgMs = ok.Select(r => (double)r.ElapsedMs).Average();
+        var p95Ms = LatencyStats.Percentile([.. ok.Select(r => r.ElapsedMs)], 0.95);
+        var ftts = ok.Where(r => r.FirstTokenMs.HasValue).Select(r => r.FirstTokenMs!.Value).ToArray();
+        var ftSegment = ftts.Length > 0
+            ? $" | ttf P50={LatencyStats.Percentile(ftts, 0.50):F0}ms P95={LatencyStats.Percentile(ftts, 0.95):F0}ms"
+            : string.Empty;
+        Console.WriteLine(
+            $"    ✓ {ok.Count}/{totalCases} | BLEU={avgBleu:F3} | avg={avgMs:F0}ms P95={p95Ms:F0}ms{ftSegment}");
     }
 
     private static List<BenchmarkCase> LoadEmbeddedCases(string resourceName)
