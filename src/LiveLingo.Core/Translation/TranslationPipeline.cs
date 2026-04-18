@@ -35,9 +35,12 @@ public sealed class TranslationPipeline : ITranslationPipeline
     }
 
     public async Task<TranslationResult> ProcessAsync(
-        TranslationRequest request, CancellationToken ct)
+        TranslationRequest request,
+        CancellationToken ct = default,
+        IProgress<TranslationLifecycleEvent>? progress = null)
     {
-        var prep = await PrepareAsync(request, ct).ConfigureAwait(false);
+        var reporter = new LifecycleReporter(progress);
+        var prep = await PrepareAsync(request, reporter, ct).ConfigureAwait(false);
         if (prep.IsIdentity)
         {
             return new TranslationResult(
@@ -48,6 +51,7 @@ public sealed class TranslationPipeline : ITranslationPipeline
         if (request.PostProcessing is not null)
             _modelReadiness.EnsurePostProcessingModelReady();
 
+        reporter.Report(TranslationPhase.TranslationStarted);
         var sw = Stopwatch.StartNew();
         string translated;
         try
@@ -88,15 +92,19 @@ public sealed class TranslationPipeline : ITranslationPipeline
 
     public async IAsyncEnumerable<TranslationDelta> ProcessStreamingAsync(
         TranslationRequest request,
-        [EnumeratorCancellation] CancellationToken ct = default)
+        [EnumeratorCancellation] CancellationToken ct = default,
+        IProgress<TranslationLifecycleEvent>? progress = null)
     {
-        var prep = await PrepareAsync(request, ct).ConfigureAwait(false);
+        var reporter = new LifecycleReporter(progress);
+        var prep = await PrepareAsync(request, reporter, ct).ConfigureAwait(false);
         if (prep.IsIdentity)
         {
             yield return new TranslationDelta(request.SourceText);
             yield break;
         }
 
+        reporter.Report(TranslationPhase.TranslationStarted);
+        var firstTokenReported = false;
         TranslationUnit? prev = null;
         foreach (var unit in prep.Units)
         {
@@ -112,6 +120,11 @@ public sealed class TranslationPipeline : ITranslationPipeline
                                unit.SourceText, prep.SourceLanguage, request.TargetLanguage, ct)
                                .ConfigureAwait(false))
             {
+                if (!firstTokenReported)
+                {
+                    firstTokenReported = true;
+                    reporter.Report(TranslationPhase.FirstTokenReceived);
+                }
                 yield return delta;
             }
 
@@ -128,13 +141,18 @@ public sealed class TranslationPipeline : ITranslationPipeline
     /// post-processing stage.
     /// </summary>
     private async Task<PreparedRequest> PrepareAsync(
-        TranslationRequest request, CancellationToken ct)
+        TranslationRequest request, LifecycleReporter reporter, CancellationToken ct)
     {
         var srcLang = request.SourceLanguage;
         if (string.IsNullOrEmpty(srcLang))
         {
+            reporter.Report(TranslationPhase.LanguageDetectionStarted);
             var detection = await _detector.DetectAsync(request.SourceText, ct).ConfigureAwait(false);
             srcLang = detection.Language;
+            reporter.Report(
+                TranslationPhase.LanguageDetected,
+                detection.Language,
+                detection.Confidence);
 
             if (detection.Confidence < 0.6f)
                 _logger.LogWarning(
@@ -154,6 +172,25 @@ public sealed class TranslationPipeline : ITranslationPipeline
         var segments = _segmenter.Segment(request.SourceText);
         var units = _segmenter.PlanUnits(segments);
         return new PreparedRequest(false, srcLang, segments, units);
+    }
+
+    /// <summary>
+    /// Thin wrapper that lets <see cref="PrepareAsync"/> and the translate loop
+    /// emit timestamped lifecycle events without worrying about null checks or
+    /// keeping an external Stopwatch in sync.
+    /// </summary>
+    private sealed class LifecycleReporter(IProgress<TranslationLifecycleEvent>? progress)
+    {
+        private readonly Stopwatch _sw = Stopwatch.StartNew();
+
+        public void Report(
+            TranslationPhase phase,
+            string? detectedLanguage = null,
+            float? confidence = null)
+        {
+            progress?.Report(new TranslationLifecycleEvent(
+                phase, _sw.Elapsed, detectedLanguage, confidence));
+        }
     }
 
     /// <summary>

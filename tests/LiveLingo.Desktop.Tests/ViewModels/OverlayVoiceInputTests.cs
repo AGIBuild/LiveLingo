@@ -223,7 +223,7 @@ public class OverlayVoiceInputTests
     [Fact]
     public async Task VoiceInput_DoesNotAffectTranslationState()
     {
-        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>(), Arg.Any<IProgress<TranslationLifecycleEvent>?>())
             .Returns(_ => SingleDeltaAsync("translated"));
 
         var vm = CreateVm();
@@ -256,7 +256,7 @@ public class OverlayVoiceInputTests
     [Fact]
     public async Task SuccessfulTranscription_TriggersTranslationPipeline()
     {
-        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>(), Arg.Any<IProgress<TranslationLifecycleEvent>?>())
             .Returns(_ => SingleDeltaAsync("translated"));
 
         var vm = CreateVm();
@@ -271,7 +271,8 @@ public class OverlayVoiceInputTests
         await Task.Delay(1000, TestContext.Current.CancellationToken);
         _pipeline.Received().ProcessStreamingAsync(
             Arg.Is<TranslationRequest>(r => r.SourceText == "voice text"),
-            Arg.Any<CancellationToken>());
+            Arg.Any<CancellationToken>(),
+            Arg.Any<IProgress<TranslationLifecycleEvent>?>());
     }
 
     [Fact]
@@ -387,7 +388,7 @@ public class OverlayVoiceInputTests
     [Fact]
     public async Task SuccessfulTranscription_TranslationFailure_ShowsFriendlyTranslationStatus()
     {
-        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>(), Arg.Any<IProgress<TranslationLifecycleEvent>?>())
             .Returns(_ => ThrowingDeltaAsync(new TranslationFailedException("Translation failed.")));
 
         var vm = CreateVm();
@@ -415,7 +416,7 @@ public class OverlayVoiceInputTests
             }
         };
 
-        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>(), Arg.Any<IProgress<TranslationLifecycleEvent>?>())
             .Returns(_ => ThrowingDeltaAsync(new NotSupportedException("unsupported pair")));
 
         var vm = new OverlayViewModel(

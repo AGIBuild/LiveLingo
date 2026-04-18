@@ -36,7 +36,7 @@ public class VoiceOverlayIntegrationTests
         var audio = new FakeAudioCapture();
         var stt = new FakeStt("hello from mic");
         SetupSttModelInstalled();
-        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>(), Arg.Any<IProgress<TranslationLifecycleEvent>?>())
             .Returns(_ => SingleDeltaAsync("translated"));
 
         using var coordinator = new SpeechInputCoordinator(audio, stt, _modelManager, new StubVoiceActivityDetector());
@@ -56,7 +56,8 @@ public class VoiceOverlayIntegrationTests
         await Task.Delay(1000, TestContext.Current.CancellationToken);
         _pipeline.Received().ProcessStreamingAsync(
             Arg.Is<TranslationRequest>(r => r.SourceText == "hello from mic"),
-            Arg.Any<CancellationToken>());
+            Arg.Any<CancellationToken>(),
+            Arg.Any<IProgress<TranslationLifecycleEvent>?>());
     }
 
     [Fact]
@@ -164,7 +165,7 @@ public class VoiceOverlayIntegrationTests
         var stt = new FakeStt("voice text");
         SetupSttModelInstalled();
 
-        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>(), Arg.Any<IProgress<TranslationLifecycleEvent>?>())
             .Returns(_ => SingleDeltaAsync("translated"));
 
         using var coordinator = new SpeechInputCoordinator(audio, stt, _modelManager, new StubVoiceActivityDetector());

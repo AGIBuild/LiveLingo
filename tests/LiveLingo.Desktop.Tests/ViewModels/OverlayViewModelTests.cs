@@ -151,7 +151,7 @@ public class OverlayViewModelTests
     [Fact]
     public async Task OnSourceTextChanged_TriggersPipeline_AfterDebounce()
     {
-        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>(), Arg.Any<IProgress<TranslationLifecycleEvent>?>())
             .Returns(_ => SingleDeltaAsync("Result"));
 
         var vm = CreateVm();
@@ -160,7 +160,7 @@ public class OverlayViewModelTests
         await Task.Delay(1000, TestContext.Current.CancellationToken);
 
         _pipeline.Received()
-            .ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>());
+            .ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>(), Arg.Any<IProgress<TranslationLifecycleEvent>?>());
     }
 
     [Fact]
@@ -330,7 +330,7 @@ public class OverlayViewModelTests
     [Fact]
     public async Task RunPipelineAsync_SetsTranslatedTextAndStatus()
     {
-        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>(), Arg.Any<IProgress<TranslationLifecycleEvent>?>())
             .Returns(_ => SingleDeltaAsync("Translated"));
 
         var vm = CreateVm();
@@ -344,7 +344,7 @@ public class OverlayViewModelTests
     [Fact]
     public async Task RunPipelineAsync_CancelsPrevious_WhenSourceTextChangesRapidly()
     {
-        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>(), Arg.Any<IProgress<TranslationLifecycleEvent>?>())
             .Returns(_ => SingleDeltaAsync("Latest"));
 
         var vm = CreateVm();
@@ -402,7 +402,7 @@ public class OverlayViewModelTests
     public async Task RunPipelineAsync_ShowsTranslatingStatus_BeforeComplete()
     {
         var tcs = new TaskCompletionSource();
-        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>(), Arg.Any<IProgress<TranslationLifecycleEvent>?>())
             .Returns(ci => BlockingDeltaAsync(tcs, ci.ArgAt<CancellationToken>(1)));
 
         var vm = CreateVm();
@@ -412,6 +412,36 @@ public class OverlayViewModelTests
         Assert.Equal("Translating...", vm.StatusText);
         Assert.True(vm.IsTranslating);
         tcs.SetResult();
+    }
+
+    [Fact]
+    public async Task RunPipelineAsync_LanguageDetectionLifecycleEvent_UpdatesStatusText()
+    {
+        // The pipeline's language-detection phase used to be invisible to the
+        // user – the UI said "Translating…" from the moment debounce fired
+        // until the first token showed up. Lifecycle progress events now
+        // surface that wait so the status bar reflects what's happening.
+        var blocker = new TaskCompletionSource();
+        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>(), Arg.Any<IProgress<TranslationLifecycleEvent>?>())
+            .Returns(ci =>
+            {
+                var progress = ci.ArgAt<IProgress<TranslationLifecycleEvent>?>(2);
+                progress?.Report(new TranslationLifecycleEvent(
+                    TranslationPhase.LanguageDetectionStarted,
+                    TimeSpan.FromMilliseconds(5)));
+                return BlockingDeltaAsync(blocker, ci.ArgAt<CancellationToken>(1));
+            });
+
+        var vm = CreateVm();
+        vm.SourceText = "hello";
+
+        // Progress<T> posts via the captured SynchronizationContext; we need
+        // to give xUnit's test sync context a few hops to drain.
+        for (var i = 0; i < 50 && !vm.StatusText.Contains("Detecting", StringComparison.OrdinalIgnoreCase); i++)
+            await Task.Delay(50, TestContext.Current.CancellationToken);
+
+        Assert.Contains("Detecting", vm.StatusText, StringComparison.OrdinalIgnoreCase);
+        blocker.SetResult();
     }
 
     [Fact]
@@ -426,7 +456,7 @@ public class OverlayViewModelTests
     [Fact]
     public async Task RunPipelineAsync_ShowsErrorStatus_WhenModelNotFound()
     {
-        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>(), Arg.Any<IProgress<TranslationLifecycleEvent>?>())
             .Returns(_ => ThrowingDeltaAsync(new FileNotFoundException("Model not found")));
 
         var vm = CreateVm();
@@ -439,7 +469,7 @@ public class OverlayViewModelTests
     [Fact]
     public async Task RunPipelineAsync_ShowsErrorStatus_WhenGenericException()
     {
-        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>(), Arg.Any<IProgress<TranslationLifecycleEvent>?>())
             .Returns(_ => ThrowingDeltaAsync(new InvalidOperationException("Something broke")));
 
         var vm = CreateVm();
@@ -454,7 +484,7 @@ public class OverlayViewModelTests
     [Fact]
     public async Task RunPipelineAsync_ShowsFriendlyError_WhenTranslationFails()
     {
-        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>(), Arg.Any<IProgress<TranslationLifecycleEvent>?>())
             .Returns(_ => ThrowingDeltaAsync(new TranslationFailedException("Translation failed.")));
 
         var vm = CreateVm();
@@ -468,7 +498,7 @@ public class OverlayViewModelTests
     [Fact]
     public async Task RunPipelineAsync_SilentOnCancellation()
     {
-        _pipeline.ProcessAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+        _pipeline.ProcessAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>(), Arg.Any<IProgress<TranslationLifecycleEvent>?>())
             .Returns<TranslationResult>(_ => throw new OperationCanceledException());
 
         var vm = CreateVm();
@@ -624,7 +654,7 @@ public class OverlayViewModelTests
             Processing = new ProcessingSettings { DefaultMode = "Summarize" }
         };
 
-        _pipeline.ProcessAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+        _pipeline.ProcessAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>(), Arg.Any<IProgress<TranslationLifecycleEvent>?>())
             .Returns(new TranslationResult("Result", "zh", "Result", TimeSpan.FromMilliseconds(10), TimeSpan.FromMilliseconds(5)));
 
         var vm = new OverlayViewModel(_target, _pipeline, _injector, _engine, settings, localizationService: _loc);
@@ -633,7 +663,8 @@ public class OverlayViewModelTests
 
         await _pipeline.Received().ProcessAsync(
             Arg.Is<TranslationRequest>(r => r.PostProcessing != null && r.PostProcessing.Summarize),
-            Arg.Any<CancellationToken>());
+            Arg.Any<CancellationToken>(),
+            Arg.Any<IProgress<TranslationLifecycleEvent>?>());
     }
 
     [Fact]
@@ -650,7 +681,7 @@ public class OverlayViewModelTests
             Processing = new ProcessingSettings { DefaultMode = "Off" }
         };
 
-        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>(), Arg.Any<IProgress<TranslationLifecycleEvent>?>())
             .Returns(_ => SingleDeltaAsync("Result"));
 
         var vm = new OverlayViewModel(_target, _pipeline, _injector, _engine, settings, localizationService: _loc);
@@ -659,7 +690,8 @@ public class OverlayViewModelTests
 
         _pipeline.Received().ProcessStreamingAsync(
             Arg.Is<TranslationRequest>(r => r.PostProcessing == null),
-            Arg.Any<CancellationToken>());
+            Arg.Any<CancellationToken>(),
+            Arg.Any<IProgress<TranslationLifecycleEvent>?>());
     }
 
     [Fact]
@@ -671,7 +703,8 @@ public class OverlayViewModelTests
         };
         _pipeline.ProcessAsync(
                 Arg.Is<TranslationRequest>(r => r.PostProcessing != null),
-                Arg.Any<CancellationToken>())
+                Arg.Any<CancellationToken>(),
+                Arg.Any<IProgress<TranslationLifecycleEvent>?>())
             .Returns<TranslationResult>(_ => throw new ModelNotReadyException(
                 ModelType.PostProcessing,
                 ModelRegistry.Qwen25_15B.Id,
@@ -679,7 +712,8 @@ public class OverlayViewModelTests
                 "download"));
         _pipeline.ProcessAsync(
                 Arg.Is<TranslationRequest>(r => r.PostProcessing == null),
-                Arg.Any<CancellationToken>())
+                Arg.Any<CancellationToken>(),
+                Arg.Any<IProgress<TranslationLifecycleEvent>?>())
             .Returns(new TranslationResult("Result", "zh", "Result", TimeSpan.FromMilliseconds(10), null));
 
         var vm = new OverlayViewModel(
@@ -694,10 +728,12 @@ public class OverlayViewModelTests
 
         await _pipeline.Received().ProcessAsync(
             Arg.Is<TranslationRequest>(r => r.PostProcessing != null),
-            Arg.Any<CancellationToken>());
+            Arg.Any<CancellationToken>(),
+            Arg.Any<IProgress<TranslationLifecycleEvent>?>());
         await _pipeline.Received().ProcessAsync(
             Arg.Is<TranslationRequest>(r => r.PostProcessing == null),
-            Arg.Any<CancellationToken>());
+            Arg.Any<CancellationToken>(),
+            Arg.Any<IProgress<TranslationLifecycleEvent>?>());
         Assert.Contains("translation-only", vm.StatusText, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -710,7 +746,8 @@ public class OverlayViewModelTests
         };
         _pipeline.ProcessAsync(
                 Arg.Is<TranslationRequest>(r => r.PostProcessing != null),
-                Arg.Any<CancellationToken>())
+                Arg.Any<CancellationToken>(),
+                Arg.Any<IProgress<TranslationLifecycleEvent>?>())
             .Returns<TranslationResult>(_ => throw new ModelNotReadyException(
                 ModelType.PostProcessing,
                 ModelRegistry.Qwen25_15B.Id,
@@ -718,9 +755,10 @@ public class OverlayViewModelTests
                 "download"));
         _pipeline.ProcessAsync(
                 Arg.Is<TranslationRequest>(r => r.PostProcessing == null),
-                Arg.Any<CancellationToken>())
+                Arg.Any<CancellationToken>(),
+                Arg.Any<IProgress<TranslationLifecycleEvent>?>())
             .Returns(new TranslationResult("Result", "zh", "Result", TimeSpan.FromMilliseconds(10), null));
-        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>(), Arg.Any<IProgress<TranslationLifecycleEvent>?>())
             .Returns(_ => SingleDeltaAsync("Result"));
 
         var vm = new OverlayViewModel(_target, _pipeline, _injector, _engine, settings, localizationService: _loc);
@@ -731,13 +769,16 @@ public class OverlayViewModelTests
 
         await _pipeline.Received(1).ProcessAsync(
             Arg.Is<TranslationRequest>(r => r.PostProcessing != null),
-            Arg.Any<CancellationToken>());
+            Arg.Any<CancellationToken>(),
+            Arg.Any<IProgress<TranslationLifecycleEvent>?>());
         await _pipeline.Received(1).ProcessAsync(
             Arg.Is<TranslationRequest>(r => r.PostProcessing == null),
-            Arg.Any<CancellationToken>());
+            Arg.Any<CancellationToken>(),
+            Arg.Any<IProgress<TranslationLifecycleEvent>?>());
         _pipeline.Received(1).ProcessStreamingAsync(
             Arg.Any<TranslationRequest>(),
-            Arg.Any<CancellationToken>());
+            Arg.Any<CancellationToken>(),
+            Arg.Any<IProgress<TranslationLifecycleEvent>?>());
     }
 
     [Fact]
@@ -748,7 +789,7 @@ public class OverlayViewModelTests
             Translation = new TranslationSettings { DefaultSourceLanguage = "ja" }
         };
 
-        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>(), Arg.Any<IProgress<TranslationLifecycleEvent>?>())
             .Returns(_ => SingleDeltaAsync("Result"));
 
         var vm = new OverlayViewModel(_target, _pipeline, _injector, _engine, settings, localizationService: _loc);
@@ -757,7 +798,8 @@ public class OverlayViewModelTests
 
         _pipeline.Received().ProcessStreamingAsync(
             Arg.Is<TranslationRequest>(r => r.SourceLanguage == "ja"),
-            Arg.Any<CancellationToken>());
+            Arg.Any<CancellationToken>(),
+            Arg.Any<IProgress<TranslationLifecycleEvent>?>());
     }
 
     [Fact]
@@ -845,7 +887,7 @@ public class OverlayViewModelTests
     [Fact]
     public async Task SelectedTargetLanguage_RetranslatesWhenSourceExists()
     {
-        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>(), Arg.Any<IProgress<TranslationLifecycleEvent>?>())
             .Returns(_ => SingleDeltaAsync("Result"));
         var vm = CreateVm();
         vm.SourceText = "hello";
@@ -856,7 +898,8 @@ public class OverlayViewModelTests
 
         _pipeline.Received().ProcessStreamingAsync(
             Arg.Is<TranslationRequest>(r => r.TargetLanguage == "zh"),
-            Arg.Any<CancellationToken>());
+            Arg.Any<CancellationToken>(),
+            Arg.Any<IProgress<TranslationLifecycleEvent>?>());
     }
 
     [Fact]
@@ -926,7 +969,7 @@ public class OverlayViewModelTests
 
         Assert.Contains("Target language is not configured", vm.StatusText);
         await _pipeline.DidNotReceive()
-            .ProcessAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>());
+            .ProcessAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>(), Arg.Any<IProgress<TranslationLifecycleEvent>?>());
     }
 
     [Fact]
@@ -941,7 +984,7 @@ public class OverlayViewModelTests
                 DefaultTargetLanguage = "en"
             }
         };
-        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>(), Arg.Any<IProgress<TranslationLifecycleEvent>?>())
             .Returns(_ => ThrowingDeltaAsync(new NotSupportedException("unsupported pair")));
         var vm = new OverlayViewModel(_target, _pipeline, _injector, engine, settings, localizationService: _loc);
         vm.SourceText = "test";
@@ -949,7 +992,7 @@ public class OverlayViewModelTests
 
         Assert.Contains("Unsupported language pair", vm.StatusText);
         _pipeline.Received(1)
-            .ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>());
+            .ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>(), Arg.Any<IProgress<TranslationLifecycleEvent>?>());
     }
 
     [Fact]
@@ -975,7 +1018,7 @@ public class OverlayViewModelTests
     [Fact]
     public async Task Debounce_RapidInput_OnlyTriggersOnce()
     {
-        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>(), Arg.Any<IProgress<TranslationLifecycleEvent>?>())
             .Returns(_ => SingleDeltaAsync("R"));
 
         var vm = CreateVm();
@@ -990,7 +1033,8 @@ public class OverlayViewModelTests
         _pipeline.Received(1)
             .ProcessStreamingAsync(
                 Arg.Is<TranslationRequest>(r => r.SourceText == "abc"),
-                Arg.Any<CancellationToken>());
+                Arg.Any<CancellationToken>(),
+                Arg.Any<IProgress<TranslationLifecycleEvent>?>());
     }
 
     // --- A3: Copy tests ---
@@ -1049,7 +1093,7 @@ public class OverlayViewModelTests
     public async Task IsTranslating_TrueDuringPipeline_FalseAfter()
     {
         var tcs = new TaskCompletionSource();
-        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>(), Arg.Any<IProgress<TranslationLifecycleEvent>?>())
             .Returns(ci => BlockingDeltaAsync(tcs, ci.ArgAt<CancellationToken>(1)));
 
         var vm = CreateVm();
@@ -1067,7 +1111,7 @@ public class OverlayViewModelTests
     [Fact]
     public async Task IsTranslating_FalseAfterError()
     {
-        _pipeline.ProcessAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+        _pipeline.ProcessAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>(), Arg.Any<IProgress<TranslationLifecycleEvent>?>())
             .Returns<TranslationResult>(_ => throw new InvalidOperationException("fail"));
 
         var vm = CreateVm();
@@ -1292,7 +1336,8 @@ public class OverlayViewModelTests
         };
         _pipeline.ProcessAsync(
                 Arg.Is<TranslationRequest>(r => r.PostProcessing != null),
-                Arg.Any<CancellationToken>())
+                Arg.Any<CancellationToken>(),
+                Arg.Any<IProgress<TranslationLifecycleEvent>?>())
             .Returns<TranslationResult>(_ => throw new ModelNotReadyException(
                 ModelType.PostProcessing,
                 ModelRegistry.Qwen25_15B.Id,
@@ -1300,9 +1345,10 @@ public class OverlayViewModelTests
                 "download"));
         _pipeline.ProcessAsync(
                 Arg.Is<TranslationRequest>(r => r.PostProcessing == null),
-                Arg.Any<CancellationToken>())
+                Arg.Any<CancellationToken>(),
+                Arg.Any<IProgress<TranslationLifecycleEvent>?>())
             .Returns(new TranslationResult("Result", "zh", "Result", TimeSpan.FromMilliseconds(10), null));
-        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>(), Arg.Any<IProgress<TranslationLifecycleEvent>?>())
             .Returns(_ => SingleDeltaAsync("Result"));
 
         var vm = new OverlayViewModel(_target, _pipeline, _injector, _engine, settings, localizationService: _loc);
@@ -1334,9 +1380,9 @@ public class OverlayViewModelTests
         var settingsService = CreateMutableSettingsService(settings);
         var messenger = new WeakReferenceMessenger();
 
-        _pipeline.ProcessAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+        _pipeline.ProcessAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>(), Arg.Any<IProgress<TranslationLifecycleEvent>?>())
             .Returns(new TranslationResult("Result", "zh", "Result", TimeSpan.FromMilliseconds(10), null));
-        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>(), Arg.Any<IProgress<TranslationLifecycleEvent>?>())
             .Returns(_ => SingleDeltaAsync("Result"));
 
         var vm = new OverlayViewModel(
@@ -1364,7 +1410,8 @@ public class OverlayViewModelTests
                 r.SourceText == "hello" &&
                 r.PostProcessing != null &&
                 r.PostProcessing.Summarize),
-            Arg.Any<CancellationToken>());
+            Arg.Any<CancellationToken>(),
+            Arg.Any<IProgress<TranslationLifecycleEvent>?>());
     }
 
     [Fact]
@@ -1382,7 +1429,8 @@ public class OverlayViewModelTests
 
         _pipeline.ProcessAsync(
                 Arg.Is<TranslationRequest>(r => r.TargetLanguage == "en" && r.PostProcessing != null),
-                Arg.Any<CancellationToken>())
+                Arg.Any<CancellationToken>(),
+                Arg.Any<IProgress<TranslationLifecycleEvent>?>())
             .Returns<TranslationResult>(_ => throw new ModelNotReadyException(
                 ModelType.PostProcessing,
                 ModelRegistry.Qwen25_15B.Id,
@@ -1390,11 +1438,13 @@ public class OverlayViewModelTests
                 "download"));
         _pipeline.ProcessAsync(
                 Arg.Is<TranslationRequest>(r => r.TargetLanguage == "en" && r.PostProcessing == null),
-                Arg.Any<CancellationToken>())
+                Arg.Any<CancellationToken>(),
+                Arg.Any<IProgress<TranslationLifecycleEvent>?>())
             .Returns(new TranslationResult("Result", "zh", "Result", TimeSpan.FromMilliseconds(10), null));
         _pipeline.ProcessAsync(
                 Arg.Is<TranslationRequest>(r => r.TargetLanguage == "ja" && r.PostProcessing != null),
-                Arg.Any<CancellationToken>())
+                Arg.Any<CancellationToken>(),
+                Arg.Any<IProgress<TranslationLifecycleEvent>?>())
             .Returns<TranslationResult>(_ => throw new ModelNotReadyException(
                 ModelType.PostProcessing,
                 ModelRegistry.Qwen25_15B.Id,
@@ -1402,7 +1452,8 @@ public class OverlayViewModelTests
                 "download"));
         _pipeline.ProcessAsync(
                 Arg.Is<TranslationRequest>(r => r.TargetLanguage == "ja" && r.PostProcessing == null),
-                Arg.Any<CancellationToken>())
+                Arg.Any<CancellationToken>(),
+                Arg.Any<IProgress<TranslationLifecycleEvent>?>())
             .Returns(new TranslationResult("結果", "zh", "結果", TimeSpan.FromMilliseconds(10), null));
 
         var vm = new OverlayViewModel(_target, _pipeline, _injector, _engine, settings, localizationService: _loc);
@@ -1417,13 +1468,16 @@ public class OverlayViewModelTests
 
         await _pipeline.Received(1).ProcessAsync(
             Arg.Is<TranslationRequest>(r => r.TargetLanguage == "en" && r.PostProcessing != null),
-            Arg.Any<CancellationToken>());
+            Arg.Any<CancellationToken>(),
+            Arg.Any<IProgress<TranslationLifecycleEvent>?>());
         await _pipeline.Received(1).ProcessAsync(
             Arg.Is<TranslationRequest>(r => r.TargetLanguage == "ja" && r.PostProcessing != null),
-            Arg.Any<CancellationToken>());
+            Arg.Any<CancellationToken>(),
+            Arg.Any<IProgress<TranslationLifecycleEvent>?>());
         await _pipeline.Received(1).ProcessAsync(
             Arg.Is<TranslationRequest>(r => r.TargetLanguage == "ja" && r.PostProcessing == null),
-            Arg.Any<CancellationToken>());
+            Arg.Any<CancellationToken>(),
+            Arg.Any<IProgress<TranslationLifecycleEvent>?>());
         Assert.Contains("translation-only", vm.StatusText, StringComparison.OrdinalIgnoreCase);
         Assert.Equal("ja", vm.TargetLanguage);
     }
@@ -1528,7 +1582,7 @@ public class OverlayViewModelTests
         // in flight when the overlay window closes.
         var pipelineStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var pipelineCancelled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>(), Arg.Any<IProgress<TranslationLifecycleEvent>?>())
             .Returns(ci => SignalingBlockingDeltaAsync(
                 pipelineStarted,
                 pipelineCancelled,
