@@ -308,6 +308,93 @@ public class TextSegmenterTests
         Assert.DoesNotContain(result, s => s.Text.EndsWith("U.S.A.", StringComparison.Ordinal));
     }
 
+    // --- Single-newline line preservation ---
+
+    [Fact]
+    public void Segment_SingleNewlineBetweenLines_MarksLineBreak()
+    {
+        // Two short lines with no sentence punctuation: the old segmenter
+        // coalesced them into a single Sentence-break and lost the hard
+        // wrap; the line pre-pass must now surface SegmentBreak.Line.
+        var text = "line one\nline two";
+
+        var result = _segmenter.Segment(text);
+
+        Assert.Equal(2, result.Count);
+        Assert.Equal("line one", result[0].Text);
+        Assert.Equal(SegmentBreak.Line, result[0].BreakAfter);
+        Assert.Equal("line two", result[1].Text);
+        Assert.Equal(SegmentBreak.None, result[1].BreakAfter);
+    }
+
+    [Fact]
+    public void Segment_LineBreakSeparator_IsNewline()
+    {
+        Assert.Equal("\n", TextSegmenter.JoinSeparatorFor(SegmentBreak.Line, "en"));
+        Assert.Equal("\n", TextSegmenter.JoinSeparatorFor(SegmentBreak.Line, "zh"));
+        Assert.Equal("\n", TextSegmenter.JoinSeparatorFor(SegmentBreak.Line, null));
+    }
+
+    [Fact]
+    public void Segment_ThreeLinesWithBlankLineInMiddle_ProducesLineThenParagraph()
+    {
+        // "first\nsecond\n\nthird" – second/third are separated by a blank
+        // line which promotes the boundary to Paragraph while the earlier
+        // single newline stays a Line break.
+        var text = "first\nsecond\n\nthird";
+
+        var result = _segmenter.Segment(text);
+
+        Assert.Equal(3, result.Count);
+        Assert.Equal("first", result[0].Text);
+        Assert.Equal(SegmentBreak.Line, result[0].BreakAfter);
+        Assert.Equal("second", result[1].Text);
+        Assert.Equal(SegmentBreak.Paragraph, result[1].BreakAfter);
+        Assert.Equal("third", result[2].Text);
+        Assert.Equal(SegmentBreak.None, result[2].BreakAfter);
+    }
+
+    [Fact]
+    public void Segment_CrlfIsNormalized()
+    {
+        var text = "alpha\r\nbeta";
+
+        var result = _segmenter.Segment(text);
+
+        Assert.Equal(2, result.Count);
+        Assert.Equal(SegmentBreak.Line, result[0].BreakAfter);
+    }
+
+    [Fact]
+    public void Segment_MultipleSentencesOnASingleLine_StayIntraLine()
+    {
+        // Sentence splits inside a line must still report Sentence breaks,
+        // not Line breaks – we only promote to Line at a real '\n'.
+        var text = "Hi there. Bye now.";
+
+        var result = _segmenter.Segment(text);
+
+        Assert.Equal(2, result.Count);
+        Assert.Equal(SegmentBreak.Sentence, result[0].BreakAfter);
+    }
+
+    [Fact]
+    public void Segment_SentencesAcrossTwoLines_LastIntraLineIsLineBreak()
+    {
+        // "A. B.\nC." – intra-line boundary between A/B is Sentence, line
+        // boundary between B and C is Line.
+        var text = "A. B.\nC.";
+
+        var result = _segmenter.Segment(text);
+
+        Assert.Equal(3, result.Count);
+        Assert.Equal("A.", result[0].Text);
+        Assert.Equal(SegmentBreak.Sentence, result[0].BreakAfter);
+        Assert.Equal("B.", result[1].Text);
+        Assert.Equal(SegmentBreak.Line, result[1].BreakAfter);
+        Assert.Equal("C.", result[2].Text);
+    }
+
     // --- CountSentenceEndings (used by TranslationQualityGuard) ---
 
     [Theory]

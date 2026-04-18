@@ -1,18 +1,23 @@
 namespace LiveLingo.Core.Translation;
 
 /// <summary>
-/// Splits text at natural sentence and paragraph boundaries for incremental translation.
+/// Splits text at natural sentence, line, and paragraph boundaries for incremental translation.
 ///
 /// Segmentation strategy:
-///  - Atomic-sentence pre-pass: any text with ≥ 2 sentence-end markers is split per
+///  - Line-structure pre-pass: the input is first split on raw newlines so that
+///    user-authored line breaks (single \n) and paragraph breaks (blank lines)
+///    are preserved as first-class segment boundaries. Each non-empty line then
+///    runs through the atomic-sentence + long-text pipeline below.
+///  - Atomic-sentence pre-pass: any line with ≥ 2 sentence-end markers is split per
 ///    sentence regardless of total length. Local LLMs (Gemma/Qwen) frequently drop the
 ///    trailing sentence when multiple clauses share a single prompt, so each sentence
 ///    gets its own translation call and the results are re-joined by the pipeline.
 ///  - Single-sentence path: short texts are returned verbatim; long ones fall back to
 ///    paragraph → sentence → word → hard-cut splitting capped by <paramref name="maxCharsPerSegment"/>.
 ///
-/// Content is preserved: reassembling the segments (with break-appropriate separators)
-/// reproduces the original text modulo collapsing runs of whitespace.
+/// Content is preserved: reassembling the segments with break-appropriate
+/// separators (see <see cref="JoinSeparatorFor"/>) reproduces the original
+/// newline layout modulo collapsing runs of intra-line whitespace.
 /// </summary>
 public sealed class TextSegmenter
 {
@@ -29,31 +34,52 @@ public sealed class TextSegmenter
         if (string.IsNullOrWhiteSpace(text))
             return [];
 
-        var trimmed = text.Trim();
-        var sentences = SplitIntoSentences(trimmed);
+        var lines = SplitIntoLines(text);
+        if (lines.Count == 0) return [];
 
-        if (sentences.Count > 1)
-            return ExpandSentences(sentences, maxCharsPerSegment);
+        var result = new List<TextSegment>();
+        for (var lineIndex = 0; lineIndex < lines.Count; lineIndex++)
+        {
+            var line = lines[lineIndex];
+            var lineSegments = SegmentSingleLine(line.Text, maxCharsPerSegment);
+            if (lineSegments.Count == 0) continue;
 
-        if (trimmed.Length <= maxCharsPerSegment)
-            return [new TextSegment(trimmed, SegmentBreak.None)];
+            var isLastLine = lineIndex == lines.Count - 1;
+            var trailingBreak = isLastLine
+                ? SegmentBreak.None
+                : (line.FollowingBlankLines >= 1 ? SegmentBreak.Paragraph : SegmentBreak.Line);
 
-        return SplitLongText(trimmed, maxCharsPerSegment);
+            for (var i = 0; i < lineSegments.Count; i++)
+            {
+                var seg = lineSegments[i];
+                var isLastInLine = i == lineSegments.Count - 1;
+                // Intra-line sentence/word breaks stay as the inner splitter
+                // reported them. Only the line's final segment carries the
+                // line-level Line/Paragraph break.
+                var effectiveBreak = isLastInLine ? trailingBreak : seg.BreakAfter;
+                result.Add(new TextSegment(seg.Text, effectiveBreak));
+            }
+        }
+
+        return result;
     }
 
     /// <summary>
     /// Returns the separator a re-assembler should insert between a segment
     /// and its successor given the break kind and the translation target.
-    /// CJK targets (Chinese, Japanese) omit spaces between sentences because
-    /// native punctuation already carries the gap; all other targets use a
-    /// single space. Paragraph breaks always produce a double newline.
+    ///   <see cref="SegmentBreak.Paragraph"/> → "\n\n" (always, to preserve layout).
+    ///   <see cref="SegmentBreak.Line"/>      → "\n"  (single hard wrap from the source).
+    ///   Sentence / Word / None              → " " for non-CJK targets, "" for CJK targets
+    ///                                         (CJK punctuation already carries the gap).
     /// </summary>
     public static string JoinSeparatorFor(SegmentBreak breakAfter, string? targetLanguage)
     {
-        if (breakAfter == SegmentBreak.Paragraph)
-            return "\n\n";
-
-        return IsCjkTarget(targetLanguage) ? string.Empty : " ";
+        return breakAfter switch
+        {
+            SegmentBreak.Paragraph => "\n\n",
+            SegmentBreak.Line => "\n",
+            _ => IsCjkTarget(targetLanguage) ? string.Empty : " "
+        };
     }
 
     private static bool IsCjkTarget(string? lang)
@@ -120,9 +146,63 @@ public sealed class TextSegmenter
         return !char.IsLower(text[next]);
     }
 
-    private static List<Sentence> SplitIntoSentences(string text)
+    /// <summary>
+    /// Splits the raw input at any newline sequence, collapsing runs of
+    /// blank lines into a <see cref="Line.FollowingBlankLines"/> count on
+    /// the preceding non-blank line. Pure whitespace lines are treated as
+    /// blank. The returned list is strictly non-empty entries.
+    /// </summary>
+    private static List<Line> SplitIntoLines(string text)
     {
-        var sentences = new List<Sentence>();
+        // Normalize CRLF and bare CR so downstream logic only deals with '\n'.
+        // This keeps the segmenter oblivious to the host platform's line endings.
+        var normalized = text.Replace("\r\n", "\n").Replace('\r', '\n');
+        var raw = normalized.Split('\n');
+
+        var result = new List<Line>();
+        var i = 0;
+        while (i < raw.Length)
+        {
+            var content = raw[i].Trim();
+            if (content.Length == 0) { i++; continue; }
+
+            var blanks = 0;
+            var j = i + 1;
+            while (j < raw.Length && raw[j].Trim().Length == 0)
+            {
+                blanks++;
+                j++;
+            }
+            result.Add(new Line(content, blanks));
+            i = j;
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Segments a single already-trimmed source line into sentence-level or
+    /// long-text chunks. The line-level break (Line/Paragraph) is stamped by
+    /// the caller; this routine only emits intra-line Sentence/Word/None.
+    /// </summary>
+    private static IReadOnlyList<TextSegment> SegmentSingleLine(
+        string line, int maxCharsPerSegment)
+    {
+        if (line.Length == 0) return [];
+
+        var sentences = SplitIntoSentences(line);
+        if (sentences.Count > 1)
+            return ExpandSentences(sentences, maxCharsPerSegment);
+
+        if (line.Length <= maxCharsPerSegment)
+            return [new TextSegment(line, SegmentBreak.None)];
+
+        return SplitLongText(line, maxCharsPerSegment);
+    }
+
+    private static List<string> SplitIntoSentences(string text)
+    {
+        var sentences = new List<string>();
         var start = 0;
 
         for (var i = 0; i < text.Length; i++)
@@ -140,20 +220,16 @@ public sealed class TextSegmenter
             while (endOfPunct < text.Length && IsAnySentenceEnd(text[endOfPunct]))
                 endOfPunct++;
 
-            // Advance over inter-sentence whitespace and detect paragraph break (2+ newlines).
+            // Skip inter-sentence whitespace. Newlines no longer reach this
+            // code path – the line pre-pass has already peeled them off.
             var afterWs = endOfPunct;
-            var newlineCount = 0;
-            while (afterWs < text.Length)
-            {
-                var w = text[afterWs];
-                if (w == '\n') { newlineCount++; afterWs++; }
-                else if (w == ' ' || w == '\t' || w == '\r') afterWs++;
-                else break;
-            }
+            while (afterWs < text.Length &&
+                   (text[afterWs] == ' ' || text[afterWs] == '\t'))
+                afterWs++;
 
             var body = text[start..endOfPunct].Trim();
             if (body.Length > 0)
-                sentences.Add(new Sentence(body, FollowedByParagraph: newlineCount >= 2));
+                sentences.Add(body);
 
             i = afterWs - 1; // compensate for loop ++
             start = afterWs;
@@ -163,28 +239,26 @@ public sealed class TextSegmenter
         {
             var tail = text[start..].Trim();
             if (tail.Length > 0)
-                sentences.Add(new Sentence(tail, FollowedByParagraph: false));
+                sentences.Add(tail);
         }
 
         return sentences;
     }
 
     private static IReadOnlyList<TextSegment> ExpandSentences(
-        List<Sentence> sentences, int maxCharsPerSegment)
+        List<string> sentences, int maxCharsPerSegment)
     {
         var result = new List<TextSegment>(sentences.Count);
 
         for (var i = 0; i < sentences.Count; i++)
         {
-            var s = sentences[i];
+            var body = sentences[i];
             var isLast = i == sentences.Count - 1;
-            var breakKind = isLast
-                ? SegmentBreak.None
-                : (s.FollowedByParagraph ? SegmentBreak.Paragraph : SegmentBreak.Sentence);
+            var breakKind = isLast ? SegmentBreak.None : SegmentBreak.Sentence;
 
-            if (s.Text.Length > maxCharsPerSegment)
+            if (body.Length > maxCharsPerSegment)
             {
-                var sub = SplitLongText(s.Text, maxCharsPerSegment);
+                var sub = SplitLongText(body, maxCharsPerSegment);
                 for (var j = 0; j < sub.Count; j++)
                 {
                     var lastOfSub = j == sub.Count - 1;
@@ -195,7 +269,7 @@ public sealed class TextSegmenter
             }
             else
             {
-                result.Add(new TextSegment(s.Text, breakKind));
+                result.Add(new TextSegment(body, breakKind));
             }
         }
 
@@ -235,22 +309,11 @@ public sealed class TextSegmenter
     {
         var end = start + maxLen;
 
-        // 1. Paragraph break: \n\n or \r\n\r\n – search backwards from end
-        for (var i = end; i > start + 1; i--)
-        {
-            if (i < text.Length && text[i - 1] == '\n')
-            {
-                var prevIsNewline = i >= 2 && (text[i - 2] == '\n' ||
-                    (text[i - 2] == '\r' && i >= 3 && text[i - 3] == '\n'));
-                if (prevIsNewline)
-                    return (i, SegmentBreak.Paragraph);
+        // The line pre-pass consumes paragraph breaks before this code runs,
+        // so FindBreakPoint only needs to think about sentence / word / hard
+        // cuts within a single logical line.
 
-                if (i + 1 < text.Length && text[i] == '\n')
-                    return (i - 1, SegmentBreak.Paragraph);
-            }
-        }
-
-        // 2. Sentence-end punctuation:
+        // 1. Sentence-end punctuation:
         //    - CJK marks (。！？…) always split — no trailing space in CJK text.
         //    - Latin marks (.!?) use the same IsLatinSentenceBoundary heuristic as the
         //      atomic-sentence pass, so abbreviations (U.S.A) and decimals (3.14) are
@@ -267,14 +330,14 @@ public sealed class TextSegmenter
             }
         }
 
-        // 3. Whitespace word boundary
+        // 2. Whitespace word boundary
         for (var i = end - 1; i > start; i--)
         {
             if (text[i] == ' ' || text[i] == '\t')
                 return (i, SegmentBreak.Word);
         }
 
-        // 4. Hard cut (no natural break found)
+        // 3. Hard cut (no natural break found)
         return (end, SegmentBreak.None);
     }
 
@@ -293,7 +356,7 @@ public sealed class TextSegmenter
         Array.IndexOf(CjkSentenceEndChars, c) >= 0 ||
         Array.IndexOf(LatinSentenceEndChars, c) >= 0;
 
-    private readonly record struct Sentence(string Text, bool FollowedByParagraph);
+    private readonly record struct Line(string Text, int FollowingBlankLines);
 }
 
 /// <summary>Describes what kind of natural boundary was detected after this segment.</summary>
@@ -302,6 +365,11 @@ public enum SegmentBreak
     None,
     Word,
     Sentence,
+    /// <summary>
+    /// A single user-authored newline separates this segment from the next.
+    /// Reassemblers should insert "\n" here to preserve the source line layout.
+    /// </summary>
+    Line,
     Paragraph
 }
 
