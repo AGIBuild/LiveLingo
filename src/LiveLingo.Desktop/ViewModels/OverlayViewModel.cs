@@ -23,8 +23,15 @@ public enum InjectionMode
     PasteAndSend
 }
 
-public partial class OverlayViewModel : ObservableObject
+public partial class OverlayViewModel : ObservableObject, IDisposable
 {
+    // Guards _pipelineCts so Cancel() can never race with the owning task's
+    // Dispose() in its finally-block. Without this, a completed task would
+    // dispose the CTS just as a new keystroke reads the field and called
+    // Cancel() on the disposed instance, throwing ObjectDisposedException.
+    private readonly object _pipelineCtsLock = new();
+    private bool _disposed;
+
     private readonly TargetWindowInfo _targetWindow;
     private readonly ITranslationPipeline _pipeline;
     private readonly ITextInjector _injector;
@@ -227,11 +234,7 @@ public partial class OverlayViewModel : ObservableObject
             return;
 
         if (!string.IsNullOrWhiteSpace(SourceText))
-        {
-            _pipelineCts?.Cancel();
-            _pipelineCts = new CancellationTokenSource();
-            _ = DebounceAndTranslateAsync(SourceText, _pipelineCts.Token);
-        }
+            ScheduleDebouncedTranslation(SourceText);
     }
 
     partial void OnSelectedSourceLanguageChanged(LanguageInfo? value)
@@ -275,10 +278,10 @@ public partial class OverlayViewModel : ObservableObject
     partial void OnSourceTextChanged(string value)
     {
         SourceTextLength = value.Length;
-        _pipelineCts?.Cancel();
 
         if (string.IsNullOrWhiteSpace(value))
         {
+            CancelActivePipeline();
             TranslatedText = string.Empty;
             IsTranslating = false;
             return;
@@ -287,15 +290,59 @@ public partial class OverlayViewModel : ObservableObject
         // Long texts (> 600 chars) are automatically routed to the cloud quality tier
         // by TranslationRoutingContext inside the MEA IChatClient pipeline.
         // No hard truncation here — routing handles quality/capacity decisions.
-        _pipelineCts = new CancellationTokenSource();
-        _ = DebounceAndTranslateAsync(value, _pipelineCts.Token);
+        ScheduleDebouncedTranslation(value);
     }
 
-    private async Task DebounceAndTranslateAsync(string text, CancellationToken ct)
+    private void CancelActivePipeline()
     {
-        // Increased debounce from 400ms to 800ms to reduce LLM churn
-        await Task.Delay(800, ct);
-        await RunPipelineAsync(text, ct);
+        lock (_pipelineCtsLock)
+        {
+            _pipelineCts?.Cancel();
+        }
+    }
+
+    private void ScheduleDebouncedTranslation(string text)
+    {
+        CancellationTokenSource cts;
+        lock (_pipelineCtsLock)
+        {
+            // Cancel the previous attempt; its owning task will dispose it
+            // under the same lock, so the Cancel() call can never race with
+            // Dispose() and throw ObjectDisposedException.
+            _pipelineCts?.Cancel();
+
+            if (_disposed) return;
+
+            cts = new CancellationTokenSource();
+            _pipelineCts = cts;
+        }
+
+        _ = DebounceAndTranslateAsync(cts, text);
+    }
+
+    private async Task DebounceAndTranslateAsync(CancellationTokenSource cts, string text)
+    {
+        try
+        {
+            // Increased debounce from 400ms to 800ms to reduce LLM churn
+            await Task.Delay(800, cts.Token).ConfigureAwait(true);
+            await RunPipelineAsync(text, cts.Token).ConfigureAwait(true);
+        }
+        catch (OperationCanceledException)
+        {
+            // Debounce was interrupted by a newer keystroke; swallow silently.
+        }
+        finally
+        {
+            lock (_pipelineCtsLock)
+            {
+                // Only clear the field if we're still the active attempt; a
+                // newer ScheduleDebouncedTranslation may have replaced it.
+                if (ReferenceEquals(_pipelineCts, cts))
+                    _pipelineCts = null;
+                cts.Dispose();
+            }
+        }
     }
 
     private string L(string key) => _loc?.T(key) ?? key;
@@ -561,11 +608,7 @@ public partial class OverlayViewModel : ObservableObject
         }
 
         if (!string.IsNullOrWhiteSpace(SourceText))
-        {
-            _pipelineCts?.Cancel();
-            _pipelineCts = new CancellationTokenSource();
-            _ = DebounceAndTranslateAsync(SourceText, _pipelineCts.Token);
-        }
+            ScheduleDebouncedTranslation(SourceText);
 
         UpdateActiveModelDisplay();
     }
@@ -636,9 +679,7 @@ public partial class OverlayViewModel : ObservableObject
         if ((translationConfigChanged || postProcessChanged || activeModelChanged || routingChanged || modeChanged) &&
             !string.IsNullOrWhiteSpace(SourceText))
         {
-            _pipelineCts?.Cancel();
-            _pipelineCts = new CancellationTokenSource();
-            _ = DebounceAndTranslateAsync(SourceText, _pipelineCts.Token);
+            ScheduleDebouncedTranslation(SourceText);
         }
     }
 
@@ -888,6 +929,29 @@ public partial class OverlayViewModel : ObservableObject
             preferences.ApiKey ?? string.Empty,
             preferences.TranslationModelId ?? string.Empty,
             preferences.PostProcessingModelId ?? string.Empty);
+
+    public void Dispose()
+    {
+        lock (_pipelineCtsLock)
+        {
+            if (_disposed) return;
+            _disposed = true;
+            // Cancel under the lock so the owning task's Dispose() stays
+            // serialized with this call. The task's finally-block disposes
+            // the CTS; we must not do it here or we would race with it.
+            _pipelineCts?.Cancel();
+        }
+
+        if (_speechCoordinator is not null)
+        {
+            _speechCoordinator.StateChanged -= HandleVoiceStateChanged;
+            _speechCoordinator.PartialTranscription -= HandlePartialTranscription;
+        }
+
+        _messenger.Unregister<SettingsChangedMessage>(this);
+
+        GC.SuppressFinalize(this);
+    }
 
     private static bool TryResolveTranslationPairFromModelId(string? modelId, out string source, out string target)
     {

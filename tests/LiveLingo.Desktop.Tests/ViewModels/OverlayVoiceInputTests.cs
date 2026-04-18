@@ -434,6 +434,37 @@ public class OverlayVoiceInputTests
         Assert.Contains("Unsupported language pair", vm.StatusText, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void Dispose_UnsubscribesFromSpeechCoordinatorEvents()
+    {
+        var vm = CreateVm();
+        Assert.Equal(VoiceInputState.Idle, vm.VoiceState);
+
+        // Baseline: while subscribed the VM reflects coordinator state.
+        _coordinator.StateChanged += Raise.Event<Action<VoiceInputState>>(VoiceInputState.Recording);
+        Assert.Equal(VoiceInputState.Recording, vm.VoiceState);
+
+        vm.Dispose();
+
+        // After Dispose the VM must no longer react to global singleton events.
+        // Prior to the fix, the singleton coordinator kept a strong reference to
+        // every overlay VM through these handlers, leaking VM instances and
+        // causing closed overlays to respond to live voice input.
+        _coordinator.StateChanged += Raise.Event<Action<VoiceInputState>>(VoiceInputState.Idle);
+        Assert.Equal(VoiceInputState.Recording, vm.VoiceState);
+
+        _coordinator.PartialTranscription += Raise.Event<Action<string>>("post-dispose transcript");
+        Assert.DoesNotContain("post-dispose transcript", vm.SourceText);
+    }
+
+    [Fact]
+    public void Dispose_IsIdempotent()
+    {
+        var vm = CreateVm();
+        vm.Dispose();
+        vm.Dispose();
+    }
+
     private sealed class DeterministicTranslationEngine : ITranslationEngine
     {
         public IReadOnlyList<LanguageInfo> SupportedLanguages { get; } =

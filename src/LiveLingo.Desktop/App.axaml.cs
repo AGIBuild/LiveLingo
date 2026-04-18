@@ -793,6 +793,7 @@ public partial class App : Application
         {
             Log.Debug("Overlay window closed");
             vm.PersistIfChanged();
+            vm.Dispose();
             _activeOverlay = null;
         };
         _activeOverlay.Show();

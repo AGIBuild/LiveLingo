@@ -1520,4 +1520,50 @@ public class OverlayViewModelTests
         await Task.FromException(exception);
         yield break;
     }
+
+    [Fact]
+    public async Task Dispose_CancelsInflightPipeline_SoBlockedStreamUnblocks()
+    {
+        // Pipeline that blocks until cancellation; mimics a slow LLM call still
+        // in flight when the overlay window closes.
+        var pipelineStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var pipelineCancelled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+            .Returns(ci => SignalingBlockingDeltaAsync(
+                pipelineStarted,
+                pipelineCancelled,
+                ci.ArgAt<CancellationToken>(1)));
+
+        var vm = CreateVm();
+        vm.SourceText = "trigger";
+
+        // Wait long enough for the 800ms debounce + pipeline entry.
+        await pipelineStarted.Task.WaitAsync(TimeSpan.FromSeconds(5), TestCt);
+
+        vm.Dispose();
+
+        // If Dispose did not cancel the in-flight CTS, this test would hang
+        // until TestCt fires, which still fails the test as a timeout.
+        await pipelineCancelled.Task.WaitAsync(TimeSpan.FromSeconds(5), TestCt);
+    }
+
+    private static async IAsyncEnumerable<TranslationDelta> SignalingBlockingDeltaAsync(
+        TaskCompletionSource started,
+        TaskCompletionSource cancelled,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    {
+        started.TrySetResult();
+        using (ct.Register(() => cancelled.TrySetResult()))
+        {
+            try
+            {
+                await Task.Delay(Timeout.Infinite, ct);
+            }
+            catch (OperationCanceledException)
+            {
+                // Expected when Dispose cancels the pipeline CTS.
+            }
+        }
+        yield break;
+    }
 }
