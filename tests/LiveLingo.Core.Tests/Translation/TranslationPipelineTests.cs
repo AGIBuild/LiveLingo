@@ -504,4 +504,42 @@ public class TranslationPipelineTests
 
         Assert.Equal("你好。再见。", result.Text);
     }
+
+    // --- Single-newline preservation (user-authored hard wraps) ---
+
+    [Fact]
+    public async Task ProcessAsync_SingleNewlineBetweenLines_PreservesNewlineInOutput()
+    {
+        // The old pipeline collapsed user-authored line breaks into spaces
+        // (for Latin targets) or joined lines directly (for CJK targets),
+        // so lyrics / bullet lists lost their layout when translated.
+        const string source = "first line\nsecond line";
+
+        _engine.TranslateAsync("first line", "en", "zh", Arg.Any<CancellationToken>())
+            .Returns("第一行");
+        _engine.TranslateAsync("second line", "en", "zh", Arg.Any<CancellationToken>())
+            .Returns("第二行");
+
+        var result = await _pipeline.ProcessAsync(
+            new TranslationRequest(source, "en", "zh", null), CancellationToken.None);
+
+        Assert.Equal("第一行\n第二行", result.Text);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_MixedLineAndParagraphBreaks_PreservesBoth()
+    {
+        // "a\nb\n\nc" must translate to "{a}\n{b}\n\n{c}" – a hard wrap
+        // between a/b and a paragraph break between b/c.
+        const string source = "alpha\nbeta\n\ngamma";
+
+        _engine.TranslateAsync("alpha", "en", "zh", Arg.Any<CancellationToken>()).Returns("甲");
+        _engine.TranslateAsync("beta", "en", "zh", Arg.Any<CancellationToken>()).Returns("乙");
+        _engine.TranslateAsync("gamma", "en", "zh", Arg.Any<CancellationToken>()).Returns("丙");
+
+        var result = await _pipeline.ProcessAsync(
+            new TranslationRequest(source, "en", "zh", null), CancellationToken.None);
+
+        Assert.Equal("甲\n乙\n\n丙", result.Text);
+    }
 }
