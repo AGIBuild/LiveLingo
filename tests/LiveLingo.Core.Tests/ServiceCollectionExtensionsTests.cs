@@ -68,14 +68,16 @@ public class ServiceCollectionExtensionsTests
     }
 
     [Fact]
-    public void AddLiveLingoCore_UsesScriptBasedDetector()
+    public void AddLiveLingoCore_UsesHybridLanguageDetector()
     {
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddLiveLingoCore();
         var sp = services.BuildServiceProvider();
 
-        Assert.IsType<ScriptBasedDetector>(sp.GetService<ILanguageDetector>());
+        Assert.IsType<HybridLanguageDetector>(sp.GetService<ILanguageDetector>());
+        Assert.NotNull(sp.GetService<ScriptBasedDetector>());
+        Assert.NotNull(sp.GetService<LinguaLanguageDetector>());
     }
 
     [Fact]
@@ -90,14 +92,17 @@ public class ServiceCollectionExtensionsTests
     }
 
     [Fact]
-    public void AddLiveLingoCore_UsesLlamaAsTranslationEngine()
+    public void AddLiveLingoCore_UsesHybridTranslationEngine()
     {
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddLiveLingoCore();
         var sp = services.BuildServiceProvider();
 
-        Assert.IsType<LlamaTranslationEngine>(sp.GetService<ITranslationEngine>());
+        // Hybrid routes fast-path (Marian ONNX) and chat-path (Llama/Gemma) internally.
+        Assert.IsType<HybridTranslationEngine>(sp.GetService<ITranslationEngine>());
+        Assert.IsType<LlamaTranslationEngine>(sp.GetService<IChatPathTranslationEngine>());
+        Assert.IsType<MarianOnnxEngine>(sp.GetService<IFastPathTranslationEngine>());
     }
 
     [Fact]

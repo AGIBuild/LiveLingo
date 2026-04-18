@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:LiveLingo.Desktop.ViewModels"
+        xmlns:views="using:LiveLingo.Desktop.Views"
         xmlns:ctrl="using:LiveLingo.Desktop.Controls"
         x:Class="LiveLingo.Desktop.Views.SettingsWindow"
         x:DataType="vm:SettingsViewModel"
@@ -213,18 +214,41 @@
                                 <DataTemplate x:DataType="vm:ModelItemViewModel">
                                     <Border Margin="0,0,0,6" Padding="12,10"
                                             CornerRadius="8" Background="{StaticResource BgSurfaceBrush}">
-                                        <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto">
-                                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                                <Border Background="#200A84FF" CornerRadius="4" Padding="6,2">
+                                        <!-- Vertical card: name row, meta row, action row, progress row.
+                                             Keeps long model names from colliding with the action buttons. -->
+                                        <Grid RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="4">
+                                            <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8">
+                                                <Border Background="#200A84FF" CornerRadius="4" Padding="6,2"
+                                                        VerticalAlignment="Center">
                                                     <TextBlock Text="{Binding TypeLabel}"
                                                                FontSize="10" Foreground="{StaticResource AccentBrush}"/>
                                                 </Border>
                                                 <TextBlock Text="{Binding DisplayName}"
                                                            Foreground="#FFFFFF" FontSize="13"
-                                                           VerticalAlignment="Center"/>
+                                                           VerticalAlignment="Center"
+                                                           TextTrimming="CharacterEllipsis"
+                                                           ToolTip.Tip="{Binding DisplayName}"/>
                                             </StackPanel>
 
-                                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                                            <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="12">
+                                                <TextBlock Text="{Binding SizeText}"
+                                                           FontSize="11" Foreground="{StaticResource FgTertiaryBrush}"
+                                                           VerticalAlignment="Center"/>
+                                                <TextBlock Text="{Binding InstalledLabel}" FontSize="11"
+                                                           Foreground="{StaticResource SuccessBrush}"
+                                                           VerticalAlignment="Center"
+                                                           IsVisible="{Binding IsInstalled}"/>
+                                                <TextBlock Text="{Binding ErrorMessage}"
+                                                           FontSize="11" Foreground="{StaticResource DangerBrush}"
+                                                           TextTrimming="CharacterEllipsis"
+                                                           ToolTip.Tip="{Binding ErrorMessage}"
+                                                           VerticalAlignment="Center"
+                                                           IsVisible="{Binding ErrorMessage,
+                                                               Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                                            </StackPanel>
+
+                                            <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="6"
+                                                        HorizontalAlignment="Right" Margin="0,2,0,0">
                                                 <Button Classes="themed sm"
                                                         Content="{Binding OpenOnHuggingFaceLabel}"
                                                         Command="{Binding OpenOnHuggingFaceCommand}"
@@ -232,35 +256,20 @@
                                                 <Button Classes="accent sm"
                                                         Content="{Binding DownloadButtonLabel}"
                                                         Command="{Binding DownloadCommand}"
-                                                        IsVisible="{Binding !IsInstalled}"/>
+                                                        IsVisible="{Binding ShowDownloadButton}"/>
                                                 <Button Classes="themed sm"
                                                         Content="{Binding CancelButtonLabel}"
                                                         Command="{Binding CancelDownloadCommand}"
                                                         IsVisible="{Binding IsDownloading}"/>
-                                                <TextBlock Text="{Binding InstalledLabel}" FontSize="11"
-                                                           Foreground="{StaticResource SuccessBrush}"
-                                                           VerticalAlignment="Center"
-                                                           IsVisible="{Binding IsInstalled}"/>
                                                 <Button Classes="danger sm"
                                                         Content="{Binding DeleteButtonLabel}"
                                                         Command="{Binding DeleteCommand}"
                                                         IsVisible="{Binding IsInstalled}"/>
                                             </StackPanel>
 
-                                            <StackPanel Grid.Row="1" Grid.ColumnSpan="2"
-                                                        Orientation="Horizontal" Spacing="12"
-                                                        Margin="0,4,0,0">
-                                                <TextBlock Text="{Binding SizeText}"
-                                                           FontSize="11" Foreground="{StaticResource FgTertiaryBrush}"/>
-                                                <TextBlock Text="{Binding ErrorMessage}"
-                                                           FontSize="11" Foreground="{StaticResource DangerBrush}"
-                                                           IsVisible="{Binding ErrorMessage,
-                                                               Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-                                            </StackPanel>
-
-                                            <ProgressBar Grid.Row="2" Grid.ColumnSpan="2"
+                                            <ProgressBar Grid.Row="3"
                                                          Classes="themed"
-                                                         Margin="0,6,0,0"
+                                                         Margin="0,4,0,0"
                                                          Minimum="0" Maximum="100"
                                                          Value="{Binding DownloadProgress}"
                                                          IsVisible="{Binding IsDownloading}"/>
@@ -448,8 +457,67 @@
                             <TextBlock Classes="hint"
                                        Text="{Binding AiCloudProviderHint}"
                                        TextWrapping="Wrap"/>
+                            <Separator Classes="themed"/>
+                            <TextBlock Classes="section" Text="{Binding AiSectionOllamaProvider}"/>
+                            <CheckBox Classes="themed"
+                                      Content="{Binding AiOllamaEnabledLabel}"
+                                      IsChecked="{Binding WorkingCopy.Translation.OllamaProvider.Enabled}"/>
+                            <Grid ColumnDefinitions="130,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="10">
+                                <TextBlock Classes="label" Text="{Binding AiOllamaBaseUrlLabel}"/>
+                                <TextBox Grid.Column="1" Classes="themed"
+                                         Text="{Binding WorkingCopy.Translation.OllamaProvider.BaseUrl}"
+                                         PlaceholderText="{Binding AiOllamaBaseUrlPlaceholder}"/>
+                                <TextBlock Grid.Row="1" Classes="label" Text="{Binding AiOllamaTranslationModelLabel}"/>
+                                <TextBox Grid.Row="1" Grid.Column="1" Classes="themed"
+                                         Text="{Binding WorkingCopy.Translation.OllamaProvider.TranslationModelId}"
+                                         PlaceholderText="{Binding AiOllamaTranslationModelPlaceholder}"/>
+                                <TextBlock Grid.Row="2" Classes="label" Text="{Binding AiOllamaPostProcessingModelLabel}"/>
+                                <TextBox Grid.Row="2" Grid.Column="1" Classes="themed"
+                                         Text="{Binding WorkingCopy.Translation.OllamaProvider.PostProcessingModelId}"
+                                         PlaceholderText="{Binding AiOllamaPostProcessingModelPlaceholder}"/>
+                            </Grid>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button Classes="themed"
+                                        Content="{Binding AiOllamaTestConnectionLabel}"
+                                        Command="{Binding TestOllamaProviderConnectionCommand}"/>
+                            </StackPanel>
+                            <TextBlock Classes="hint"
+                                       Text="{Binding OllamaProviderStatusMessage}"
+                                       TextWrapping="Wrap"/>
+                            <StackPanel IsVisible="{Binding HasDiscoveredOllamaModels}" Spacing="6">
+                                <TextBlock Classes="label" Text="{Binding AiOllamaDiscoveredModelsLabel}"/>
+                                <ItemsControl ItemsSource="{Binding DiscoveredOllamaModels}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:OllamaProviderModelOption">
+                                            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                                                <TextBlock VerticalAlignment="Center"
+                                                           Text="{Binding Caption}"
+                                                           TextWrapping="Wrap"/>
+                                                <Button Grid.Column="1"
+                                                        Classes="themed"
+                                                        Content="{Binding $parent[Window].((vm:SettingsViewModel)DataContext).AiOllamaUseTranslationLabel}"
+                                                        Command="{Binding $parent[Window].((vm:SettingsViewModel)DataContext).UseOllamaTranslationModelCommand}"
+                                                        CommandParameter="{Binding Id}"/>
+                                                <Button Grid.Column="2"
+                                                        Classes="themed"
+                                                        Content="{Binding $parent[Window].((vm:SettingsViewModel)DataContext).AiOllamaUsePostProcessingLabel}"
+                                                        Command="{Binding $parent[Window].((vm:SettingsViewModel)DataContext).UseOllamaPostProcessingModelCommand}"
+                                                        CommandParameter="{Binding Id}"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                            <TextBlock Classes="hint"
+                                       Text="{Binding AiOllamaProviderHint}"
+                                       TextWrapping="Wrap"/>
                         </StackPanel>
                     </ScrollViewer>
+                </TabItem>
+
+                <!-- Diagnostics -->
+                <TabItem Name="TabDiagnostics" Header="Diagnostics" Classes="themed">
+                    <views:DiagnosticsView DataContext="{Binding Diagnostics}"/>
                 </TabItem>
             </TabControl>
         </DockPanel>

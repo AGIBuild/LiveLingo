@@ -1,5 +1,6 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using LiveLingo.Core.Processing;
@@ -20,25 +21,8 @@ public sealed class OpenAICompatibleChatProvider(
         ModelInvocationRequest request,
         CancellationToken ct = default)
     {
-        var apiKey = options.Value.CloudProviderApiKey?.Trim();
-        if (string.IsNullOrWhiteSpace(apiKey))
-            throw new InvalidOperationException("Cloud provider API key is not configured.");
-
-        var payload = new OpenAICompatibleChatRequest(
-            request.Profile.Id,
-            request.Messages.Select(m => new OpenAICompatibleChatMessage(m.Role, m.Content)).ToArray(),
-            request.Options.MaxTokens,
-            request.Options.Temperature,
-            request.Options.TopP,
-            request.Options.StopSequences,
-            request.Options.Stream);
-
-        using var httpRequest = new HttpRequestMessage(
-            HttpMethod.Post,
-            OpenAICompatibleEndpoints.BuildChatCompletionsEndpoint(session.Endpoint));
-        httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
-        httpRequest.Content = JsonContent.Create(payload);
-
+        var apiKey = ResolveApiKey();
+        using var httpRequest = BuildRequest(session, request, apiKey, stream: false);
         var response = await http.SendAsync(httpRequest, ct).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 
@@ -55,6 +39,53 @@ public sealed class OpenAICompatibleChatProvider(
             request.Profile.Id,
             LlamaServerChatResponse.DescribeFirstChoiceForLog(doc.RootElement));
         throw new InvalidOperationException("Cloud model invocation returned empty output.");
+    }
+
+    public async IAsyncEnumerable<string> InvokeStreamingAsync(
+        ModelRuntimeSession session,
+        ModelInvocationRequest request,
+        [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        var apiKey = ResolveApiKey();
+        using var httpRequest = BuildRequest(session, request, apiKey, stream: true);
+        var response = await http.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead, ct)
+            .ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+
+        await using var body = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+        await foreach (var delta in SseStreamReader.ReadDeltasAsync(body, ct).ConfigureAwait(false))
+            yield return delta;
+    }
+
+    private string ResolveApiKey()
+    {
+        var apiKey = options.Value.CloudProviderApiKey?.Trim();
+        if (string.IsNullOrWhiteSpace(apiKey))
+            throw new InvalidOperationException("Cloud provider API key is not configured.");
+        return apiKey;
+    }
+
+    private static HttpRequestMessage BuildRequest(
+        ModelRuntimeSession session,
+        ModelInvocationRequest request,
+        string apiKey,
+        bool stream)
+    {
+        var payload = new OpenAICompatibleChatRequest(
+            request.Profile.Id,
+            request.Messages.Select(m => new OpenAICompatibleChatMessage(m.Role, m.Content)).ToArray(),
+            request.Options.MaxTokens,
+            request.Options.Temperature,
+            request.Options.TopP,
+            request.Options.StopSequences,
+            stream);
+
+        var httpRequest = new HttpRequestMessage(
+            HttpMethod.Post,
+            OpenAICompatibleEndpoints.BuildChatCompletionsEndpoint(session.Endpoint));
+        httpRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+        httpRequest.Content = JsonContent.Create(payload);
+        return httpRequest;
     }
 
     private sealed record OpenAICompatibleChatRequest(

@@ -64,12 +64,51 @@ public sealed class TranslationQualityGuardTests
         var result = TranslationQualityGuard.Check("Hi", "你好", "en", "zh");
         Assert.True(result.IsAcceptable);
     }
+
+    [Fact]
+    public void Check_SentenceCountDrops_FailsForMultiSentenceSource()
+    {
+        // Regression: model outputs "Hello, coward." for 2-sentence source.
+        var src = "你好啊，胆小鬼。 你是不是不知道我是谁？"; // 2 sentences
+        var tgt = "Hello, coward.";                       // 1 sentence
+
+        var result = TranslationQualityGuard.Check(src, tgt, "zh", "en");
+
+        Assert.False(result.IsAcceptable);
+        Assert.Contains("Sentence count", result.FailureReason);
+    }
+
+    [Fact]
+    public void Check_SentenceCountMatches_Passes()
+    {
+        var src = "你好啊，胆小鬼。 你是不是不知道我是谁？";
+        var tgt = "Hello, coward. Don't you know who I am?";
+
+        var result = TranslationQualityGuard.Check(src, tgt, "zh", "en");
+
+        Assert.True(result.IsAcceptable);
+    }
+
+    [Fact]
+    public void Check_MergedSentences_FailsWhenTargetDrops()
+    {
+        // 3 source sentences merged into 2 target sentences must fail: the
+        // pipeline now translates one sentence at a time, so any drop points
+        // at an upstream caller bypassing segmentation.
+        var src = "Hi there. How are you? Nice day.";
+        var tgt = "Hi there, how are you? Nice day.";
+
+        var result = TranslationQualityGuard.Check(src, tgt, "en", "zh");
+
+        Assert.False(result.IsAcceptable);
+        Assert.Contains("Sentence count", result.FailureReason);
+    }
 }
 
 public sealed class TranslationChatClientQualityGuardIntegrationTests
 {
     private static readonly ModelProfile LocalProfile =
-        new StaticModelCatalog().FindById(ModelRegistry.Gemma4_12B.Id)!;
+        new StaticModelCatalog().FindById(ModelRegistry.Gemma4_26B_A4B.Id)!;
 
     private static readonly ModelProfile CloudProfile = new ModelProfile(
         "gpt-4o-mini", "Cloud GPT-4o-mini",
@@ -82,34 +121,36 @@ public sealed class TranslationChatClientQualityGuardIntegrationTests
         SupportsAllLanguages: true);
 
     [Fact]
-    public async Task GetResponseAsync_EscalatesToCloud_WhenQualityGuardFails()
+    public async Task GetResponseAsync_FallsBackToCloudCandidate_WhenQualityGuardFailsOnLocal()
     {
         var selector = NSubstitute.Substitute.For<IModelSelector>();
         var invocationService = NSubstitute.Substitute.For<IModelInvocationService>();
 
-        // Local returns a bad (suspiciously short) translation
-        selector.SelectTranslationProfile("en", "fr", Arg.Is<TranslationRoutingContext?>(c => c == null || !c.IsHighQualityMode))
-            .Returns(LocalProfile);
-        // Cloud escalation path
-        selector.SelectTranslationProfile("en", "fr", Arg.Is<TranslationRoutingContext?>(c => c != null && c.IsHighQualityMode))
-            .Returns(CloudProfile);
+        // Plan: local candidate first, cloud candidate as fallback.
+        var plan = new TranslationRoutePlan(
+        [
+            new TranslationRouteCandidate(LocalProfile, TranslationRouteTier.Local, TimeSpan.FromSeconds(8)),
+            new TranslationRouteCandidate(CloudProfile, TranslationRouteTier.Cloud, TimeSpan.FromSeconds(4))
+        ]);
+        selector.BuildTranslationRoutePlan("en", "fr", Arg.Any<TranslationRoutingContext?>()).Returns(plan);
 
-        // Local model returns just "ok" for a 50+ char source → quality guard fires
         var source = new string('a', 50);
+        // Local returns a bad (suspiciously short) translation → quality guard rejects it.
         invocationService
             .InvokeAsync(
                 Arg.Is<ModelInvocationRequest>(r => r.Profile.RuntimeKind == ModelRuntimeKind.LlamaServer),
                 Arg.Any<CancellationToken>())
             .Returns(new ModelInvocationResult("ok"));
 
-        // Cloud model returns a proper translation
+        // Cloud fallback returns a proper translation that passes the guard.
         invocationService
             .InvokeAsync(
                 Arg.Is<ModelInvocationRequest>(r => r.Profile.RuntimeKind == ModelRuntimeKind.RemoteHttp),
                 Arg.Any<CancellationToken>())
             .Returns(new ModelInvocationResult("Good cloud translation output here."));
 
-        var client = new TranslationChatClient(selector, invocationService);
+        var invoker = new FallbackTranslationInvoker(invocationService, new InProcessTranslationTelemetry());
+        var client = new TranslationChatClient(selector, invocationService, invoker);
         var options = new ChatOptions
         {
             AdditionalProperties = new AdditionalPropertiesDictionary
@@ -129,6 +170,6 @@ public sealed class TranslationChatClientQualityGuardIntegrationTests
             options, CancellationToken.None);
 
         Assert.Equal("Good cloud translation output here.", response.Text);
-        Assert.Equal("gpt-4o-mini", response.ModelId); // cloud model used
+        Assert.Equal("gpt-4o-mini", response.ModelId);
     }
 }

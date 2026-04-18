@@ -151,16 +151,16 @@ public class OverlayViewModelTests
     [Fact]
     public async Task OnSourceTextChanged_TriggersPipeline_AfterDebounce()
     {
-        _pipeline.ProcessAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
-            .Returns(new TranslationResult("Result", "zh", "Result", TimeSpan.FromMilliseconds(10), null));
+        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+            .Returns(_ => SingleDeltaAsync("Result"));
 
         var vm = CreateVm();
         vm.SourceText = "你好";
 
         await Task.Delay(1000, TestContext.Current.CancellationToken);
 
-        await _pipeline.Received()
-            .ProcessAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>());
+        _pipeline.Received()
+            .ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -234,7 +234,7 @@ public class OverlayViewModelTests
         };
         var vm = new OverlayViewModel(_target, _pipeline, _injector, _engine, settings, localizationService: _loc);
 
-        Assert.Contains("Gemma 4 12B", vm.ActiveModelLabel);
+        Assert.Contains("Gemma 4 26B", vm.ActiveModelLabel);
     }
 
     [Fact]
@@ -303,7 +303,7 @@ public class OverlayViewModelTests
             localizationService: _loc,
             cloudProviderRuntimeState: runtimeState);
 
-        Assert.Contains("Gemma 4 12B", vm.ActiveModelLabel);
+        Assert.Contains("Gemma 4 26B", vm.ActiveModelLabel);
     }
 
     [Fact]
@@ -330,37 +330,26 @@ public class OverlayViewModelTests
     [Fact]
     public async Task RunPipelineAsync_SetsTranslatedTextAndStatus()
     {
-        _pipeline.ProcessAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
-            .Returns(new TranslationResult("Translated", "zh", "Translated", TimeSpan.FromMilliseconds(42), null));
+        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+            .Returns(_ => SingleDeltaAsync("Translated"));
 
         var vm = CreateVm();
         vm.SourceText = "你好";
         await Task.Delay(1000, TestContext.Current.CancellationToken);
 
         Assert.Equal("Translated", vm.TranslatedText);
-        Assert.Contains("42", vm.StatusText);
+        Assert.Contains("Translated", vm.StatusText);
     }
 
     [Fact]
     public async Task RunPipelineAsync_CancelsPrevious_WhenSourceTextChangesRapidly()
     {
-        _pipeline.ProcessAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
-            .Returns(callInfo =>
-            {
-                var ct = callInfo.ArgAt<CancellationToken>(1);
-                return Task.Run(async () =>
-                {
-                    await Task.Delay(2000, ct);
-                    return new TranslationResult("Old", "zh", "Old", TimeSpan.Zero, null);
-                }, ct);
-            });
+        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+            .Returns(_ => SingleDeltaAsync("Latest"));
 
         var vm = CreateVm();
         vm.SourceText = "first";
         await Task.Delay(50, TestContext.Current.CancellationToken);
-
-        _pipeline.ProcessAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
-            .Returns(new TranslationResult("Latest", "zh", "Latest", TimeSpan.Zero, null));
 
         vm.SourceText = "second";
         for (var i = 0; i < 25 && !string.Equals(vm.TranslatedText, "Latest", StringComparison.Ordinal); i++)
@@ -412,9 +401,9 @@ public class OverlayViewModelTests
     [Fact]
     public async Task RunPipelineAsync_ShowsTranslatingStatus_BeforeComplete()
     {
-        var tcs = new TaskCompletionSource<TranslationResult>();
-        _pipeline.ProcessAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
-            .Returns(tcs.Task);
+        var tcs = new TaskCompletionSource();
+        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+            .Returns(ci => BlockingDeltaAsync(tcs, ci.ArgAt<CancellationToken>(1)));
 
         var vm = CreateVm();
         vm.SourceText = "test";
@@ -422,7 +411,7 @@ public class OverlayViewModelTests
 
         Assert.Equal("Translating...", vm.StatusText);
         Assert.True(vm.IsTranslating);
-        tcs.SetResult(new TranslationResult("Done", "zh", "Done", TimeSpan.Zero, null));
+        tcs.SetResult();
     }
 
     [Fact]
@@ -437,8 +426,8 @@ public class OverlayViewModelTests
     [Fact]
     public async Task RunPipelineAsync_ShowsErrorStatus_WhenModelNotFound()
     {
-        _pipeline.ProcessAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
-            .Returns<TranslationResult>(_ => throw new FileNotFoundException("Model not found"));
+        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+            .Returns(_ => ThrowingDeltaAsync(new FileNotFoundException("Model not found")));
 
         var vm = CreateVm();
         vm.SourceText = "test";
@@ -450,8 +439,8 @@ public class OverlayViewModelTests
     [Fact]
     public async Task RunPipelineAsync_ShowsErrorStatus_WhenGenericException()
     {
-        _pipeline.ProcessAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
-            .Returns<TranslationResult>(_ => throw new InvalidOperationException("Something broke"));
+        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+            .Returns(_ => ThrowingDeltaAsync(new InvalidOperationException("Something broke")));
 
         var vm = CreateVm();
         vm.SourceText = "test";
@@ -465,8 +454,8 @@ public class OverlayViewModelTests
     [Fact]
     public async Task RunPipelineAsync_ShowsFriendlyError_WhenTranslationFails()
     {
-        _pipeline.ProcessAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
-            .Returns<TranslationResult>(_ => throw new TranslationFailedException("Translation failed."));
+        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+            .Returns(_ => ThrowingDeltaAsync(new TranslationFailedException("Translation failed.")));
 
         var vm = CreateVm();
         vm.SourceText = "test";
@@ -582,6 +571,14 @@ public class OverlayViewModelTests
         public Task<string> TranslateAsync(string text, string src, string tgt, CancellationToken ct)
             => Task.FromResult($"[{src}→{tgt}] {text}");
 
+        public async IAsyncEnumerable<LiveLingo.Core.Engines.TranslationDelta> TranslateStreamingAsync(
+            string text, string src, string tgt,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+        {
+            await Task.CompletedTask;
+            yield return new LiveLingo.Core.Engines.TranslationDelta($"[{src}→{tgt}] {text}");
+        }
+
         public bool SupportsLanguagePair(string src, string tgt) => true;
         public void Dispose() { }
     }
@@ -653,14 +650,14 @@ public class OverlayViewModelTests
             Processing = new ProcessingSettings { DefaultMode = "Off" }
         };
 
-        _pipeline.ProcessAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
-            .Returns(new TranslationResult("Result", "zh", "Result", TimeSpan.FromMilliseconds(10), TimeSpan.FromMilliseconds(5)));
+        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+            .Returns(_ => SingleDeltaAsync("Result"));
 
         var vm = new OverlayViewModel(_target, _pipeline, _injector, _engine, settings, localizationService: _loc);
         vm.SourceText = "你好世界";
         await Task.Delay(1000, TestContext.Current.CancellationToken);
 
-        await _pipeline.Received().ProcessAsync(
+        _pipeline.Received().ProcessStreamingAsync(
             Arg.Is<TranslationRequest>(r => r.PostProcessing == null),
             Arg.Any<CancellationToken>());
     }
@@ -723,6 +720,8 @@ public class OverlayViewModelTests
                 Arg.Is<TranslationRequest>(r => r.PostProcessing == null),
                 Arg.Any<CancellationToken>())
             .Returns(new TranslationResult("Result", "zh", "Result", TimeSpan.FromMilliseconds(10), null));
+        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+            .Returns(_ => SingleDeltaAsync("Result"));
 
         var vm = new OverlayViewModel(_target, _pipeline, _injector, _engine, settings, localizationService: _loc);
         vm.SourceText = "你好世界";
@@ -733,8 +732,11 @@ public class OverlayViewModelTests
         await _pipeline.Received(1).ProcessAsync(
             Arg.Is<TranslationRequest>(r => r.PostProcessing != null),
             Arg.Any<CancellationToken>());
-        await _pipeline.Received(2).ProcessAsync(
+        await _pipeline.Received(1).ProcessAsync(
             Arg.Is<TranslationRequest>(r => r.PostProcessing == null),
+            Arg.Any<CancellationToken>());
+        _pipeline.Received(1).ProcessStreamingAsync(
+            Arg.Any<TranslationRequest>(),
             Arg.Any<CancellationToken>());
     }
 
@@ -746,14 +748,14 @@ public class OverlayViewModelTests
             Translation = new TranslationSettings { DefaultSourceLanguage = "ja" }
         };
 
-        _pipeline.ProcessAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
-            .Returns(new TranslationResult("Result", "ja", "Result", TimeSpan.FromMilliseconds(10), null));
+        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+            .Returns(_ => SingleDeltaAsync("Result"));
 
         var vm = new OverlayViewModel(_target, _pipeline, _injector, _engine, settings, localizationService: _loc);
         vm.SourceText = "こんにちは";
         await Task.Delay(1000, TestContext.Current.CancellationToken);
 
-        await _pipeline.Received().ProcessAsync(
+        _pipeline.Received().ProcessStreamingAsync(
             Arg.Is<TranslationRequest>(r => r.SourceLanguage == "ja"),
             Arg.Any<CancellationToken>());
     }
@@ -843,8 +845,8 @@ public class OverlayViewModelTests
     [Fact]
     public async Task SelectedTargetLanguage_RetranslatesWhenSourceExists()
     {
-        _pipeline.ProcessAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
-            .Returns(new TranslationResult("Result", "zh", "Result", TimeSpan.FromMilliseconds(10), null));
+        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+            .Returns(_ => SingleDeltaAsync("Result"));
         var vm = CreateVm();
         vm.SourceText = "hello";
         await Task.Delay(1000, TestContext.Current.CancellationToken);
@@ -852,7 +854,7 @@ public class OverlayViewModelTests
         vm.SelectedTargetLanguage = CatalogLanguages.First(l => l.Code == "zh");
         await Task.Delay(1000, TestContext.Current.CancellationToken);
 
-        await _pipeline.Received().ProcessAsync(
+        _pipeline.Received().ProcessStreamingAsync(
             Arg.Is<TranslationRequest>(r => r.TargetLanguage == "zh"),
             Arg.Any<CancellationToken>());
     }
@@ -939,15 +941,15 @@ public class OverlayViewModelTests
                 DefaultTargetLanguage = "en"
             }
         };
-        _pipeline.ProcessAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
-            .Returns<TranslationResult>(_ => throw new NotSupportedException("unsupported pair"));
+        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+            .Returns(_ => ThrowingDeltaAsync(new NotSupportedException("unsupported pair")));
         var vm = new OverlayViewModel(_target, _pipeline, _injector, engine, settings, localizationService: _loc);
         vm.SourceText = "test";
         await Task.Delay(1000, TestContext.Current.CancellationToken);
 
         Assert.Contains("Unsupported language pair", vm.StatusText);
-        await _pipeline.Received(1)
-            .ProcessAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>());
+        _pipeline.Received(1)
+            .ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -973,8 +975,8 @@ public class OverlayViewModelTests
     [Fact]
     public async Task Debounce_RapidInput_OnlyTriggersOnce()
     {
-        _pipeline.ProcessAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
-            .Returns(new TranslationResult("R", "zh", "R", TimeSpan.Zero, null));
+        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+            .Returns(_ => SingleDeltaAsync("R"));
 
         var vm = CreateVm();
         vm.SourceText = "a";
@@ -985,8 +987,8 @@ public class OverlayViewModelTests
 
         await Task.Delay(1000, TestContext.Current.CancellationToken);
 
-        await _pipeline.Received(1)
-            .ProcessAsync(
+        _pipeline.Received(1)
+            .ProcessStreamingAsync(
                 Arg.Is<TranslationRequest>(r => r.SourceText == "abc"),
                 Arg.Any<CancellationToken>());
     }
@@ -1046,9 +1048,9 @@ public class OverlayViewModelTests
     [Fact]
     public async Task IsTranslating_TrueDuringPipeline_FalseAfter()
     {
-        var tcs = new TaskCompletionSource<TranslationResult>();
-        _pipeline.ProcessAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
-            .Returns(tcs.Task);
+        var tcs = new TaskCompletionSource();
+        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+            .Returns(ci => BlockingDeltaAsync(tcs, ci.ArgAt<CancellationToken>(1)));
 
         var vm = CreateVm();
         vm.SourceText = "test";
@@ -1056,7 +1058,7 @@ public class OverlayViewModelTests
 
         Assert.True(vm.IsTranslating);
 
-        tcs.SetResult(new TranslationResult("Done", "zh", "Done", TimeSpan.Zero, null));
+        tcs.SetResult();
         await Task.Delay(50, TestContext.Current.CancellationToken);
 
         Assert.False(vm.IsTranslating);
@@ -1300,6 +1302,8 @@ public class OverlayViewModelTests
                 Arg.Is<TranslationRequest>(r => r.PostProcessing == null),
                 Arg.Any<CancellationToken>())
             .Returns(new TranslationResult("Result", "zh", "Result", TimeSpan.FromMilliseconds(10), null));
+        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+            .Returns(_ => SingleDeltaAsync("Result"));
 
         var vm = new OverlayViewModel(_target, _pipeline, _injector, _engine, settings, localizationService: _loc);
 
@@ -1332,6 +1336,8 @@ public class OverlayViewModelTests
 
         _pipeline.ProcessAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
             .Returns(new TranslationResult("Result", "zh", "Result", TimeSpan.FromMilliseconds(10), null));
+        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+            .Returns(_ => SingleDeltaAsync("Result"));
 
         var vm = new OverlayViewModel(
             _target,
@@ -1454,6 +1460,10 @@ public class OverlayViewModelTests
     {
         public IReadOnlyList<LiveLingo.Core.Engines.LanguageInfo> SupportedLanguages { get; } = [];
         public Task<string> TranslateAsync(string text, string src, string tgt, CancellationToken ct) => Task.FromResult(text);
+        public async IAsyncEnumerable<LiveLingo.Core.Engines.TranslationDelta> TranslateStreamingAsync(
+            string text, string src, string tgt,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+        { await Task.CompletedTask; yield return new LiveLingo.Core.Engines.TranslationDelta(text); }
         public bool SupportsLanguagePair(string src, string tgt) => false;
         public void Dispose() { }
     }
@@ -1463,6 +1473,10 @@ public class OverlayViewModelTests
         public IReadOnlyList<LiveLingo.Core.Engines.LanguageInfo> SupportedLanguages { get; } =
             [new("ja", "日本語"), new("en", "English")];
         public Task<string> TranslateAsync(string text, string src, string tgt, CancellationToken ct) => Task.FromResult(text);
+        public async IAsyncEnumerable<LiveLingo.Core.Engines.TranslationDelta> TranslateStreamingAsync(
+            string text, string src, string tgt,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+        { await Task.CompletedTask; yield return new LiveLingo.Core.Engines.TranslationDelta(text); }
         public bool SupportsLanguagePair(string src, string tgt) => false;
         public void Dispose() { }
     }
@@ -1478,5 +1492,32 @@ public class OverlayViewModelTests
         public CloudProviderRoutingState GetRoutingState(CloudModelPreferences? preferences) => routingState;
         public Task<CloudProviderRuntimeSnapshot> RefreshAsync(CloudModelPreferences? preferences, CancellationToken ct = default) =>
             Task.FromResult(Current);
+    }
+
+    // --- Streaming test helpers ---
+
+    private static async IAsyncEnumerable<TranslationDelta> SingleDeltaAsync(
+        string text,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        await Task.CompletedTask;
+        yield return new TranslationDelta(text);
+    }
+
+    private static async IAsyncEnumerable<TranslationDelta> BlockingDeltaAsync(
+        TaskCompletionSource tcs,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    {
+        await tcs.Task.WaitAsync(ct);
+        yield break;
+    }
+
+    private static async IAsyncEnumerable<TranslationDelta> ThrowingDeltaAsync(
+        Exception exception,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    {
+        await Task.FromException(exception);
+        yield break;
     }
 }

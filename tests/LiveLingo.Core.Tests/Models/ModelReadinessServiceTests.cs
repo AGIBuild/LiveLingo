@@ -17,7 +17,7 @@ public class ModelReadinessServiceTests
             service.EnsureTranslationModelReady("zh", "en"));
 
         Assert.Equal(ModelType.Translation, ex.ModelType);
-        Assert.Equal("gemma4-12b", ex.ModelId);
+        Assert.Equal("gemma4-26b-a4b", ex.ModelId);
     }
 
     [Fact]
@@ -27,14 +27,14 @@ public class ModelReadinessServiceTests
         manager.ListInstalled().Returns(
         [
             new InstalledModel(
-                ModelRegistry.Gemma4_12B.Id,
-                ModelRegistry.Gemma4_12B.DisplayName,
+                ModelRegistry.Gemma4_26B_A4B.Id,
+                ModelRegistry.Gemma4_26B_A4B.DisplayName,
                 "/fake/qwen25_7b",
-                ModelRegistry.Gemma4_12B.SizeBytes,
+                ModelRegistry.Gemma4_26B_A4B.SizeBytes,
                 ModelType.Translation,
                 DateTime.UtcNow)
         ]);
-        manager.HasAllExpectedLocalAssets(ModelRegistry.Gemma4_12B).Returns(false);
+        manager.HasAllExpectedLocalAssets(ModelRegistry.Gemma4_26B_A4B).Returns(false);
         var service = CreateService(manager);
 
         Assert.Throws<ModelNotReadyException>(() => service.EnsureTranslationModelReady("zh", "en"));
@@ -49,7 +49,7 @@ public class ModelReadinessServiceTests
         var ex = Assert.Throws<ModelNotReadyException>(() =>
             service.EnsureTranslationModelReady("ko", "fr"));
 
-        Assert.Equal("gemma4-12b", ex.ModelId);
+        Assert.Equal("gemma4-26b-a4b", ex.ModelId);
     }
 
     [Fact]
@@ -85,17 +85,17 @@ public class ModelReadinessServiceTests
     }
 
     [Fact]
-    public void EnsurePostProcessingModelReady_DoesNotThrow_WhenGemma4_12BInstalled()
+    public void EnsurePostProcessingModelReady_DoesNotThrow_WhenGemma4_26B_A4BInstalled()
     {
         var manager = Substitute.For<IModelManager>();
         manager.HasAllExpectedLocalAssets(Arg.Any<ModelDescriptor>()).Returns(true);
         manager.ListInstalled().Returns(
         [
             new InstalledModel(
-                ModelRegistry.Gemma4_12B.Id,
-                ModelRegistry.Gemma4_12B.DisplayName,
+                ModelRegistry.Gemma4_26B_A4B.Id,
+                ModelRegistry.Gemma4_26B_A4B.DisplayName,
                 "/fake/qwen25_7b",
-                ModelRegistry.Gemma4_12B.SizeBytes,
+                ModelRegistry.Gemma4_26B_A4B.SizeBytes,
                 ModelType.Translation,
                 DateTime.UtcNow)
         ]);

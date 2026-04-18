@@ -47,5 +47,6 @@ public partial class MainWindow : Window
             settingsButton.Content = $"⚙ {L("tray.settings", "Settings")}";
     }
 
-    private string L(string key, string fallback) => _loc?.T(key) ?? fallback;
+    private string L(string key, string fallback)
+        => _loc is not null && _loc.TryT(key, out var value) ? value : fallback;
 }

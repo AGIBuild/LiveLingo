@@ -31,7 +31,24 @@ public sealed class DefaultModelSelector : IModelSelector
             _options.RouteUnsupportedLanguagePairsToCloud,
             CreateCloudPreferences(),
             _cloudRuntimeState.GetRoutingState(CreateCloudPreferences()),
-            context);
+            context,
+            CreateOllamaPreferences());
+
+    public TranslationRoutePlan BuildTranslationRoutePlan(
+        string sourceLanguage,
+        string targetLanguage,
+        TranslationRoutingContext? context = null) =>
+        ModelSelectionPolicy.BuildTranslationRoutePlan(
+            _catalog,
+            _options.ActiveTranslationModelId,
+            sourceLanguage,
+            targetLanguage,
+            _options.TranslationRoutingMode,
+            _options.RouteUnsupportedLanguagePairsToCloud,
+            CreateCloudPreferences(),
+            _cloudRuntimeState.GetRoutingState(CreateCloudPreferences()),
+            context,
+            CreateOllamaPreferences());
 
     public ModelProfile SelectPostProcessingProfile() =>
         ModelSelectionPolicy.SelectPostProcessingProfile(
@@ -41,7 +58,8 @@ public sealed class DefaultModelSelector : IModelSelector
             _options.TranslationRoutingMode,
             _options.RoutePostProcessingToCloud,
             CreateCloudPreferences(),
-            _cloudRuntimeState.GetRoutingState(CreateCloudPreferences()));
+            _cloudRuntimeState.GetRoutingState(CreateCloudPreferences()),
+            CreateOllamaPreferences());
 
     public ModelProfile? FindProfileById(string id) =>
         ModelSelectionPolicy.FindProfileById(_catalog, id, CreateCloudPreferences());
@@ -53,4 +71,11 @@ public sealed class DefaultModelSelector : IModelSelector
             _options.CloudProviderApiKey,
             _options.CloudTranslationModelId,
             _options.CloudPostProcessingModelId);
+
+    private OllamaPreferences CreateOllamaPreferences() =>
+        new(
+            _options.OllamaEnabled,
+            _options.OllamaBaseUrl,
+            _options.OllamaTranslationModelId,
+            _options.OllamaPostProcessingModelId);
 }

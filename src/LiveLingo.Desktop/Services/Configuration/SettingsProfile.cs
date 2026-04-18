@@ -48,6 +48,8 @@ public partial class TranslationSettings : ObservableObject
     [ObservableProperty] private List<LanguagePair> _languagePairs = [new("zh", "en")];
     [ObservableProperty] private ModelPolicySettings _modelPolicy = new();
     [ObservableProperty] private CloudProviderSettings _cloudProvider = new();
+    [ObservableProperty] private OllamaProviderSettings _ollamaProvider = new();
+    [ObservableProperty] private List<GlossaryEntrySettings> _glossary = [];
 
     public TranslationSettings DeepClone()
     {
@@ -58,9 +60,35 @@ public partial class TranslationSettings : ObservableObject
             ActiveTranslationModelId = ActiveTranslationModelId,
             LanguagePairs = LanguagePairs.Select(pair => pair.DeepClone()).ToList(),
             ModelPolicy = ModelPolicy.DeepClone(),
-            CloudProvider = CloudProvider.DeepClone()
+            CloudProvider = CloudProvider.DeepClone(),
+            OllamaProvider = OllamaProvider.DeepClone(),
+            Glossary = Glossary.Select(e => e.DeepClone()).ToList()
         };
     }
+}
+
+/// <summary>
+/// Serialized representation of a single glossary term mapping.
+/// Use <see cref="CoreOptionsSync"/> to convert to <see cref="LiveLingo.Core.Translation.GlossaryEntry"/>.
+/// </summary>
+public sealed class GlossaryEntrySettings
+{
+    public string SourceTerm { get; set; } = string.Empty;
+    public string TargetTerm { get; set; } = string.Empty;
+
+    /// <summary>BCP-47 source language code constraint; null means applies to all source languages.</summary>
+    public string? SourceLanguage { get; set; }
+
+    /// <summary>BCP-47 target language code constraint; null means applies to all target languages.</summary>
+    public string? TargetLanguage { get; set; }
+
+    public GlossaryEntrySettings DeepClone() => new()
+    {
+        SourceTerm = SourceTerm,
+        TargetTerm = TargetTerm,
+        SourceLanguage = SourceLanguage,
+        TargetLanguage = TargetLanguage
+    };
 }
 
 public partial class ModelPolicySettings : ObservableObject
@@ -76,6 +104,26 @@ public partial class ModelPolicySettings : ObservableObject
         RouteUnsupportedPairsToCloud = RouteUnsupportedPairsToCloud,
         RoutePostProcessingToCloud = RoutePostProcessingToCloud,
         PreferredLocalTranslationModelId = PreferredLocalTranslationModelId
+    };
+}
+
+/// <summary>
+/// User-supplied configuration for the Ollama local daemon. Ollama itself is installed
+/// and run by the user (e.g. <c>ollama serve</c>); we only point at a running instance.
+/// </summary>
+public partial class OllamaProviderSettings : ObservableObject
+{
+    [ObservableProperty] private bool _enabled;
+    [ObservableProperty] private string _baseUrl = "http://localhost:11434";
+    [ObservableProperty] private string? _translationModelId;
+    [ObservableProperty] private string? _postProcessingModelId;
+
+    public OllamaProviderSettings DeepClone() => new()
+    {
+        Enabled = Enabled,
+        BaseUrl = BaseUrl,
+        TranslationModelId = TranslationModelId,
+        PostProcessingModelId = PostProcessingModelId
     };
 }
 

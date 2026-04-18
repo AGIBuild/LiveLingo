@@ -178,6 +178,14 @@ public class SettingsRuntimeIntegrationTests : IDisposable
         public Task<string> TranslateAsync(string text, string sourceLanguage, string targetLanguage, CancellationToken ct)
             => Task.FromResult(text);
 
+        public async IAsyncEnumerable<LiveLingo.Core.Engines.TranslationDelta> TranslateStreamingAsync(
+            string text, string sourceLanguage, string targetLanguage,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+        {
+            await Task.CompletedTask;
+            yield return new LiveLingo.Core.Engines.TranslationDelta(text);
+        }
+
         public bool SupportsLanguagePair(string sourceLanguage, string targetLanguage) => true;
 
         public void Dispose()

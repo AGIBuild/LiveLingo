@@ -22,7 +22,7 @@ public sealed class DefaultModelSelectorTests
 
         var profile = selector.SelectTranslationProfile("en", "zh");
 
-        Assert.Equal(ModelRegistry.Gemma4_12B.Id, profile.Id);
+        Assert.Equal(ModelRegistry.Gemma4_26B_A4B.Id, profile.Id);
     }
 
     [Fact]
@@ -125,7 +125,93 @@ public sealed class DefaultModelSelectorTests
 
         var profile = selector.SelectTranslationProfile("zh", "en");
 
-        Assert.Equal(ModelRegistry.Gemma4_12B.Id, profile.Id);
+        Assert.Equal(ModelRegistry.Gemma4_26B_A4B.Id, profile.Id);
+    }
+
+    [Fact]
+    public void SelectTranslationProfile_UsesOllamaProfile_WhenOllamaEnabledAndConfigured()
+    {
+        var selector = CreateSelector(
+            ollamaEnabled: true,
+            ollamaTranslationModelId: "gemma3:4b");
+
+        var profile = selector.SelectTranslationProfile("zh", "en");
+
+        Assert.Equal("gemma3:4b", profile.Id);
+        Assert.Equal(ModelProviderKind.Ollama, profile.ProviderKind);
+        Assert.Equal(ModelRuntimeKind.Ollama, profile.RuntimeKind);
+        Assert.True(profile.SupportsAllLanguages);
+    }
+
+    [Fact]
+    public void SelectTranslationProfile_FallsBackToLocal_WhenOllamaEnabledButNoModelConfigured()
+    {
+        var selector = CreateSelector(
+            ollamaEnabled: true,
+            ollamaTranslationModelId: null);
+
+        var profile = selector.SelectTranslationProfile("zh", "en");
+
+        Assert.Equal(ModelRegistry.Gemma4_26B_A4B.Id, profile.Id);
+        Assert.Equal(ModelProviderKind.LlamaServer, profile.ProviderKind);
+    }
+
+    [Fact]
+    public void SelectTranslationProfile_OllamaDisabled_IgnoresConfiguredTag()
+    {
+        var selector = CreateSelector(
+            ollamaEnabled: false,
+            ollamaTranslationModelId: "gemma3:4b");
+
+        var profile = selector.SelectTranslationProfile("zh", "en");
+
+        Assert.NotEqual(ModelProviderKind.Ollama, profile.ProviderKind);
+    }
+
+    [Fact]
+    public void SelectTranslationProfile_CloudOnlyOverridesOllama()
+    {
+        var selector = CreateSelector(
+            routingMode: TranslationRoutingMode.CloudOnly,
+            cloudEnabled: true,
+            cloudTranslationModelId: "gpt-4.1-mini",
+            cloudApiKey: "sk-test",
+            cloudBaseUrl: "https://api.openai.com/v1",
+            ollamaEnabled: true,
+            ollamaTranslationModelId: "gemma3:4b");
+
+        var profile = selector.SelectTranslationProfile("zh", "en");
+
+        Assert.Equal("gpt-4.1-mini", profile.Id);
+        Assert.Equal(ModelProviderKind.OpenAICompatible, profile.ProviderKind);
+    }
+
+    [Fact]
+    public void SelectPostProcessingProfile_UsesOllamaProfile_WhenEnabled()
+    {
+        var selector = CreateSelector(
+            ollamaEnabled: true,
+            ollamaTranslationModelId: "gemma3:4b",
+            ollamaPostProcessingModelId: "qwen3:4b");
+
+        var profile = selector.SelectPostProcessingProfile();
+
+        Assert.Equal("qwen3:4b", profile.Id);
+        Assert.Equal(ModelTaskType.PostProcessing, profile.TaskType);
+        Assert.Equal(ModelProviderKind.Ollama, profile.ProviderKind);
+    }
+
+    [Fact]
+    public void SelectPostProcessingProfile_OllamaFallsBackToTranslationModel_WhenNoDedicatedPostProcessingTag()
+    {
+        var selector = CreateSelector(
+            ollamaEnabled: true,
+            ollamaTranslationModelId: "gemma3:4b");
+
+        var profile = selector.SelectPostProcessingProfile();
+
+        Assert.Equal("gemma3:4b", profile.Id);
+        Assert.Equal(ModelProviderKind.Ollama, profile.ProviderKind);
     }
 
     [Fact]
@@ -159,7 +245,11 @@ public sealed class DefaultModelSelectorTests
         string? cloudApiKey = null,
         string? cloudTranslationModelId = null,
         string? cloudPostProcessingModelId = null,
-        ICloudProviderRuntimeState? cloudRuntimeState = null)
+        ICloudProviderRuntimeState? cloudRuntimeState = null,
+        bool ollamaEnabled = false,
+        string ollamaBaseUrl = "http://localhost:11434",
+        string? ollamaTranslationModelId = null,
+        string? ollamaPostProcessingModelId = null)
     {
         var catalog = new StaticModelCatalog();
         var options = Options.Create(new CoreOptions
@@ -172,7 +262,11 @@ public sealed class DefaultModelSelectorTests
             CloudProviderBaseUrl = cloudBaseUrl,
             CloudProviderApiKey = cloudApiKey,
             CloudTranslationModelId = cloudTranslationModelId,
-            CloudPostProcessingModelId = cloudPostProcessingModelId
+            CloudPostProcessingModelId = cloudPostProcessingModelId,
+            OllamaEnabled = ollamaEnabled,
+            OllamaBaseUrl = ollamaBaseUrl,
+            OllamaTranslationModelId = ollamaTranslationModelId,
+            OllamaPostProcessingModelId = ollamaPostProcessingModelId
         });
 
         return new DefaultModelSelector(catalog, options, cloudRuntimeState ?? new NullCloudProviderRuntimeState());

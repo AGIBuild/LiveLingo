@@ -658,8 +658,8 @@ public class AppStartupSmokeTests
     public async Task OverlayWindow_TypingText_ShowsTranslatedResult()
     {
         var pipeline = Substitute.For<ITranslationPipeline>();
-        pipeline.ProcessAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
-            .Returns(new TranslationResult("translated", "zh", "translated", TimeSpan.FromMilliseconds(5), null));
+        pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+            .Returns(_ => SingleDeltaAsync("translated"));
         var injector = Substitute.For<LiveLingo.Desktop.Platform.ITextInjector>();
         var target = new LiveLingo.Desktop.Platform.TargetWindowInfo(
             IntPtr.Zero, IntPtr.Zero, "Test", "TestWindow", 0, 0, 800, 600);
@@ -912,12 +912,12 @@ public class AppStartupSmokeTests
             loc,
             new LocalModelFallbackEventArgs
             {
-                Primary = ModelRegistry.Gemma4_12B,
-                Fallback = ModelRegistry.Gemma4_4B
+                Primary = ModelRegistry.Gemma4_26B_A4B,
+                Fallback = ModelRegistry.Gemma4_E4B
             });
 
-        Assert.Contains(ModelRegistry.Gemma4_12B.DisplayName, message);
-        Assert.Contains(ModelRegistry.Gemma4_4B.DisplayName, message);
+        Assert.Contains(ModelRegistry.Gemma4_26B_A4B.DisplayName, message);
+        Assert.Contains(ModelRegistry.Gemma4_E4B.DisplayName, message);
         Assert.DoesNotContain("could not load; using", message, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -946,6 +946,8 @@ public class AppStartupSmokeTests
         services.AddSingleton<ISecretStore>(new InMemorySecretStore());
         services.AddSingleton(Substitute.For<ICloudProviderProbeService>());
         services.AddSingleton(Substitute.For<ICloudProviderRuntimeState>());
+        services.AddSingleton<ITranslationTelemetry>(new InProcessTranslationTelemetry());
+        services.AddSingleton<IModelDownloadCoordinator, InProcessModelDownloadCoordinator>();
         services.AddSingleton(platform);
         services.AddSingleton<IMessenger>(_ => new WeakReferenceMessenger());
         return services.BuildServiceProvider();
@@ -1050,5 +1052,14 @@ public class AppStartupSmokeTests
         public Task LoadAsync(CancellationToken ct = default) => Task.CompletedTask;
 
         public Task SaveAsync(CancellationToken ct = default) => Task.CompletedTask;
+    }
+
+    private static async IAsyncEnumerable<TranslationDelta> SingleDeltaAsync(
+        string text,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        await Task.CompletedTask;
+        yield return new TranslationDelta(text);
     }
 }

@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using LiveLingo.Core.Models;
 using LiveLingo.Core.Translation;
 using Microsoft.Extensions.AI;
@@ -18,7 +19,7 @@ namespace LiveLingo.Core.Engines;
 ///   <see cref="TranslationPromptBuilder"/> before calling the actual model,
 ///   so the optimal prompt is always used for inference.
 /// </summary>
-public sealed class LlamaTranslationEngine : ITranslationEngine
+public sealed class LlamaTranslationEngine : IChatPathTranslationEngine
 {
     private readonly IChatClient _chatClient;
     private readonly ILogger<LlamaTranslationEngine> _logger;
@@ -91,6 +92,51 @@ public sealed class LlamaTranslationEngine : ITranslationEngine
 
         _logger.LogDebug("Translated {Src}→{Tgt}: {In} → {Out}", sourceLanguage, targetLanguage, text, result);
         return result;
+    }
+
+    public async IAsyncEnumerable<TranslationDelta> TranslateStreamingAsync(
+        string text,
+        string sourceLanguage,
+        string targetLanguage,
+        [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+
+        var srcName = GetLanguageName(sourceLanguage);
+        var tgtName = GetLanguageName(targetLanguage);
+
+        var defaultMessages = TranslationPromptBuilder.BuildDefault(text, srcName, tgtName);
+        var chatMessages = defaultMessages
+            .Select(m => new ChatMessage(new ChatRole(m.Role), m.Content))
+            .ToList();
+
+        var defaults = ModelInvocationOptions.CreateTranslationDefaults();
+        var options = new ChatOptions
+        {
+            Temperature = defaults.Temperature,
+            MaxOutputTokens = defaults.MaxTokens,
+            AdditionalProperties = new AdditionalPropertiesDictionary
+            {
+                ["sourceLang"] = sourceLanguage,
+                ["targetLang"] = targetLanguage,
+                ["taskType"] = nameof(ModelTaskType.Translation),
+                ["textLength"] = text.Length,
+                ["sourceText"] = text,
+                ["sourceLangName"] = srcName,
+                ["targetLangName"] = tgtName
+            }
+        };
+
+        await foreach (var update in _chatClient.GetStreamingResponseAsync(chatMessages, options, ct)
+                           .ConfigureAwait(false))
+        {
+            if (string.IsNullOrEmpty(update.Text)) continue;
+
+            // replaceAll = true → quality guard triggered cloud escalation; signal replacement.
+            var isReplacement = update.AdditionalProperties?.TryGetValue("replaceAll", out var r) == true
+                                && r is true;
+            yield return new TranslationDelta(update.Text, isReplacement);
+        }
     }
 
     public bool SupportsLanguagePair(string sourceLanguage, string targetLanguage) =>

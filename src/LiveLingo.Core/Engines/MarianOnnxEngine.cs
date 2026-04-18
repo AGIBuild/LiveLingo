@@ -10,7 +10,7 @@ using Microsoft.ML.OnnxRuntime.Tensors;
 
 namespace LiveLingo.Core.Engines;
 
-public sealed class MarianOnnxEngine : ITranslationEngine
+public sealed class MarianOnnxEngine : IFastPathTranslationEngine
 {
     private readonly IModelManager _modelManager;
     private readonly IModelCatalog _catalog;
@@ -46,6 +46,15 @@ public sealed class MarianOnnxEngine : ITranslationEngine
         var session = await GetOrCreateSessionAsync(descriptor, ct);
         return await Task.Run(() => session.Translate(text, sourceLanguage, targetLanguage, ct), ct)
             .ConfigureAwait(false);
+    }
+
+    public async IAsyncEnumerable<TranslationDelta> TranslateStreamingAsync(
+        string text, string sourceLanguage, string targetLanguage,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    {
+        // Marian ONNX runs synchronously; yield the completed translation as a single delta.
+        var result = await TranslateAsync(text, sourceLanguage, targetLanguage, ct).ConfigureAwait(false);
+        yield return new TranslationDelta(result);
     }
 
     public bool SupportsLanguagePair(string sourceLanguage, string targetLanguage) =>

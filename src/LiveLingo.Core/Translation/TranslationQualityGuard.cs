@@ -65,6 +65,20 @@ public static class TranslationQualityGuard
                     $"Number '{m.Value}' from source not found in translation.");
         }
 
+        // Sentence-count fidelity: when the source clearly ships ≥ 2 sentences,
+        // the translation must preserve the sentence count. The pipeline already
+        // segments per sentence before invoking the engine, so this is the last
+        // line of defence against callers that bypass the segmenter – e.g.
+        // "你好啊，胆小鬼。 你是不是不知道我是谁？" → "Hello, coward." (second clause dropped).
+        var srcSentences = TextSegmenter.CountSentenceEndings(sourceText);
+        if (srcSentences >= 2)
+        {
+            var tgtSentences = TextSegmenter.CountSentenceEndings(translation);
+            if (tgtSentences < srcSentences)
+                return QualityCheckResult.Fail(
+                    $"Sentence count dropped from {srcSentences} to {tgtSentences} – likely omission of trailing clauses.");
+        }
+
         // Repetition guard (model collapse: "the the the the …")
         if (HasPathologicalRepetition(translation))
             return QualityCheckResult.Fail("Pathological token repetition detected in output.");

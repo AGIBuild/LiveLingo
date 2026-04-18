@@ -13,6 +13,7 @@ public enum ModelProviderKind
 {
     LlamaServer,
     OpenAICompatible,
+    Ollama,
     MarianOnnx,
     FastText,
     WhisperCpp,
@@ -23,6 +24,7 @@ public enum ModelRuntimeKind
 {
     LlamaServer,
     RemoteHttp,
+    Ollama,
     OnnxRuntime,
     InProcess
 }

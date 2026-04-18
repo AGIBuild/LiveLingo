@@ -273,6 +273,7 @@ public partial class App : Application
 
         var settingsService = _serviceProvider!.GetRequiredService<ISettingsService>();
         var modelManager = _serviceProvider!.GetRequiredService<IModelManager>();
+        var modelDownloadCoordinator = _serviceProvider!.GetRequiredService<IModelDownloadCoordinator>();
         var engine = _serviceProvider!.GetRequiredService<ITranslationEngine>();
         var loc = _serviceProvider!.GetRequiredService<ILocalizationService>();
         var languageCatalog = _serviceProvider!.GetRequiredService<ILanguageCatalog>();
@@ -281,6 +282,7 @@ public partial class App : Application
         var cloudProviderRuntimeState = _serviceProvider!.GetRequiredService<ICloudProviderRuntimeState>();
         var platform = _serviceProvider!.GetRequiredService<IPlatformServices>();
         var secretStore = _serviceProvider!.GetRequiredService<ISecretStore>();
+        var translationTelemetry = _serviceProvider!.GetRequiredService<ITranslationTelemetry>();
         var vm = new SettingsViewModel(
             settingsService,
             modelManager,
@@ -292,7 +294,9 @@ public partial class App : Application
             llmCoordinator: llmCoordinator,
             platformServices: platform,
             secretStore: secretStore,
-            cloudProviderRuntimeState: cloudProviderRuntimeState);
+            cloudProviderRuntimeState: cloudProviderRuntimeState,
+            translationTelemetry: translationTelemetry,
+            modelDownloadCoordinator: modelDownloadCoordinator);
         if (initialTabIndex is { } idx)
             vm.SelectedTabIndex = idx;
         var subscribedUi = vm.WorkingCopy.UI;
@@ -324,6 +328,7 @@ public partial class App : Application
         {
             subscribedUi.PropertyChanged -= uiHandler;
             vm.PropertyChanged -= vmHandler;
+            vm.Dispose();
             _settingsWindow = null;
         };
         _settingsWindow.Show();

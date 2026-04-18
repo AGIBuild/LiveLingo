@@ -1,3 +1,5 @@
+using LiveLingo.Core.Translation;
+
 namespace LiveLingo.Core;
 
 public enum TranslationRoutingMode
@@ -62,7 +64,36 @@ public class CoreOptions
     /// </summary>
     public string? CloudPostProcessingModelId { get; set; }
 
+    /// <summary>
+    /// Enables the Ollama local daemon provider. User is responsible for running
+    /// Ollama (e.g. <c>ollama serve</c>) and pre-pulling the required model tags.
+    /// </summary>
+    public bool OllamaEnabled { get; set; }
+
+    /// <summary>
+    /// Base URL of the Ollama daemon. Defaults to the standard local endpoint.
+    /// </summary>
+    public string OllamaBaseUrl { get; set; } = "http://localhost:11434";
+
+    /// <summary>
+    /// Ollama model tag used for translation (e.g. <c>gemma3:4b</c>, <c>llama3.2:3b</c>).
+    /// User must have pulled this tag via <c>ollama pull</c> beforehand.
+    /// </summary>
+    public string? OllamaTranslationModelId { get; set; }
+
+    /// <summary>
+    /// Optional Ollama model tag for post-processing. Falls back to
+    /// <see cref="OllamaTranslationModelId"/> when empty.
+    /// </summary>
+    public string? OllamaPostProcessingModelId { get; set; }
+
     public int InferenceThreads { get; set; }
+
+    /// <summary>
+    /// User-defined term mappings injected into translation prompts when the
+    /// source term is found in the source text.
+    /// </summary>
+    public IReadOnlyList<GlossaryEntry> Glossary { get; set; } = [];
 
     /// <summary>
     /// Mirror base URL for huggingface.co downloads (e.g. "https://hf-mirror.com").

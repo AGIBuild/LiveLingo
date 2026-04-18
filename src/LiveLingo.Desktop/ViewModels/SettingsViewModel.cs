@@ -18,13 +18,14 @@ using Microsoft.Extensions.Logging;
 
 namespace LiveLingo.Desktop.ViewModels;
 
-public partial class SettingsViewModel : ObservableObject
+public partial class SettingsViewModel : ObservableObject, IDisposable
 {
     private readonly ISettingsService _settings;
     private readonly IModelManager? _modelManager;
     private readonly CoreOptions? _coreOptions;
     private readonly ILlmModelLoadCoordinator? _llmCoordinator;
     private readonly ICloudProviderRuntimeState _cloudProviderRuntimeState;
+    private readonly IOllamaProbeService? _ollamaProbeService;
     private readonly ILocalModelRuntimeState _localModelRuntimeState;
     private readonly IPlatformServices? _platformServices;
     private readonly ISecretStore _secretStore;
@@ -46,6 +47,8 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private bool _isTestingCloudProvider;
     [ObservableProperty] private bool _isFetchingCloudModels;
     [ObservableProperty] private string? _cloudProviderStatusMessage;
+    [ObservableProperty] private bool _isTestingOllamaProvider;
+    [ObservableProperty] private string? _ollamaProviderStatusMessage;
     [ObservableProperty] private string? _localModelStatusMessage;
 
     public static IReadOnlyList<string> InjectionModes { get; } = ["PasteAndSend", "PasteOnly"];
@@ -145,6 +148,32 @@ public partial class SettingsViewModel : ObservableObject
     public ObservableCollection<CloudProviderModelOption> DiscoveredCloudModels { get; }
     public bool HasDiscoveredCloudModels => DiscoveredCloudModels.Count > 0;
 
+    public string AiSectionOllamaProvider => L("settings.ai.ollamaProvider", "Ollama (local daemon)");
+    public string AiOllamaEnabledLabel => L("settings.ai.ollamaEnabled", "Enable Ollama Provider");
+    public string AiOllamaBaseUrlLabel => L("settings.ai.ollamaBaseUrl", "Base URL:");
+    public static string AiOllamaBaseUrlPlaceholder => "http://localhost:11434";
+    public string AiOllamaTranslationModelLabel => L("settings.ai.ollamaTranslationModel", "Translation Tag:");
+    public static string AiOllamaTranslationModelPlaceholder => "gemma3:4b";
+    public string AiOllamaPostProcessingModelLabel => L("settings.ai.ollamaPostModel", "Post-Processing Tag:");
+    public static string AiOllamaPostProcessingModelPlaceholder => "qwen3:4b";
+    public string AiOllamaTestConnectionLabel => L("settings.ai.ollamaTestConnection", "Test Connection");
+    public string AiOllamaDiscoveredModelsLabel => L("settings.ai.ollamaDiscoveredModels", "Pulled Models");
+    public string AiOllamaUseTranslationLabel => L("settings.ai.ollamaUseTranslation", "Use for Translation");
+    public string AiOllamaUsePostProcessingLabel => L("settings.ai.ollamaUsePost", "Use for Post-Processing");
+    public string AiOllamaProviderHint => L(
+        "settings.ai.ollamaProviderHint",
+        "Ollama is a user-managed local daemon. Install Ollama, run 'ollama serve', and pre-pull models with 'ollama pull <tag>'. LiveLingo never starts the daemon or downloads models.");
+
+    public ObservableCollection<OllamaProviderModelOption> DiscoveredOllamaModels { get; }
+    public bool HasDiscoveredOllamaModels => DiscoveredOllamaModels.Count > 0;
+
+    /// <summary>
+    /// Diagnostics sub-viewmodel. Populated when telemetry is available; otherwise
+    /// stays <c>null</c> and the view binds to an empty panel. Lifecycle is tied to
+    /// the owning <see cref="SettingsViewModel"/> — nothing else holds a reference.
+    /// </summary>
+    public DiagnosticsViewModel? Diagnostics { get; }
+
     public SettingsViewModel(
         ISettingsService settings,
         IModelManager modelManager,
@@ -158,13 +187,20 @@ public partial class SettingsViewModel : ObservableObject
         IPlatformServices? platformServices = null,
         ISecretStore? secretStore = null,
         ICloudProviderRuntimeState? cloudProviderRuntimeState = null,
-        ILocalModelRuntimeState? localModelRuntimeState = null)
+        ILocalModelRuntimeState? localModelRuntimeState = null,
+        IOllamaProbeService? ollamaProbeService = null,
+        ITranslationTelemetry? translationTelemetry = null,
+        IModelDownloadCoordinator? modelDownloadCoordinator = null)
     {
         _settings = settings;
         _modelManager = modelManager;
         _coreOptions = coreOptions;
         _llmCoordinator = llmCoordinator;
         _cloudProviderRuntimeState = cloudProviderRuntimeState ?? new NullCloudProviderRuntimeState();
+        _ollamaProbeService = ollamaProbeService;
+        Diagnostics = translationTelemetry is null
+            ? null
+            : new DiagnosticsViewModel(translationTelemetry, localizationService);
         _localModelRuntimeState = localModelRuntimeState ?? new NullLocalModelRuntimeState();
         _localModelRuntimeState.StateChanged += state => LocalModelStatusMessage =
             LocalModelRuntimePresentation.BuildSettingsStatusMessage(_loc, state, _localModelRuntimeState.ActiveModelDescriptor);
@@ -178,7 +214,12 @@ public partial class SettingsViewModel : ObservableObject
         AvailableLanguages = _languageCatalog.All;
         AvailableTranslationModels = new ObservableCollection<TranslationModelOption>();
         DiscoveredCloudModels = new ObservableCollection<CloudProviderModelOption>();
-        Models = ModelItemViewModel.CreateAll(modelManager, localizationService, platformServices);
+        DiscoveredOllamaModels = new ObservableCollection<OllamaProviderModelOption>();
+        Models = ModelItemViewModel.CreateAll(
+            modelManager,
+            modelDownloadCoordinator ?? NullModelDownloadCoordinator.Instance,
+            localizationService,
+            platformServices);
         HookWorkingCopy(WorkingCopy);
         HookModelItemChanges();
         RefreshTranslationModelsInternal();
@@ -196,7 +237,9 @@ public partial class SettingsViewModel : ObservableObject
         ILlmModelLoadCoordinator? llmCoordinator = null,
         ISecretStore? secretStore = null,
         ICloudProviderRuntimeState? cloudProviderRuntimeState = null,
-        ILocalModelRuntimeState? localModelRuntimeState = null)
+        ILocalModelRuntimeState? localModelRuntimeState = null,
+        IOllamaProbeService? ollamaProbeService = null,
+        ITranslationTelemetry? translationTelemetry = null)
     {
         _settings = settings;
         _modelManager = null;
@@ -204,6 +247,10 @@ public partial class SettingsViewModel : ObservableObject
         _coreOptions = coreOptions;
         _llmCoordinator = llmCoordinator;
         _cloudProviderRuntimeState = cloudProviderRuntimeState ?? new NullCloudProviderRuntimeState();
+        _ollamaProbeService = ollamaProbeService;
+        Diagnostics = translationTelemetry is null
+            ? null
+            : new DiagnosticsViewModel(translationTelemetry, localizationService);
         _localModelRuntimeState = localModelRuntimeState ?? new NullLocalModelRuntimeState();
         _localModelRuntimeState.StateChanged += state => LocalModelStatusMessage =
             LocalModelRuntimePresentation.BuildSettingsStatusMessage(_loc, state, _localModelRuntimeState.ActiveModelDescriptor);
@@ -216,6 +263,7 @@ public partial class SettingsViewModel : ObservableObject
         AvailableLanguages = _languageCatalog.All;
         AvailableTranslationModels = new ObservableCollection<TranslationModelOption>();
         DiscoveredCloudModels = new ObservableCollection<CloudProviderModelOption>();
+        DiscoveredOllamaModels = new ObservableCollection<OllamaProviderModelOption>();
         Models = [];
         HookWorkingCopy(WorkingCopy);
         RefreshTranslationModelsInternal();
@@ -268,6 +316,7 @@ public partial class SettingsViewModel : ObservableObject
         HookGroup(model.Translation, OnWorkingCopyNestedChanged);
         HookGroup(model.Translation.ModelPolicy, OnWorkingCopyNestedChanged);
         HookGroup(model.Translation.CloudProvider, OnWorkingCopyNestedChanged);
+        HookGroup(model.Translation.OllamaProvider, OnWorkingCopyNestedChanged);
         HookGroup(model.Processing, OnWorkingCopyNestedChanged);
         HookGroup(model.UI, OnWorkingCopyNestedChanged);
         HookGroup(model.Update, OnWorkingCopyNestedChanged);
@@ -280,6 +329,7 @@ public partial class SettingsViewModel : ObservableObject
         UnhookGroup(model.Translation, OnWorkingCopyNestedChanged);
         UnhookGroup(model.Translation.ModelPolicy, OnWorkingCopyNestedChanged);
         UnhookGroup(model.Translation.CloudProvider, OnWorkingCopyNestedChanged);
+        UnhookGroup(model.Translation.OllamaProvider, OnWorkingCopyNestedChanged);
         UnhookGroup(model.Processing, OnWorkingCopyNestedChanged);
         UnhookGroup(model.UI, OnWorkingCopyNestedChanged);
         UnhookGroup(model.Update, OnWorkingCopyNestedChanged);
@@ -321,6 +371,15 @@ public partial class SettingsViewModel : ObservableObject
             {
                 ClearDiscoveredCloudModels();
                 CloudProviderStatusMessage = null;
+            }
+        }
+        else if (sender is OllamaProviderSettings)
+        {
+            if (e.PropertyName is nameof(OllamaProviderSettings.Enabled)
+                or nameof(OllamaProviderSettings.BaseUrl))
+            {
+                ClearDiscoveredOllamaModels();
+                OllamaProviderStatusMessage = null;
             }
         }
 
@@ -517,12 +576,74 @@ public partial class SettingsViewModel : ObservableObject
     }
 
     [RelayCommand]
+    private async Task TestOllamaProviderConnectionAsync()
+    {
+        if (_ollamaProbeService is null)
+        {
+            OllamaProviderStatusMessage = L(
+                "settings.ai.ollamaProbeUnavailable",
+                "Ollama probe service is not available in this build.");
+            return;
+        }
+
+        IsTestingOllamaProvider = true;
+        try
+        {
+            var baseUrl = WorkingCopy.Translation.OllamaProvider.BaseUrl?.Trim();
+            if (string.IsNullOrWhiteSpace(baseUrl))
+            {
+                OllamaProviderStatusMessage = L(
+                    "settings.ai.ollamaInvalidBaseUrl",
+                    "Ollama base URL is required.");
+                return;
+            }
+
+            var result = await _ollamaProbeService.TestConnectionAsync(
+                new OllamaProbeRequest(baseUrl),
+                CancellationToken.None);
+            OllamaProviderStatusMessage = result.Message;
+            if (!result.IsSuccess)
+            {
+                ClearDiscoveredOllamaModels();
+                return;
+            }
+
+            var catalog = await _ollamaProbeService.GetModelCatalogAsync(
+                new OllamaProbeRequest(baseUrl),
+                CancellationToken.None);
+            ApplyDiscoveredOllamaModels(catalog.Models);
+        }
+        finally
+        {
+            IsTestingOllamaProvider = false;
+        }
+    }
+
+    [RelayCommand]
+    private void UseOllamaTranslationModel(string? modelId)
+    {
+        if (string.IsNullOrWhiteSpace(modelId))
+            return;
+
+        WorkingCopy.Translation.OllamaProvider.TranslationModelId = modelId;
+    }
+
+    [RelayCommand]
+    private void UseOllamaPostProcessingModel(string? modelId)
+    {
+        if (string.IsNullOrWhiteSpace(modelId))
+            return;
+
+        WorkingCopy.Translation.OllamaProvider.PostProcessingModelId = modelId;
+    }
+
+    [RelayCommand]
     private void OpenPrimaryTranslationModelOnHuggingFace()
     {
         if (_platformServices is null) return;
         var primaryModel = ModelRegistry.RequiredModels.Count > 0
             ? ModelRegistry.RequiredModels[0]
-            : ModelRegistry.Gemma4_12B;
+            : ModelRegistry.Gemma4_26B_A4B;
         if (!HuggingFaceWebUrls.TryGetModelCardUrl(primaryModel.DownloadUrl, out var url)) return;
         _platformServices.OpenUrl(url);
     }
@@ -865,6 +986,20 @@ public partial class SettingsViewModel : ObservableObject
         OnPropertyChanged(nameof(HasDiscoveredCloudModels));
     }
 
+    private void ApplyDiscoveredOllamaModels(IReadOnlyList<OllamaModelInfo> models)
+    {
+        DiscoveredOllamaModels.Clear();
+        foreach (var model in models)
+            DiscoveredOllamaModels.Add(new OllamaProviderModelOption(model.Id, model.SizeBytes));
+        OnPropertyChanged(nameof(HasDiscoveredOllamaModels));
+    }
+
+    private void ClearDiscoveredOllamaModels()
+    {
+        DiscoveredOllamaModels.Clear();
+        OnPropertyChanged(nameof(HasDiscoveredOllamaModels));
+    }
+
     private string GetCloudProviderPresetDisplayName(CloudProviderPreset preset) =>
         preset.Id switch
         {
@@ -875,8 +1010,25 @@ public partial class SettingsViewModel : ObservableObject
             _ => preset.DisplayName
         };
 
-    private string L(string key, string fallback) => _loc?.T(key) ?? fallback;
-    private string L(string key, string fallback, params object[] args) => _loc?.T(key, args) ?? string.Format(fallback, args);
+    private string L(string key, string fallback)
+        => _loc is not null && _loc.TryT(key, out var value) ? value : fallback;
+
+    private string L(string key, string fallback, params object[] args)
+    {
+        if (_loc is not null && _loc.TryT(key, out var template))
+        {
+            try { return string.Format(template, args); }
+            catch (FormatException) { return template; }
+        }
+        return string.Format(fallback, args);
+    }
+
+    public void Dispose()
+    {
+        foreach (var item in Models)
+            item.Dispose();
+        Diagnostics?.Dispose();
+    }
 }
 
 public record UILanguageOption(string Code, string DisplayName)
@@ -904,4 +1056,19 @@ public record CloudProviderModelOption(string Id, string? OwnedBy)
 {
     public string Caption => string.IsNullOrWhiteSpace(OwnedBy) ? Id : $"{Id} · {OwnedBy}";
     public override string ToString() => Caption;
+}
+
+public record OllamaProviderModelOption(string Id, long SizeBytes)
+{
+    public string Caption => SizeBytes > 0 ? $"{Id} · {FormatSize(SizeBytes)}" : Id;
+    public override string ToString() => Caption;
+
+    private static string FormatSize(long bytes)
+    {
+        const double gib = 1024d * 1024d * 1024d;
+        const double mib = 1024d * 1024d;
+        return bytes >= gib
+            ? $"{bytes / gib:F1} GB"
+            : $"{bytes / mib:F0} MB";
+    }
 }

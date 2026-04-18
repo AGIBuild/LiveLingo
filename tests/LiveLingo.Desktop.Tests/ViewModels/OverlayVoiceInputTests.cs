@@ -223,8 +223,8 @@ public class OverlayVoiceInputTests
     [Fact]
     public async Task VoiceInput_DoesNotAffectTranslationState()
     {
-        _pipeline.ProcessAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
-            .Returns(new TranslationResult("translated", "zh", "translated", TimeSpan.FromMilliseconds(10), null));
+        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+            .Returns(_ => SingleDeltaAsync("translated"));
 
         var vm = CreateVm();
         vm.SourceText = "manual input";
@@ -256,8 +256,8 @@ public class OverlayVoiceInputTests
     [Fact]
     public async Task SuccessfulTranscription_TriggersTranslationPipeline()
     {
-        _pipeline.ProcessAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
-            .Returns(new TranslationResult("translated", "zh", "translated", TimeSpan.FromMilliseconds(10), null));
+        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+            .Returns(_ => SingleDeltaAsync("translated"));
 
         var vm = CreateVm();
         vm.VoiceState = VoiceInputState.Recording;
@@ -269,7 +269,7 @@ public class OverlayVoiceInputTests
         Assert.Equal("voice text", vm.SourceText);
 
         await Task.Delay(1000, TestContext.Current.CancellationToken);
-        await _pipeline.Received().ProcessAsync(
+        _pipeline.Received().ProcessStreamingAsync(
             Arg.Is<TranslationRequest>(r => r.SourceText == "voice text"),
             Arg.Any<CancellationToken>());
     }
@@ -387,8 +387,8 @@ public class OverlayVoiceInputTests
     [Fact]
     public async Task SuccessfulTranscription_TranslationFailure_ShowsFriendlyTranslationStatus()
     {
-        _pipeline.ProcessAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
-            .Returns<TranslationResult>(_ => throw new TranslationFailedException("Translation failed."));
+        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+            .Returns(_ => ThrowingDeltaAsync(new TranslationFailedException("Translation failed.")));
 
         var vm = CreateVm();
         vm.VoiceState = VoiceInputState.Recording;
@@ -415,8 +415,8 @@ public class OverlayVoiceInputTests
             }
         };
 
-        _pipeline.ProcessAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
-            .Returns<TranslationResult>(_ => throw new NotSupportedException("unsupported pair"));
+        _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+            .Returns(_ => ThrowingDeltaAsync(new NotSupportedException("unsupported pair")));
 
         var vm = new OverlayViewModel(
             Target, _pipeline, _injector, _engine, settings,
@@ -446,7 +446,32 @@ public class OverlayVoiceInputTests
         public Task<string> TranslateAsync(string text, string sourceLanguage, string targetLanguage, CancellationToken ct)
             => Task.FromResult($"[{sourceLanguage}\u2192{targetLanguage}] {text}");
 
+        public async IAsyncEnumerable<TranslationDelta> TranslateStreamingAsync(
+            string text, string sourceLanguage, string targetLanguage,
+            [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+        {
+            await Task.CompletedTask;
+            yield return new TranslationDelta($"[{sourceLanguage}\u2192{targetLanguage}] {text}");
+        }
+
         public bool SupportsLanguagePair(string sourceLanguage, string targetLanguage) => true;
         public void Dispose() { }
+    }
+
+    private static async IAsyncEnumerable<TranslationDelta> SingleDeltaAsync(
+        string text,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        await Task.CompletedTask;
+        yield return new TranslationDelta(text);
+    }
+
+    private static async IAsyncEnumerable<TranslationDelta> ThrowingDeltaAsync(
+        Exception exception,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    {
+        await Task.FromException(exception);
+        yield break;
     }
 }

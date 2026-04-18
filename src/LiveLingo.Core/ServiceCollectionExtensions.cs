@@ -26,8 +26,14 @@ public static class ServiceCollectionExtensions
         services.AddSingleton(coreOptions);
         services.AddSingleton<IOptions<CoreOptions>>(_ => Options.Create(coreOptions));
 
+        services.AddSingleton<TextSegmenter>();
         services.AddSingleton<ITranslationPipeline, TranslationPipeline>();
-        services.AddSingleton<ILanguageDetector, ScriptBasedDetector>();
+
+        // Two-stage language detection: script heuristic fast-paths pure CJK/Cyrillic/Arabic,
+        // Lingua n-gram models handle Latin disambiguation and mixed-script inputs.
+        services.AddSingleton<ScriptBasedDetector>();
+        services.AddSingleton<LinguaLanguageDetector>();
+        services.AddSingleton<ILanguageDetector, HybridLanguageDetector>();
 
         services.AddHttpClient<ModelManager>()
             .AddResilienceHandler("model-download", pipeline =>
@@ -47,6 +53,7 @@ public static class ServiceCollectionExtensions
                 pipeline.AddTimeout(TimeSpan.FromMinutes(3));
             });
         services.AddSingleton<IModelManager>(sp => sp.GetRequiredService<ModelManager>());
+        services.AddSingleton<IModelDownloadCoordinator, InProcessModelDownloadCoordinator>();
         services.AddSingleton<IModelCatalog, StaticModelCatalog>();
         services.AddSingleton<ICloudProviderRuntimeState, NullCloudProviderRuntimeState>();
         services.AddSingleton<IModelSelector, DefaultModelSelector>();
@@ -79,6 +86,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ILocalModelRuntimeState>(sp => sp.GetRequiredService<LocalLlamaModelHost>());
         services.AddSingleton<IModelRuntime>(sp => new LlamaServerRuntime(sp.GetRequiredService<LocalLlamaModelHost>()));
         services.AddSingleton<IModelRuntime, RemoteHttpRuntime>();
+        services.AddSingleton<IModelRuntime, OllamaRuntime>();
         // Translation inference HttpClients get resilience:
         //   - Local llama-server: 1 retry (transient server hiccup), 120 s per-request timeout
         //   - Cloud provider:     2 retries with exponential back-off, 60 s per-request timeout
@@ -117,6 +125,24 @@ public static class ServiceCollectionExtensions
                 });
                 pipeline.AddTimeout(TimeSpan.FromSeconds(60));
             });
+        // Ollama local daemon HTTP client.
+        // Per-request timeout is long because Ollama may cold-load a multi-GB model on first chat call.
+        services.AddHttpClient<OllamaChatProvider>()
+            .AddResilienceHandler("ollama-translation", pipeline =>
+            {
+                pipeline.AddRetry(new HttpRetryStrategyOptions
+                {
+                    MaxRetryAttempts = 1,
+                    BackoffType = DelayBackoffType.Constant,
+                    Delay = TimeSpan.FromMilliseconds(500),
+                    ShouldHandle = args => ValueTask.FromResult(
+                        args.Outcome.Exception is HttpRequestException or IOException or TaskCanceledException ||
+                        args.Outcome.Result is { IsSuccessStatusCode: false,
+                            StatusCode: System.Net.HttpStatusCode.ServiceUnavailable
+                                or System.Net.HttpStatusCode.GatewayTimeout })
+                });
+                pipeline.AddTimeout(TimeSpan.FromSeconds(180));
+            });
         services.AddHttpClient<OpenAICompatibleProbeService>()
             .AddResilienceHandler("cloud-provider-probe", pipeline =>
             {
@@ -139,10 +165,31 @@ public static class ServiceCollectionExtensions
                 });
                 pipeline.AddTimeout(TimeSpan.FromSeconds(15));
             });
+        services.AddHttpClient<OllamaProbeService>()
+            .AddResilienceHandler("ollama-probe", pipeline =>
+            {
+                pipeline.AddRetry(new HttpRetryStrategyOptions
+                {
+                    MaxRetryAttempts = 1,
+                    BackoffType = DelayBackoffType.Constant,
+                    Delay = TimeSpan.FromMilliseconds(300),
+                    ShouldHandle = args => ValueTask.FromResult(
+                        args.Outcome.Exception is HttpRequestException or IOException or TaskCanceledException or TimeoutRejectedException)
+                });
+                pipeline.AddTimeout(TimeSpan.FromSeconds(5));
+            });
         services.AddSingleton<IModelProvider>(sp => sp.GetRequiredService<LlamaServerChatProvider>());
         services.AddSingleton<IModelProvider>(sp => sp.GetRequiredService<OpenAICompatibleChatProvider>());
+        services.AddSingleton<IModelProvider>(sp => sp.GetRequiredService<OllamaChatProvider>());
         services.AddSingleton<ICloudProviderProbeService>(sp => sp.GetRequiredService<OpenAICompatibleProbeService>());
+        services.AddSingleton<IOllamaProbeService>(sp => sp.GetRequiredService<OllamaProbeService>());
         services.AddSingleton<IModelInvocationService, DefaultModelInvocationService>();
+        services.AddSingleton<ITranslationTelemetry, InProcessTranslationTelemetry>();
+        services.AddSingleton<ITranslationInvoker, FallbackTranslationInvoker>();
+
+        // Glossary service – reads CoreOptions.Glossary on every lookup for live settings updates.
+        services.AddSingleton<ITranslationGlossary>(sp =>
+            new InMemoryTranslationGlossary(sp.GetRequiredService<CoreOptions>()));
 
         // MEA IChatClient pipeline:
         //   LoggingChatClient → DistributedCachingChatClient → TranslationChatClient
@@ -151,11 +198,15 @@ public static class ServiceCollectionExtensions
         services.AddChatClient(sp => new TranslationChatClient(
                 sp.GetRequiredService<IModelSelector>(),
                 sp.GetRequiredService<IModelInvocationService>(),
+                sp.GetRequiredService<ITranslationInvoker>(),
+                sp.GetRequiredService<ITranslationGlossary>(),
                 sp.GetService<ILogger<TranslationChatClient>>()))
             .UseDistributedCache()
             .UseLogging();
 
-        services.AddSingleton<ITranslationEngine, LlamaTranslationEngine>();
+        services.AddSingleton<IChatPathTranslationEngine, LlamaTranslationEngine>();
+        services.AddSingleton<IFastPathTranslationEngine, MarianOnnxEngine>();
+        services.AddSingleton<ITranslationEngine, HybridTranslationEngine>();
         services.AddSingleton<ITextProcessor, SummarizeProcessor>();
         services.AddSingleton<ITextProcessor, OptimizeProcessor>();
         services.AddSingleton<ITextProcessor, ColloquializeProcessor>();

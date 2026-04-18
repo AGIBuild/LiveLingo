@@ -1,0 +1,180 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:LiveLingo.Desktop.ViewModels"
+             xmlns:conv="using:LiveLingo.Desktop.Converters"
+             x:Class="LiveLingo.Desktop.Views.DiagnosticsView"
+             x:DataType="vm:DiagnosticsViewModel">
+    <UserControl.Resources>
+        <conv:BrushKeyToBrushConverter x:Key="BrushKeyConverter"/>
+    </UserControl.Resources>
+
+    <Grid RowDefinitions="Auto,*,Auto,*" Margin="0,4">
+
+        <!-- Summary bar -->
+        <Border Grid.Row="0"
+                Background="{StaticResource BgSurfaceBrush}"
+                CornerRadius="6"
+                Padding="10,8"
+                Margin="0,0,0,6">
+            <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Grid.Column="0" Orientation="Vertical" Spacing="2">
+                    <TextBlock Text="{Binding SummaryCaption}"
+                               FontSize="12"
+                               Foreground="{StaticResource FgSecondaryBrush}"
+                               TextWrapping="Wrap"/>
+                    <TextBlock Text="{Binding PanelHint}"
+                               FontSize="10"
+                               Foreground="{StaticResource FgMutedBrush}"
+                               TextWrapping="Wrap"/>
+                </StackPanel>
+                <Button Grid.Column="1"
+                        Classes="themed sm"
+                        Content="{Binding ClearLabel}"
+                        Command="{Binding ClearCommand}"
+                        VerticalAlignment="Top"
+                        IsEnabled="{Binding HasTraces}"/>
+            </Grid>
+        </Border>
+
+        <!-- Trace list -->
+        <Border Grid.Row="1"
+                Background="{StaticResource BgDeepBrush}"
+                BorderBrush="{StaticResource BgElevatedBrush}"
+                BorderThickness="1"
+                CornerRadius="6">
+            <ListBox ItemsSource="{Binding Traces}"
+                     SelectedItem="{Binding SelectedTrace, Mode=TwoWay}"
+                     Background="Transparent"
+                     BorderThickness="0"
+                     Padding="0">
+                <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:TranslationTraceRow">
+                        <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto"
+                              ColumnSpacing="8"
+                              Margin="0,2">
+                            <TextBlock Grid.Column="0"
+                                       Text="{Binding Glyph}"
+                                       FontSize="12"
+                                       FontWeight="Bold"
+                                       Foreground="{Binding GlyphBrushKey, Converter={StaticResource BrushKeyConverter}}"
+                                       VerticalAlignment="Center"
+                                       Width="14"
+                                       TextAlignment="Center"/>
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding TimeLabel}"
+                                       FontSize="11"
+                                       FontFamily="Menlo, Consolas, monospace"
+                                       Foreground="{StaticResource FgTertiaryBrush}"
+                                       VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="2"
+                                       Text="{Binding WinningCandidateLabel}"
+                                       FontSize="11"
+                                       Foreground="{StaticResource FgSecondaryBrush}"
+                                       VerticalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Grid.Column="3"
+                                       Text="fallback"
+                                       FontSize="10"
+                                       Foreground="{StaticResource WarningBrush}"
+                                       IsVisible="{Binding UsedFallback}"
+                                       VerticalAlignment="Center"/>
+                            <TextBlock Grid.Column="4"
+                                       Text="{Binding DurationLabel}"
+                                       FontSize="11"
+                                       FontFamily="Menlo, Consolas, monospace"
+                                       Foreground="{StaticResource FgMutedBrush}"
+                                       VerticalAlignment="Center"/>
+                        </Grid>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </Border>
+
+        <!-- Splitter between list and detail -->
+        <Separator Grid.Row="2" Classes="themed" Margin="0,6,0,6"/>
+
+        <!-- Detail: selected trace + attempts -->
+        <ScrollViewer Grid.Row="3"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled">
+            <Panel>
+                <TextBlock Text="{Binding NoSelectionHint}"
+                           Classes="hint"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           IsVisible="{Binding SelectedTrace, Converter={x:Static ObjectConverters.IsNull}}"/>
+
+                <StackPanel Spacing="4"
+                            IsVisible="{Binding SelectedTrace, Converter={x:Static ObjectConverters.IsNotNull}}">
+                    <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" ColumnSpacing="10" RowSpacing="2">
+                        <TextBlock Grid.Row="0" Grid.Column="0" Classes="label" Text="{Binding StartedAtLabel}"/>
+                        <TextBlock Grid.Row="0" Grid.Column="1" FontSize="12" Foreground="{StaticResource FgPrimaryBrush}"
+                                   Text="{Binding SelectedTrace.StartedAtCaption}"/>
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" Classes="label" Text="{Binding KindLabel}"/>
+                        <TextBlock Grid.Row="1" Grid.Column="1" FontSize="12" Foreground="{StaticResource FgPrimaryBrush}"
+                                   Text="{Binding SelectedTrace.KindLabel}"/>
+
+                        <TextBlock Grid.Row="2" Grid.Column="0" Classes="label" Text="{Binding OutcomeLabel}"/>
+                        <TextBlock Grid.Row="2" Grid.Column="1" FontSize="12" Foreground="{StaticResource FgPrimaryBrush}"
+                                   Text="{Binding SelectedTrace.OutcomeCaption}"/>
+
+                        <TextBlock Grid.Row="3" Grid.Column="0" Classes="label" Text="{Binding DurationLabel}"/>
+                        <TextBlock Grid.Row="3" Grid.Column="1" FontSize="12" Foreground="{StaticResource FgPrimaryBrush}"
+                                   Text="{Binding SelectedTrace.DurationLabel}"/>
+
+                        <TextBlock Grid.Row="4" Grid.Column="0" Classes="label" Text="{Binding WinningCandidateLabel}"/>
+                        <TextBlock Grid.Row="4" Grid.Column="1" FontSize="12" Foreground="{StaticResource FgPrimaryBrush}"
+                                   Text="{Binding SelectedTrace.WinningCandidateLabel}"/>
+                    </Grid>
+
+                    <TextBlock Text="{Binding AttemptsHeader}"
+                               Classes="section"
+                               Margin="0,8,0,2"/>
+
+                    <ItemsControl ItemsSource="{Binding SelectedTrace.Attempts}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:TranslationAttemptRow">
+                                <Border Background="{StaticResource BgSurfaceBrush}"
+                                        CornerRadius="4"
+                                        Padding="8,5"
+                                        Margin="0,0,0,3">
+                                    <StackPanel Spacing="2">
+                                        <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="6">
+                                            <TextBlock Grid.Column="0"
+                                                       Text="{Binding Glyph}"
+                                                       FontWeight="Bold"
+                                                       FontSize="12"
+                                                       Foreground="{Binding BrushKey, Converter={StaticResource BrushKeyConverter}}"/>
+                                            <TextBlock Grid.Column="1"
+                                                       Text="{Binding Header}"
+                                                       FontSize="12"
+                                                       Foreground="{StaticResource FgPrimaryBrush}"
+                                                       TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Grid.Column="2"
+                                                       Text="{Binding FirstTokenLabel}"
+                                                       IsVisible="{Binding HasFirstTokenLatency}"
+                                                       FontSize="10"
+                                                       FontFamily="Menlo, Consolas, monospace"
+                                                       Foreground="{StaticResource FgMutedBrush}"/>
+                                            <TextBlock Grid.Column="3"
+                                                       Text="{Binding DurationLabel}"
+                                                       FontSize="11"
+                                                       FontFamily="Menlo, Consolas, monospace"
+                                                       Foreground="{StaticResource FgTertiaryBrush}"/>
+                                        </Grid>
+                                        <TextBlock Text="{Binding FailureReason}"
+                                                   IsVisible="{Binding HasFailureReason}"
+                                                   FontSize="10"
+                                                   Foreground="{StaticResource DangerBrush}"
+                                                   TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Panel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

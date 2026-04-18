@@ -8,8 +8,8 @@ public class ModelRegistryTests
     public void TranslationModels_ContainsExpectedModels()
     {
         Assert.Equal(7, ModelRegistry.TranslationModels.Count);
-        Assert.Contains(ModelRegistry.Gemma4_12B, ModelRegistry.TranslationModels);
-        Assert.Contains(ModelRegistry.Gemma4_4B, ModelRegistry.TranslationModels);
+        Assert.Contains(ModelRegistry.Gemma4_26B_A4B, ModelRegistry.TranslationModels);
+        Assert.Contains(ModelRegistry.Gemma4_E4B, ModelRegistry.TranslationModels);
         Assert.Contains(ModelRegistry.Qwen35_9B, ModelRegistry.TranslationModels);
         Assert.Contains(ModelRegistry.Qwen25_7B, ModelRegistry.TranslationModels);
         Assert.Contains(ModelRegistry.MarianZhEn, ModelRegistry.TranslationModels);
@@ -18,25 +18,25 @@ public class ModelRegistryTests
     }
 
     [Fact]
-    public void RequiredModels_DefaultsToGemma4_12B()
+    public void RequiredModels_DefaultsToGemma4_26B_A4B()
     {
         Assert.NotEmpty(ModelRegistry.RequiredModels);
-        Assert.Contains(ModelRegistry.Gemma4_12B, ModelRegistry.RequiredModels);
+        Assert.Contains(ModelRegistry.Gemma4_26B_A4B, ModelRegistry.RequiredModels);
         Assert.DoesNotContain(ModelRegistry.FastTextLid, ModelRegistry.RequiredModels);
         Assert.DoesNotContain(ModelRegistry.Qwen25_15B, ModelRegistry.RequiredModels);
     }
 
     [Fact]
-    public void Gemma4_12B_HasLoadFailureFallback_ToGemma4_4B()
+    public void Gemma4_26B_A4B_HasLoadFailureFallback_ToGemma4_E4B()
     {
-        Assert.Same(ModelRegistry.Gemma4_4B, ModelRegistry.Gemma4_12B.LoadFailureFallback);
+        Assert.Same(ModelRegistry.Gemma4_E4B, ModelRegistry.Gemma4_26B_A4B.LoadFailureFallback);
     }
 
     [Fact]
     public void Gemma4_Models_HaveGemmaChatTemplate()
     {
-        Assert.Equal(LocalModelChatTemplate.Gemma, ModelRegistry.Gemma4_12B.ChatTemplate);
-        Assert.Equal(LocalModelChatTemplate.Gemma, ModelRegistry.Gemma4_4B.ChatTemplate);
+        Assert.Equal(LocalModelChatTemplate.Gemma, ModelRegistry.Gemma4_26B_A4B.ChatTemplate);
+        Assert.Equal(LocalModelChatTemplate.Gemma, ModelRegistry.Gemma4_E4B.ChatTemplate);
     }
 
     [Fact]
@@ -48,9 +48,9 @@ public class ModelRegistryTests
     }
 
     [Fact]
-    public void OptionalModels_ContainsGemma4_4B_And_Qwen()
+    public void OptionalModels_ContainsGemma4_E4B_And_Qwen()
     {
-        Assert.Contains(ModelRegistry.Gemma4_4B, ModelRegistry.OptionalModels);
+        Assert.Contains(ModelRegistry.Gemma4_E4B, ModelRegistry.OptionalModels);
         Assert.Contains(ModelRegistry.Qwen25_15B, ModelRegistry.OptionalModels);
     }
 
@@ -58,8 +58,8 @@ public class ModelRegistryTests
     public void AllModels_ContainsAll()
     {
         Assert.Equal(11, ModelRegistry.AllModels.Count);
-        Assert.Contains(ModelRegistry.Gemma4_12B, ModelRegistry.AllModels);
-        Assert.Contains(ModelRegistry.Gemma4_4B, ModelRegistry.AllModels);
+        Assert.Contains(ModelRegistry.Gemma4_26B_A4B, ModelRegistry.AllModels);
+        Assert.Contains(ModelRegistry.Gemma4_E4B, ModelRegistry.AllModels);
         Assert.Contains(ModelRegistry.Qwen35_9B, ModelRegistry.AllModels);
         Assert.Contains(ModelRegistry.Qwen25_7B, ModelRegistry.AllModels);
         Assert.Contains(ModelRegistry.Qwen25_15B, ModelRegistry.AllModels);
@@ -83,9 +83,9 @@ public class ModelRegistryTests
     }
 
     [Theory]
-    [InlineData("zh", "en", "gemma4-12b")]
-    [InlineData("en", "zh", "gemma4-12b")]
-    [InlineData("ja", "en", "gemma4-12b")]
+    [InlineData("zh", "en", "gemma4-26b-a4b")]
+    [InlineData("en", "zh", "gemma4-26b-a4b")]
+    [InlineData("ja", "en", "gemma4-26b-a4b")]
     public void FindTranslationModel_FindsCorrectModel(string src, string tgt, string expectedId)
     {
         var model = ModelRegistry.FindTranslationModel(src, tgt);
@@ -178,8 +178,8 @@ public class ModelRegistryTests
     [InlineData("opus-mt-en-zh", "MarianMT English\u2192Chinese")]
     [InlineData("opus-mt-ja-en", "MarianMT Japanese\u2192English")]
     [InlineData("lid.176.ftz", "FastText Language Detection")]
-    [InlineData("gemma4-12b", "Gemma 4 12B (GGUF Q4_K_M)")]
-    [InlineData("gemma4-4b", "Gemma 4 4B (GGUF Q4_K_M)")]
+    [InlineData("gemma4-26b-a4b", "Gemma 4 26B-A4B MoE (GGUF Q4_K_M)")]
+    [InlineData("gemma4-e4b", "Gemma 4 E4B (GGUF Q4_K_M)")]
     [InlineData("qwen25-1.5b", "Qwen2.5-1.5B-Instruct (GGUF Q4_K_M)")]
     [InlineData("qwen35-9b", "Qwen3.5-9B Abliterated (GGUF Q4_K_M)")]
     public void Model_HasExpectedIdAndDisplayName(string expectedId, string expectedName)

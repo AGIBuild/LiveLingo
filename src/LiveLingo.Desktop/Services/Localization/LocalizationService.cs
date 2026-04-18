@@ -32,15 +32,30 @@ public class LocalizationService : ILocalizationService
 
     public string T(string key)
     {
-        if (_resources.TryGetValue(CurrentCulture.Name, out var active) && active.TryGetValue(key, out var value))
+        if (TryT(key, out var value))
             return value;
-
-        if (!string.Equals(CurrentCulture.Name, FallbackCulture, StringComparison.OrdinalIgnoreCase) &&
-            _resources.TryGetValue(FallbackCulture, out var fallback) && fallback.TryGetValue(key, out var fallbackValue))
-            return fallbackValue;
 
         _logger?.LogWarning("Missing localization key: {Key} for culture {Culture}", key, CurrentCulture.Name);
         return key;
+    }
+
+    public bool TryT(string key, out string value)
+    {
+        if (_resources.TryGetValue(CurrentCulture.Name, out var active) && active.TryGetValue(key, out var active_value))
+        {
+            value = active_value;
+            return true;
+        }
+
+        if (!string.Equals(CurrentCulture.Name, FallbackCulture, StringComparison.OrdinalIgnoreCase) &&
+            _resources.TryGetValue(FallbackCulture, out var fallback) && fallback.TryGetValue(key, out var fallback_value))
+        {
+            value = fallback_value;
+            return true;
+        }
+
+        value = string.Empty;
+        return false;
     }
 
     public string T(string key, params object[] args)

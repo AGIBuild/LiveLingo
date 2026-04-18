@@ -7,7 +7,16 @@ namespace LiveLingo.Core.Tests.Models;
 public sealed class TranslationChatClientTests
 {
     private static readonly ModelProfile LocalProfile =
-        new StaticModelCatalog().FindById(ModelRegistry.Gemma4_12B.Id)!;
+        new StaticModelCatalog().FindById(ModelRegistry.Gemma4_26B_A4B.Id)!;
+
+    private static TranslationRoutePlan SingleCandidatePlan(ModelProfile profile) =>
+        new([new TranslationRouteCandidate(profile, TranslationRouteTier.Local, TimeSpan.FromSeconds(8))]);
+
+    private static TranslationChatClient CreateClient(
+        IModelSelector selector,
+        IModelInvocationService invocationService) =>
+        new(selector, invocationService,
+            new FallbackTranslationInvoker(invocationService, new InProcessTranslationTelemetry()));
 
     [Fact]
     public async Task GetResponseAsync_selects_translation_profile_and_invokes()
@@ -16,12 +25,13 @@ public sealed class TranslationChatClientTests
         var invocationService = Substitute.For<IModelInvocationService>();
 
         ModelInvocationRequest? capturedRequest = null;
-        selector.SelectTranslationProfile("zh", "en", Arg.Any<TranslationRoutingContext?>()).Returns(LocalProfile);
+        selector.BuildTranslationRoutePlan("zh", "en", Arg.Any<TranslationRoutingContext?>())
+            .Returns(SingleCandidatePlan(LocalProfile));
         invocationService
             .InvokeAsync(Arg.Do<ModelInvocationRequest>(r => capturedRequest = r), Arg.Any<CancellationToken>())
             .Returns(new ModelInvocationResult("Hello world"));
 
-        var client = new TranslationChatClient(selector, invocationService);
+        var client = CreateClient(selector, invocationService);
         var messages = new List<ChatMessage>
         {
             new(ChatRole.System, "Translate zh to en."),
@@ -53,12 +63,13 @@ public sealed class TranslationChatClientTests
         var invocationService = Substitute.For<IModelInvocationService>();
 
         ModelInvocationRequest? capturedRequest = null;
-        selector.SelectTranslationProfile("zh", "en", Arg.Any<TranslationRoutingContext?>()).Returns(LocalProfile);
+        selector.BuildTranslationRoutePlan("zh", "en", Arg.Any<TranslationRoutingContext?>())
+            .Returns(SingleCandidatePlan(LocalProfile));
         invocationService
             .InvokeAsync(Arg.Do<ModelInvocationRequest>(r => capturedRequest = r), Arg.Any<CancellationToken>())
             .Returns(new ModelInvocationResult("result"));
 
-        var client = new TranslationChatClient(selector, invocationService);
+        var client = CreateClient(selector, invocationService);
         var options = new ChatOptions
         {
             AdditionalProperties = new AdditionalPropertiesDictionary
@@ -76,7 +87,7 @@ public sealed class TranslationChatClientTests
             [new ChatMessage(ChatRole.System, "cache-key-system"), new ChatMessage(ChatRole.User, "cache-key-user")],
             options, CancellationToken.None);
 
-        // TranslationChatClient should have rebuilt using Gemma template (LocalProfile uses Gemma4_12B)
+        // TranslationChatClient should have rebuilt using Gemma template (LocalProfile uses Gemma4_26B_A4B)
         Assert.NotNull(capturedRequest);
         Assert.Contains("Begin your response immediately", capturedRequest!.Messages[0].Content,
             StringComparison.Ordinal); // Gemma template
@@ -94,7 +105,7 @@ public sealed class TranslationChatClientTests
             .InvokeAsync(Arg.Any<ModelInvocationRequest>(), Arg.Any<CancellationToken>())
             .Returns(new ModelInvocationResult("optimized text"));
 
-        var client = new TranslationChatClient(selector, invocationService);
+        var client = CreateClient(selector, invocationService);
         var options = new ChatOptions
         {
             AdditionalProperties = new AdditionalPropertiesDictionary
@@ -110,7 +121,8 @@ public sealed class TranslationChatClientTests
 
         Assert.Equal("optimized text", response.Text);
         selector.Received(1).SelectPostProcessingProfile();
-        selector.DidNotReceive().SelectTranslationProfile(Arg.Any<string>(), Arg.Any<string>());
+        selector.DidNotReceive().BuildTranslationRoutePlan(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<TranslationRoutingContext?>());
     }
 
     [Fact]
@@ -119,13 +131,14 @@ public sealed class TranslationChatClientTests
         var selector = Substitute.For<IModelSelector>();
         var invocationService = Substitute.For<IModelInvocationService>();
 
-        selector.SelectTranslationProfile("zh", "en").Returns(LocalProfile);
+        selector.BuildTranslationRoutePlan("zh", "en", Arg.Any<TranslationRoutingContext?>())
+            .Returns(SingleCandidatePlan(LocalProfile));
         invocationService.InvokeAsync(Arg.Any<ModelInvocationRequest>(), Arg.Any<CancellationToken>())
             .Returns(new ModelInvocationResult("result"));
 
-        var client = new TranslationChatClient(selector, invocationService);
+        var client = CreateClient(selector, invocationService);
         await client.GetResponseAsync([new ChatMessage(ChatRole.User, "hi")], null, CancellationToken.None);
 
-        selector.Received(1).SelectTranslationProfile("zh", "en");
+        selector.Received(1).BuildTranslationRoutePlan("zh", "en", Arg.Any<TranslationRoutingContext?>());
     }
 }

@@ -227,6 +227,7 @@ public partial class SettingsWindow : Window
         SetHeader("TabModels", loc.T("settings.tab.models"));
         SetHeader("TabAdvanced", loc.T("settings.tab.advanced"));
         SetHeader("TabAI", loc.T("settings.tab.ai"));
+        SetHeader("TabDiagnostics", loc.T("settings.tab.diagnostics"));
     }
 
     private void SetText(string name, string text)
@@ -266,6 +267,7 @@ public partial class SettingsWindow : Window
             vm.WorkingCopy.Advanced.ModelStoragePath = folders[0].Path.LocalPath;
     }
 
-    private string L(string key, string fallback) => _loc?.T(key) ?? fallback;
+    private string L(string key, string fallback)
+        => _loc is not null && _loc.TryT(key, out var value) ? value : fallback;
 
 }
