@@ -8,6 +8,7 @@ using System.Xml.Linq;
 using Nuke.Common;
 using Nuke.Common.IO;
 using Nuke.Common.ProjectModel;
+using Nuke.Common.Tooling;
 using Nuke.Common.Tools.DotNet;
 using Serilog;
 using static Nuke.Common.Tools.DotNet.DotNetTasks;
@@ -176,6 +177,32 @@ class BuildTask : NukeBuild
             Log.Information("Mutation score:  {Score:F1}% (threshold {Threshold}%)", score, MutationThreshold);
         });
 
+    // macOS frameworks occasionally spam NSLog to stderr during input-method
+    // bring-up. These lines are benign but Nuke otherwise reclassifies them
+    // as build errors and dumps them under "Errors & Warnings" at the end of
+    // the Run target. We recognise and demote them to informational logs so
+    // the real errors stay actionable.
+    private static readonly Regex[] BenignAppStderrPatterns =
+    [
+        new(@"IMKCFRunLoopWakeUp", RegexOptions.Compiled),
+        new(@"error messaging the mach port", RegexOptions.Compiled),
+    ];
+
+    private static void RunProcessLogger(OutputType type, string output)
+    {
+        if (type == OutputType.Err &&
+            BenignAppStderrPatterns.Any(p => p.IsMatch(output)))
+        {
+            Log.Debug("App stderr (benign): {Line}", output);
+            return;
+        }
+
+        if (type == OutputType.Err)
+            Log.Error(output);
+        else
+            Log.Information(output);
+    }
+
     Target Run => _ => _
         .DependsOn(Build)
         .Executes(() =>
@@ -183,7 +210,8 @@ class BuildTask : NukeBuild
             DotNetRun(_ => _
                 .SetProjectFile(AppProject)
                 .SetConfiguration(Configuration.Debug)
-                .EnableNoBuild());
+                .EnableNoBuild()
+                .SetProcessLogger(RunProcessLogger));
         });
 
     Target ProbeTranslation => _ => _
