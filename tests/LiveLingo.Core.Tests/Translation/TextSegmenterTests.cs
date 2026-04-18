@@ -395,6 +395,116 @@ public class TextSegmenterTests
         Assert.Equal("C.", result[2].Text);
     }
 
+    // --- PlanUnits: grouping adjacent Line-connected segments ---
+
+    [Fact]
+    public void PlanUnits_LineConnectedLinesWithoutSentenceMark_MergeIntoOneUnit()
+    {
+        // Poetry / wrapped lines share semantic context – they must be sent
+        // to the engine as one prompt so the translation stays cohesive.
+        var segments = _segmenter.Segment("first line\nsecond line");
+
+        var units = _segmenter.PlanUnits(segments);
+
+        Assert.Single(units);
+        Assert.Equal("first line\nsecond line", units[0].SourceText);
+        Assert.Equal(0, units[0].FirstSegmentIndex);
+        Assert.Equal(2, units[0].SegmentCount);
+        Assert.Equal(SegmentBreak.None, units[0].BreakAfter);
+    }
+
+    [Fact]
+    public void PlanUnits_LineEndsWithSentenceMark_KeepsLinesIndependent()
+    {
+        // "Hello.\nWorld." – the period signals a complete thought, so the
+        // planner keeps the two lines as separate units to avoid smearing
+        // sentence boundaries across one prompt.
+        var segments = _segmenter.Segment("Hello.\nWorld.");
+
+        var units = _segmenter.PlanUnits(segments);
+
+        Assert.Equal(2, units.Count);
+        Assert.Equal("Hello.", units[0].SourceText);
+        Assert.Equal(SegmentBreak.Line, units[0].BreakAfter);
+        Assert.Equal("World.", units[1].SourceText);
+        Assert.Equal(SegmentBreak.None, units[1].BreakAfter);
+    }
+
+    [Fact]
+    public void PlanUnits_ParagraphBreak_AlwaysTerminatesUnit()
+    {
+        // "a\nb\n\nc" – a/b merge across the Line break, but the blank
+        // line between b and c must force a new unit.
+        var segments = _segmenter.Segment("alpha\nbeta\n\ngamma");
+
+        var units = _segmenter.PlanUnits(segments);
+
+        Assert.Equal(2, units.Count);
+        Assert.Equal("alpha\nbeta", units[0].SourceText);
+        Assert.Equal(SegmentBreak.Paragraph, units[0].BreakAfter);
+        Assert.Equal("gamma", units[1].SourceText);
+        Assert.Equal(SegmentBreak.None, units[1].BreakAfter);
+    }
+
+    [Fact]
+    public void PlanUnits_SentenceBreak_AlwaysTerminatesUnit()
+    {
+        // Intra-line sentence splits never fold into the same unit, or we'd
+        // lose the atomic-sentence guarantee that prevents local LLMs from
+        // dropping trailing clauses.
+        var segments = _segmenter.Segment("Hi there. Bye now.");
+
+        var units = _segmenter.PlanUnits(segments);
+
+        Assert.Equal(2, units.Count);
+        Assert.Equal("Hi there.", units[0].SourceText);
+        Assert.Equal(SegmentBreak.Sentence, units[0].BreakAfter);
+        Assert.Equal("Bye now.", units[1].SourceText);
+    }
+
+    [Fact]
+    public void PlanUnits_ExceedingBudget_ClosesUnitAtLimit()
+    {
+        // When the next line would push the unit past its char budget the
+        // planner must close the current unit rather than growing unbounded.
+        // Three ~40-char lines with budget 60 → each line stays its own unit.
+        var segments = _segmenter.Segment(
+            "alpha beta gamma delta epsilon zeta eta\n" +
+            "theta iota kappa lambda mu nu xi\n" +
+            "omicron pi rho sigma tau upsilon");
+
+        var units = _segmenter.PlanUnits(segments, maxCharsPerUnit: 60);
+
+        Assert.Equal(3, units.Count);
+        foreach (var unit in units)
+            Assert.Equal(1, unit.SegmentCount);
+    }
+
+    [Fact]
+    public void PlanUnits_EmptySegmentList_ReturnsEmpty()
+    {
+        var units = _segmenter.PlanUnits([]);
+        Assert.Empty(units);
+    }
+
+    [Theory]
+    [InlineData("Done.", true)]
+    [InlineData("Done!", true)]
+    [InlineData("Done?", true)]
+    [InlineData("结束。", true)]
+    [InlineData("真的！", true)]
+    [InlineData("为什么？", true)]
+    [InlineData("ellipsis…", true)]
+    [InlineData("trailing ws.  ", true)]       // whitespace is trimmed
+    [InlineData("no mark", false)]
+    [InlineData("comma,", false)]
+    [InlineData("", false)]
+    [InlineData("   ", false)]
+    public void EndsWithSentenceMark_RecognisesBothScripts(string text, bool expected)
+    {
+        Assert.Equal(expected, TextSegmenter.EndsWithSentenceMark(text));
+    }
+
     // --- CountSentenceEndings (used by TranslationQualityGuard) ---
 
     [Theory]
