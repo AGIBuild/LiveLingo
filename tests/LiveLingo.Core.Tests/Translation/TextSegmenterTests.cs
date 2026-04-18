@@ -287,6 +287,27 @@ public class TextSegmenterTests
         Assert.Equal(text, result[0].Text);
     }
 
+    [Fact]
+    public void Segment_LongSingleSentenceWithAbbreviation_DoesNotBreakInsideAbbreviation()
+    {
+        // Single logical sentence (one terminal '.') longer than the max-per-segment
+        // budget so the long-text path must split. "U.S.A." sits inside the window —
+        // the old FindBreakPoint picked abbreviation dots as boundaries; the fix
+        // aligns it with IsLatinSentenceBoundary so the split falls on a word gap.
+        const string prefix = "Today the entire U.S.A. economy";
+        var filler = string.Join(' ', Enumerable.Repeat("alpha", 150));
+        var text = $"{prefix} kept expanding while {filler} stopped growing.";
+
+        Assert.True(text.Length > TextSegmenter.DefaultMaxCharsPerSegment,
+            "Test precondition: text must exceed max-per-segment budget.");
+        Assert.Equal(1, TextSegmenter.CountSentenceEndings(text));
+
+        var result = _segmenter.Segment(text);
+
+        Assert.True(result.Count >= 2, "Expected the long sentence to be split.");
+        Assert.DoesNotContain(result, s => s.Text.EndsWith("U.S.A.", StringComparison.Ordinal));
+    }
+
     // --- CountSentenceEndings (used by TranslationQualityGuard) ---
 
     [Theory]
