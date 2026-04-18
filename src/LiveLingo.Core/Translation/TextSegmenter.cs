@@ -42,6 +42,28 @@ public sealed class TextSegmenter
     }
 
     /// <summary>
+    /// Returns the separator a re-assembler should insert between a segment
+    /// and its successor given the break kind and the translation target.
+    /// CJK targets (Chinese, Japanese) omit spaces between sentences because
+    /// native punctuation already carries the gap; all other targets use a
+    /// single space. Paragraph breaks always produce a double newline.
+    /// </summary>
+    public static string JoinSeparatorFor(SegmentBreak breakAfter, string? targetLanguage)
+    {
+        if (breakAfter == SegmentBreak.Paragraph)
+            return "\n\n";
+
+        return IsCjkTarget(targetLanguage) ? string.Empty : " ";
+    }
+
+    private static bool IsCjkTarget(string? lang)
+    {
+        if (string.IsNullOrEmpty(lang)) return false;
+        return lang.StartsWith("zh", StringComparison.OrdinalIgnoreCase)
+            || lang.StartsWith("ja", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
     /// Counts sentence-ending punctuation that would drive a segmentation split.
     /// Latin marks (.!?) only count when followed by whitespace or end-of-input,
     /// so abbreviations and decimals are not mistaken for sentence boundaries.
