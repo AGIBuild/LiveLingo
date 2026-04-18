@@ -1,23 +1,33 @@
+using System.Net.Http.Json;
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using LiveLingo.Core.Processing;
 using Microsoft.Extensions.Logging;
-using OllamaSharp;
-using OllamaSharp.Models;
-using OllamaSharp.Models.Chat;
 
 namespace LiveLingo.Core.Models;
 
 /// <summary>
 /// Backend for the user-managed Ollama daemon (<c>ollama serve</c>).
-/// Uses <c>OllamaSharp</c> for native <c>/api/chat</c> calls with streaming.
+/// Talks to <c>/api/chat</c> directly over <see cref="HttpClient"/> with NDJSON
+/// streaming, mirroring <see cref="LlamaServerChatProvider"/>'s style so the
+/// Ollama session endpoint is the sole source of truth for the request URL —
+/// no reliance on <see cref="HttpClient.BaseAddress"/>, no per-instance
+/// mutable binding, and therefore no races between concurrent translations.
 /// The Ollama daemon lifecycle (install, start, model pull) is the user's
-/// responsibility – we only connect to an already-running endpoint.
+/// responsibility; we only connect to an already-running endpoint.
 /// </summary>
 public sealed class OllamaChatProvider(
     HttpClient http,
     ILogger<OllamaChatProvider> logger) : IModelProvider
 {
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+    };
+
     public ModelProviderKind ProviderKind => ModelProviderKind.Ollama;
 
     public async Task<ModelInvocationResult> InvokeAsync(
@@ -55,62 +65,70 @@ public sealed class OllamaChatProvider(
         ModelInvocationRequest request,
         [EnumeratorCancellation] CancellationToken ct)
     {
-        EnsureBaseAddress(session.Endpoint);
-        var client = new OllamaApiClient(http, request.Profile.Id);
-        var chatRequest = BuildChatRequest(request);
-
-        await foreach (var response in client.ChatAsync(chatRequest, ct).ConfigureAwait(false))
+        var url = $"{session.Endpoint.TrimEnd('/')}/api/chat";
+        using var httpRequest = new HttpRequestMessage(HttpMethod.Post, url)
         {
-            if (response?.Message?.Content is { Length: > 0 } content)
-                yield return content;
-        }
-    }
-
-    /// <summary>
-    /// OllamaSharp reads the endpoint from <see cref="HttpClient.BaseAddress"/>.
-    /// The Ollama base URL is effectively immutable within a session (sourced from
-    /// <see cref="CoreOptions.OllamaBaseUrl"/>), so we assign it once per HttpClient
-    /// and reuse across all invocations; concurrent calls pointing at the same
-    /// endpoint are a no-op after the first assignment.
-    /// </summary>
-    private void EnsureBaseAddress(string endpoint)
-    {
-        var uri = new Uri(endpoint);
-        if (http.BaseAddress is null)
-        {
-            http.BaseAddress = uri;
-            return;
-        }
-
-        if (http.BaseAddress != uri)
-        {
-            throw new InvalidOperationException(
-                $"Ollama HTTP client base address is already bound to {http.BaseAddress}; " +
-                $"cannot switch to {uri} at runtime. Restart the app after changing Ollama base URL.");
-        }
-    }
-
-    private static ChatRequest BuildChatRequest(ModelInvocationRequest request) =>
-        new()
-        {
-            Model = request.Profile.Id,
-            Messages = request.Messages.Select(m => new Message(MapRole(m.Role), m.Content)).ToArray(),
-            Stream = true,
-            Options = new RequestOptions
-            {
-                Temperature = request.Options.Temperature,
-                TopP = request.Options.TopP,
-                NumPredict = request.Options.MaxTokens,
-                Stop = request.Options.StopSequences.ToArray(),
-            },
+            Content = JsonContent.Create(BuildRequestBody(request), options: JsonOptions),
         };
 
-    private static ChatRole MapRole(string role) => role.ToLowerInvariant() switch
+        using var response = await http
+            .SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead, ct)
+            .ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+
+        await using var body = await response.Content.ReadAsStreamAsync(ct).ConfigureAwait(false);
+        using var reader = new StreamReader(body, Encoding.UTF8);
+
+        while (true)
+        {
+            var line = await reader.ReadLineAsync(ct).ConfigureAwait(false);
+            if (line is null) break;
+            if (string.IsNullOrWhiteSpace(line)) continue;
+
+            OllamaChatChunk? chunk;
+            try
+            {
+                chunk = JsonSerializer.Deserialize<OllamaChatChunk>(line, JsonOptions);
+            }
+            catch (JsonException ex)
+            {
+                logger.LogWarning(ex, "Skipping malformed Ollama NDJSON line: {Line}", line);
+                continue;
+            }
+
+            if (chunk?.Message?.Content is { Length: > 0 } content)
+                yield return content;
+
+            if (chunk?.Done == true)
+                yield break;
+        }
+    }
+
+    private static object BuildRequestBody(ModelInvocationRequest request) => new
     {
-        "system" => ChatRole.System,
-        "user" => ChatRole.User,
-        "assistant" => ChatRole.Assistant,
-        "tool" => ChatRole.Tool,
-        _ => ChatRole.User,
+        model = request.Profile.Id,
+        messages = request.Messages
+            .Select(m => new { role = m.Role.ToLowerInvariant(), content = m.Content })
+            .ToArray(),
+        stream = true,
+        options = new
+        {
+            temperature = request.Options.Temperature,
+            top_p = request.Options.TopP,
+            num_predict = request.Options.MaxTokens,
+            stop = request.Options.StopSequences.ToArray(),
+        },
     };
+
+    private sealed record OllamaChatChunk
+    {
+        [JsonPropertyName("message")] public OllamaChatMessage? Message { get; init; }
+        [JsonPropertyName("done")] public bool Done { get; init; }
+    }
+
+    private sealed record OllamaChatMessage
+    {
+        [JsonPropertyName("role")] public string Role { get; init; } = string.Empty;
+        [JsonPropertyName("content")] public string Content { get; init; } = string.Empty;
+    }
 }
