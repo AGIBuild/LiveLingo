@@ -309,7 +309,53 @@ public sealed class FallbackTranslationInvokerTests
         Assert.Equal(CloudProfile.Id, trace.WinningCandidate?.Profile.Id);
     }
 
+    [Fact]
+    public async Task InvokeStreamingAsync_EmitsDeltasInRealTime_NotBuffered()
+    {
+        // Proves the invoker yields each delta as it arrives from the producer
+        // rather than buffering the entire candidate stream before yielding. The
+        // producer blocks on releaseSecond between the two deltas; if the invoker
+        // waited for the stream to finish before yielding anything, the caller's
+        // first MoveNextAsync would never complete (deadlock) because we only
+        // release the producer after observing the first delta.
+        var releaseSecond = new TaskCompletionSource();
+
+        var service = new StubInvocationService
+        {
+            StreamBehaviour = (_, ct) => BlockingPairStream("first", "second", releaseSecond, ct)
+        };
+        var (invoker, _) = CreateInvoker(service);
+
+        await using var e = invoker.InvokeStreamingAsync(TwoCandidatePlan, BuildRequest, qualityGuard: null)
+            .GetAsyncEnumerator();
+
+        var firstMove = e.MoveNextAsync().AsTask();
+        Assert.True(await firstMove.WaitAsync(TimeSpan.FromSeconds(2)));
+        Assert.Equal("first", e.Current.Delta);
+
+        // Producer is still parked inside releaseSecond.Task — if the invoker were
+        // buffering, it would be parked too and we'd never have reached this line.
+        releaseSecond.SetResult();
+
+        Assert.True(await e.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(2)));
+        Assert.Equal("second", e.Current.Delta);
+        Assert.False(await e.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(2)));
+    }
+
     // --- Streaming helpers ---------------------------------------------------
+
+    private static async IAsyncEnumerable<string> BlockingPairStream(
+        string first,
+        string second,
+        TaskCompletionSource releaseSecond,
+        [EnumeratorCancellation] CancellationToken ct)
+    {
+        await Task.Yield();
+        yield return first;
+        await releaseSecond.Task.WaitAsync(ct).ConfigureAwait(false);
+        yield return second;
+    }
+
 
     private static async IAsyncEnumerable<string> StreamingSequence(params string[] items)
     {

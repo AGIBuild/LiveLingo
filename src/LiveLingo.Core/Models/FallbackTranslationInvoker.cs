@@ -159,19 +159,80 @@ public sealed class FallbackTranslationInvoker(
                     ct.ThrowIfCancellationRequested();
                 }
 
+                // Stream the candidate in real time. Deltas are yielded as soon as
+                // the first token clears the watchdog; pre-first-token failures stay
+                // internal and let us transparently fall through to the next
+                // candidate without ever reaching the caller's enumerator.
+                var attemptSw = Stopwatch.StartNew();
+                using var firstTokenCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                firstTokenCts.CancelAfter(candidate.FirstTokenBudget);
                 var assembler = new StringBuilder();
-                var streamResult = await TryStreamCandidateAsync(
-                    candidate, requestBuilder(candidate), assembler, ct).ConfigureAwait(false);
+                TimeSpan? firstTokenLatency = null;
+                var hasYielded = false;
+                Exception? attemptError = null;
+                var attemptStatus = StreamAttemptStatus.Succeeded;
 
-                attempts.Add(BuildStreamingAttempt(candidate, streamResult));
-
-                if (streamResult.Deltas is { Count: > 0 })
+                await using (var enumerator = invocationService
+                    .InvokeStreamingAsync(requestBuilder(candidate), firstTokenCts.Token)
+                    .GetAsyncEnumerator(firstTokenCts.Token))
                 {
-                    foreach (var delta in streamResult.Deltas)
-                        yield return new TranslationStreamingUpdate(candidate, delta);
-                }
+                    while (true)
+                    {
+                        bool hasNext;
+                        try
+                        {
+                            hasNext = await enumerator.MoveNextAsync().ConfigureAwait(false);
+                        }
+                        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                        {
+                            throw;
+                        }
+                        catch (OperationCanceledException ex) when (!hasYielded)
+                        {
+                            attemptError = ex;
+                            attemptStatus = StreamAttemptStatus.FirstTokenTimeout;
+                            break;
+                        }
+                        catch (Exception ex) when (!hasYielded)
+                        {
+                            attemptError = ex;
+                            attemptStatus = StreamAttemptStatus.FailedBeforeFirstToken;
+                            break;
+                        }
+                        catch (Exception ex)
+                        {
+                            attemptError = ex;
+                            attemptStatus = StreamAttemptStatus.FailedAfterFirstToken;
+                            break;
+                        }
 
-                if (streamResult.Status == StreamAttemptStatus.Succeeded)
+                        if (!hasNext)
+                        {
+                            attemptStatus = StreamAttemptStatus.Succeeded;
+                            break;
+                        }
+
+                        var delta = enumerator.Current;
+                        if (string.IsNullOrEmpty(delta)) continue;
+
+                        if (!hasYielded)
+                        {
+                            firstTokenLatency = attemptSw.Elapsed;
+                            // First token arrived — cancel the first-token watchdog;
+                            // subsequent reads run on the outer token only.
+                            firstTokenCts.CancelAfter(Timeout.InfiniteTimeSpan);
+                            hasYielded = true;
+                        }
+                        assembler.Append(delta);
+                        yield return new TranslationStreamingUpdate(candidate, delta);
+                    }
+                }
+                attemptSw.Stop();
+
+                attempts.Add(BuildStreamingAttempt(
+                    candidate, attemptStatus, attemptError, attemptSw.Elapsed, firstTokenLatency));
+
+                if (attemptStatus == StreamAttemptStatus.Succeeded)
                 {
                     winningCandidateIndex = i;
                     winner = candidate;
@@ -179,18 +240,18 @@ public sealed class FallbackTranslationInvoker(
                     break;
                 }
 
-                if (streamResult.Status == StreamAttemptStatus.FailedAfterFirstToken)
+                if (attemptStatus == StreamAttemptStatus.FailedAfterFirstToken)
                 {
                     traceOutcome = TranslationRouteTraceOutcome.FailedAfterFirstToken;
                     throw new InvalidOperationException(
                         $"Streaming candidate {candidate.Profile.Id} failed after partial output was emitted.",
-                        streamResult.Error);
+                        attemptError);
                 }
 
                 logger?.LogWarning(
-                    streamResult.Error,
-                    "Candidate {Tier}/{ProfileId} failed before first token ({Reason}); falling back to next candidate.",
-                    candidate.Tier, candidate.Profile.Id, streamResult.Status);
+                    attemptError,
+                    "Candidate {Tier}/{ProfileId} failed before first token ({Status}); falling back to next candidate.",
+                    candidate.Tier, candidate.Profile.Id, attemptStatus);
             }
 
             if (winningCandidateIndex < 0)
@@ -250,79 +311,6 @@ public sealed class FallbackTranslationInvoker(
                 winner,
                 attempts));
         }
-    }
-
-    private async Task<StreamAttemptResult> TryStreamCandidateAsync(
-        TranslationRouteCandidate candidate,
-        ModelInvocationRequest request,
-        StringBuilder assembler,
-        CancellationToken outerCt)
-    {
-        using var firstTokenCts = CancellationTokenSource.CreateLinkedTokenSource(outerCt);
-        firstTokenCts.CancelAfter(candidate.FirstTokenBudget);
-        var attemptSw = Stopwatch.StartNew();
-        TimeSpan? firstTokenLatency = null;
-        var hasYielded = false;
-        var deltas = new List<string>();
-
-        await using var enumerator = invocationService
-            .InvokeStreamingAsync(request, firstTokenCts.Token)
-            .GetAsyncEnumerator(firstTokenCts.Token);
-
-        while (true)
-        {
-            bool hasNext;
-            try
-            {
-                hasNext = await enumerator.MoveNextAsync().ConfigureAwait(false);
-            }
-            catch (OperationCanceledException) when (outerCt.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch (OperationCanceledException ex) when (!hasYielded)
-            {
-                attemptSw.Stop();
-                return new StreamAttemptResult(
-                    StreamAttemptStatus.FirstTokenTimeout, deltas, ex,
-                    attemptSw.Elapsed, firstTokenLatency);
-            }
-            catch (Exception ex) when (!hasYielded)
-            {
-                attemptSw.Stop();
-                return new StreamAttemptResult(
-                    StreamAttemptStatus.FailedBeforeFirstToken, deltas, ex,
-                    attemptSw.Elapsed, firstTokenLatency);
-            }
-            catch (Exception ex)
-            {
-                attemptSw.Stop();
-                return new StreamAttemptResult(
-                    StreamAttemptStatus.FailedAfterFirstToken, deltas, ex,
-                    attemptSw.Elapsed, firstTokenLatency);
-            }
-
-            if (!hasNext) break;
-
-            var delta = enumerator.Current;
-            if (string.IsNullOrEmpty(delta)) continue;
-
-            if (!hasYielded)
-            {
-                firstTokenLatency = attemptSw.Elapsed;
-                // First token arrived — cancel the first-token watchdog.
-                // Subsequent reads run on the outer token only.
-                firstTokenCts.CancelAfter(Timeout.InfiniteTimeSpan);
-                hasYielded = true;
-            }
-            assembler.Append(delta);
-            deltas.Add(delta);
-        }
-
-        attemptSw.Stop();
-        return new StreamAttemptResult(
-            StreamAttemptStatus.Succeeded, deltas, null,
-            attemptSw.Elapsed, firstTokenLatency);
     }
 
     private async Task<TranslationInvocationOutcome?> TryProduceReplacementAsync(
@@ -398,9 +386,12 @@ public sealed class FallbackTranslationInvoker(
 
     private static TranslationRouteAttempt BuildStreamingAttempt(
         TranslationRouteCandidate candidate,
-        StreamAttemptResult streamResult)
+        StreamAttemptStatus status,
+        Exception? error,
+        TimeSpan duration,
+        TimeSpan? firstTokenLatency)
     {
-        var outcome = streamResult.Status switch
+        var outcome = status switch
         {
             StreamAttemptStatus.Succeeded => TranslationRouteAttemptOutcome.Succeeded,
             StreamAttemptStatus.FirstTokenTimeout => TranslationRouteAttemptOutcome.FirstTokenBudgetExpired,
@@ -408,19 +399,14 @@ public sealed class FallbackTranslationInvoker(
             StreamAttemptStatus.FailedAfterFirstToken => TranslationRouteAttemptOutcome.FailedAfterFirstToken,
             _ => TranslationRouteAttemptOutcome.FailedWithException
         };
-        var reason = streamResult.Status == StreamAttemptStatus.Succeeded
-            ? null
-            : streamResult.Status == StreamAttemptStatus.FirstTokenTimeout
-                ? $"First-token budget of {candidate.FirstTokenBudget.TotalMilliseconds:0} ms expired."
-                : streamResult.Error is { } ex
-                    ? FormatFailureReason(ex)
-                    : "Unknown streaming failure.";
-        return new TranslationRouteAttempt(
-            candidate,
-            outcome,
-            streamResult.Duration,
-            streamResult.FirstTokenLatency,
-            reason);
+        var reason = status switch
+        {
+            StreamAttemptStatus.Succeeded => null,
+            StreamAttemptStatus.FirstTokenTimeout =>
+                $"First-token budget of {candidate.FirstTokenBudget.TotalMilliseconds:0} ms expired.",
+            _ => error is { } ex ? FormatFailureReason(ex) : "Unknown streaming failure."
+        };
+        return new TranslationRouteAttempt(candidate, outcome, duration, firstTokenLatency, reason);
     }
 
     private static void RetroactivelyRejectLastAttempt(List<TranslationRouteAttempt> attempts)
@@ -445,11 +431,4 @@ public sealed class FallbackTranslationInvoker(
         FailedBeforeFirstToken,
         FailedAfterFirstToken
     }
-
-    private sealed record StreamAttemptResult(
-        StreamAttemptStatus Status,
-        IReadOnlyList<string> Deltas,
-        Exception? Error,
-        TimeSpan Duration,
-        TimeSpan? FirstTokenLatency);
 }
