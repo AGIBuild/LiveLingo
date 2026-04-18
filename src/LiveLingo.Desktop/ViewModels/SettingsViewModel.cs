@@ -816,6 +816,12 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
             item.PropertyChanged += OnModelItemPropertyChanged;
     }
 
+    private void UnhookModelItemChanges()
+    {
+        foreach (var item in Models)
+            item.PropertyChanged -= OnModelItemPropertyChanged;
+    }
+
     private void OnModelItemPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName is nameof(ModelItemViewModel.IsInstalled))
@@ -1025,6 +1031,10 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
 
     public void Dispose()
     {
+        // Detach the IsInstalled listeners first so a last-moment
+        // coordinator publish cannot fire a PropertyChanged into a
+        // partially-disposed SettingsViewModel.
+        UnhookModelItemChanges();
         foreach (var item in Models)
             item.Dispose();
         Diagnostics?.Dispose();
