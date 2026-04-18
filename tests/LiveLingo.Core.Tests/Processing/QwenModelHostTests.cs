@@ -55,25 +55,35 @@ public sealed class LocalLlamaModelHostTests : IDisposable
                 state = ModelLoadState.Loaded;
             });
 
+        // LocalLlamaModelHost resolves the translation profile via ModelSelectionPolicy using
+        // CoreOptions.ActiveTranslationModelId (not the injected IModelSelector). Pin the active
+        // id so the resolver lands on the model whose directory/gguf we prepared above; without
+        // this the resolver falls back to another registry entry whose stubs are missing and the
+        // load task faults before the test's startup gate can trigger.
         using var host = new LocalLlamaModelHost(
             modelManager,
             serverManager,
             selector,
-            Options.Create(new CoreOptions { ModelStoragePath = _tempDir }),
+            Options.Create(new CoreOptions
+            {
+                ModelStoragePath = _tempDir,
+                ActiveTranslationModelId = ModelRegistry.Qwen35_9B.Id,
+            }),
             logger);
 
         using var firstCallerCts = new CancellationTokenSource();
         var firstWait = host.GetOrStartServerAsync(firstCallerCts.Token);
 
-        await startupEntered.Task;
+        await startupEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
         firstCallerCts.Cancel();
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => firstWait);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+            await firstWait.WaitAsync(TimeSpan.FromSeconds(5)));
 
         var secondWait = host.GetOrStartServerAsync(CancellationToken.None);
         allowStartupToFinish.SetResult();
 
-        var readyEndpoint = await secondWait;
+        var readyEndpoint = await secondWait.WaitAsync(TimeSpan.FromSeconds(5));
 
         Assert.Equal("http://127.0.0.1:50123", readyEndpoint);
         await modelManager.Received(1)
