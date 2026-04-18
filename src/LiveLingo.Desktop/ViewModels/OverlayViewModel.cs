@@ -348,6 +348,59 @@ public partial class OverlayViewModel : ObservableObject, IDisposable
     private string L(string key) => _loc?.T(key) ?? key;
     private string L(string key, params object[] args) => _loc?.T(key, args) ?? key;
 
+    /// <summary>
+    /// Builds a progress callback that surfaces the pipeline's hidden waits
+    /// (language detection, model warm-up) as status-bar updates. Callbacks
+    /// fire on arbitrary threads so every mutation stays on the property's
+    /// captured sync context by going through <see cref="Progress{T}"/>, which
+    /// captures the current <see cref="SynchronizationContext"/>.
+    /// </summary>
+    private IProgress<TranslationLifecycleEvent> BuildLifecycleProgress()
+    {
+        return new Progress<TranslationLifecycleEvent>(evt =>
+        {
+            switch (evt.Phase)
+            {
+                case TranslationPhase.LanguageDetectionStarted:
+                    StatusText = L("overlay.detectingLanguage");
+                    break;
+                case TranslationPhase.LanguageDetected:
+                    if (!string.IsNullOrEmpty(evt.DetectedLanguage))
+                    {
+                        StatusText = L(
+                            "overlay.translating.fromDetected",
+                            FriendlyLanguageName(evt.DetectedLanguage),
+                            FriendlyLanguageName(TargetLanguage));
+                    }
+                    break;
+                case TranslationPhase.TranslationStarted:
+                    // Only escalate back to the generic "translating…" label if
+                    // detection did not already produce a more specific one.
+                    if (string.IsNullOrEmpty(StatusText) ||
+                        StatusText == L("overlay.detectingLanguage"))
+                    {
+                        StatusText = L("overlay.translating");
+                    }
+                    break;
+                case TranslationPhase.FirstTokenReceived:
+                    // Streaming output is now filling TranslatedText; no status
+                    // change needed but logging helps profile cold-start latency.
+                    _logger?.LogDebug(
+                        "First translation token received after {Elapsed}ms",
+                        evt.Elapsed.TotalMilliseconds);
+                    break;
+            }
+        });
+    }
+
+    private string FriendlyLanguageName(string? code)
+    {
+        if (string.IsNullOrWhiteSpace(code)) return L("overlay.language.auto");
+        var match = _availableLanguages.FirstOrDefault(l =>
+            string.Equals(l.Code, code, StringComparison.OrdinalIgnoreCase));
+        return match?.DisplayName ?? code;
+    }
+
     private async Task RunPipelineAsync(string text, CancellationToken ct)
     {
         try
@@ -383,13 +436,14 @@ public partial class OverlayViewModel : ObservableObject, IDisposable
                 return;
             }
 
+            var progress = BuildLifecycleProgress();
             var degradedToTranslationOnly = false;
             var showFallbackNotice = false;
             TranslationResult result;
             try
             {
                 result = await _pipeline.ProcessAsync(
-                    new TranslationRequest(text, _sourceLanguage, TargetLanguage, postProcessing), ct);
+                    new TranslationRequest(text, _sourceLanguage, TargetLanguage, postProcessing), ct, progress);
             }
             catch (ModelNotReadyException ex) when (
                 ex.ModelType == ModelType.PostProcessing)
@@ -405,7 +459,7 @@ public partial class OverlayViewModel : ObservableObject, IDisposable
                     ex.ModelId);
                 degradedToTranslationOnly = true;
                 result = await _pipeline.ProcessAsync(
-                    new TranslationRequest(text, _sourceLanguage, TargetLanguage, null), ct);
+                    new TranslationRequest(text, _sourceLanguage, TargetLanguage, null), ct, progress);
             }
             TranslatedText = result.Text;
 
@@ -472,11 +526,12 @@ public partial class OverlayViewModel : ObservableObject, IDisposable
         string text, System.Diagnostics.Stopwatch sw, CancellationToken ct)
     {
         var translatedBuilder = new System.Text.StringBuilder();
+        var progress = BuildLifecycleProgress();
 
         try
         {
             await foreach (var delta in _pipeline.ProcessStreamingAsync(
-                               new TranslationRequest(text, _sourceLanguage, TargetLanguage, null), ct)
+                               new TranslationRequest(text, _sourceLanguage, TargetLanguage, null), ct, progress)
                            .ConfigureAwait(false))
             {
                 if (delta.IsReplacement)

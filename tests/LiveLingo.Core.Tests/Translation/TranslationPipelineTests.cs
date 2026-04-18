@@ -568,6 +568,124 @@ public class TranslationPipelineTests
             "Hello.\nWorld.", "en", "zh", Arg.Any<CancellationToken>());
     }
 
+    // --- Lifecycle progress events (surface hidden waits) ---
+
+    [Fact]
+    public async Task ProcessAsync_ReportsLifecycleEventsInOrder_WhenLanguageDetectionNeeded()
+    {
+        _detector.DetectAsync("hello", Arg.Any<CancellationToken>())
+            .Returns(new DetectionResult("en", 0.9f));
+        _engine.TranslateAsync("hello", "en", "zh", Arg.Any<CancellationToken>())
+            .Returns("你好");
+
+        var events = new List<TranslationLifecycleEvent>();
+        var progress = new Progress<TranslationLifecycleEvent>(events.Add);
+
+        await _pipeline.ProcessAsync(
+            new TranslationRequest("hello", null, "zh", null),
+            CancellationToken.None,
+            progress);
+
+        // Progress<T> posts asynchronously; allow the captured sync context to drain.
+        await WaitForPhaseAsync(events, TranslationPhase.TranslationStarted);
+
+        Assert.Equal(
+            [TranslationPhase.LanguageDetectionStarted,
+             TranslationPhase.LanguageDetected,
+             TranslationPhase.TranslationStarted],
+            events.Select(e => e.Phase));
+        Assert.Equal("en", events[1].DetectedLanguage);
+        Assert.Equal(0.9f, events[1].DetectionConfidence);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_SkipsDetectionEvents_WhenSourceLanguageProvided()
+    {
+        _engine.TranslateAsync("hello", "en", "zh", Arg.Any<CancellationToken>())
+            .Returns("你好");
+
+        var events = new List<TranslationLifecycleEvent>();
+        var progress = new Progress<TranslationLifecycleEvent>(events.Add);
+
+        await _pipeline.ProcessAsync(
+            new TranslationRequest("hello", "en", "zh", null),
+            CancellationToken.None,
+            progress);
+
+        await WaitForPhaseAsync(events, TranslationPhase.TranslationStarted);
+        Assert.Equal(
+            [TranslationPhase.TranslationStarted],
+            events.Select(e => e.Phase));
+    }
+
+    [Fact]
+    public async Task ProcessStreamingAsync_ReportsFirstTokenReceived_OnFirstDelta()
+    {
+        _engine.TranslateStreamingAsync("hello", "en", "zh", Arg.Any<CancellationToken>())
+            .Returns(AsyncEnumerable(new TranslationDelta("你"), new TranslationDelta("好")));
+
+        var events = new List<TranslationLifecycleEvent>();
+        var progress = new Progress<TranslationLifecycleEvent>(events.Add);
+
+        await foreach (var _ in _pipeline.ProcessStreamingAsync(
+                           new TranslationRequest("hello", "en", "zh", null),
+                           CancellationToken.None,
+                           progress))
+        {
+        }
+
+        await WaitForPhaseAsync(events, TranslationPhase.FirstTokenReceived);
+        Assert.Contains(events, e => e.Phase == TranslationPhase.TranslationStarted);
+        Assert.Contains(events, e => e.Phase == TranslationPhase.FirstTokenReceived);
+        // First-token must be reported AFTER TranslationStarted, never before.
+        var startedIdx = events.FindIndex(e => e.Phase == TranslationPhase.TranslationStarted);
+        var firstTokenIdx = events.FindIndex(e => e.Phase == TranslationPhase.FirstTokenReceived);
+        Assert.True(firstTokenIdx > startedIdx);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_IdentityTranslation_EmitsNoLifecycleEvents()
+    {
+        // Same source and target language short-circuits before any work.
+        var events = new List<TranslationLifecycleEvent>();
+        var progress = new Progress<TranslationLifecycleEvent>(events.Add);
+
+        await _pipeline.ProcessAsync(
+            new TranslationRequest("hello", "en", "en", null),
+            CancellationToken.None,
+            progress);
+
+        // Wait a couple of hops to be fair to Progress<T>'s async posting.
+        for (var i = 0; i < 5 && events.Count == 0; i++)
+            await Task.Delay(10);
+        Assert.Empty(events);
+    }
+
+    private static async IAsyncEnumerable<TranslationDelta> AsyncEnumerable(
+        params TranslationDelta[] deltas)
+    {
+        foreach (var d in deltas)
+        {
+            yield return d;
+            await Task.Yield();
+        }
+    }
+
+    private static async Task WaitForPhaseAsync(
+        List<TranslationLifecycleEvent> events, TranslationPhase phase)
+    {
+        // Progress<T>'s callback is posted via SynchronizationContext.Post, so we
+        // need to give it up to ~1s of slack when running on xUnit's test context.
+        for (var i = 0; i < 50; i++)
+        {
+            if (events.Any(e => e.Phase == phase)) return;
+            await Task.Delay(20);
+        }
+        throw new Xunit.Sdk.XunitException(
+            $"Timed out waiting for lifecycle phase {phase}. Got: "
+            + string.Join(",", events.Select(e => e.Phase)));
+    }
+
     [Fact]
     public async Task ProcessAsync_UnitOutputMissingNewlines_FallsBackWithoutLosingContent()
     {

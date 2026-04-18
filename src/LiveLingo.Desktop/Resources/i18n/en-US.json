@@ -173,6 +173,8 @@
   "localModel.status.ready": "✓ {0} is loaded and ready.",
 
   "overlay.translating": "Translating...",
+  "overlay.detectingLanguage": "Detecting source language…",
+  "overlay.translating.fromDetected": "Translating ({0}→{1})…",
   "overlay.translated": "Translated ({0})",
   "overlay.translatedWithPost": "Translated ({0} + {1} post)",
   "overlay.error": "Error: {0}",

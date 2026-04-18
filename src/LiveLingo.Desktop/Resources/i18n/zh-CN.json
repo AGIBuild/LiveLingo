@@ -173,6 +173,8 @@
   "localModel.status.ready": "✓ {0} 已就绪。",
 
   "overlay.translating": "翻译中...",
+  "overlay.detectingLanguage": "正在识别源语言...",
+  "overlay.translating.fromDetected": "翻译中（{0}→{1}）...",
   "overlay.translated": "已翻译 ({0})",
   "overlay.translatedWithPost": "已翻译 ({0} + {1} 后处理)",
   "overlay.error": "错误: {0}",

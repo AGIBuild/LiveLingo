@@ -658,7 +658,7 @@ public class AppStartupSmokeTests
     public async Task OverlayWindow_TypingText_ShowsTranslatedResult()
     {
         var pipeline = Substitute.For<ITranslationPipeline>();
-        pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>())
+        pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>(), Arg.Any<IProgress<TranslationLifecycleEvent>?>())
             .Returns(_ => SingleDeltaAsync("translated"));
         var injector = Substitute.For<LiveLingo.Desktop.Platform.ITextInjector>();
         var target = new LiveLingo.Desktop.Platform.TargetWindowInfo(
