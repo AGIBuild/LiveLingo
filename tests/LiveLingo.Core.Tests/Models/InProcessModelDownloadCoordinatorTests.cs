@@ -192,4 +192,46 @@ public class InProcessModelDownloadCoordinatorTests
 
         Assert.Contains(25d, seen);
     }
+
+    [Fact]
+    public async Task LateProgressReport_AfterTerminal_DoesNotResurrectDownloadingState()
+    {
+        // Capture the coordinator's IProgress<T> instance so the test can replay a
+        // progress report after the terminal Installed state has already been
+        // published. Without the Publish guard, the late report would overwrite
+        // session.State back to Downloading and fire a bogus event.
+        IProgress<ModelDownloadProgress>? capturedProgress = null;
+        var mm = Substitute.For<IModelManager>();
+        mm.EnsureModelAsync(Arg.Any<ModelDescriptor>(), Arg.Any<IProgress<ModelDownloadProgress>?>(), Arg.Any<CancellationToken>())
+            .Returns(call =>
+            {
+                capturedProgress = call.ArgAt<IProgress<ModelDownloadProgress>?>(1);
+                return Task.CompletedTask;
+            });
+
+        var coord = new InProcessModelDownloadCoordinator(mm);
+        var events = new List<ModelDownloadState>();
+        coord.StateChanged += events.Add;
+
+        await coord.StartAsync(Descriptor);
+
+        Assert.Equal(ModelDownloadStatus.Installed, events[^1].Status);
+        var terminalIndex = events.Count - 1;
+
+        Assert.NotNull(capturedProgress);
+        capturedProgress!.Report(new ModelDownloadProgress("coord-test", 512, 1024));
+
+        // Progress<T> hops through a scheduler (thread pool when no sync-context
+        // was captured), so wait for any queued continuation to run before
+        // inspecting the event log.
+        for (var i = 0; i < 20 && events.Count > terminalIndex + 1; i++)
+            await Task.Delay(10);
+        await Task.Delay(20);
+
+        Assert.Equal(ModelDownloadStatus.Installed, coord.GetState(Descriptor.Id).Status);
+        Assert.Equal(ModelDownloadStatus.Installed, events[^1].Status);
+        Assert.DoesNotContain(
+            events.GetRange(terminalIndex + 1, events.Count - terminalIndex - 1),
+            s => s.Status == ModelDownloadStatus.Downloading);
+    }
 }

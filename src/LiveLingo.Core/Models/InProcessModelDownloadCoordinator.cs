@@ -16,6 +16,7 @@ public sealed class InProcessModelDownloadCoordinator : IModelDownloadCoordinato
     private readonly ILogger<InProcessModelDownloadCoordinator>? _logger;
     private readonly ConcurrentDictionary<string, Session> _sessions = new(StringComparer.Ordinal);
     private readonly object _startLock = new();
+    private readonly object _publishLock = new();
 
     public event Action<ModelDownloadState>? StateChanged;
 
@@ -55,19 +56,18 @@ public sealed class InProcessModelDownloadCoordinator : IModelDownloadCoordinato
 
             Publish(session, new ModelDownloadState(descriptor.Id, ModelDownloadStatus.Downloading, 0, null));
 
-            // Progress<T> is constructed here to capture the caller's SynchronizationContext
-            // so incremental progress lands on the same scheduler that invoked StartAsync.
-            // Terminal transitions published from the continuation below run on whichever
-            // thread the download pipeline completes on; subscribers are expected to marshal.
+            // Progress<T> captures the caller's SynchronizationContext so incremental
+            // progress lands on the same scheduler that invoked StartAsync. Terminal
+            // transitions published from RunAsync run on whichever thread the download
+            // pipeline completes on; Publish serializes both paths and enforces that
+            // terminal states (Installed/Failed/Cancelled) cannot be downgraded by a
+            // late progress callback racing a completion.
             var progress = new Progress<ModelDownloadProgress>(p =>
-            {
-                if (session.State.Status != ModelDownloadStatus.Downloading) return;
-                Publish(session, session.State with
-                {
-                    Percentage = p.Percentage,
-                    ErrorMessage = null
-                });
-            });
+                Publish(session, new ModelDownloadState(
+                    descriptor.Id,
+                    ModelDownloadStatus.Downloading,
+                    p.Percentage,
+                    null)));
 
             session.Task = RunAsync(descriptor, session, progress);
             return session.Task;
@@ -130,9 +130,28 @@ public sealed class InProcessModelDownloadCoordinator : IModelDownloadCoordinato
 
     private void Publish(Session session, ModelDownloadState state)
     {
-        session.State = state;
-        StateChanged?.Invoke(state);
+        ModelDownloadState effective;
+        lock (_publishLock)
+        {
+            // Terminal states (Installed/Failed/Cancelled) are sticky: a late
+            // progress callback must not resurrect the Downloading status after
+            // we've already reported a completion or failure.
+            if (IsTerminal(session.State.Status) && !IsTerminal(state.Status))
+                return;
+
+            session.State = state;
+            effective = state;
+        }
+
+        // Invoke outside the lock so subscribers that call back into the
+        // coordinator (e.g. GetState) cannot deadlock with the publisher.
+        StateChanged?.Invoke(effective);
     }
+
+    private static bool IsTerminal(ModelDownloadStatus status) =>
+        status is ModelDownloadStatus.Installed
+               or ModelDownloadStatus.Failed
+               or ModelDownloadStatus.Cancelled;
 
     private sealed class Session
     {
