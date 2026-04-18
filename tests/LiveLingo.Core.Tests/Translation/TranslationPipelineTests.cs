@@ -687,6 +687,176 @@ public class TranslationPipelineTests
     }
 
     [Fact]
+    public async Task ProcessStreamingAsync_ReportsFirstTokenReceived_ExactlyOnce()
+    {
+        // Even when the engine produces many deltas, the FirstTokenReceived
+        // phase must only be emitted once (a flag gates it). A mutation that
+        // clears the flag on the hot path would generate duplicate events.
+        _engine.TranslateStreamingAsync("hello", "en", "zh", Arg.Any<CancellationToken>())
+            .Returns(AsyncEnumerable(
+                new TranslationDelta("你"),
+                new TranslationDelta("好"),
+                new TranslationDelta("世"),
+                new TranslationDelta("界")));
+
+        var events = new List<TranslationLifecycleEvent>();
+        var progress = new Progress<TranslationLifecycleEvent>(events.Add);
+
+        await foreach (var _ in _pipeline.ProcessStreamingAsync(
+                           new TranslationRequest("hello", "en", "zh", null),
+                           CancellationToken.None,
+                           progress))
+        {
+        }
+
+        await WaitForPhaseAsync(events, TranslationPhase.FirstTokenReceived);
+        Assert.Single(events, e => e.Phase == TranslationPhase.FirstTokenReceived);
+    }
+
+    [Fact]
+    public async Task ProcessStreamingAsync_ForwardsEveryDelta_ToConsumer()
+    {
+        // Guard against a regression where the streaming loop drops mid-stream
+        // deltas (e.g. a missing `yield return` inside the inner await foreach).
+        _engine.TranslateStreamingAsync("hello", "en", "zh", Arg.Any<CancellationToken>())
+            .Returns(AsyncEnumerable(
+                new TranslationDelta("你"),
+                new TranslationDelta("好"),
+                new TranslationDelta("世界")));
+
+        var collected = new List<string>();
+        await foreach (var delta in _pipeline.ProcessStreamingAsync(
+                           new TranslationRequest("hello", "en", "zh", null),
+                           CancellationToken.None))
+        {
+            collected.Add(delta.Text);
+        }
+
+        Assert.Equal(["你", "好", "世界"], collected);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_CallsEnsureTranslationModelReady_BeforeEngine()
+    {
+        // If the readiness check is skipped, the pipeline could call the
+        // engine on a model that has not been downloaded yet.
+        var callOrder = new List<string>();
+        _readiness
+            .When(r => r.EnsureTranslationModelReady(Arg.Any<string>(), Arg.Any<string>()))
+            .Do(_ => callOrder.Add("readiness"));
+        _engine.TranslateAsync("hi", "en", "zh", Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                callOrder.Add("engine");
+                return "你好";
+            });
+
+        await _pipeline.ProcessAsync(
+            new TranslationRequest("hi", "en", "zh", null), CancellationToken.None);
+
+        _readiness.Received(1).EnsureTranslationModelReady("en", "zh");
+        Assert.Equal(["readiness", "engine"], callOrder);
+    }
+
+    [Fact]
+    public async Task ProcessAsync_CancellationBetweenUnits_StopsBeforeNextEngineCall()
+    {
+        // Two independent units (a sentence break keeps them separate). The
+        // first engine call triggers cancellation; the pipeline must check
+        // the token before invoking the second unit so no redundant engine
+        // work happens after the user cancels.
+        using var cts = new CancellationTokenSource();
+        const string source = "First sentence. Second sentence.";
+
+        _engine.TranslateAsync("First sentence.", "en", "zh", Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                cts.Cancel();
+                return "第一句。";
+            });
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            _pipeline.ProcessAsync(
+                new TranslationRequest(source, "en", "zh", null), cts.Token));
+
+        await _engine.DidNotReceive().TranslateAsync(
+            "Second sentence.", "en", "zh", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ProcessAsync_DetectionConfidence_AtExactThreshold_LogsAsDebugNotWarning()
+    {
+        // The low-confidence warning is strictly "< 0.6", so a detection at
+        // exactly 0.6 must take the Debug branch. This pins down the
+        // strictness of the threshold comparison.
+        _detector.DetectAsync("x", Arg.Any<CancellationToken>())
+            .Returns(new DetectionResult("en", 0.6f));
+        _engine.TranslateAsync("x", "en", "zh", Arg.Any<CancellationToken>())
+            .Returns("y");
+
+        await _pipeline.ProcessAsync(
+            new TranslationRequest("x", null, "zh", null), CancellationToken.None);
+
+        _logger.DidNotReceive().Log(
+            LogLevel.Warning,
+            Arg.Any<EventId>(),
+            Arg.Any<object>(),
+            Arg.Any<Exception?>(),
+            Arg.Any<Func<object, Exception?, string>>());
+        _logger.Received().Log(
+            LogLevel.Debug,
+            Arg.Any<EventId>(),
+            Arg.Any<object>(),
+            Arg.Any<Exception?>(),
+            Arg.Any<Func<object, Exception?, string>>());
+    }
+
+    [Fact]
+    public async Task ProcessAsync_DetectionConfidence_BelowThreshold_LogsAsWarning()
+    {
+        _detector.DetectAsync("x", Arg.Any<CancellationToken>())
+            .Returns(new DetectionResult("en", 0.4f));
+        _engine.TranslateAsync("x", "en", "zh", Arg.Any<CancellationToken>())
+            .Returns("y");
+
+        await _pipeline.ProcessAsync(
+            new TranslationRequest("x", null, "zh", null), CancellationToken.None);
+
+        _logger.Received().Log(
+            LogLevel.Warning,
+            Arg.Any<EventId>(),
+            Arg.Any<object>(),
+            Arg.Any<Exception?>(),
+            Arg.Any<Func<object, Exception?, string>>());
+    }
+
+    [Fact]
+    public async Task ProcessAsync_CancellationDuringDetection_SkipsReadinessAndEngine()
+    {
+        // If the pipeline forgets to re-check the cancellation token after
+        // language detection, both the readiness service and the engine
+        // could be invoked even though the caller has cancelled the request.
+        using var cts = new CancellationTokenSource();
+        _detector.DetectAsync("test", Arg.Any<CancellationToken>())
+            .Returns(_ =>
+            {
+                cts.Cancel();
+                return new DetectionResult("zh", 0.9f);
+            });
+
+        await Assert.ThrowsAsync<OperationCanceledException>(() =>
+            _pipeline.ProcessAsync(
+                new TranslationRequest("test", null, "en", null), cts.Token));
+
+        _readiness.DidNotReceive().EnsureTranslationModelReady(
+            Arg.Any<string>(), Arg.Any<string>());
+        await _engine.DidNotReceive().TranslateAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
+            Arg.Any<CancellationToken>());
+    }
+
+
+    [Fact]
     public async Task ProcessAsync_UnitOutputMissingNewlines_FallsBackWithoutLosingContent()
     {
         // When a small local LLM rewrites "alpha\nbeta" as one line, we must
