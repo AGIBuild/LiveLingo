@@ -65,7 +65,7 @@ public class ModelRegistryTests
         Assert.Contains(ModelRegistry.Qwen25_15B, ModelRegistry.AllModels);
         Assert.Contains(ModelRegistry.MarianZhEn, ModelRegistry.AllModels);
         Assert.Contains(ModelRegistry.FastTextLid, ModelRegistry.AllModels);
-        Assert.Contains(ModelRegistry.WhisperBase, ModelRegistry.AllModels);
+        Assert.Contains(ModelRegistry.SherpaCohereTranscribe14LangInt8, ModelRegistry.AllModels);
         Assert.Contains(ModelRegistry.SileroVad, ModelRegistry.AllModels);
     }
 
@@ -158,6 +158,25 @@ public class ModelRegistryTests
     {
         foreach (var model in ModelRegistry.AllModels)
             Assert.False(string.IsNullOrEmpty(model.DisplayName), $"Model {model.Id} has empty DisplayName");
+    }
+
+    [Fact]
+    public void SherpaCohereTranscribe_HasCorrectTypeAndArchiveLayout()
+    {
+        var model = ModelRegistry.SherpaCohereTranscribe14LangInt8;
+        Assert.Equal(ModelType.SpeechToText, model.Type);
+        Assert.Equal(ModelArchiveType.TarBz2, model.ArchiveType);
+        Assert.Contains("encoder.int8.onnx", model.ExtractedFiles);
+        Assert.Contains("decoder.int8.onnx", model.ExtractedFiles);
+        Assert.Contains("tokens.txt", model.ExtractedFiles);
+        Assert.True(model.SizeBytes > 0);
+    }
+
+    [Fact]
+    public void SpeechToTextModels_OnlyContainsSherpaCohereTranscribe()
+    {
+        Assert.Contains(ModelRegistry.SherpaCohereTranscribe14LangInt8, ModelRegistry.SpeechToTextModels);
+        Assert.All(ModelRegistry.SpeechToTextModels, m => Assert.Equal(ModelType.SpeechToText, m.Type));
     }
 
     [Fact]

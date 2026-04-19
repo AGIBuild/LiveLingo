@@ -2,6 +2,8 @@ namespace LiveLingo.Core.Speech;
 
 public sealed class StubSpeechToTextEngine : ISpeechToTextEngine
 {
+    public IReadOnlyCollection<string> SupportedModelIds { get; } = [];
+
     public Task<SpeechTranscriptionResult> TranscribeAsync(
         AudioCaptureResult audio,
         string? language = null,

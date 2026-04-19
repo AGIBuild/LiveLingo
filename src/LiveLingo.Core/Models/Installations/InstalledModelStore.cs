@@ -56,9 +56,9 @@ internal sealed class InstalledModelStore
         if (!Directory.Exists(modelDir))
             return false;
 
-        foreach (var asset in ModelStoragePaths.GetExpectedAssets(descriptor))
+        foreach (var rel in ModelStoragePaths.GetExpectedInstalledFiles(descriptor))
         {
-            var path = Path.Combine(modelDir, ModelStoragePaths.NormalizeRelativePath(asset.RelativePath));
+            var path = Path.Combine(modelDir, rel);
             if (!File.Exists(path))
                 return false;
         }

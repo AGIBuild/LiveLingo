@@ -1,5 +1,6 @@
 using LiveLingo.Core;
 using LiveLingo.Core.Models;
+using LiveLingo.Core.Speech;
 using LiveLingo.Core.Translation;
 
 namespace LiveLingo.Desktop.Services.Configuration;
@@ -64,6 +65,10 @@ public static class CoreOptionsSync
             : settings.Translation.OllamaProvider.PostProcessingModelId.Trim();
 
         target.InferenceThreads = settings.Advanced.InferenceThreads;
+        target.SpeechRoutingMode = ParseSpeechRoutingMode(settings.Speech.RoutingMode);
+        target.ActiveSttModelId = string.IsNullOrWhiteSpace(settings.Speech.ActiveModelId)
+            ? null
+            : settings.Speech.ActiveModelId.Trim();
         target.HuggingFaceMirror = string.IsNullOrWhiteSpace(settings.Advanced.HuggingFaceMirror)
             ? null
             : settings.Advanced.HuggingFaceMirror.Trim();
@@ -131,4 +136,9 @@ public static class CoreOptionsSync
         Enum.TryParse<TranslationRoutingMode>(routingMode, ignoreCase: true, out var parsed)
             ? parsed
             : TranslationRoutingMode.PreferLocal;
+
+    private static SttRoutingMode ParseSpeechRoutingMode(string? routingMode) =>
+        Enum.TryParse<SttRoutingMode>(routingMode, ignoreCase: true, out var parsed)
+            ? parsed
+            : SttRoutingMode.AccuracyFirst;
 }

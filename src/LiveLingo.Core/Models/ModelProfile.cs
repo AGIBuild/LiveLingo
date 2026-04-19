@@ -16,7 +16,8 @@ public enum ModelProviderKind
     Ollama,
     MarianOnnx,
     FastText,
-    WhisperCpp,
+    /// <summary>sherpa-onnx ASR runtime (Cohere Transcribe / Zipformer / Parakeet bundles).</summary>
+    SherpaOnnx,
     SileroVad
 }
 

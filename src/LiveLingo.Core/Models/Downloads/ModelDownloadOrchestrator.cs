@@ -14,6 +14,7 @@ internal sealed class ModelDownloadOrchestrator
 {
     private readonly CoreOptions _options;
     private readonly ModelAssetDownloader _assetDownloader;
+    private readonly ModelArchiveExtractor _archiveExtractor;
     private readonly InflightDownloadRegistry _inflight;
     private readonly ILogger _logger;
 
@@ -25,6 +26,7 @@ internal sealed class ModelDownloadOrchestrator
     {
         _options = options;
         _assetDownloader = assetDownloader;
+        _archiveExtractor = new ModelArchiveExtractor(logger);
         _inflight = inflight;
         _logger = logger;
     }
@@ -39,6 +41,28 @@ internal sealed class ModelDownloadOrchestrator
 
         if (File.Exists(manifestPath))
         {
+            // For archive-based models the asset is the .tar.bz2 itself, but after extraction
+            // only the unpacked files exist on disk. Validate against ExtractedFiles instead.
+            if (descriptor.ArchiveType != ModelArchiveType.None)
+            {
+                var missingExtracted = descriptor.ExtractedFiles
+                    .Where(rel => !File.Exists(Path.Combine(modelDir, ModelStoragePaths.NormalizeRelativePath(rel))))
+                    .ToArray();
+
+                if (missingExtracted.Length == 0)
+                {
+                    _logger.LogDebug("Model {Id} already installed at {Path}", descriptor.Id, modelDir);
+                    return Task.CompletedTask;
+                }
+
+                _logger.LogInformation(
+                    "Archive-based model {Id} is installed but missing {MissingCount} extracted files. Re-downloading and re-extracting.",
+                    descriptor.Id, missingExtracted.Length);
+
+                return _inflight.GetOrAdd(descriptor.Id, _ =>
+                    DownloadModelAsync(descriptor, modelDir, manifestPath, progress, ct));
+            }
+
             var missingAssets = ModelStoragePaths.GetExpectedAssets(descriptor)
                 .Where(asset => !File.Exists(Path.Combine(modelDir, ModelStoragePaths.NormalizeRelativePath(asset.RelativePath))))
                 .ToArray();
@@ -88,6 +112,8 @@ internal sealed class ModelDownloadOrchestrator
 
             await DownloadAssetSequenceAsync(descriptor.Id, modelDir, assets, totalBytes, progress, ct).ConfigureAwait(false);
 
+            ExtractIfArchive(descriptor, modelDir, assets);
+
             await WriteManifestAsync(descriptor, manifestPath, ct).ConfigureAwait(false);
             _logger.LogDebug("Model {Id} downloaded to {Path}", descriptor.Id, modelDir);
         }
@@ -100,6 +126,29 @@ internal sealed class ModelDownloadOrchestrator
         {
             _inflight.Release(descriptor.Id);
         }
+    }
+
+    /// <summary>
+    /// When the descriptor declares <see cref="ModelArchiveType.TarBz2"/> (or similar),
+    /// the downloaded payload is the archive itself. Extract it into the model directory
+    /// so callers can address the unpacked files via <see cref="ModelDescriptor.ExtractedFiles"/>.
+    /// </summary>
+    private void ExtractIfArchive(
+        ModelDescriptor descriptor,
+        string modelDir,
+        IReadOnlyList<ModelAsset> downloadedAssets)
+    {
+        if (descriptor.ArchiveType == ModelArchiveType.None)
+            return;
+
+        if (downloadedAssets.Count != 1)
+        {
+            throw new InvalidOperationException(
+                $"Archive-based model '{descriptor.Id}' must declare exactly one asset (the archive); found {downloadedAssets.Count}.");
+        }
+
+        var archivePath = Path.Combine(modelDir, ModelStoragePaths.NormalizeRelativePath(downloadedAssets[0].RelativePath));
+        _archiveExtractor.Extract(descriptor, archivePath, modelDir);
     }
 
     private async Task DownloadMissingAssetsAsync(

@@ -15,8 +15,22 @@ public class VoiceInputIntegrationTests
     private readonly IModelManager _modelManager = Substitute.For<IModelManager>();
     private static CancellationToken TestCt => TestContext.Current.CancellationToken;
 
-    private static readonly ModelDescriptor SttModel =
-        ModelRegistry.AllModels.First(m => m.Type == ModelType.SpeechToText);
+    private static readonly ModelDescriptor SttModel = ModelRegistry.SherpaCohereTranscribe14LangInt8;
+
+    private static ISpeechEngineSelector CreateSelector(ISpeechToTextEngine engine)
+    {
+        var selector = Substitute.For<ISpeechEngineSelector>();
+        selector.GetEngine().Returns(engine);
+        selector.GetActiveModel().Returns(SttModel);
+        return selector;
+    }
+
+    private static SpeechInputCoordinator CreateCoordinator(
+        IAudioCaptureService audio,
+        ISpeechToTextEngine stt,
+        IModelManager modelManager,
+        IVoiceActivityDetector? vad = null) =>
+        new(audio, CreateSelector(stt), modelManager, vad ?? new StubVoiceActivityDetector());
 
     [Fact]
     [Trait("Category", "Integration")]
@@ -26,7 +40,7 @@ public class VoiceInputIntegrationTests
         var stt = new FakeSpeechToTextEngine("hello world");
         SetupSttModelInstalled();
 
-        using var coordinator = new SpeechInputCoordinator(audio, stt, _modelManager, new StubVoiceActivityDetector());
+        using var coordinator = CreateCoordinator(audio, stt, _modelManager);
         var states = new List<VoiceInputState>();
         coordinator.StateChanged += s => states.Add(s);
 
@@ -52,7 +66,7 @@ public class VoiceInputIntegrationTests
         var stt = new FakeSpeechToTextEngine("text");
         SetupSttModelInstalled();
 
-        using var coordinator = new SpeechInputCoordinator(audio, stt, _modelManager, new StubVoiceActivityDetector());
+        using var coordinator = CreateCoordinator(audio, stt, _modelManager);
 
         var denied = await coordinator.StartRecordingAsync(ct: TestCt);
         Assert.False(denied.Success);
@@ -73,7 +87,7 @@ public class VoiceInputIntegrationTests
         var stt = new FakeSpeechToTextEngine("transcribed");
         _modelManager.ListInstalled().Returns(new List<InstalledModel>());
 
-        using var coordinator = new SpeechInputCoordinator(audio, stt, _modelManager, new StubVoiceActivityDetector());
+        using var coordinator = CreateCoordinator(audio, stt, _modelManager);
 
         var missing = await coordinator.StartRecordingAsync(ct: TestCt);
         Assert.False(missing.Success);
@@ -98,7 +112,7 @@ public class VoiceInputIntegrationTests
         var stt = new FakeSpeechToTextEngine("ignored");
         SetupSttModelInstalled();
 
-        using var coordinator = new SpeechInputCoordinator(audio, stt, _modelManager, new StubVoiceActivityDetector());
+        using var coordinator = CreateCoordinator(audio, stt, _modelManager);
         await coordinator.StartRecordingAsync(ct: TestCt);
         Assert.Equal(VoiceInputState.Recording, coordinator.State);
 
@@ -118,7 +132,7 @@ public class VoiceInputIntegrationTests
         var stt = new FakeSpeechToTextEngine("second try");
         SetupSttModelInstalled();
 
-        using var coordinator = new SpeechInputCoordinator(audio, stt, _modelManager, new StubVoiceActivityDetector());
+        using var coordinator = CreateCoordinator(audio, stt, _modelManager);
         await coordinator.StartRecordingAsync(ct: TestCt);
         coordinator.CancelCurrent();
 
@@ -138,7 +152,7 @@ public class VoiceInputIntegrationTests
         var stt = new FakeSpeechToTextEngine("ok") { ShouldFail = true };
         SetupSttModelInstalled();
 
-        using var coordinator = new SpeechInputCoordinator(audio, stt, _modelManager, new StubVoiceActivityDetector());
+        using var coordinator = CreateCoordinator(audio, stt, _modelManager);
         await coordinator.StartRecordingAsync(ct: TestCt);
         var failed = await coordinator.StopAndTranscribeAsync(ct: TestCt);
 
@@ -163,7 +177,7 @@ public class VoiceInputIntegrationTests
         var stt = new FakeSpeechToTextEngine("text");
         SetupSttModelInstalled();
 
-        using var coordinator = new SpeechInputCoordinator(audio, stt, _modelManager, new StubVoiceActivityDetector());
+        using var coordinator = CreateCoordinator(audio, stt, _modelManager);
         var first = await coordinator.StartRecordingAsync(ct: TestCt);
         Assert.True(first.Success);
 
@@ -182,7 +196,7 @@ public class VoiceInputIntegrationTests
         var stt = new FakeSpeechToTextEngine("text");
         SetupSttModelInstalled();
 
-        using var coordinator = new SpeechInputCoordinator(audio, stt, _modelManager, new StubVoiceActivityDetector());
+        using var coordinator = CreateCoordinator(audio, stt, _modelManager);
         var result = await coordinator.StopAndTranscribeAsync(ct: TestCt);
 
         Assert.False(result.Success);
@@ -198,7 +212,7 @@ public class VoiceInputIntegrationTests
         var stt = new FakeSpeechToTextEngine("text");
         SetupSttModelInstalled();
 
-        using var coordinator = new SpeechInputCoordinator(audio, stt, _modelManager, new StubVoiceActivityDetector());
+        using var coordinator = CreateCoordinator(audio, stt, _modelManager);
         var result = await coordinator.StartRecordingAsync(ct: TestCt);
 
         Assert.False(result.Success);
@@ -216,7 +230,7 @@ public class VoiceInputIntegrationTests
                 Arg.Any<CancellationToken>())
             .Returns<Task>(_ => throw new HttpRequestException("network error"));
 
-        using var coordinator = new SpeechInputCoordinator(audio, stt, _modelManager, new StubVoiceActivityDetector());
+        using var coordinator = CreateCoordinator(audio, stt, _modelManager);
         var result = await coordinator.EnsureSttModelAsync(ct: TestCt);
 
         Assert.False(result.Success);
@@ -240,7 +254,7 @@ public class VoiceInputIntegrationTests
         using var cts = new CancellationTokenSource();
         cts.Cancel();
 
-        using var coordinator = new SpeechInputCoordinator(audio, stt, _modelManager, new StubVoiceActivityDetector());
+        using var coordinator = CreateCoordinator(audio, stt, _modelManager);
         var result = await coordinator.EnsureSttModelAsync(ct: cts.Token);
 
         Assert.False(result.Success);
@@ -266,7 +280,7 @@ public class VoiceInputIntegrationTests
         var reported = new List<float>();
         var progress = new Progress<float>(v => reported.Add(v));
 
-        using var coordinator = new SpeechInputCoordinator(audio, stt, _modelManager, new StubVoiceActivityDetector());
+        using var coordinator = CreateCoordinator(audio, stt, _modelManager);
         var result = await coordinator.EnsureSttModelAsync(progress, TestCt);
 
         Assert.True(result.Success);
@@ -280,7 +294,7 @@ public class VoiceInputIntegrationTests
         var stt = new FakeSpeechToTextEngine("session");
         SetupSttModelInstalled();
 
-        using var coordinator = new SpeechInputCoordinator(audio, stt, _modelManager, new StubVoiceActivityDetector());
+        using var coordinator = CreateCoordinator(audio, stt, _modelManager);
 
         for (var i = 0; i < 3; i++)
         {
@@ -302,7 +316,7 @@ public class VoiceInputIntegrationTests
         var stt = new FakeSpeechToTextEngine("text");
         SetupSttModelInstalled();
 
-        var coordinator = new SpeechInputCoordinator(audio, stt, _modelManager, new StubVoiceActivityDetector());
+        var coordinator = CreateCoordinator(audio, stt, _modelManager);
         await coordinator.StartRecordingAsync(ct: TestCt);
         Assert.Equal(VoiceInputState.Recording, coordinator.State);
 
@@ -317,6 +331,7 @@ public class VoiceInputIntegrationTests
             new(SttModel.Id, SttModel.DisplayName, "/models/" + SttModel.Id,
                 SttModel.SizeBytes, SttModel.Type, DateTime.UtcNow)
         });
+        _modelManager.HasAllExpectedLocalAssets(SttModel).Returns(true);
     }
 
     /// <summary>
@@ -357,6 +372,8 @@ public class VoiceInputIntegrationTests
     private sealed class FakeSpeechToTextEngine(string text) : ISpeechToTextEngine
     {
         public bool ShouldFail { get; set; }
+
+        public IReadOnlyCollection<string> SupportedModelIds { get; } = [SttModel.Id];
 
         public Task<SpeechTranscriptionResult> TranscribeAsync(AudioCaptureResult audio, string? language = null, CancellationToken ct = default)
         {

@@ -14,7 +14,7 @@ public sealed class SpeechInputCoordinator : ISpeechInputCoordinator
     private const int BytesPerSample = 2;
 
     private readonly IAudioCaptureService _audioCapture;
-    private readonly ISpeechToTextEngine _sttEngine;
+    private readonly ISpeechEngineSelector _engineSelector;
     private readonly IModelManager _modelManager;
     private readonly IVoiceActivityDetector _vadDetector;
     private readonly ILogger<SpeechInputCoordinator>? _logger;
@@ -30,13 +30,13 @@ public sealed class SpeechInputCoordinator : ISpeechInputCoordinator
 
     public SpeechInputCoordinator(
         IAudioCaptureService audioCapture,
-        ISpeechToTextEngine sttEngine,
+        ISpeechEngineSelector engineSelector,
         IModelManager modelManager,
         IVoiceActivityDetector vadDetector,
         ILogger<SpeechInputCoordinator>? logger = null)
     {
         _audioCapture = audioCapture;
-        _sttEngine = sttEngine;
+        _engineSelector = engineSelector;
         _modelManager = modelManager;
         _vadDetector = vadDetector;
         _logger = logger;
@@ -62,17 +62,14 @@ public sealed class SpeechInputCoordinator : ISpeechInputCoordinator
                 "Microphone permission is required.");
         }
 
-        var sttModel = ModelRegistry.AllModels
-            .FirstOrDefault(m => m.Type == ModelType.SpeechToText);
-        if (sttModel is not null)
+        var sttModel = _engineSelector.GetActiveModel();
+        var installed = _modelManager.ListInstalled();
+        if (!installed.Any(m => m.Id == sttModel.Id) ||
+            !_modelManager.HasAllExpectedLocalAssets(sttModel))
         {
-            var installed = _modelManager.ListInstalled();
-            if (!installed.Any(m => m.Id == sttModel.Id))
-            {
-                SetState(VoiceInputState.Error);
-                return new SpeechInputResult(false, null, SpeechInputErrorCode.ModelMissing,
-                    "STT model is not installed. Please download it first.");
-            }
+            SetState(VoiceInputState.Error);
+            return new SpeechInputResult(false, null, SpeechInputErrorCode.ModelMissing,
+                $"STT model '{sttModel.DisplayName}' is not installed. Please download it first.");
         }
 
         try
@@ -133,7 +130,8 @@ public sealed class SpeechInputCoordinator : ISpeechInputCoordinator
 
             var lang = language ?? _recordingLanguage;
             var windowedAudio = CreateWindow(audio, FinalWindowSeconds);
-            var result = await _sttEngine.TranscribeAsync(windowedAudio, lang, _sessionCts.Token);
+            var engine = _engineSelector.GetEngine();
+            var result = await engine.TranscribeAsync(windowedAudio, lang, _sessionCts.Token);
             SetState(VoiceInputState.Idle);
             return new SpeechInputResult(true, result.Text, SpeechInputErrorCode.None);
         }
@@ -197,7 +195,8 @@ public sealed class SpeechInputCoordinator : ISpeechInputCoordinator
                 try
                 {
                     var windowBuffer = CreateWindow(buffer, PartialWindowSeconds);
-                    var result = await _sttEngine.TranscribeAsync(windowBuffer, _recordingLanguage, ct);
+                    var engine = _engineSelector.GetEngine();
+                    var result = await engine.TranscribeAsync(windowBuffer, _recordingLanguage, ct);
                     if (!string.IsNullOrWhiteSpace(result.Text))
                         PartialTranscription?.Invoke(result.Text);
                 }
@@ -248,11 +247,7 @@ public sealed class SpeechInputCoordinator : ISpeechInputCoordinator
         IProgress<float>? progress = null,
         CancellationToken ct = default)
     {
-        var sttModel = ModelRegistry.AllModels
-            .FirstOrDefault(m => m.Type == ModelType.SpeechToText);
-        if (sttModel is null)
-            return new SpeechInputResult(false, null, SpeechInputErrorCode.ModelMissing,
-                "No STT model defined in registry.");
+        var sttModel = _engineSelector.GetActiveModel();
 
         try
         {
