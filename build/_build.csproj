@@ -13,6 +13,10 @@
 
   <ItemGroup>
     <PackageReference Include="Nuke.Common" Version="10.1.0" />
+    <!-- Override vulnerable transitive deps pulled in by Nuke.Common 10.1.0.
+         Remove once Nuke.Common ships with these patched versions. -->
+    <PackageReference Include="NuGet.Packaging" Version="6.12.5" />
+    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.6" />
   </ItemGroup>
 
 </Project>
