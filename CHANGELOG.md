@@ -14,6 +14,48 @@ process-wide task with shared progress and dedup across every UI surface.
 
 ### Added
 
+- **Streaming STT segment-commit**: `ISpeechInputCoordinator` exposes
+  `SegmentCommitted` (immutable, append-only) and `PartialPreview` (transient,
+  replace-only). Each VAD-bounded utterance becomes its own segment, transcribed
+  exactly once, with a 60s safeguard for users who never pause. The recognizer
+  is serialized through a single `SemaphoreSlim` and previews skip themselves
+  whenever a real commit is in flight, so accuracy is never starved by
+  best-effort live previews.
+
+### Fixed
+
+- **Voice input no longer drops earlier sentences**: the previous design fed a
+  10s sliding window into STT for partial transcriptions and then overwrote
+  `OverlayViewModel.SourceText` with each new partial. Long utterances or
+  speakers who continued past the window lost the earlier audio entirely, and
+  `StopAndTranscribeAsync` finalized only the last 30s. The new segment-commit
+  flow streams every committed VAD segment through `SegmentCommitted`, the
+  overlay APPENDS to a per-session buffer, and `StopAndTranscribeAsync` drains
+  the uncommitted tail through the same channel before returning the full
+  concatenated transcript.
+- **Cross-thread crash on voice stop**: `SpeechInputCoordinator.SetState`,
+  `SegmentCommitted` and `PartialPreview` were synchronously firing on the STT
+  background thread, which let `OverlayViewModel` mutate observable properties
+  off the UI thread. The next `PropertyChanged` subscriber inside Avalonia
+  (`OverlayWindow.UpdateMicIconState`) then crashed with
+  `InvalidOperationException: The calling thread cannot access this object`.
+  Every coordinator handler now routes through a single `MarshalToUi` helper
+  that posts to the captured UI `SynchronizationContext`, matching the
+  pre-existing `OnDownloadStateChanged` pattern. (ViewModel still owns no
+  Avalonia.* dependency — only the BCL `SynchronizationContext`.)
+- **Voice STT mis-recognized as the wrong language**: `ToggleVoiceInputAsync`
+  unconditionally reset `SelectedVoiceLanguage = SelectedSourceLanguage` on
+  every Start, silently wiping any explicit voice-language pick from a previous
+  session, and a null pick was passed straight through to sherpa-onnx, which
+  then ran internal language ID and routinely mis-detected short Chinese
+  utterances as English / Japanese. The overlay now preserves an explicit pick
+  (`SelectedVoiceLanguage ??= SelectedSourceLanguage`) and always passes a
+  non-empty hint by walking the `voice → source pick → resolved source code`
+  fallback chain, biasing Cohere Transcribe / SenseVoice toward the language
+  the user is actually speaking.
+
+### Added (continued)
+
 - **Global model download visibility**: `IModelDownloadCoordinator` is now the
   sole UI-facing entry point for model downloads. `SetupWizardViewModel`,
   `SpeechInputCoordinator.EnsureSttModelAsync`, `OverlayViewModel` and the
@@ -92,6 +134,13 @@ process-wide task with shared progress and dedup across every UI surface.
   failure from `StateChanged`. `SetupWizardViewModel` now implements
   `IDisposable` so its coordinator subscription is released when the wizard
   window closes.
+- **`ISpeechInputCoordinator` event surface**: removed `PartialTranscription`
+  (single-shot, overwrite-style). Subscribers must migrate to
+  `SegmentCommitted` (append) and `PartialPreview` (replace). The contract for
+  `StopAndTranscribeAsync` is unchanged for callers using `result.Text` — it
+  now returns the concatenated transcript of the entire session, kept as a
+  one-shot fallback for any caller that doesn't subscribe to the streaming
+  events.
 
 ### Removed
 
@@ -113,6 +162,17 @@ process-wide task with shared progress and dedup across every UI surface.
 - `OverlayViewModelTests` gains coordinator-subscription scenarios (downloading
   STT progress, installed clears the link, failed exposes the link, non-STT
   events ignored, post-`Dispose` events are no-ops).
+- `OverlayVoiceInputTests` and `SpeechInputCoordinatorTests` rewritten around
+  the new event contract: append-not-replace across multiple committed
+  segments, preview replaced by commit, new-recording resets the per-session
+  buffer, tail shorter than `MinSegmentSeconds` is skipped, and the empty
+  preview is fired before idle.
+- `OverlayVoiceInputTests` adds three regressions for the cross-thread / wrong
+  language fixes: background-thread coordinator events post through a captured
+  `SynchronizationContext` (asserted via a tracking sync context),
+  `SelectedVoiceLanguage` is preserved across Start cycles, and STT receives a
+  non-null source-language hint even when no voice language is explicitly
+  picked.
 
 ## [0.1.4] - prior
 
