@@ -23,4 +23,13 @@ public interface IModelManager
     /// Clears automatic hf-mirror fallback so the next Hugging Face download tries the primary hub again.
     /// </summary>
     void ResetHuggingfaceTransportFallback();
+
+    /// <summary>
+    /// Removes residue of model ids no longer registered in <see cref="ModelRegistry"/>
+    /// (typically supplied from <see cref="ObsoleteModelRegistry.Ids"/>). Returns the total
+    /// bytes reclaimed; safe to call on every startup — missing directories are no-ops.
+    /// </summary>
+    Task<long> CleanObsoleteModelsAsync(
+        IEnumerable<string> obsoleteModelIds,
+        CancellationToken ct = default);
 }
