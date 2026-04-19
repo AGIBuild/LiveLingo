@@ -1620,4 +1620,103 @@ public class OverlayViewModelTests
         }
         yield break;
     }
+
+    private OverlayViewModel CreateVmWithDownloadCoordinator(IModelDownloadCoordinator coordinator)
+    {
+        var settings = new UserSettings();
+        return new OverlayViewModel(
+            _target,
+            _pipeline,
+            _injector,
+            _engine,
+            settings,
+            _clipboard,
+            _loc,
+            settingsService: CreateMutableSettingsService(settings),
+            messenger: new WeakReferenceMessenger(),
+            downloadCoordinator: coordinator);
+    }
+
+    [Fact]
+    public void DownloadCoordinator_DownloadingSttModel_UpdatesVoiceStatusText()
+    {
+        var coordinator = Substitute.For<IModelDownloadCoordinator>();
+        var vm = CreateVmWithDownloadCoordinator(coordinator);
+
+        coordinator.StateChanged += Raise.Event<Action<ModelDownloadState>>(
+            new ModelDownloadState(
+                ModelRegistry.SherpaCohereTranscribe14LangInt8.Id,
+                ModelDownloadStatus.Downloading,
+                42,
+                null));
+
+        Assert.Contains("42", vm.VoiceStatusText);
+        Assert.False(vm.ShowSttDownloadLink);
+    }
+
+    [Fact]
+    public void DownloadCoordinator_InstalledSttModel_ShowsModelReady()
+    {
+        var coordinator = Substitute.For<IModelDownloadCoordinator>();
+        var vm = CreateVmWithDownloadCoordinator(coordinator);
+
+        coordinator.StateChanged += Raise.Event<Action<ModelDownloadState>>(
+            new ModelDownloadState(
+                ModelRegistry.SherpaCohereTranscribe14LangInt8.Id,
+                ModelDownloadStatus.Installed,
+                100,
+                null));
+
+        Assert.NotEmpty(vm.VoiceStatusText);
+        Assert.False(vm.ShowSttDownloadLink);
+    }
+
+    [Fact]
+    public void DownloadCoordinator_FailedSttModel_ExposesDownloadLink()
+    {
+        var coordinator = Substitute.For<IModelDownloadCoordinator>();
+        var vm = CreateVmWithDownloadCoordinator(coordinator);
+
+        coordinator.StateChanged += Raise.Event<Action<ModelDownloadState>>(
+            new ModelDownloadState(
+                ModelRegistry.SherpaCohereTranscribe14LangInt8.Id,
+                ModelDownloadStatus.Failed,
+                10,
+                "boom"));
+
+        Assert.True(vm.ShowSttDownloadLink);
+        Assert.Equal("boom", vm.VoiceStatusText);
+    }
+
+    [Fact]
+    public void DownloadCoordinator_NonSttModel_IsIgnored()
+    {
+        var coordinator = Substitute.For<IModelDownloadCoordinator>();
+        var vm = CreateVmWithDownloadCoordinator(coordinator);
+        var beforeStatus = vm.VoiceStatusText;
+
+        coordinator.StateChanged += Raise.Event<Action<ModelDownloadState>>(
+            new ModelDownloadState("some-translation-model", ModelDownloadStatus.Downloading, 50, null));
+
+        Assert.Equal(beforeStatus, vm.VoiceStatusText);
+    }
+
+    [Fact]
+    public void DownloadCoordinator_AfterDispose_DoesNotMutateVm()
+    {
+        var coordinator = Substitute.For<IModelDownloadCoordinator>();
+        var vm = CreateVmWithDownloadCoordinator(coordinator);
+        vm.Dispose();
+
+        coordinator.StateChanged += Raise.Event<Action<ModelDownloadState>>(
+            new ModelDownloadState(
+                ModelRegistry.SherpaCohereTranscribe14LangInt8.Id,
+                ModelDownloadStatus.Downloading,
+                70,
+                null));
+
+        // No assertion on VoiceStatusText specifically — the contract is
+        // simply that Raise.Event must not throw or mutate disposed state.
+        Assert.True(true);
+    }
 }

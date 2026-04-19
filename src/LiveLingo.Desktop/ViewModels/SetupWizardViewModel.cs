@@ -6,6 +6,7 @@ using LiveLingo.Desktop.Platform;
 using LiveLingo.Desktop.Services.Configuration;
 using LiveLingo.Desktop.Services.LanguageCatalog;
 using LiveLingo.Desktop.Services.Localization;
+using LiveLingo.Desktop.ViewModels.Settings;
 using LiveLingo.Core;
 using LiveLingo.Core.Engines;
 using LiveLingo.Core.Models;
@@ -14,10 +15,11 @@ using Microsoft.Extensions.Logging;
 
 namespace LiveLingo.Desktop.ViewModels;
 
-public partial class SetupWizardViewModel : ObservableObject
+public partial class SetupWizardViewModel : ObservableObject, IDisposable
 {
     private readonly ISettingsService _settings;
     private readonly IModelManager? _modelManager;
+    private readonly IModelDownloadCoordinator _downloadCoordinator;
     private readonly IMessenger _messenger;
     private readonly ILogger<SetupWizardViewModel>? _logger;
     private readonly ILocalizationService? _localization;
@@ -26,7 +28,15 @@ public partial class SetupWizardViewModel : ObservableObject
     private readonly ILlmModelLoadCoordinator? _llmCoordinator;
     private readonly IPlatformServices? _platform;
     private readonly IModelCatalog _modelCatalog;
-    private CancellationTokenSource? _downloadCts;
+    private readonly Action<ModelDownloadState> _onCoordinatorStateChanged;
+    private readonly SynchronizationContext? _uiContext;
+    // The wizard downloads required models sequentially; the active descriptor /
+    // index pair lets coordinator state events update the right "(N/M) percent"
+    // status text without a separate per-model subscription.
+    private ModelDescriptor? _activeDescriptor;
+    private int _activeIndex;
+    private int _activeTotal;
+    private bool _disposed;
 
     [ObservableProperty] private int _currentStep;
     [ObservableProperty] private string _sourceLanguage = "zh";
@@ -108,7 +118,8 @@ public partial class SetupWizardViewModel : ObservableObject
         CoreOptions? coreOptions = null,
         ILlmModelLoadCoordinator? llmCoordinator = null,
         IPlatformServices? platformServices = null,
-        IModelCatalog? modelCatalog = null)
+        IModelCatalog? modelCatalog = null,
+        IModelDownloadCoordinator? downloadCoordinator = null)
     {
         _settings = settings;
         _modelManager = modelManager;
@@ -120,6 +131,12 @@ public partial class SetupWizardViewModel : ObservableObject
         _logger = logger;
         _localization = localization;
         _clipboard = clipboard;
+        // The wizard always observes the global coordinator so a download
+        // started here remains visible to Settings → Models, the overlay STT
+        // download link, and any future surface that subscribes. Tests that
+        // omit a coordinator get the no-op singleton.
+        _downloadCoordinator = downloadCoordinator ?? NullModelDownloadCoordinator.Instance;
+        _uiContext = SynchronizationContext.Current;
         TotalSteps = 3;
         StartStep = startStep;
         _currentStep = startStep;
@@ -133,6 +150,9 @@ public partial class SetupWizardViewModel : ObservableObject
             this,
             static (r, _) => r.RefreshHuggingFaceTokenUiState());
 
+        _onCoordinatorStateChanged = OnCoordinatorStateChanged;
+        _downloadCoordinator.StateChanged += _onCoordinatorStateChanged;
+
         RefreshModelInstalledState();
     }
 
@@ -144,7 +164,8 @@ public partial class SetupWizardViewModel : ObservableObject
 
     [RelayCommand]
     private void OpenAdvancedForHuggingFace() =>
-        _messenger.Send(new AppUiRequestMessage(new AppUiRequest(this, AppUiRequestKind.OpenSettings, 3)));
+        _messenger.Send(new AppUiRequestMessage(
+            new AppUiRequest(this, AppUiRequestKind.OpenSettings, (int)SettingsTab.Advanced)));
 
     [RelayCommand]
     private void OpenRequiredModelOnHuggingFace()
@@ -213,7 +234,6 @@ public partial class SetupWizardViewModel : ObservableObject
         DownloadProgress = 0;
         RefreshHuggingFaceTokenUiState();
         DownloadStatus = T("wizard.download.preparing", "Preparing downloads...");
-        _downloadCts = new CancellationTokenSource();
 
         try
         {
@@ -229,47 +249,69 @@ public partial class SetupWizardViewModel : ObservableObject
             for (var index = 0; index < requiredModels.Count; index++)
             {
                 var descriptor = requiredModels[index];
-                var modelIndex = index;
+                _activeDescriptor = descriptor;
+                _activeIndex = index;
+                _activeTotal = requiredModels.Count;
 
                 DownloadProgress = 0;
-                DownloadStatus = T(
-                    "wizard.download.modelProgress",
-                    "{0} ({1}/{2}) {3:F0}%",
-                    descriptor.DisplayName,
-                    modelIndex + 1,
-                    requiredModels.Count,
-                    0d);
+                DownloadStatus = FormatProgressStatus(descriptor, index, requiredModels.Count, 0d);
                 _logger?.LogInformation(
                     "Setup wizard model download started: {ModelId} ({Current}/{Total})",
                     descriptor.Id,
-                    modelIndex + 1,
+                    index + 1,
                     requiredModels.Count);
 
-                var progress = new Progress<ModelDownloadProgress>(p =>
-                {
-                    var modelProgress = Math.Clamp(p.Percentage, 0, 100);
-                    DownloadProgress = modelProgress;
-                    DownloadStatus = T(
-                        "wizard.download.modelProgress",
-                        "{0} ({1}/{2}) {3:F0}%",
-                        descriptor.DisplayName,
-                        modelIndex + 1,
-                        requiredModels.Count,
-                        modelProgress);
-                });
+                // StartAsync collapses to the in-flight task if Settings (or any
+                // other surface) is already downloading the same model — UI state
+                // for both surfaces stays consistent through the StateChanged event.
+                await _downloadCoordinator.StartAsync(descriptor);
 
-                await _modelManager.EnsureModelAsync(descriptor, progress, _downloadCts.Token);
+                var finalState = _downloadCoordinator.GetState(descriptor.Id);
+                if (finalState.Status == ModelDownloadStatus.Cancelled)
+                {
+                    HasError = false;
+                    DownloadStatus = T("wizard.download.cancelled", "Cancelled");
+                    _logger?.LogWarning("Setup wizard model download cancelled by user.");
+                    return;
+                }
+
+                if (finalState.Status == ModelDownloadStatus.Failed)
+                {
+                    HasError = true;
+                    if (finalState.ErrorMessage == ModelDownloadErrorCodes.HuggingFaceAuthorization)
+                    {
+                        DownloadStatus = T(
+                            "wizard.download.errorAuth",
+                            "Download failed: Hugging Face access denied. Add a read token under Settings → Advanced (huggingface.co/settings/tokens), click Save, then retry.");
+                        _logger?.LogError(
+                            "Setup wizard model download failed: Hugging Face authorization for {ModelId}.",
+                            descriptor.Id);
+                    }
+                    else
+                    {
+                        DownloadStatus = T(
+                            "wizard.download.error",
+                            "Download failed. You can download it manually from Hugging Face and place it in the models directory.",
+                            finalState.ErrorMessage ?? string.Empty);
+                        _logger?.LogError(
+                            "Setup wizard model download failed: {ModelId} reason={Reason}",
+                            descriptor.Id,
+                            finalState.ErrorMessage);
+                    }
+                    return;
+                }
+
                 DownloadProgress = 100;
                 DownloadStatus = T(
                     "wizard.download.modelDone",
                     "{0} ({1}/{2}) done",
                     descriptor.DisplayName,
-                    modelIndex + 1,
+                    index + 1,
                     requiredModels.Count);
                 _logger?.LogInformation(
                     "Setup wizard model download completed: {ModelId} ({Current}/{Total})",
                     descriptor.Id,
-                    modelIndex + 1,
+                    index + 1,
                     requiredModels.Count);
             }
 
@@ -277,45 +319,56 @@ public partial class SetupWizardViewModel : ObservableObject
             HasError = false;
             DownloadStatus = T("wizard.download.complete", "Download complete ✓");
         }
-        catch (OperationCanceledException)
-        {
-            HasError = false;
-            DownloadStatus = T("wizard.download.cancelled", "Cancelled");
-            _logger?.LogWarning("Setup wizard model download cancelled by user.");
-        }
-        catch (ModelDownloadAuthorizationException ex)
-        {
-            HasError = true;
-            DownloadStatus = T(
-                "wizard.download.errorAuth",
-                "Download failed: Hugging Face access denied. Add a read token under Settings → Advanced (huggingface.co/settings/tokens), click Save, then retry.");
-            _logger?.LogError(ex, "Setup wizard model download failed: Hugging Face authorization.");
-        }
-        catch (System.Net.Http.HttpRequestException ex) when (ex.Message.Contains("404") || ex.Message.Contains("401"))
-        {
-            HasError = true;
-            DownloadStatus = T("wizard.download.errorAuth", "Download failed. This model may require authorization on HuggingFace. Configure an access token under Settings → Advanced, or download manually into your models folder.");
-            _logger?.LogError(ex, "Setup wizard model download failed with HTTP error.");
-        }
-        catch (Exception ex)
-        {
-            HasError = true;
-            DownloadStatus = T("wizard.download.error", "Download failed. You can download it manually from Hugging Face and place it in the models directory.", ex.Message);
-            _logger?.LogError(ex, "Setup wizard model download failed.");
-        }
         finally
         {
+            _activeDescriptor = null;
             IsDownloading = false;
-            _downloadCts?.Dispose();
-            _downloadCts = null;
         }
     }
 
     [RelayCommand]
     private void CancelDownload()
     {
-        _downloadCts?.Cancel();
+        var current = _activeDescriptor;
+        if (current is not null)
+            _downloadCoordinator.Cancel(current.Id);
     }
+
+    private void OnCoordinatorStateChanged(ModelDownloadState state)
+    {
+        var current = _activeDescriptor;
+        if (current is null || !string.Equals(state.ModelId, current.Id, StringComparison.Ordinal))
+            return;
+
+        if (_uiContext is null)
+        {
+            ApplyCoordinatorState(state, current);
+            return;
+        }
+
+        _uiContext.Post(_ => ApplyCoordinatorState(state, current), null);
+    }
+
+    private void ApplyCoordinatorState(ModelDownloadState state, ModelDescriptor current)
+    {
+        if (_disposed) return;
+        // Same model that the active loop iteration is awaiting — only progress
+        // updates need wiring; terminal states are handled by the awaiting task.
+        if (state.Status != ModelDownloadStatus.Downloading) return;
+
+        var pct = Math.Clamp(state.Percentage, 0, 100);
+        DownloadProgress = pct;
+        DownloadStatus = FormatProgressStatus(current, _activeIndex, _activeTotal, pct);
+    }
+
+    private string FormatProgressStatus(ModelDescriptor descriptor, int index, int total, double percentage) =>
+        T(
+            "wizard.download.modelProgress",
+            "{0} ({1}/{2}) {3:F0}%",
+            descriptor.DisplayName,
+            index + 1,
+            total,
+            percentage);
 
     [RelayCommand]
     private async Task CopyUrlAsync()
@@ -381,5 +434,14 @@ public partial class SetupWizardViewModel : ObservableObject
         if (_localization is not null)
             return _localization.T(key, args);
         return args.Length == 0 ? fallback : string.Format(fallback, args);
+    }
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        _downloadCoordinator.StateChanged -= _onCoordinatorStateChanged;
+        _messenger.Unregister<SettingsChangedMessage>(this);
+        GC.SuppressFinalize(this);
     }
 }

@@ -1,7 +1,20 @@
+using System.ComponentModel;
+
 namespace LiveLingo.Core.Models;
 
 public interface IModelManager
 {
+    /// <summary>
+    /// Low-level "fetch model bytes to disk" primitive. Prefer
+    /// <see cref="IModelDownloadCoordinator.StartAsync"/> for any UI-visible
+    /// download — the coordinator is the single source of truth for download
+    /// progress / state across the Settings, Wizard, and Overlay surfaces, and
+    /// it deduplicates concurrent calls. Direct callers of this method bypass
+    /// that observability and should be limited to engines performing internal,
+    /// non-user-facing on-demand model loads (where byte-level dedup is still
+    /// provided by InflightDownloadRegistry).
+    /// </summary>
+    [EditorBrowsable(EditorBrowsableState.Advanced)]
     Task EnsureModelAsync(
         ModelDescriptor descriptor,
         IProgress<ModelDownloadProgress>? progress = null,

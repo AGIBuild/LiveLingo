@@ -38,7 +38,12 @@ public class VoiceOverlayIntegrationTests
     }
 
     private SpeechInputCoordinator CreateCoordinator(IAudioCaptureService audio, ISpeechToTextEngine stt) =>
-        new(audio, CreateSelector(stt), _modelManager, new StubVoiceActivityDetector());
+        new(
+            audio,
+            CreateSelector(stt),
+            _modelManager,
+            new StubVoiceActivityDetector(),
+            new InProcessModelDownloadCoordinator(_modelManager));
 
     [Fact]
     [Trait("Category", "Integration")]

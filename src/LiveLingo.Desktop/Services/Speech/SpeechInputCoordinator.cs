@@ -16,6 +16,7 @@ public sealed class SpeechInputCoordinator : ISpeechInputCoordinator
     private readonly IAudioCaptureService _audioCapture;
     private readonly ISpeechEngineSelector _engineSelector;
     private readonly IModelManager _modelManager;
+    private readonly IModelDownloadCoordinator _downloadCoordinator;
     private readonly IVoiceActivityDetector _vadDetector;
     private readonly ILogger<SpeechInputCoordinator>? _logger;
     private readonly object _gate = new();
@@ -33,11 +34,13 @@ public sealed class SpeechInputCoordinator : ISpeechInputCoordinator
         ISpeechEngineSelector engineSelector,
         IModelManager modelManager,
         IVoiceActivityDetector vadDetector,
+        IModelDownloadCoordinator downloadCoordinator,
         ILogger<SpeechInputCoordinator>? logger = null)
     {
         _audioCapture = audioCapture;
         _engineSelector = engineSelector;
         _modelManager = modelManager;
+        _downloadCoordinator = downloadCoordinator;
         _vadDetector = vadDetector;
         _logger = logger;
     }
@@ -251,19 +254,16 @@ public sealed class SpeechInputCoordinator : ISpeechInputCoordinator
 
         try
         {
-            var downloadProgress = progress is not null
-                ? new Progress<ModelDownloadProgress>(p =>
-                    progress.Report(p.TotalBytes > 0
-                        ? (float)p.BytesDownloaded / p.TotalBytes
-                        : 0f))
-                : null;
-
-            await _modelManager.EnsureModelAsync(sttModel, downloadProgress, ct);
+            var sttResult = await EnsureModelViaCoordinatorAsync(sttModel, progress, ct).ConfigureAwait(false);
+            if (!sttResult.Success) return sttResult;
 
             var vadModel = ModelRegistry.AllModels
                 .FirstOrDefault(m => m.Type == ModelType.VoiceActivityDetection);
             if (vadModel is not null)
-                await _modelManager.EnsureModelAsync(vadModel, null, ct);
+            {
+                var vadResult = await EnsureModelViaCoordinatorAsync(vadModel, null, ct).ConfigureAwait(false);
+                if (!vadResult.Success) return vadResult;
+            }
 
             return new SpeechInputResult(true, null, SpeechInputErrorCode.None);
         }
@@ -276,6 +276,74 @@ public sealed class SpeechInputCoordinator : ISpeechInputCoordinator
             _logger?.LogError(ex, "STT model download failed");
             return new SpeechInputResult(false, null, SpeechInputErrorCode.TranscriptionFailed,
                 ex.Message);
+        }
+    }
+
+    /// <summary>
+    /// Routes the download through the global coordinator so progress/state is
+    /// visible to every UI surface and concurrent calls collapse into a single
+    /// download. The optional <paramref name="progress"/> reporter forwards the
+    /// coordinator's percent updates to callers that want a local stream.
+    /// </summary>
+    private async Task<SpeechInputResult> EnsureModelViaCoordinatorAsync(
+        ModelDescriptor descriptor,
+        IProgress<float>? progress,
+        CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+
+        var initial = _downloadCoordinator.GetState(descriptor.Id);
+        if (initial.IsInstalled)
+            return new SpeechInputResult(true, null, SpeechInputErrorCode.None);
+
+        Action<ModelDownloadState>? handler = null;
+        if (progress is not null)
+        {
+            handler = state =>
+            {
+                if (!string.Equals(state.ModelId, descriptor.Id, StringComparison.Ordinal)) return;
+                if (state.Status == ModelDownloadStatus.Downloading)
+                    progress.Report((float)(Math.Clamp(state.Percentage, 0, 100) / 100.0));
+            };
+            _downloadCoordinator.StateChanged += handler;
+        }
+
+        try
+        {
+            // StartAsync is dedup-safe — concurrent callers attach to the same
+            // session. The local cancellation token only aborts our wait; the
+            // global download keeps going for any other observer.
+            var startTask = _downloadCoordinator.StartAsync(descriptor);
+
+            if (ct.CanBeCanceled)
+            {
+                var ctTcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                using var reg = ct.Register(() => ctTcs.TrySetResult());
+                var winner = await Task.WhenAny(startTask, ctTcs.Task).ConfigureAwait(false);
+                if (winner != startTask)
+                    throw new OperationCanceledException(ct);
+            }
+            else
+            {
+                await startTask.ConfigureAwait(false);
+            }
+
+            var finalState = _downloadCoordinator.GetState(descriptor.Id);
+            return finalState.Status switch
+            {
+                ModelDownloadStatus.Installed =>
+                    new SpeechInputResult(true, null, SpeechInputErrorCode.None),
+                ModelDownloadStatus.Cancelled =>
+                    new SpeechInputResult(false, null, SpeechInputErrorCode.Cancelled),
+                _ =>
+                    new SpeechInputResult(false, null, SpeechInputErrorCode.TranscriptionFailed,
+                        finalState.ErrorMessage ?? "Model download failed."),
+            };
+        }
+        finally
+        {
+            if (handler is not null)
+                _downloadCoordinator.StateChanged -= handler;
         }
     }
 

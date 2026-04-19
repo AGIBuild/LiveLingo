@@ -13,16 +13,20 @@ public class SpeechInputCoordinatorTests
     private readonly IModelManager _modelManager = Substitute.For<IModelManager>();
     private readonly IVoiceActivityDetector _vadDetector = Substitute.For<IVoiceActivityDetector>();
     private readonly ISpeechEngineSelector _engineSelector = Substitute.For<ISpeechEngineSelector>();
+    // Real coordinator wrapping the substitute model manager — keeps the global
+    // download dedup behaviour under test instead of a mock-on-mock pyramid.
+    private readonly InProcessModelDownloadCoordinator _downloadCoordinator;
     private static CancellationToken TestCt => TestContext.Current.CancellationToken;
 
     public SpeechInputCoordinatorTests()
     {
         _engineSelector.GetEngine().Returns(_sttEngine);
         _engineSelector.GetActiveModel().Returns(ModelRegistry.SherpaCohereTranscribe14LangInt8);
+        _downloadCoordinator = new InProcessModelDownloadCoordinator(_modelManager);
     }
 
     private SpeechInputCoordinator CreateCoordinator() =>
-        new(_audioCapture, _engineSelector, _modelManager, _vadDetector);
+        new(_audioCapture, _engineSelector, _modelManager, _vadDetector, _downloadCoordinator);
 
     [Fact]
     public async Task StartRecording_PermissionDenied_ReturnsError()
