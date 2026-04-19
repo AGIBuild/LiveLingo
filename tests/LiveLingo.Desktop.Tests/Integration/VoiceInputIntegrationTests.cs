@@ -30,7 +30,12 @@ public class VoiceInputIntegrationTests
         ISpeechToTextEngine stt,
         IModelManager modelManager,
         IVoiceActivityDetector? vad = null) =>
-        new(audio, CreateSelector(stt), modelManager, vad ?? new StubVoiceActivityDetector());
+        new(
+            audio,
+            CreateSelector(stt),
+            modelManager,
+            vad ?? new StubVoiceActivityDetector(),
+            new InProcessModelDownloadCoordinator(modelManager));
 
     [Fact]
     [Trait("Category", "Integration")]

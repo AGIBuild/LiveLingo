@@ -3,6 +3,7 @@ using LiveLingo.Desktop.Services.LanguageCatalog;
 using LiveLingo.Desktop.Messaging;
 using LiveLingo.Desktop.Platform;
 using LiveLingo.Desktop.ViewModels;
+using LiveLingo.Desktop.ViewModels.Settings;
 using CommunityToolkit.Mvvm.Messaging;
 using LiveLingo.Core;
 using LiveLingo.Core.Engines;
@@ -15,14 +16,15 @@ namespace LiveLingo.Desktop.Tests.ViewModels;
 
 public class SetupWizardViewModelTests
 {
-    private static (SetupWizardViewModel vm, ISettingsService settings, IModelManager models) Create(
+    private static (SetupWizardViewModel vm, ISettingsService settings, IModelManager models, IModelDownloadCoordinator coordinator) Create(
         int startStep = 0,
         IMessenger? messenger = null,
         ILlmModelLoadCoordinator? llmCoordinator = null,
         IReadOnlyList<InstalledModel>? installedModels = null,
         IClipboardService? clipboard = null,
         CoreOptions? coreOptions = null,
-        IPlatformServices? platformServices = null)
+        IPlatformServices? platformServices = null,
+        IModelDownloadCoordinator? downloadCoordinator = null)
     {
         var current = new UserSettings();
         var settings = Substitute.For<ISettingsService>();
@@ -33,6 +35,9 @@ public class SetupWizardViewModelTests
         var models = Substitute.For<IModelManager>();
         models.ListInstalled().Returns(installedModels ?? []);
         models.HasAllExpectedLocalAssets(Arg.Any<ModelDescriptor>()).Returns(true);
+        // Default coordinator: marks every requested download as Installed so the
+        // happy-path tests don't have to set up StartAsync / GetState themselves.
+        var coordinator = downloadCoordinator ?? CreateAlwaysInstalledCoordinator();
         var vm = new SetupWizardViewModel(
             settings,
             models,
@@ -41,14 +46,25 @@ public class SetupWizardViewModelTests
             clipboard: clipboard,
             coreOptions: coreOptions,
             llmCoordinator: llmCoordinator,
-            platformServices: platformServices);
-        return (vm, settings, models);
+            platformServices: platformServices,
+            downloadCoordinator: coordinator);
+        return (vm, settings, models, coordinator);
+    }
+
+    private static IModelDownloadCoordinator CreateAlwaysInstalledCoordinator()
+    {
+        var coordinator = Substitute.For<IModelDownloadCoordinator>();
+        coordinator.StartAsync(Arg.Any<ModelDescriptor>()).Returns(Task.CompletedTask);
+        coordinator.GetState(Arg.Any<string>())
+            .Returns(call => new ModelDownloadState(
+                call.Arg<string>(), ModelDownloadStatus.Installed, 100, null));
+        return coordinator;
     }
 
     [Fact]
     public void InitialState()
     {
-        var (vm, _, _) = Create();
+        var (vm, _, _, _) = Create();
 
         Assert.Equal(0, vm.CurrentStep);
         Assert.Equal("zh", vm.SourceLanguage);
@@ -63,14 +79,14 @@ public class SetupWizardViewModelTests
     [Fact]
     public void TotalSteps_Is3()
     {
-        var (vm, _, _) = Create();
+        var (vm, _, _, _) = Create();
         Assert.Equal(3, vm.TotalSteps);
     }
 
     [Fact]
     public void Navigation_Forward_AllSteps()
     {
-        var (vm, _, _) = Create();
+        var (vm, _, _, _) = Create();
 
         vm.GoNextCommand.Execute(null);
         Assert.Equal(1, vm.CurrentStep);
@@ -87,7 +103,7 @@ public class SetupWizardViewModelTests
     [Fact]
     public void Navigation_Backward()
     {
-        var (vm, _, _) = Create();
+        var (vm, _, _, _) = Create();
 
         vm.GoNextCommand.Execute(null);
         vm.GoBackCommand.Execute(null);
@@ -99,7 +115,7 @@ public class SetupWizardViewModelTests
     [Fact]
     public void GoBack_NoOp_AtFirstStep()
     {
-        var (vm, _, _) = Create();
+        var (vm, _, _, _) = Create();
         vm.GoBackCommand.Execute(null);
         Assert.Equal(0, vm.CurrentStep);
     }
@@ -107,7 +123,7 @@ public class SetupWizardViewModelTests
     [Fact]
     public void GoNext_NoOp_AtLastStep()
     {
-        var (vm, _, _) = Create();
+        var (vm, _, _, _) = Create();
         vm.GoNextCommand.Execute(null);
         vm.GoNextCommand.Execute(null);
         vm.GoNextCommand.Execute(null);
@@ -117,7 +133,7 @@ public class SetupWizardViewModelTests
     [Fact]
     public void StartStep_SkipsToModelDownload()
     {
-        var (vm, _, _) = Create(startStep: 2);
+        var (vm, _, _, _) = Create(startStep: 2);
 
         Assert.Equal(2, vm.CurrentStep);
         Assert.True(vm.IsStep2);
@@ -128,7 +144,7 @@ public class SetupWizardViewModelTests
     [Fact]
     public void StartStep_CanGoBackOnlyToStartStep()
     {
-        var (vm, _, _) = Create(startStep: 1);
+        var (vm, _, _, _) = Create(startStep: 1);
 
         Assert.Equal(1, vm.CurrentStep);
         Assert.False(vm.CanGoBack);
@@ -148,7 +164,7 @@ public class SetupWizardViewModelTests
     [Fact]
     public async Task FinishCommand_SavesSettings()
     {
-        var (vm, settings, _) = Create();
+        var (vm, settings, _, _) = Create();
         vm.SourceLanguage = "ja";
         vm.TargetLanguage = "zh";
         vm.OverlayHotkey = "Alt+Space";
@@ -166,7 +182,7 @@ public class SetupWizardViewModelTests
         AppUiRequestKind? receivedKind = null;
         messenger.Register<object, AppUiRequestMessage>(recipient, (_, message) =>
             receivedKind = message.Value.Kind);
-        var (vm, _, _) = Create(messenger: messenger);
+        var (vm, _, _, _) = Create(messenger: messenger);
 
         await vm.FinishCommand.ExecuteAsync(null);
 
@@ -176,7 +192,7 @@ public class SetupWizardViewModelTests
     [Fact]
     public void DisplayStep_MatchesCurrentStepPlusOne()
     {
-        var (vm, _, _) = Create();
+        var (vm, _, _, _) = Create();
         Assert.Equal(1, vm.DisplayStep);
 
         vm.GoNextCommand.Execute(null);
@@ -189,7 +205,7 @@ public class SetupWizardViewModelTests
     [Fact]
     public void OnStepChanged_NotifiesAllNavigationProperties()
     {
-        var (vm, _, _) = Create();
+        var (vm, _, _, _) = Create();
         var changed = new List<string?>();
         vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
 
@@ -208,7 +224,7 @@ public class SetupWizardViewModelTests
     [Fact]
     public async Task FinishCommand_SavesCorrectLanguageValues()
     {
-        var (vm, settings, _) = Create();
+        var (vm, settings, _, _) = Create();
         vm.SourceLanguage = "ja";
         vm.TargetLanguage = "zh";
         vm.OverlayHotkey = "Alt+Space";
@@ -231,7 +247,7 @@ public class SetupWizardViewModelTests
         var installed = ModelRegistry.GetRequiredModelsForLanguagePair("zh", "en")
             .Select(m => new InstalledModel(m.Id, m.DisplayName, "/p", m.SizeBytes, m.Type, DateTime.UtcNow))
             .ToArray();
-        var (vm, _, _) = Create(llmCoordinator: coordinator, installedModels: installed);
+        var (vm, _, _, _) = Create(llmCoordinator: coordinator, installedModels: installed);
 
         await vm.FinishCommand.ExecuteAsync(null);
 
@@ -242,7 +258,7 @@ public class SetupWizardViewModelTests
     public async Task FinishCommand_WhenModelsNotInstalled_DoesNotRequestLlmRetry()
     {
         var coordinator = Substitute.For<ILlmModelLoadCoordinator>();
-        var (vm, _, _) = Create(llmCoordinator: coordinator);
+        var (vm, _, _, _) = Create(llmCoordinator: coordinator);
 
         await vm.FinishCommand.ExecuteAsync(null);
 
@@ -252,10 +268,8 @@ public class SetupWizardViewModelTests
     [Fact]
     public async Task DownloadModelAsync_SetsInstalledOnSuccess()
     {
-        var (vm, _, models) = Create(startStep: 2);
-
-        models.EnsureModelAsync(Arg.Any<ModelDescriptor>(), Arg.Any<IProgress<ModelDownloadProgress>?>(), Arg.Any<CancellationToken>())
-            .Returns(Task.CompletedTask);
+        // Default coordinator from Create() reports Installed for every requested model.
+        var (vm, _, _, _) = Create(startStep: 2);
 
         await vm.DownloadModelCommand.ExecuteAsync(null);
 
@@ -267,26 +281,31 @@ public class SetupWizardViewModelTests
     [Fact]
     public async Task DownloadModelAsync_ShowsPerModelProgressWithOrderLabel()
     {
-        var (vm, _, models) = Create(startStep: 2);
+        var coordinator = Substitute.For<IModelDownloadCoordinator>();
+        coordinator.StartAsync(Arg.Any<ModelDescriptor>())
+            .Returns(call =>
+            {
+                var descriptor = call.Arg<ModelDescriptor>();
+                // Drive coordinator-style progress events the same way the production
+                // coordinator would publish them, so the wizard's StateChanged handler
+                // updates DownloadStatus mid-download.
+                coordinator.StateChanged += Raise.Event<Action<ModelDownloadState>>(
+                    new ModelDownloadState(descriptor.Id, ModelDownloadStatus.Downloading, 50, null));
+                coordinator.StateChanged += Raise.Event<Action<ModelDownloadState>>(
+                    new ModelDownloadState(descriptor.Id, ModelDownloadStatus.Downloading, 100, null));
+                return Task.CompletedTask;
+            });
+        coordinator.GetState(Arg.Any<string>())
+            .Returns(call => new ModelDownloadState(
+                call.Arg<string>(), ModelDownloadStatus.Installed, 100, null));
+        var (vm, _, _, _) = Create(startStep: 2, downloadCoordinator: coordinator);
+
         var statusHistory = new List<string>();
         vm.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(vm.DownloadStatus) && !string.IsNullOrWhiteSpace(vm.DownloadStatus))
                 statusHistory.Add(vm.DownloadStatus!);
         };
-
-        models.EnsureModelAsync(
-                Arg.Any<ModelDescriptor>(),
-                Arg.Any<IProgress<ModelDownloadProgress>?>(),
-                Arg.Any<CancellationToken>())
-            .Returns(call =>
-            {
-                var descriptor = call.Arg<ModelDescriptor>();
-                var progress = call.Arg<IProgress<ModelDownloadProgress>?>();
-                progress?.Report(new ModelDownloadProgress(descriptor.Id, descriptor.SizeBytes / 2, descriptor.SizeBytes));
-                progress?.Report(new ModelDownloadProgress(descriptor.Id, descriptor.SizeBytes, descriptor.SizeBytes));
-                return Task.CompletedTask;
-            });
 
         await vm.DownloadModelCommand.ExecuteAsync(null);
 
@@ -296,22 +315,25 @@ public class SetupWizardViewModelTests
     [Fact]
     public async Task DownloadModelAsync_ShowsErrorOnFailure()
     {
-        var (vm, _, models) = Create(startStep: 2);
-
-        models.EnsureModelAsync(Arg.Any<ModelDescriptor>(), Arg.Any<IProgress<ModelDownloadProgress>?>(), Arg.Any<CancellationToken>())
-            .Returns<Task>(_ => throw new InvalidOperationException("Network error"));
+        var coordinator = Substitute.For<IModelDownloadCoordinator>();
+        coordinator.StartAsync(Arg.Any<ModelDescriptor>()).Returns(Task.CompletedTask);
+        coordinator.GetState(Arg.Any<string>())
+            .Returns(call => new ModelDownloadState(
+                call.Arg<string>(), ModelDownloadStatus.Failed, 0, "Network error"));
+        var (vm, _, _, _) = Create(startStep: 2, downloadCoordinator: coordinator);
 
         await vm.DownloadModelCommand.ExecuteAsync(null);
 
         Assert.False(vm.IsModelInstalled);
         Assert.False(vm.IsDownloading);
+        Assert.True(vm.HasError);
         Assert.Contains("Download failed. You can download it manually from", vm.DownloadStatus!);
     }
 
     [Fact]
     public async Task DownloadModelAsync_SkipsWhenAlreadyInstalled()
     {
-        var (vm, _, models) = Create();
+        var (_, _, models, coordinator) = Create();
         var installed = ModelRegistry.GetRequiredModelsForLanguagePair("zh", "en")
             .Select(m => new InstalledModel(m.Id, m.DisplayName, "/path", m.SizeBytes, m.Type, DateTime.UtcNow))
             .ToArray();
@@ -320,26 +342,77 @@ public class SetupWizardViewModelTests
         var stubSettings = Substitute.For<ISettingsService>();
         stubSettings.Current.Returns(new UserSettings());
         stubSettings.CloneCurrent().Returns(new UserSettings());
-        var vm2 = new SetupWizardViewModel(stubSettings, models);
+        var vm2 = new SetupWizardViewModel(stubSettings, models, downloadCoordinator: coordinator);
         Assert.True(vm2.IsModelInstalled);
 
         await vm2.DownloadModelCommand.ExecuteAsync(null);
-        await models.DidNotReceive().EnsureModelAsync(Arg.Any<ModelDescriptor>(), Arg.Any<IProgress<ModelDownloadProgress>?>(), Arg.Any<CancellationToken>());
+        await coordinator.DidNotReceive().StartAsync(Arg.Any<ModelDescriptor>());
     }
 
     [Fact]
     public async Task DownloadModelAsync_HandlesCancellation()
     {
-        var (vm, _, models) = Create(startStep: 2);
-
-        models.EnsureModelAsync(Arg.Any<ModelDescriptor>(), Arg.Any<IProgress<ModelDownloadProgress>?>(), Arg.Any<CancellationToken>())
-            .Returns<Task>(_ => throw new OperationCanceledException());
+        var coordinator = Substitute.For<IModelDownloadCoordinator>();
+        coordinator.StartAsync(Arg.Any<ModelDescriptor>()).Returns(Task.CompletedTask);
+        coordinator.GetState(Arg.Any<string>())
+            .Returns(call => new ModelDownloadState(
+                call.Arg<string>(), ModelDownloadStatus.Cancelled, 0, null));
+        var (vm, _, _, _) = Create(startStep: 2, downloadCoordinator: coordinator);
 
         await vm.DownloadModelCommand.ExecuteAsync(null);
 
         Assert.False(vm.IsModelInstalled);
         Assert.False(vm.IsDownloading);
         Assert.Equal("Cancelled", vm.DownloadStatus);
+    }
+
+    [Fact]
+    public void CancelDownload_RoutesToCoordinatorForActiveDescriptor()
+    {
+        var coordinator = Substitute.For<IModelDownloadCoordinator>();
+        // Start returns a task that never completes so we can cancel mid-flight.
+        coordinator.StartAsync(Arg.Any<ModelDescriptor>())
+            .Returns(_ => new TaskCompletionSource<bool>().Task);
+        var (vm, _, _, _) = Create(startStep: 2, downloadCoordinator: coordinator);
+
+        // Kick off but don't await — leaves the wizard in the "active descriptor" state.
+        _ = vm.DownloadModelCommand.ExecuteAsync(null);
+
+        vm.CancelDownloadCommand.Execute(null);
+
+        coordinator.Received().Cancel(Arg.Any<string>());
+    }
+
+    [Fact]
+    public async Task DownloadModelAsync_HuggingFaceAuth_ShowsAuthRecoveryMessage()
+    {
+        var coordinator = Substitute.For<IModelDownloadCoordinator>();
+        coordinator.StartAsync(Arg.Any<ModelDescriptor>()).Returns(Task.CompletedTask);
+        coordinator.GetState(Arg.Any<string>())
+            .Returns(call => new ModelDownloadState(
+                call.Arg<string>(),
+                ModelDownloadStatus.Failed,
+                0,
+                ModelDownloadErrorCodes.HuggingFaceAuthorization));
+        var (vm, _, _, _) = Create(startStep: 2, downloadCoordinator: coordinator);
+
+        await vm.DownloadModelCommand.ExecuteAsync(null);
+
+        Assert.True(vm.HasError);
+        Assert.Contains("token", vm.DownloadStatus!, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Dispose_UnsubscribesFromCoordinator()
+    {
+        var coordinator = Substitute.For<IModelDownloadCoordinator>();
+        var (vm, _, _, _) = Create(downloadCoordinator: coordinator);
+
+        vm.Dispose();
+
+        // After dispose, raised events must not throw or call back into the wizard.
+        coordinator.StateChanged += Raise.Event<Action<ModelDownloadState>>(
+            new ModelDownloadState("any", ModelDownloadStatus.Downloading, 50, null));
     }
 
     [Fact]
@@ -363,21 +436,6 @@ public class SetupWizardViewModelTests
     }
 
     [Fact]
-    public async Task DownloadModelAsync_ShowsAuthorizationRecoveryMessage_OnAuthFailure()
-    {
-        var (vm, _, models) = Create(startStep: 2);
-
-        models.EnsureModelAsync(Arg.Any<ModelDescriptor>(), Arg.Any<IProgress<ModelDownloadProgress>?>(), Arg.Any<CancellationToken>())
-            .Returns<Task>(_ => throw new ModelDownloadAuthorizationException("forbidden"));
-
-        await vm.DownloadModelCommand.ExecuteAsync(null);
-
-        Assert.True(vm.HasError);
-        Assert.Contains("token", vm.DownloadStatus!, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("Settings", vm.DownloadStatus!, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
     public void OpenAdvancedForHuggingFaceCommand_SendsOpenSettingsAdvancedRequest()
     {
         var messenger = new WeakReferenceMessenger();
@@ -385,13 +443,13 @@ public class SetupWizardViewModelTests
         AppUiRequest? received = null;
         messenger.Register<object, AppUiRequestMessage>(recipient, (_, message) =>
             received = message.Value);
-        var (vm, _, _) = Create(messenger: messenger);
+        var (vm, _, _, _) = Create(messenger: messenger);
 
         vm.OpenAdvancedForHuggingFaceCommand.Execute(null);
 
         Assert.NotNull(received);
         Assert.Equal(AppUiRequestKind.OpenSettings, received!.Kind);
-        Assert.Equal(3, received.SettingsInitialTabIndex);
+        Assert.Equal((int)SettingsTab.Advanced, received.SettingsInitialTabIndex);
     }
 
     [Fact]
@@ -399,7 +457,7 @@ public class SetupWizardViewModelTests
     {
         var messenger = new WeakReferenceMessenger();
         var coreOptions = new CoreOptions();
-        var (vm, _, _) = Create(messenger: messenger, coreOptions: coreOptions);
+        var (vm, _, _, _) = Create(messenger: messenger, coreOptions: coreOptions);
 
         Assert.False(vm.HasHuggingFaceTokenConfigured);
         Assert.True(vm.ShowHuggingFaceTokenMissingCallout);
@@ -415,7 +473,7 @@ public class SetupWizardViewModelTests
     public async Task CopyUrlCommand_CopiesRequiredModelDownloadUrl()
     {
         var clipboard = Substitute.For<IClipboardService>();
-        var (vm, _, _) = Create(startStep: 2, clipboard: clipboard);
+        var (vm, _, _, _) = Create(startStep: 2, clipboard: clipboard);
 
         await vm.CopyUrlCommand.ExecuteAsync(null);
 
@@ -426,7 +484,7 @@ public class SetupWizardViewModelTests
     public void OpenRequiredModelOnHuggingFaceCommand_OpensResolvedModelCardUrl()
     {
         var platform = Substitute.For<IPlatformServices>();
-        var (vm, _, _) = Create(startStep: 2, platformServices: platform);
+        var (vm, _, _, _) = Create(startStep: 2, platformServices: platform);
 
         vm.OpenRequiredModelOnHuggingFaceCommand.Execute(null);
 
@@ -439,7 +497,7 @@ public class SetupWizardViewModelTests
         var installed = ModelRegistry.GetRequiredModelsForLanguagePair("zh", "en")
             .Select(m => new InstalledModel(m.Id, m.DisplayName, "/path", m.SizeBytes, m.Type, DateTime.UtcNow))
             .ToArray();
-        var (vm, _, models) = Create(installedModels: installed);
+        var (vm, _, models, coordinator) = Create(installedModels: installed);
 
         Assert.True(vm.IsModelInstalled);
 
@@ -452,7 +510,7 @@ public class SetupWizardViewModelTests
     [Fact]
     public void ShowOpenRequiredModelOnHuggingFace_IsFalseWithoutPlatform()
     {
-        var (vm, _, _) = Create(startStep: 2);
+        var (vm, _, _, _) = Create(startStep: 2);
 
         Assert.False(vm.ShowOpenRequiredModelOnHuggingFace);
     }
@@ -461,7 +519,7 @@ public class SetupWizardViewModelTests
     public void ShowOpenModelPageOnDownloadFailure_RequiresErrorAndPlatform()
     {
         var platform = Substitute.For<IPlatformServices>();
-        var (vm, _, _) = Create(startStep: 2, platformServices: platform);
+        var (vm, _, _, _) = Create(startStep: 2, platformServices: platform);
 
         Assert.False(vm.ShowOpenModelPageOnDownloadFailure);
 

@@ -788,6 +788,7 @@ public partial class App : Application
         var clipboard = platform.Clipboard;
         var speechCoordinator = _serviceProvider!.GetService<ISpeechInputCoordinator>();
         var cloudProviderRuntimeState = _serviceProvider!.GetRequiredService<ICloudProviderRuntimeState>();
+        var downloadCoordinator = _serviceProvider!.GetRequiredService<IModelDownloadCoordinator>();
         var vm = new OverlayViewModel(
             target,
             pipeline,
@@ -802,7 +803,8 @@ public partial class App : Application
             _messenger,
             languageCatalog,
             speechCoordinator,
-            cloudProviderRuntimeState: cloudProviderRuntimeState);
+            cloudProviderRuntimeState: cloudProviderRuntimeState,
+            downloadCoordinator: downloadCoordinator);
         _activeOverlay = new OverlayWindow(vm);
         var uiSettings = settingsService.Current.UI;
         _activeOverlay.ApplyAutoSizingDefaults();
@@ -852,6 +854,7 @@ public partial class App : Application
         var coreOptions = _serviceProvider!.GetRequiredService<CoreOptions>();
         var llmCoordinator = _serviceProvider!.GetRequiredService<ILlmModelLoadCoordinator>();
         var platform = _serviceProvider!.GetRequiredService<IPlatformServices>();
+        var downloadCoordinator = _serviceProvider!.GetRequiredService<IModelDownloadCoordinator>();
         var wizardVm = new SetupWizardViewModel(
             settingsService,
             modelManager,
@@ -863,11 +866,15 @@ public partial class App : Application
             platform.Clipboard,
             coreOptions: coreOptions,
             llmCoordinator: llmCoordinator,
-            platformServices: platform);
+            platformServices: platform,
+            downloadCoordinator: downloadCoordinator);
         _wizardWindow = new SetupWizardWindow(wizardVm);
         var done = new TaskCompletionSource();
         _wizardWindow.Closed += (_, _) =>
         {
+            // Wizard subscribes to the global IModelDownloadCoordinator.StateChanged;
+            // disposing here unsubscribes so closed wizards stop receiving progress.
+            wizardVm.Dispose();
             _wizardWindow = null;
             done.SetResult();
         };

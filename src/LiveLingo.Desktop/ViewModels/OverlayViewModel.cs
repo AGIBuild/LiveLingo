@@ -45,6 +45,12 @@ public partial class OverlayViewModel : ObservableObject, IDisposable
     private readonly IMessenger _messenger;
     private readonly IReadOnlyList<LanguageInfo> _availableLanguages;
     private readonly ISpeechInputCoordinator? _speechCoordinator;
+    private readonly IModelDownloadCoordinator _downloadCoordinator;
+    private readonly Action<ModelDownloadState>? _onDownloadStateChanged;
+    private readonly SynchronizationContext? _uiContext;
+    // STT model ids the overlay listens for; computed once because the registry is static.
+    private static readonly HashSet<string> SttModelIds =
+        ModelRegistry.SpeechToTextModels.Select(m => m.Id).ToHashSet(StringComparer.Ordinal);
     private CancellationTokenSource? _pipelineCts;
     private string _postProcessMode;
     private string? _activeModelId;
@@ -124,7 +130,8 @@ public partial class OverlayViewModel : ObservableObject, IDisposable
         ILanguageCatalog? languageCatalog = null,
         ISpeechInputCoordinator? speechCoordinator = null,
         IModelCatalog? modelCatalog = null,
-        ICloudProviderRuntimeState? cloudProviderRuntimeState = null)
+        ICloudProviderRuntimeState? cloudProviderRuntimeState = null,
+        IModelDownloadCoordinator? downloadCoordinator = null)
     {
         _targetWindow = targetWindow;
         _pipeline = pipeline;
@@ -140,6 +147,12 @@ public partial class OverlayViewModel : ObservableObject, IDisposable
         _availableLanguages = languageCatalog?.All ?? LanguageCatalog.DefaultLanguages;
         _speechCoordinator = speechCoordinator;
         _isVoiceAvailable = speechCoordinator is not null;
+        // Listen on the global coordinator so STT downloads kicked off from
+        // Settings → Models or the wizard project their progress here too.
+        _downloadCoordinator = downloadCoordinator ?? NullModelDownloadCoordinator.Instance;
+        _uiContext = SynchronizationContext.Current;
+        _onDownloadStateChanged = OnDownloadStateChanged;
+        _downloadCoordinator.StateChanged += _onDownloadStateChanged;
         ApplyRoutingSettings(settings);
         _activeModelId = GetPreferredLocalModelId(settings);
         _sourceLanguage = string.IsNullOrWhiteSpace(settings.Translation.DefaultSourceLanguage)
@@ -202,6 +215,7 @@ public partial class OverlayViewModel : ObservableObject, IDisposable
         _cloudProviderRuntimeState = cloudProviderRuntimeState ?? new NullCloudProviderRuntimeState();
         _messenger = messenger ?? WeakReferenceMessenger.Default;
         _availableLanguages = languageCatalog?.All ?? LanguageCatalog.DefaultLanguages;
+        _downloadCoordinator = NullModelDownloadCoordinator.Instance;
         _targetLanguage = NormalizeTargetLanguage(targetLanguage);
         _activeModelId = ModelSelectionPolicy
             .SelectTranslationProfile(_modelCatalog, null, _sourceLanguage ?? "zh", _targetLanguage)
@@ -878,6 +892,48 @@ public partial class OverlayViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(IsRecording));
     }
 
+    private void OnDownloadStateChanged(ModelDownloadState state)
+    {
+        // Filter to STT models so unrelated translation/postprocessing downloads
+        // don't bleed into the voice status banner.
+        if (!SttModelIds.Contains(state.ModelId)) return;
+
+        if (_uiContext is null)
+        {
+            ApplySttDownloadState(state);
+            return;
+        }
+
+        _uiContext.Post(_ => ApplySttDownloadState(state), null);
+    }
+
+    private void ApplySttDownloadState(ModelDownloadState state)
+    {
+        if (_disposed) return;
+        // Don't overwrite live recording / transcribing status text — those
+        // states have higher priority than background download progress.
+        if (VoiceState is VoiceInputState.Recording or VoiceInputState.Transcribing) return;
+
+        switch (state.Status)
+        {
+            case ModelDownloadStatus.Downloading:
+                VoiceStatusText = L("overlay.voice.downloadingProgress", state.Percentage);
+                ShowSttDownloadLink = false;
+                break;
+            case ModelDownloadStatus.Installed:
+                VoiceStatusText = L("overlay.voice.modelReady");
+                ShowSttDownloadLink = false;
+                break;
+            case ModelDownloadStatus.Failed:
+                VoiceStatusText = state.ErrorMessage ?? L("overlay.voice.transcriptionFailed");
+                ShowSttDownloadLink = true;
+                break;
+            case ModelDownloadStatus.Cancelled:
+                ShowSttDownloadLink = true;
+                break;
+        }
+    }
+
     private string MapVoiceError(SpeechInputResult result) => result.ErrorCode switch
     {
         SpeechInputErrorCode.PermissionDenied => L("overlay.voice.permissionDenied"),
@@ -1002,6 +1058,9 @@ public partial class OverlayViewModel : ObservableObject, IDisposable
             _speechCoordinator.StateChanged -= HandleVoiceStateChanged;
             _speechCoordinator.PartialTranscription -= HandlePartialTranscription;
         }
+
+        if (_onDownloadStateChanged is not null)
+            _downloadCoordinator.StateChanged -= _onDownloadStateChanged;
 
         _messenger.Unregister<SettingsChangedMessage>(this);
 
