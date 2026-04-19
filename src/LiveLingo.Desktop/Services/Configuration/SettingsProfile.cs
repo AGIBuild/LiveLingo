@@ -1,6 +1,7 @@
 using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using LiveLingo.Core;
+using LiveLingo.Core.Speech;
 
 namespace LiveLingo.Desktop.Services.Configuration;
 
@@ -12,6 +13,7 @@ public partial class SettingsModel : ObservableObject
     [ObservableProperty] private HotkeySettings _hotkeys = new();
     [ObservableProperty] private TranslationSettings _translation = new();
     [ObservableProperty] private ProcessingSettings _processing = new();
+    [ObservableProperty] private SpeechSettings _speech = new();
     [ObservableProperty] private UISettings _uI = new();
     [ObservableProperty] private UpdateSettings _update = new();
     [ObservableProperty] private AdvancedSettings _advanced = new();
@@ -26,11 +28,35 @@ public partial class SettingsModel : ObservableObject
             Hotkeys = Hotkeys.DeepClone(),
             Translation = Translation.DeepClone(),
             Processing = Processing.DeepClone(),
+            Speech = Speech.DeepClone(),
             UI = UI.DeepClone(),
             Update = Update.DeepClone(),
             Advanced = Advanced.DeepClone()
         };
     }
+}
+
+/// <summary>
+/// Persisted speech-recognition preferences. The <see cref="ISpeechEngineSelector"/> turns the
+/// stored <see cref="RoutingMode"/> string into an <see cref="SttRoutingMode"/> at runtime, so adding
+/// a new mode does not require a settings migration.
+/// </summary>
+public partial class SpeechSettings : ObservableObject
+{
+    [ObservableProperty] private string _routingMode = nameof(SttRoutingMode.AccuracyFirst);
+
+    /// <summary>
+    /// Optional override for the speech-to-text model id. When null the selector picks the best model
+    /// for the current routing mode (Cohere Transcribe today). Setting this lets advanced users pin a
+    /// specific bundle without changing the routing mode.
+    /// </summary>
+    [ObservableProperty] private string? _activeModelId;
+
+    public SpeechSettings DeepClone() => new()
+    {
+        RoutingMode = RoutingMode,
+        ActiveModelId = ActiveModelId
+    };
 }
 
 public partial class HotkeySettings : ObservableObject

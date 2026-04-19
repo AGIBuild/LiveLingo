@@ -140,12 +140,36 @@ public static class ModelRegistry
     public static IReadOnlyList<ModelDescriptor> RequiredModels { get; } =
         [Gemma4_26B_A4B];
 
-    public static readonly ModelDescriptor WhisperBase = new(
-        "whisper-base",
-        "Whisper Base (Speech-to-Text)",
-        "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin",
-        147_951_465,
-        ModelType.SpeechToText);
+    // ── Speech-to-Text ──────────────────────────────────────────────────────────
+    //
+    // Cohere Transcribe 14-language int8 (sherpa-onnx bundle).
+    // Source: https://github.com/k2-fsa/sherpa-onnx/releases/tag/asr-models
+    //
+    // Why Cohere Transcribe over Whisper:
+    //   - Top of the Open ASR Leaderboard at the time of writing (~12 % WER long-form English vs Whisper-large-v3 ~14 %).
+    //   - Encoder-decoder model with built-in punctuation + ITN (no separate punc model needed).
+    //   - 14 languages including zh / ja / ko / en / de / es / fr / it / pt / nl / pl / el / vi / ar — covers all
+    //     LiveLingo translation language pairs without needing a multi-engine fallback.
+    //   - int8 quantization keeps the bundle ~1.6 GB — comparable to whisper-large-v3 q5_1 (~1.5 GB) for materially
+    //     better accuracy.
+    //
+    // The bundle is a tar.bz2 containing encoder.int8.onnx, decoder.int8.onnx and tokens.txt.
+    // ModelDownloadOrchestrator extracts it via ModelArchiveExtractor; the engine reads the unpacked files directly.
+    public static readonly ModelDescriptor SherpaCohereTranscribe14LangInt8 = new(
+        "sherpa-cohere-transcribe-14lang-int8",
+        "Cohere Transcribe 14-Lang int8 (sherpa-onnx)",
+        "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-cohere-transcribe-14-lang-int8-2026-04-01.tar.bz2",
+        1_699_792_000, // ~1.62 GB compressed; matches release listing (1659953 KB)
+        ModelType.SpeechToText)
+    {
+        ArchiveType = ModelArchiveType.TarBz2,
+        ExtractedFiles =
+        [
+            "encoder.int8.onnx",
+            "decoder.int8.onnx",
+            "tokens.txt"
+        ]
+    };
 
     public static readonly ModelDescriptor SileroVad = new(
         "silero-vad",
@@ -154,15 +178,18 @@ public static class ModelRegistry
         2_440_000,
         ModelType.VoiceActivityDetection);
 
+    public static IReadOnlyList<ModelDescriptor> SpeechToTextModels { get; } =
+        [SherpaCohereTranscribe14LangInt8];
+
     public static IReadOnlyList<ModelDescriptor> OptionalModels { get; } =
-        [Gemma4_E4B, Qwen25_15B, WhisperBase, SileroVad];
+        [Gemma4_E4B, Qwen25_15B, SherpaCohereTranscribe14LangInt8, SileroVad];
 
     public static IReadOnlyList<ModelDescriptor> AllModels { get; } =
     [
         Gemma4_26B_A4B, Gemma4_E4B,
         Qwen35_9B, Qwen25_7B,
         MarianZhEn, MarianEnZh, MarianJaEn,
-        FastTextLid, Qwen25_15B, WhisperBase, SileroVad
+        FastTextLid, Qwen25_15B, SherpaCohereTranscribe14LangInt8, SileroVad
     ];
 
     public static ModelDescriptor? FindTranslationModel(string sourceLanguage, string targetLanguage) =>

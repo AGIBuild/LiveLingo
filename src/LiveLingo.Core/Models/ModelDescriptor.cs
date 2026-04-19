@@ -36,12 +36,34 @@ public record ModelDescriptor(
     /// Defaults to <see cref="LocalModelChatTemplate.Generic"/> (standard chat completions, no post-processing).
     /// </summary>
     public LocalModelChatTemplate ChatTemplate { get; init; } = LocalModelChatTemplate.Generic;
+
+    /// <summary>
+    /// Files inside the archive (after extraction) that must be present for the model to be considered installed.
+    /// Only used when <see cref="ArchiveType"/> is not <see cref="ModelArchiveType.None"/>.
+    /// Paths are relative to the model directory.
+    /// </summary>
+    public IReadOnlyList<string> ExtractedFiles { get; init; } = [];
+
+    /// <summary>
+    /// Archive format of the downloaded payload. When set, <see cref="ModelManager"/> will extract
+    /// the archive into the model directory after download and validate <see cref="ExtractedFiles"/>.
+    /// </summary>
+    public ModelArchiveType ArchiveType { get; init; } = ModelArchiveType.None;
 }
 
 public record ModelAsset(
     string RelativePath,
     string DownloadUrl,
     long SizeBytes);
+
+public enum ModelArchiveType
+{
+    /// <summary>The downloaded file is the model file itself (e.g. .gguf, .onnx, .ftz).</summary>
+    None,
+
+    /// <summary>The downloaded file is a tar archive compressed with bzip2 (e.g. sherpa-onnx model bundles).</summary>
+    TarBz2
+}
 
 public enum ModelType
 {

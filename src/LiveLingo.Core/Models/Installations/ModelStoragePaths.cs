@@ -33,6 +33,21 @@ internal static class ModelStoragePaths
             ? descriptor.Assets
             : [new ModelAsset(GetFileNameFromUrl(descriptor.DownloadUrl), descriptor.DownloadUrl, descriptor.SizeBytes)];
 
+    /// <summary>
+    /// Files that must be present inside <paramref name="modelDir"/> for the model to be
+    /// considered fully installed. For archive-based descriptors this is the post-extraction
+    /// file list; otherwise it falls back to the asset relative paths.
+    /// </summary>
+    public static IReadOnlyList<string> GetExpectedInstalledFiles(ModelDescriptor descriptor)
+    {
+        if (descriptor.ArchiveType != ModelArchiveType.None && descriptor.ExtractedFiles.Count > 0)
+            return descriptor.ExtractedFiles;
+
+        return GetExpectedAssets(descriptor)
+            .Select(asset => NormalizeRelativePath(asset.RelativePath))
+            .ToArray();
+    }
+
     public static string GetFileNameFromUrl(string url)
     {
         var uri = new Uri(url);

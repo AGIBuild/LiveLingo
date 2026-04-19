@@ -211,7 +211,11 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ITextProcessor, OptimizeProcessor>();
         services.AddSingleton<ITextProcessor, ColloquializeProcessor>();
 
-        services.AddSingleton<ISpeechToTextEngine, WhisperSpeechToTextEngine>();
+        services.AddSingleton<ISpeechToTextEngine, SherpaCohereTranscribeEngine>();
+        services.AddSingleton<ISpeechEngineSelector>(sp => new DefaultSpeechEngineSelector(
+            sp.GetRequiredService<CoreOptions>(),
+            sp.GetServices<ISpeechToTextEngine>(),
+            sp.GetService<ILogger<DefaultSpeechEngineSelector>>()));
         services.AddSingleton<IVoiceActivityDetector, SileroVadDetector>();
 
         return services;

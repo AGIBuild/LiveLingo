@@ -29,6 +29,17 @@ public class VoiceOverlayIntegrationTests
     private static readonly ModelDescriptor SttModel =
         ModelRegistry.AllModels.First(m => m.Type == ModelType.SpeechToText);
 
+    private static ISpeechEngineSelector CreateSelector(ISpeechToTextEngine engine)
+    {
+        var selector = Substitute.For<ISpeechEngineSelector>();
+        selector.GetEngine().Returns(engine);
+        selector.GetActiveModel().Returns(SttModel);
+        return selector;
+    }
+
+    private SpeechInputCoordinator CreateCoordinator(IAudioCaptureService audio, ISpeechToTextEngine stt) =>
+        new(audio, CreateSelector(stt), _modelManager, new StubVoiceActivityDetector());
+
     [Fact]
     [Trait("Category", "Integration")]
     public async Task ToggleVoice_RecordStop_SourceTextPopulated_TranslationTriggered()
@@ -39,7 +50,7 @@ public class VoiceOverlayIntegrationTests
         _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>(), Arg.Any<IProgress<TranslationLifecycleEvent>?>())
             .Returns(_ => SingleDeltaAsync("translated"));
 
-        using var coordinator = new SpeechInputCoordinator(audio, stt, _modelManager, new StubVoiceActivityDetector());
+        using var coordinator = CreateCoordinator(audio, stt);
         var vm = CreateVm(coordinator);
 
         Assert.True(vm.IsVoiceAvailable);
@@ -68,7 +79,7 @@ public class VoiceOverlayIntegrationTests
         var stt = new FakeStt("ignored");
         SetupSttModelInstalled();
 
-        using var coordinator = new SpeechInputCoordinator(audio, stt, _modelManager, new StubVoiceActivityDetector());
+        using var coordinator = CreateCoordinator(audio, stt);
         var vm = CreateVm(coordinator);
 
         await vm.ToggleVoiceInputCommand.ExecuteAsync(null);
@@ -87,7 +98,7 @@ public class VoiceOverlayIntegrationTests
         var stt = new FakeStt("after download");
         _modelManager.ListInstalled().Returns(new List<InstalledModel>());
 
-        using var coordinator = new SpeechInputCoordinator(audio, stt, _modelManager, new StubVoiceActivityDetector());
+        using var coordinator = CreateCoordinator(audio, stt);
         var vm = CreateVm(coordinator);
 
         await vm.ToggleVoiceInputCommand.ExecuteAsync(null);
@@ -118,7 +129,7 @@ public class VoiceOverlayIntegrationTests
         messenger.Register<object, AppUiRequestMessage>(recipient, (_, msg) =>
             receivedKind = msg.Value.Kind);
 
-        using var coordinator = new SpeechInputCoordinator(audio, stt, _modelManager, new StubVoiceActivityDetector());
+        using var coordinator = CreateCoordinator(audio, stt);
         var vm = CreateVm(coordinator, messenger);
 
         await vm.ToggleVoiceInputCommand.ExecuteAsync(null);
@@ -138,7 +149,7 @@ public class VoiceOverlayIntegrationTests
         var stt = new FakeStt("success") { ShouldFail = true };
         SetupSttModelInstalled();
 
-        using var coordinator = new SpeechInputCoordinator(audio, stt, _modelManager, new StubVoiceActivityDetector());
+        using var coordinator = CreateCoordinator(audio, stt);
         var vm = CreateVm(coordinator);
 
         await vm.ToggleVoiceInputCommand.ExecuteAsync(null);
@@ -168,7 +179,7 @@ public class VoiceOverlayIntegrationTests
         _pipeline.ProcessStreamingAsync(Arg.Any<TranslationRequest>(), Arg.Any<CancellationToken>(), Arg.Any<IProgress<TranslationLifecycleEvent>?>())
             .Returns(_ => SingleDeltaAsync("translated"));
 
-        using var coordinator = new SpeechInputCoordinator(audio, stt, _modelManager, new StubVoiceActivityDetector());
+        using var coordinator = CreateCoordinator(audio, stt);
         var vm = CreateVm(coordinator);
 
         vm.SourceText = "manual text";
@@ -197,6 +208,7 @@ public class VoiceOverlayIntegrationTests
             new(SttModel.Id, SttModel.DisplayName, "/models/" + SttModel.Id,
                 SttModel.SizeBytes, SttModel.Type, DateTime.UtcNow)
         });
+        _modelManager.HasAllExpectedLocalAssets(SttModel).Returns(true);
     }
 
     private sealed class FakeAudioCapture : IAudioCaptureService
@@ -231,6 +243,8 @@ public class VoiceOverlayIntegrationTests
     private sealed class FakeStt(string text) : ISpeechToTextEngine
     {
         public bool ShouldFail { get; set; }
+
+        public IReadOnlyCollection<string> SupportedModelIds { get; } = [SttModel.Id];
 
         public Task<SpeechTranscriptionResult> TranscribeAsync(AudioCaptureResult audio, string? language = null, CancellationToken ct = default)
         {

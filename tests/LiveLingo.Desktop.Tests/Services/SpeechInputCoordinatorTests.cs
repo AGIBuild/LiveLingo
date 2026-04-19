@@ -12,10 +12,17 @@ public class SpeechInputCoordinatorTests
     private readonly ISpeechToTextEngine _sttEngine = Substitute.For<ISpeechToTextEngine>();
     private readonly IModelManager _modelManager = Substitute.For<IModelManager>();
     private readonly IVoiceActivityDetector _vadDetector = Substitute.For<IVoiceActivityDetector>();
+    private readonly ISpeechEngineSelector _engineSelector = Substitute.For<ISpeechEngineSelector>();
     private static CancellationToken TestCt => TestContext.Current.CancellationToken;
 
+    public SpeechInputCoordinatorTests()
+    {
+        _engineSelector.GetEngine().Returns(_sttEngine);
+        _engineSelector.GetActiveModel().Returns(ModelRegistry.SherpaCohereTranscribe14LangInt8);
+    }
+
     private SpeechInputCoordinator CreateCoordinator() =>
-        new(_audioCapture, _sttEngine, _modelManager, _vadDetector);
+        new(_audioCapture, _engineSelector, _modelManager, _vadDetector);
 
     [Fact]
     public async Task StartRecording_PermissionDenied_ReturnsError()
@@ -118,15 +125,8 @@ public class SpeechInputCoordinatorTests
         var coordinator = CreateCoordinator();
         var result = await coordinator.StartRecordingAsync(ct: TestCt);
 
-        if (ModelRegistry.AllModels.Any(m => m.Type == ModelType.SpeechToText))
-        {
-            Assert.False(result.Success);
-            Assert.Equal(SpeechInputErrorCode.ModelMissing, result.ErrorCode);
-        }
-        else
-        {
-            Assert.True(result.Success);
-        }
+        Assert.False(result.Success);
+        Assert.Equal(SpeechInputErrorCode.ModelMissing, result.ErrorCode);
     }
 
     [Fact]
@@ -252,14 +252,15 @@ public class SpeechInputCoordinatorTests
     }
 
     [Fact]
-    public async Task EnsureSttModel_NoSttModelInRegistry_ReturnsModelMissing()
+    public async Task EnsureSttModel_DelegatesToModelManagerForActiveModel()
     {
         var coordinator = CreateCoordinator();
-        // This test validates the code path for when no STT model is defined.
-        // Since we know WhisperBase is registered, we only verify the return
-        // type matches the happy path (EnsureModelAsync is called).
         var result = await coordinator.EnsureSttModelAsync(ct: TestCt);
         Assert.True(result.Success);
+        await _modelManager.Received().EnsureModelAsync(
+            ModelRegistry.SherpaCohereTranscribe14LangInt8,
+            Arg.Any<IProgress<ModelDownloadProgress>?>(),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -341,15 +342,12 @@ public class SpeechInputCoordinatorTests
 
     private void SetupSttModelInstalled()
     {
-        var sttModel = ModelRegistry.AllModels
-            .FirstOrDefault(m => m.Type == ModelType.SpeechToText);
-        if (sttModel is not null)
+        var sttModel = ModelRegistry.SherpaCohereTranscribe14LangInt8;
+        _modelManager.ListInstalled().Returns(new List<InstalledModel>
         {
-            _modelManager.ListInstalled().Returns(new List<InstalledModel>
-            {
-                new(sttModel.Id, sttModel.DisplayName, "/models/" + sttModel.Id,
-                    sttModel.SizeBytes, sttModel.Type, DateTime.UtcNow)
-            });
-        }
+            new(sttModel.Id, sttModel.DisplayName, "/models/" + sttModel.Id,
+                sttModel.SizeBytes, sttModel.Type, DateTime.UtcNow)
+        });
+        _modelManager.HasAllExpectedLocalAssets(sttModel).Returns(true);
     }
 }

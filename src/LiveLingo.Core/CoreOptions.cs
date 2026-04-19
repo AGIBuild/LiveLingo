@@ -1,3 +1,4 @@
+using LiveLingo.Core.Speech;
 using LiveLingo.Core.Translation;
 
 namespace LiveLingo.Core;
@@ -88,6 +89,18 @@ public class CoreOptions
     public string? OllamaPostProcessingModelId { get; set; }
 
     public int InferenceThreads { get; set; }
+
+    /// <summary>
+    /// Routing mode for speech-to-text. Drives which engine the <see cref="ISpeechEngineSelector"/>
+    /// resolves at runtime.
+    /// </summary>
+    public SttRoutingMode SpeechRoutingMode { get; set; } = SttRoutingMode.AccuracyFirst;
+
+    /// <summary>
+    /// Optional explicit STT model id override. When null the selector picks the canonical
+    /// model for the current routing mode.
+    /// </summary>
+    public string? ActiveSttModelId { get; set; }
 
     /// <summary>
     /// User-defined term mappings injected into translation prompts when the
