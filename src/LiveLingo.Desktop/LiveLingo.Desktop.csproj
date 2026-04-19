@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="LiveLingo.Desktop.Tests" />
+    <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
   </ItemGroup>
 
   <ItemGroup>
