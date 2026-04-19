@@ -1,3 +1,4 @@
+using System.Text;
 using LiveLingo.Core.Models;
 using LiveLingo.Core.Speech;
 using LiveLingo.Desktop.Platform;
@@ -5,12 +6,29 @@ using Microsoft.Extensions.Logging;
 
 namespace LiveLingo.Desktop.Services.Speech;
 
+/// <summary>
+/// VAD-driven streaming STT coordinator that converts the raw microphone capture
+/// into an append-only transcript via the segment-commit pattern:
+/// <list type="bullet">
+///   <item>Each VAD-bounded utterance (or 60s safeguard) becomes one immutable
+///         segment, transcribed exactly once, then surfaced via
+///         <see cref="SegmentCommitted"/> for the UI to APPEND.</item>
+///   <item>While a segment is in flight, a best-effort sliding preview window is
+///         transcribed at most every 1.5s and surfaced via
+///         <see cref="PartialPreview"/> for the UI to REPLACE its preview slot
+///         (cleared atomically when the segment commits).</item>
+/// </list>
+/// All STT calls go through a single <see cref="SemaphoreSlim"/> so the underlying
+/// recognizer is never invoked concurrently — previews skip themselves when a real
+/// commit holds the gate, ensuring final accuracy is never starved by previews.
+/// </summary>
 public sealed class SpeechInputCoordinator : ISpeechInputCoordinator
 {
     private static readonly TimeSpan VadPollInterval = TimeSpan.FromMilliseconds(100);
-    private static readonly TimeSpan FallbackTranscriptionInterval = TimeSpan.FromSeconds(5);
-    private const int PartialWindowSeconds = 10;
-    private const int FinalWindowSeconds = 30;
+    private static readonly TimeSpan PreviewMinInterval = TimeSpan.FromMilliseconds(1500);
+    private const int MaxSegmentSeconds = 60;
+    private const int PreviewWindowSeconds = 8;
+    private const double MinSegmentSeconds = 0.4;
     private const int BytesPerSample = 2;
 
     private readonly IAudioCaptureService _audioCapture;
@@ -20,14 +38,19 @@ public sealed class SpeechInputCoordinator : ISpeechInputCoordinator
     private readonly IVoiceActivityDetector _vadDetector;
     private readonly ILogger<SpeechInputCoordinator>? _logger;
     private readonly object _gate = new();
+    private readonly SemaphoreSlim _sttGate = new(1, 1);
     private CancellationTokenSource? _sessionCts;
     private string? _recordingLanguage;
-    private Task? _partialLoop;
+    private Task? _vadLoop;
     private VoiceActivityMonitor? _vadMonitor;
+    private int _committedByteOffset;
+    private DateTime _lastPreviewAt = DateTime.MinValue;
+    private readonly StringBuilder _sessionTranscript = new();
 
     public VoiceInputState State { get; private set; } = VoiceInputState.Idle;
     public event Action<VoiceInputState>? StateChanged;
-    public event Action<string>? PartialTranscription;
+    public event Action<string>? SegmentCommitted;
+    public event Action<string>? PartialPreview;
 
     public SpeechInputCoordinator(
         IAudioCaptureService audioCapture,
@@ -79,9 +102,12 @@ public sealed class SpeechInputCoordinator : ISpeechInputCoordinator
         {
             _sessionCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             _recordingLanguage = language;
+            _committedByteOffset = 0;
+            _lastPreviewAt = DateTime.MinValue;
+            _sessionTranscript.Clear();
             await _audioCapture.StartAsync(_sessionCts.Token);
             SetState(VoiceInputState.Recording);
-            _partialLoop = RunVadDrivenTranscriptionLoopAsync(_sessionCts.Token);
+            _vadLoop = RunVadDrivenTranscriptionLoopAsync(_sessionCts.Token);
             return new SpeechInputResult(true, null, SpeechInputErrorCode.None);
         }
         catch (PlatformNotSupportedException)
@@ -117,13 +143,13 @@ public sealed class SpeechInputCoordinator : ISpeechInputCoordinator
             _sessionCts?.Cancel();
             SetState(VoiceInputState.Transcribing);
 
-            if (_partialLoop is not null)
+            if (_vadLoop is not null)
             {
-                try { await _partialLoop; }
+                try { await _vadLoop; }
                 catch (OperationCanceledException) { }
-                catch (Exception ex) { _logger?.LogWarning(ex, "Partial loop ended with error"); }
+                catch (Exception ex) { _logger?.LogWarning(ex, "VAD loop ended with error"); }
             }
-            _partialLoop = null;
+            _vadLoop = null;
 
             _vadMonitor?.Reset();
             _vadMonitor = null;
@@ -132,11 +158,15 @@ public sealed class SpeechInputCoordinator : ISpeechInputCoordinator
             var audio = await _audioCapture.StopAsync(_sessionCts.Token);
 
             var lang = language ?? _recordingLanguage;
-            var windowedAudio = CreateWindow(audio, FinalWindowSeconds);
-            var engine = _engineSelector.GetEngine();
-            var result = await engine.TranscribeAsync(windowedAudio, lang, _sessionCts.Token);
+
+            // Drain the uncommitted tail through the same SegmentCommitted channel
+            // so the UI's append model sees a consistent stream of segments.
+            await CommitTailIfAnyAsync(audio, lang, _sessionCts.Token).ConfigureAwait(false);
+
+            // PartialPreview is cleared so subscribers don't keep a stale preview.
+            PartialPreview?.Invoke(string.Empty);
             SetState(VoiceInputState.Idle);
-            return new SpeechInputResult(true, result.Text, SpeechInputErrorCode.None);
+            return new SpeechInputResult(true, _sessionTranscript.ToString(), SpeechInputErrorCode.None);
         }
         catch (OperationCanceledException)
         {
@@ -155,8 +185,7 @@ public sealed class SpeechInputCoordinator : ISpeechInputCoordinator
     private async Task RunVadDrivenTranscriptionLoopAsync(CancellationToken ct)
     {
         var pauseDetected = false;
-        var lastTranscribeTime = DateTime.UtcNow;
-        var lastProcessedBytes = 0;
+        var lastVadProcessedBytes = 0;
 
         try
         {
@@ -169,12 +198,12 @@ public sealed class SpeechInputCoordinator : ISpeechInputCoordinator
                 await Task.Delay(VadPollInterval, ct);
 
                 var buffer = _audioCapture.GetCurrentBuffer();
-                if (buffer is null || buffer.PcmData.Length <= lastProcessedBytes)
+                if (buffer is null || buffer.PcmData.Length <= lastVadProcessedBytes)
                     continue;
 
-                var newBytes = buffer.PcmData.Length - lastProcessedBytes;
-                var newSamples = ConvertPcmToFloat(buffer.PcmData, lastProcessedBytes, newBytes);
-                lastProcessedBytes = buffer.PcmData.Length;
+                var newBytes = buffer.PcmData.Length - lastVadProcessedBytes;
+                var newSamples = ConvertPcmToFloat(buffer.PcmData, lastVadProcessedBytes, newBytes);
+                lastVadProcessedBytes = buffer.PcmData.Length;
 
                 try
                 {
@@ -186,33 +215,34 @@ public sealed class SpeechInputCoordinator : ISpeechInputCoordinator
                     continue;
                 }
 
-                var timeSinceLastTranscribe = DateTime.UtcNow - lastTranscribeTime;
-                var shouldTranscribe = pauseDetected ||
-                                       timeSinceLastTranscribe >= FallbackTranscriptionInterval;
+                var endByte = buffer.PcmData.Length;
+                var segmentSeconds = BytesToSeconds(endByte - _committedByteOffset, buffer);
+                var maxReached = segmentSeconds >= MaxSegmentSeconds;
+                var pauseReady = pauseDetected && segmentSeconds >= MinSegmentSeconds;
 
-                if (!shouldTranscribe) continue;
-
-                pauseDetected = false;
-                lastTranscribeTime = DateTime.UtcNow;
-
-                try
+                if (pauseReady || maxReached)
                 {
-                    var windowBuffer = CreateWindow(buffer, PartialWindowSeconds);
-                    var engine = _engineSelector.GetEngine();
-                    var result = await engine.TranscribeAsync(windowBuffer, _recordingLanguage, ct);
-                    if (!string.IsNullOrWhiteSpace(result.Text))
-                        PartialTranscription?.Invoke(result.Text);
+                    pauseDetected = false;
+                    var startByte = _committedByteOffset;
+                    _committedByteOffset = endByte;
+                    var slice = SliceAudio(buffer, startByte, endByte);
+                    await CommitSegmentAsync(slice, ct).ConfigureAwait(false);
+                    continue;
                 }
-                catch (OperationCanceledException) { throw; }
-                catch (Exception ex)
+
+                // Best-effort live preview of the in-flight segment.
+                var sinceLastPreview = DateTime.UtcNow - _lastPreviewAt;
+                if (segmentSeconds >= MinSegmentSeconds && sinceLastPreview >= PreviewMinInterval)
                 {
-                    _logger?.LogWarning(ex, "Partial transcription failed (non-fatal)");
+                    _lastPreviewAt = DateTime.UtcNow;
+                    var previewSlice = ExtractPreviewSlice(buffer, _committedByteOffset, endByte);
+                    await TryPreviewAsync(previewSlice, ct).ConfigureAwait(false);
                 }
             }
         }
         catch (OperationCanceledException)
         {
-            // Expected on stop/cancel
+            // Expected on stop/cancel.
         }
         catch (Exception ex)
         {
@@ -220,18 +250,113 @@ public sealed class SpeechInputCoordinator : ISpeechInputCoordinator
         }
     }
 
-    private static AudioCaptureResult CreateWindow(AudioCaptureResult full, int windowSeconds)
+    private async Task CommitSegmentAsync(AudioCaptureResult slice, CancellationToken ct)
     {
-        var maxWindowBytes = windowSeconds * full.SampleRate * full.Channels * BytesPerSample;
-        if (full.PcmData.Length <= maxWindowBytes)
-            return full;
+        if (slice.PcmData.Length == 0) return;
 
-        var windowStart = full.PcmData.Length - maxWindowBytes;
-        var windowPcm = new byte[maxWindowBytes];
-        Buffer.BlockCopy(full.PcmData, windowStart, windowPcm, 0, maxWindowBytes);
-        var duration = TimeSpan.FromSeconds(
-            (double)maxWindowBytes / (full.SampleRate * full.Channels * BytesPerSample));
-        return new AudioCaptureResult(windowPcm, full.SampleRate, full.Channels, duration);
+        await _sttGate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            var engine = _engineSelector.GetEngine();
+            var result = await engine.TranscribeAsync(slice, _recordingLanguage, ct).ConfigureAwait(false);
+            var text = result.Text?.Trim() ?? string.Empty;
+            if (text.Length == 0) return;
+
+            if (_sessionTranscript.Length > 0)
+                _sessionTranscript.Append(' ');
+            _sessionTranscript.Append(text);
+
+            // Order matters: clear the preview first so subscribers don't render
+            // both committed text and a stale preview for the same audio.
+            PartialPreview?.Invoke(string.Empty);
+            SegmentCommitted?.Invoke(text);
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            _logger?.LogWarning(ex, "Segment transcription failed (segment dropped)");
+        }
+        finally
+        {
+            _sttGate.Release();
+        }
+    }
+
+    private async Task CommitTailIfAnyAsync(AudioCaptureResult audio, string? lang, CancellationToken ct)
+    {
+        if (audio.PcmData.Length <= _committedByteOffset) return;
+
+        var tailSeconds = BytesToSeconds(audio.PcmData.Length - _committedByteOffset, audio);
+        if (tailSeconds < MinSegmentSeconds) return;
+
+        var startByte = _committedByteOffset;
+        _committedByteOffset = audio.PcmData.Length;
+        var slice = SliceAudio(audio, startByte, audio.PcmData.Length);
+
+        await _sttGate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            var engine = _engineSelector.GetEngine();
+            var result = await engine.TranscribeAsync(slice, lang, ct).ConfigureAwait(false);
+            var text = result.Text?.Trim() ?? string.Empty;
+            if (text.Length == 0) return;
+
+            if (_sessionTranscript.Length > 0)
+                _sessionTranscript.Append(' ');
+            _sessionTranscript.Append(text);
+            SegmentCommitted?.Invoke(text);
+        }
+        finally
+        {
+            _sttGate.Release();
+        }
+    }
+
+    private async Task TryPreviewAsync(AudioCaptureResult slice, CancellationToken ct)
+    {
+        if (slice.PcmData.Length == 0) return;
+        // Skip when a real commit holds the gate — accuracy beats preview latency.
+        if (!await _sttGate.WaitAsync(0, ct).ConfigureAwait(false)) return;
+        try
+        {
+            var engine = _engineSelector.GetEngine();
+            var result = await engine.TranscribeAsync(slice, _recordingLanguage, ct).ConfigureAwait(false);
+            var text = result.Text?.Trim() ?? string.Empty;
+            if (text.Length > 0)
+                PartialPreview?.Invoke(text);
+        }
+        catch (OperationCanceledException) { /* expected */ }
+        catch (Exception ex)
+        {
+            _logger?.LogDebug(ex, "Preview transcription failed (suppressed)");
+        }
+        finally
+        {
+            _sttGate.Release();
+        }
+    }
+
+    private static AudioCaptureResult SliceAudio(AudioCaptureResult full, int startByte, int endByte)
+    {
+        var len = endByte - startByte;
+        var pcm = new byte[len];
+        Buffer.BlockCopy(full.PcmData, startByte, pcm, 0, len);
+        var duration = TimeSpan.FromSeconds(BytesToSeconds(len, full));
+        return new AudioCaptureResult(pcm, full.SampleRate, full.Channels, duration);
+    }
+
+    private static AudioCaptureResult ExtractPreviewSlice(AudioCaptureResult buffer, int committedOffset, int endByte)
+    {
+        var bytesPerSecond = buffer.SampleRate * buffer.Channels * BytesPerSample;
+        var maxPreviewBytes = PreviewWindowSeconds * bytesPerSecond;
+        var actualStart = Math.Max(committedOffset, endByte - maxPreviewBytes);
+        return SliceAudio(buffer, actualStart, endByte);
+    }
+
+    private static double BytesToSeconds(int byteCount, AudioCaptureResult buffer)
+    {
+        var bytesPerSecond = buffer.SampleRate * buffer.Channels * BytesPerSample;
+        return bytesPerSecond <= 0 ? 0 : (double)byteCount / bytesPerSecond;
     }
 
     private static float[] ConvertPcmToFloat(byte[] pcm, int byteOffset, int byteCount)
@@ -358,6 +483,8 @@ public sealed class SpeechInputCoordinator : ISpeechInputCoordinator
 
         _vadMonitor?.Reset();
         _vadMonitor = null;
+        _committedByteOffset = 0;
+        _sessionTranscript.Clear();
         SetState(VoiceInputState.Idle);
     }
 
@@ -365,6 +492,7 @@ public sealed class SpeechInputCoordinator : ISpeechInputCoordinator
     {
         CancelCurrent();
         _sessionCts?.Dispose();
+        _sttGate.Dispose();
     }
 
     private void SetState(VoiceInputState state)

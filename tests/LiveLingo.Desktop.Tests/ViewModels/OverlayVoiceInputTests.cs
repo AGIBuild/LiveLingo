@@ -322,12 +322,12 @@ public class OverlayVoiceInputTests
     }
 
     [Fact]
-    public async Task PartialTranscription_AppendsToExistingSourceText()
+    public async Task SegmentCommitted_AppendsToExistingSourceText()
     {
         var coordinator = Substitute.For<ISpeechInputCoordinator>();
-        Action<string>? partialHandler = null;
-        coordinator.When(c => c.PartialTranscription += Arg.Any<Action<string>>())
-            .Do(ci => partialHandler = ci.Arg<Action<string>>());
+        Action<string>? committedHandler = null;
+        coordinator.When(c => c.SegmentCommitted += Arg.Any<Action<string>>())
+            .Do(ci => committedHandler = ci.Arg<Action<string>>());
 
         var vm = CreateVm(coordinator);
         vm.SourceText = "before";
@@ -339,27 +339,96 @@ public class OverlayVoiceInputTests
         await vm.ToggleVoiceInputCommand.ExecuteAsync(null);
 
         vm.VoiceState = VoiceInputState.Recording;
-        Assert.NotNull(partialHandler);
-        partialHandler!.Invoke("partial result");
+        Assert.NotNull(committedHandler);
+        committedHandler!.Invoke("first segment");
+        committedHandler!.Invoke("second segment");
 
-        Assert.Equal("before partial result", vm.SourceText);
+        // Append-only: each committed segment is preserved instead of overwritten,
+        // which is the regression this contract guards against.
+        Assert.Equal("before first segment second segment", vm.SourceText);
     }
 
     [Fact]
-    public async Task PartialTranscription_IgnoredWhenNotRecording()
+    public async Task PartialPreview_OnlyShownDuringRecording_AndReplacedByCommit()
     {
         var coordinator = Substitute.For<ISpeechInputCoordinator>();
-        Action<string>? partialHandler = null;
-        coordinator.When(c => c.PartialTranscription += Arg.Any<Action<string>>())
-            .Do(ci => partialHandler = ci.Arg<Action<string>>());
+        Action<string>? committedHandler = null;
+        Action<string>? previewHandler = null;
+        coordinator.When(c => c.SegmentCommitted += Arg.Any<Action<string>>())
+            .Do(ci => committedHandler = ci.Arg<Action<string>>());
+        coordinator.When(c => c.PartialPreview += Arg.Any<Action<string>>())
+            .Do(ci => previewHandler = ci.Arg<Action<string>>());
+
+        var vm = CreateVm(coordinator);
+        coordinator.State.Returns(VoiceInputState.Idle);
+        coordinator.StartRecordingAsync(Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(new SpeechInputResult(true, null, SpeechInputErrorCode.None));
+
+        await vm.ToggleVoiceInputCommand.ExecuteAsync(null);
+        vm.VoiceState = VoiceInputState.Recording;
+
+        Assert.NotNull(previewHandler);
+        Assert.NotNull(committedHandler);
+
+        previewHandler!.Invoke("hello wor");
+        Assert.Equal("hello wor", vm.SourceText);
+
+        previewHandler!.Invoke("hello world");
+        Assert.Equal("hello world", vm.SourceText);
+
+        // Committing the segment must REPLACE the preview portion (no duplicate text).
+        committedHandler!.Invoke("hello world.");
+        Assert.Equal("hello world.", vm.SourceText);
+    }
+
+    [Fact]
+    public void SegmentCommitted_IgnoredWhenIdle()
+    {
+        var coordinator = Substitute.For<ISpeechInputCoordinator>();
+        Action<string>? committedHandler = null;
+        coordinator.When(c => c.SegmentCommitted += Arg.Any<Action<string>>())
+            .Do(ci => committedHandler = ci.Arg<Action<string>>());
 
         var vm = CreateVm(coordinator);
         vm.SourceText = "original";
 
-        Assert.NotNull(partialHandler);
-        partialHandler!.Invoke("should be ignored");
+        Assert.NotNull(committedHandler);
+        committedHandler!.Invoke("should be ignored");
 
         Assert.Equal("original", vm.SourceText);
+    }
+
+    [Fact]
+    public async Task NewRecording_ResetsCommittedTranscriptFromPreviousSession()
+    {
+        var coordinator = Substitute.For<ISpeechInputCoordinator>();
+        Action<string>? committedHandler = null;
+        coordinator.When(c => c.SegmentCommitted += Arg.Any<Action<string>>())
+            .Do(ci => committedHandler = ci.Arg<Action<string>>());
+
+        var vm = CreateVm(coordinator);
+        coordinator.State.Returns(VoiceInputState.Idle);
+        coordinator.StartRecordingAsync(Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(new SpeechInputResult(true, null, SpeechInputErrorCode.None));
+        coordinator.StopAndTranscribeAsync(Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(new SpeechInputResult(true, "first session", SpeechInputErrorCode.None));
+
+        await vm.ToggleVoiceInputCommand.ExecuteAsync(null);
+        vm.VoiceState = VoiceInputState.Recording;
+        committedHandler!.Invoke("first session");
+        await vm.ToggleVoiceInputCommand.ExecuteAsync(null);
+        Assert.Equal("first session", vm.SourceText);
+
+        // Start a new recording — the previous session's segments must NOT bleed
+        // into the new session's append buffer.
+        vm.VoiceState = VoiceInputState.Idle;
+        coordinator.StopAndTranscribeAsync(Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(new SpeechInputResult(true, "second", SpeechInputErrorCode.None));
+        await vm.ToggleVoiceInputCommand.ExecuteAsync(null);
+        vm.VoiceState = VoiceInputState.Recording;
+        committedHandler!.Invoke("second");
+
+        Assert.Equal("first session second", vm.SourceText);
     }
 
     [Fact]
@@ -454,8 +523,9 @@ public class OverlayVoiceInputTests
         _coordinator.StateChanged += Raise.Event<Action<VoiceInputState>>(VoiceInputState.Idle);
         Assert.Equal(VoiceInputState.Recording, vm.VoiceState);
 
-        _coordinator.PartialTranscription += Raise.Event<Action<string>>("post-dispose transcript");
-        Assert.DoesNotContain("post-dispose transcript", vm.SourceText);
+        _coordinator.SegmentCommitted += Raise.Event<Action<string>>("post-dispose segment");
+        _coordinator.PartialPreview += Raise.Event<Action<string>>("post-dispose preview");
+        Assert.DoesNotContain("post-dispose", vm.SourceText);
     }
 
     [Fact]
@@ -464,6 +534,125 @@ public class OverlayVoiceInputTests
         var vm = CreateVm();
         vm.Dispose();
         vm.Dispose();
+    }
+
+    [Fact]
+    public async Task SegmentCommitted_FromBackgroundThread_MarshalsToCapturedSyncContext()
+    {
+        // Regression: HandleSegmentCommitted / HandlePartialPreview / HandleVoiceStateChanged
+        // were invoking observable-property setters synchronously on the STT
+        // background thread, which crashed Avalonia subscribers with
+        // "calling thread cannot access this object". Every coordinator handler
+        // must instead post through the SynchronizationContext captured at ctor.
+        var coordinator = Substitute.For<ISpeechInputCoordinator>();
+        Action<string>? committedHandler = null;
+        coordinator.When(c => c.SegmentCommitted += Arg.Any<Action<string>>())
+            .Do(ci => committedHandler = ci.Arg<Action<string>>());
+
+        var sync = new TrackingSyncContext();
+        var prior = SynchronizationContext.Current;
+        SynchronizationContext.SetSynchronizationContext(sync);
+        OverlayViewModel vm;
+        try { vm = CreateVm(coordinator); }
+        finally { SynchronizationContext.SetSynchronizationContext(prior); }
+
+        vm.VoiceState = VoiceInputState.Recording;
+        Assert.NotNull(committedHandler);
+
+        await Task.Run(() => committedHandler!.Invoke("from background"),
+            TestContext.Current.CancellationToken);
+
+        Assert.True(sync.PostCount > 0,
+            "Coordinator events from a background thread must be posted to the captured UI SyncContext.");
+        sync.DrainPending();
+        Assert.Contains("from background", vm.SourceText);
+    }
+
+    [Fact]
+    public async Task ToggleVoice_ExplicitVoiceLanguage_PreservedAcrossSessions()
+    {
+        // Regression: the previous code unconditionally assigned
+        // SelectedVoiceLanguage = SelectedSourceLanguage on every Start, so an
+        // explicit voice-language pick from a previous session was silently
+        // wiped — leading to the wrong language hint being passed to STT.
+        var coordinator = Substitute.For<ISpeechInputCoordinator>();
+        var capturedHints = new List<string?>();
+        coordinator.StartRecordingAsync(Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(ci =>
+            {
+                capturedHints.Add(ci.ArgAt<string?>(0));
+                return new SpeechInputResult(true, null, SpeechInputErrorCode.None);
+            });
+        coordinator.StopAndTranscribeAsync(Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(new SpeechInputResult(true, null, SpeechInputErrorCode.None));
+
+        var vm = CreateVm(coordinator);
+        vm.SelectedVoiceLanguage = new LanguageInfo("ja", "Japanese");
+
+        coordinator.State.Returns(VoiceInputState.Idle);
+        await vm.ToggleVoiceInputCommand.ExecuteAsync(null);
+        vm.VoiceState = VoiceInputState.Recording;
+        await vm.ToggleVoiceInputCommand.ExecuteAsync(null);
+        vm.VoiceState = VoiceInputState.Idle;
+        await vm.ToggleVoiceInputCommand.ExecuteAsync(null);
+
+        Assert.Equal(2, capturedHints.Count);
+        Assert.All(capturedHints, code => Assert.Equal("ja", code));
+    }
+
+    [Fact]
+    public async Task ToggleVoice_NoVoiceLanguagePicked_PassesSourceLanguageHintToStt()
+    {
+        // Regression: when SelectedVoiceLanguage was null we passed null to
+        // sherpa-onnx, which then ran internal language ID and mis-detected short
+        // Chinese utterances as English / Japanese. The hint must always fall
+        // back to the active source language so the recognizer is biased toward
+        // the language the user is actually speaking.
+        var coordinator = Substitute.For<ISpeechInputCoordinator>();
+        string? capturedHint = null;
+        coordinator.StartRecordingAsync(Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(ci =>
+            {
+                capturedHint = ci.ArgAt<string?>(0);
+                return new SpeechInputResult(true, null, SpeechInputErrorCode.None);
+            });
+
+        var settings = new UserSettings
+        {
+            Translation = new LiveLingo.Desktop.Services.Configuration.TranslationSettings
+            {
+                DefaultSourceLanguage = "zh",
+                DefaultTargetLanguage = "en"
+            }
+        };
+        var vm = new OverlayViewModel(
+            Target, _pipeline, _injector, _engine, settings,
+            localizationService: _loc,
+            speechCoordinator: coordinator);
+
+        coordinator.State.Returns(VoiceInputState.Idle);
+        await vm.ToggleVoiceInputCommand.ExecuteAsync(null);
+
+        Assert.Equal("zh", capturedHint);
+    }
+
+    private sealed class TrackingSyncContext : SynchronizationContext
+    {
+        private readonly Queue<Action> _queue = new();
+
+        public int PostCount { get; private set; }
+
+        public override void Post(SendOrPostCallback d, object? state)
+        {
+            PostCount++;
+            _queue.Enqueue(() => d(state));
+        }
+
+        public void DrainPending()
+        {
+            while (_queue.Count > 0)
+                _queue.Dequeue().Invoke();
+        }
     }
 
     private sealed class DeterministicTranslationEngine : ITranslationEngine

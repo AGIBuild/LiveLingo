@@ -86,17 +86,24 @@ public class SpeechInputCoordinatorTests
         SetupPermissionGranted();
         SetupSttModelInstalled();
 
-        var audio = new AudioCaptureResult(new byte[320], 16000, 1, TimeSpan.FromMilliseconds(10));
+        var audio = OneSecondOfSilence();
         _audioCapture.StopAsync(Arg.Any<CancellationToken>()).Returns(audio);
-        _sttEngine.TranscribeAsync(audio, Arg.Any<string?>(), Arg.Any<CancellationToken>())
+        _sttEngine.TranscribeAsync(Arg.Any<AudioCaptureResult>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns(new SpeechTranscriptionResult("hello", "en", 0.95f));
 
         var coordinator = CreateCoordinator();
+        var committed = new List<string>();
+        coordinator.SegmentCommitted += s => committed.Add(s);
+
         await coordinator.StartRecordingAsync(ct: TestCt);
         var result = await coordinator.StopAndTranscribeAsync(ct: TestCt);
 
         Assert.True(result.Success);
         Assert.Equal("hello", result.Text);
+        // The tail must be drained through SegmentCommitted so subscribers that
+        // build the transcript by appending events stay in sync with result.Text.
+        Assert.Single(committed);
+        Assert.Equal("hello", committed[0]);
         Assert.Equal(VoiceInputState.Idle, coordinator.State);
     }
 
@@ -106,9 +113,9 @@ public class SpeechInputCoordinatorTests
         SetupPermissionGranted();
         SetupSttModelInstalled();
 
-        var audio = new AudioCaptureResult(new byte[320], 16000, 1, TimeSpan.FromMilliseconds(10));
+        var audio = OneSecondOfSilence();
         _audioCapture.StopAsync(Arg.Any<CancellationToken>()).Returns(audio);
-        _sttEngine.TranscribeAsync(audio, Arg.Any<string?>(), Arg.Any<CancellationToken>())
+        _sttEngine.TranscribeAsync(Arg.Any<AudioCaptureResult>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns<SpeechTranscriptionResult>(_ => throw new InvalidOperationException("decode error"));
 
         var coordinator = CreateCoordinator();
@@ -148,9 +155,9 @@ public class SpeechInputCoordinatorTests
         SetupPermissionGranted();
         SetupSttModelInstalled();
 
-        var audio = new AudioCaptureResult(new byte[320], 16000, 1, TimeSpan.FromMilliseconds(10));
+        var audio = OneSecondOfSilence();
         _audioCapture.StopAsync(Arg.Any<CancellationToken>()).Returns(audio);
-        _sttEngine.TranscribeAsync(audio, Arg.Any<string?>(), Arg.Any<CancellationToken>())
+        _sttEngine.TranscribeAsync(Arg.Any<AudioCaptureResult>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns(new SpeechTranscriptionResult("test", "en", 0.9f));
 
         var coordinator = CreateCoordinator();
@@ -187,9 +194,10 @@ public class SpeechInputCoordinatorTests
         SetupSttModelInstalled();
 
         var tcs = new TaskCompletionSource<SpeechTranscriptionResult>();
-        var audio = new AudioCaptureResult(new byte[320], 16000, 1, TimeSpan.FromMilliseconds(10));
+        var audio = OneSecondOfSilence();
         _audioCapture.StopAsync(Arg.Any<CancellationToken>()).Returns(audio);
-        _sttEngine.TranscribeAsync(audio, Arg.Any<string?>(), Arg.Any<CancellationToken>()).Returns(tcs.Task);
+        _sttEngine.TranscribeAsync(Arg.Any<AudioCaptureResult>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(tcs.Task);
 
         var coordinator = CreateCoordinator();
         await coordinator.StartRecordingAsync(ct: TestCt);
@@ -242,9 +250,9 @@ public class SpeechInputCoordinatorTests
         SetupPermissionGranted();
         SetupSttModelInstalled();
 
-        var audio = new AudioCaptureResult(new byte[320], 16000, 1, TimeSpan.FromMilliseconds(10));
+        var audio = OneSecondOfSilence();
         _audioCapture.StopAsync(Arg.Any<CancellationToken>()).Returns(audio);
-        _sttEngine.TranscribeAsync(audio, Arg.Any<string?>(), Arg.Any<CancellationToken>())
+        _sttEngine.TranscribeAsync(Arg.Any<AudioCaptureResult>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns(new SpeechTranscriptionResult("", "en", 0.1f));
 
         var coordinator = CreateCoordinator();
@@ -274,7 +282,7 @@ public class SpeechInputCoordinatorTests
         SetupSttModelInstalled();
 
         var tcs = new TaskCompletionSource<SpeechTranscriptionResult>();
-        var audio = new AudioCaptureResult(new byte[320], 16000, 1, TimeSpan.FromMilliseconds(10));
+        var audio = OneSecondOfSilence();
         _audioCapture.StopAsync(Arg.Any<CancellationToken>()).Returns(audio);
         _sttEngine.TranscribeAsync(Arg.Any<AudioCaptureResult>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns(tcs.Task);
@@ -353,5 +361,59 @@ public class SpeechInputCoordinatorTests
                 sttModel.SizeBytes, sttModel.Type, DateTime.UtcNow)
         });
         _modelManager.HasAllExpectedLocalAssets(sttModel).Returns(true);
+    }
+
+    /// <summary>
+    /// Builds 1s of silent 16kHz mono PCM16, which is long enough to clear the
+    /// coordinator's MinSegmentSeconds gate so the tail-drain branch of
+    /// StopAndTranscribeAsync runs end-to-end. Tests that pass shorter audio
+    /// would silently exercise the "skip transcription" path.
+    /// </summary>
+    private static AudioCaptureResult OneSecondOfSilence() =>
+        new(new byte[16000 * 2], 16000, 1, TimeSpan.FromSeconds(1));
+
+    [Fact]
+    public async Task StopAndTranscribe_TailShorterThanMinSegment_SkipsTranscription()
+    {
+        SetupPermissionGranted();
+        SetupSttModelInstalled();
+
+        // 50ms of audio is below MinSegmentSeconds — the tail must be ignored
+        // so the recognizer is never invoked with a sub-segment that would
+        // produce noise/garbage in place of an utterance.
+        var tinyAudio = new AudioCaptureResult(new byte[1600], 16000, 1, TimeSpan.FromMilliseconds(50));
+        _audioCapture.StopAsync(Arg.Any<CancellationToken>()).Returns(tinyAudio);
+
+        var coordinator = CreateCoordinator();
+        await coordinator.StartRecordingAsync(ct: TestCt);
+        var result = await coordinator.StopAndTranscribeAsync(ct: TestCt);
+
+        Assert.True(result.Success);
+        Assert.Equal(string.Empty, result.Text);
+        await _sttEngine.DidNotReceive().TranscribeAsync(
+            Arg.Any<AudioCaptureResult>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task StopAndTranscribe_EmitsEmptyPreviewBeforeIdle()
+    {
+        SetupPermissionGranted();
+        SetupSttModelInstalled();
+
+        var audio = OneSecondOfSilence();
+        _audioCapture.StopAsync(Arg.Any<CancellationToken>()).Returns(audio);
+        _sttEngine.TranscribeAsync(Arg.Any<AudioCaptureResult>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(new SpeechTranscriptionResult("done", "en", 0.9f));
+
+        var coordinator = CreateCoordinator();
+        var previews = new List<string>();
+        coordinator.PartialPreview += s => previews.Add(s);
+
+        await coordinator.StartRecordingAsync(ct: TestCt);
+        await coordinator.StopAndTranscribeAsync(ct: TestCt);
+
+        // The empty-string preview is the contract that lets UI subscribers
+        // clear any stale preview overlay atomically with the final commit.
+        Assert.Contains(string.Empty, previews);
     }
 }

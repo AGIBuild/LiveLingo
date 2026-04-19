@@ -87,6 +87,12 @@ public partial class OverlayViewModel : ObservableObject, IDisposable
     [ObservableProperty] private bool _showSttDownloadLink;
     [ObservableProperty] private bool _isVoiceLanguagePickerOpen;
     private string _preRecordingText = string.Empty;
+    // Append-only buffer of committed STT segments for the active voice session.
+    // Cleared when a new recording starts so old transcripts can never leak into
+    // the next session. SourceText = _preRecordingText + committed + currentPreview
+    // (preview is shown only while the in-flight segment hasn't committed yet).
+    private readonly System.Text.StringBuilder _committedVoiceTranscript = new();
+    private string _currentVoicePreview = string.Empty;
     [ObservableProperty] private LanguageInfo? _selectedVoiceLanguage;
 
     public string CopyLabel => L("overlay.copy");
@@ -821,8 +827,23 @@ public partial class OverlayViewModel : ObservableObject, IDisposable
             _preRecordingText = SourceText;
             if (!string.IsNullOrEmpty(_preRecordingText) && !_preRecordingText.EndsWith(' '))
                 _preRecordingText += " ";
-            SelectedVoiceLanguage = SelectedSourceLanguage;
-            var result = await _speechCoordinator.StartRecordingAsync(SelectedVoiceLanguage?.Code);
+            // New session: drop any segments / preview from a previous recording
+            // before the coordinator starts streaming new ones.
+            ResetVoiceSessionBuffers();
+            // Preserve any explicit voice-language pick from a previous session;
+            // only fall back to the current source language when the user hasn't
+            // chosen one. Unconditional assignment used to wipe out the picker
+            // selection on every Start.
+            SelectedVoiceLanguage ??= SelectedSourceLanguage;
+            // Always pass a non-empty hint when we have one. Without it Cohere
+            // Transcribe falls back to internal language ID, which on short
+            // segments routinely mis-detects (e.g. zh recognized as en/ja). The
+            // fallback chain prefers the explicit voice pick → source pick →
+            // currently-resolved source language code.
+            var hint = SelectedVoiceLanguage?.Code
+                       ?? SelectedSourceLanguage?.Code
+                       ?? _sourceLanguage;
+            var result = await _speechCoordinator.StartRecordingAsync(hint);
             if (!result.Success)
             {
                 VoiceStatusText = MapVoiceError(result);
@@ -870,26 +891,80 @@ public partial class OverlayViewModel : ObservableObject, IDisposable
     private void SubscribeSpeechCoordinator()
     {
         if (_speechCoordinator is null) return;
+        // Coordinator events fire on a background STT thread. Every handler must
+        // marshal to the captured UI SynchronizationContext before touching any
+        // observable property, otherwise PropertyChanged subscribers in the View
+        // (e.g. OverlayWindow.UpdateMicIconState) cross-thread access Avalonia
+        // controls and throw "calling thread cannot access this object".
         _speechCoordinator.StateChanged += HandleVoiceStateChanged;
-        _speechCoordinator.PartialTranscription += HandlePartialTranscription;
+        _speechCoordinator.SegmentCommitted += HandleSegmentCommitted;
+        _speechCoordinator.PartialPreview += HandlePartialPreview;
     }
 
-    private void HandlePartialTranscription(string text)
+    private void HandleSegmentCommitted(string text)
     {
-        if (VoiceState == VoiceInputState.Recording)
-            SourceText = _preRecordingText + text;
+        var trimmed = text?.Trim() ?? string.Empty;
+        if (trimmed.Length == 0) return;
+
+        MarshalToUi(() =>
+        {
+            // Segments stream in during Recording AND while StopAndTranscribe drains
+            // the tail (Transcribing). Both must append; only Idle/Error are stale.
+            if (VoiceState != VoiceInputState.Recording && VoiceState != VoiceInputState.Transcribing)
+                return;
+
+            if (_committedVoiceTranscript.Length > 0)
+                _committedVoiceTranscript.Append(' ');
+            _committedVoiceTranscript.Append(trimmed);
+            _currentVoicePreview = string.Empty;
+            SourceText = ComposeVoiceSourceText();
+        });
+    }
+
+    private void HandlePartialPreview(string text)
+    {
+        var preview = text ?? string.Empty;
+        MarshalToUi(() =>
+        {
+            if (VoiceState != VoiceInputState.Recording) return;
+            _currentVoicePreview = preview;
+            SourceText = ComposeVoiceSourceText();
+        });
+    }
+
+    private string ComposeVoiceSourceText()
+    {
+        var hasCommitted = _committedVoiceTranscript.Length > 0;
+        var hasPreview = !string.IsNullOrWhiteSpace(_currentVoicePreview);
+        var live = (hasCommitted, hasPreview) switch
+        {
+            (true, true) => $"{_committedVoiceTranscript} {_currentVoicePreview.Trim()}",
+            (true, false) => _committedVoiceTranscript.ToString(),
+            (false, true) => _currentVoicePreview.Trim(),
+            (false, false) => string.Empty,
+        };
+        return _preRecordingText + live;
+    }
+
+    private void ResetVoiceSessionBuffers()
+    {
+        _committedVoiceTranscript.Clear();
+        _currentVoicePreview = string.Empty;
     }
 
     private void HandleVoiceStateChanged(VoiceInputState state)
     {
-        VoiceState = state;
-        if (state == VoiceInputState.Idle)
+        MarshalToUi(() =>
         {
-            VoiceStatusText = string.Empty;
-            ShowSttDownloadLink = false;
-        }
-        OnPropertyChanged(nameof(VoiceTooltip));
-        OnPropertyChanged(nameof(IsRecording));
+            VoiceState = state;
+            if (state == VoiceInputState.Idle)
+            {
+                VoiceStatusText = string.Empty;
+                ShowSttDownloadLink = false;
+            }
+            OnPropertyChanged(nameof(VoiceTooltip));
+            OnPropertyChanged(nameof(IsRecording));
+        });
     }
 
     private void OnDownloadStateChanged(ModelDownloadState state)
@@ -897,14 +972,29 @@ public partial class OverlayViewModel : ObservableObject, IDisposable
         // Filter to STT models so unrelated translation/postprocessing downloads
         // don't bleed into the voice status banner.
         if (!SttModelIds.Contains(state.ModelId)) return;
+        MarshalToUi(() => ApplySttDownloadState(state));
+    }
 
-        if (_uiContext is null)
+    /// <summary>
+    /// Routes <paramref name="action"/> to the captured UI SynchronizationContext
+    /// so observable-property mutations from background events (STT thread,
+    /// download coordinator, etc.) trip PropertyChanged subscribers on the UI
+    /// thread. Synchronously executes when already on the UI context to avoid
+    /// re-entrancy. Drops the action if the VM has been disposed in the meantime.
+    /// </summary>
+    private void MarshalToUi(Action action)
+    {
+        if (_uiContext is null || SynchronizationContext.Current == _uiContext)
         {
-            ApplySttDownloadState(state);
+            if (_disposed) return;
+            action();
             return;
         }
-
-        _uiContext.Post(_ => ApplySttDownloadState(state), null);
+        _uiContext.Post(_ =>
+        {
+            if (_disposed) return;
+            action();
+        }, null);
     }
 
     private void ApplySttDownloadState(ModelDownloadState state)
@@ -1056,7 +1146,8 @@ public partial class OverlayViewModel : ObservableObject, IDisposable
         if (_speechCoordinator is not null)
         {
             _speechCoordinator.StateChanged -= HandleVoiceStateChanged;
-            _speechCoordinator.PartialTranscription -= HandlePartialTranscription;
+            _speechCoordinator.SegmentCommitted -= HandleSegmentCommitted;
+            _speechCoordinator.PartialPreview -= HandlePartialPreview;
         }
 
         if (_onDownloadStateChanged is not null)
