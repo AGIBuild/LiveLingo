@@ -57,7 +57,7 @@ public class ModelRegistryTests
     [Fact]
     public void AllModels_ContainsAll()
     {
-        Assert.Equal(11, ModelRegistry.AllModels.Count);
+        Assert.Equal(12, ModelRegistry.AllModels.Count);
         Assert.Contains(ModelRegistry.Gemma4_26B_A4B, ModelRegistry.AllModels);
         Assert.Contains(ModelRegistry.Gemma4_E4B, ModelRegistry.AllModels);
         Assert.Contains(ModelRegistry.Qwen35_9B, ModelRegistry.AllModels);
@@ -66,6 +66,7 @@ public class ModelRegistryTests
         Assert.Contains(ModelRegistry.MarianZhEn, ModelRegistry.AllModels);
         Assert.Contains(ModelRegistry.FastTextLid, ModelRegistry.AllModels);
         Assert.Contains(ModelRegistry.SherpaCohereTranscribe14LangInt8, ModelRegistry.AllModels);
+        Assert.Contains(ModelRegistry.SherpaSenseVoiceSmallInt8, ModelRegistry.AllModels);
         Assert.Contains(ModelRegistry.SileroVad, ModelRegistry.AllModels);
     }
 
@@ -173,9 +174,11 @@ public class ModelRegistryTests
     }
 
     [Fact]
-    public void SpeechToTextModels_OnlyContainsSherpaCohereTranscribe()
+    public void SpeechToTextModels_ContainsCohereAndSenseVoice()
     {
+        Assert.Equal(2, ModelRegistry.SpeechToTextModels.Count);
         Assert.Contains(ModelRegistry.SherpaCohereTranscribe14LangInt8, ModelRegistry.SpeechToTextModels);
+        Assert.Contains(ModelRegistry.SherpaSenseVoiceSmallInt8, ModelRegistry.SpeechToTextModels);
         Assert.All(ModelRegistry.SpeechToTextModels, m => Assert.Equal(ModelType.SpeechToText, m.Type));
     }
 

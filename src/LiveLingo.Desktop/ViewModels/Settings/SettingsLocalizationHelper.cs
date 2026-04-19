@@ -1,4 +1,5 @@
 using LiveLingo.Core;
+using LiveLingo.Core.Speech;
 using LiveLingo.Desktop.Services.Configuration;
 using LiveLingo.Desktop.Services.Localization;
 
@@ -50,6 +51,16 @@ internal sealed class SettingsLocalizationHelper : ISettingsLocalizationHelper
             new(nameof(TranslationRoutingMode.CloudOnly), Translate("settings.routing.cloudOnly", "Cloud Only")),
         };
 
+        var sttRoutingModes = new SelectableOption[]
+        {
+            new(nameof(SttRoutingMode.AccuracyFirst),
+                Translate("settings.speech.routing.accuracyFirst", "Accuracy First")),
+            new(nameof(SttRoutingMode.StreamingFirst),
+                Translate("settings.speech.routing.streamingFirst", "Streaming First")),
+            new(nameof(SttRoutingMode.MultilingualFirst),
+                Translate("settings.speech.routing.multilingualFirst", "Multilingual First")),
+        };
+
         var cloudPresets = CloudProviderPresetCatalog.All
             .Select(preset => new SelectableOption(preset.Id, ResolveCloudPresetDisplayName(preset)))
             .ToArray();
@@ -63,7 +74,13 @@ internal sealed class SettingsLocalizationHelper : ISettingsLocalizationHelper
             new("Error", Translate("settings.logLevel.error", "Error")),
         };
 
-        return new LocalizedSettingsOptions(injectionModes, postProcessModes, routingModes, cloudPresets, logLevels);
+        return new LocalizedSettingsOptions(
+            injectionModes,
+            postProcessModes,
+            routingModes,
+            sttRoutingModes,
+            cloudPresets,
+            logLevels);
     }
 
     public string ResolveCloudPresetDisplayName(CloudProviderPreset preset) =>

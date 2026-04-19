@@ -7,6 +7,7 @@ using LiveLingo.Desktop.Messaging;
 using LiveLingo.Desktop.Platform;
 using LiveLingo.Desktop.Services.Configuration;
 using LiveLingo.Desktop.ViewModels;
+using LiveLingo.Desktop.ViewModels.Settings;
 using Microsoft.Extensions.DependencyInjection;
 using NSubstitute;
 
@@ -108,7 +109,7 @@ public class SettingsRuntimeIntegrationTests : IDisposable
 
         wizardVm.OpenAdvancedForHuggingFaceCommand.Execute(null);
 
-        Assert.Equal(3, settingsVm.SelectedTabIndex);
+        Assert.Equal((int)SettingsTab.Advanced, settingsVm.SelectedTabIndex);
 
         settingsVm.WorkingCopy.Advanced.HuggingFaceToken = "hf_test_token";
         await settingsVm.SaveCommand.ExecuteAsync(null);

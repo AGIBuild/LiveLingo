@@ -171,6 +171,33 @@ public static class ModelRegistry
         ]
     };
 
+    // SenseVoice Small int8 (sherpa-onnx bundle).
+    // Source: https://github.com/k2-fsa/sherpa-onnx/releases/tag/asr-models
+    //
+    // Why ship SenseVoice alongside Cohere Transcribe:
+    //   - Single-file model (~228 MB int8) — ~1/7 the disk footprint of Cohere.
+    //   - 5 languages with state-of-the-art CJK accuracy (Chinese / Cantonese / Japanese /
+    //     Korean / English); particularly strong for Mandarin & Cantonese where Cohere lags.
+    //   - Built-in inverse text normalization (punctuation) when UseInverseTextNormalization=1.
+    //   - On-model language detection (set Language="auto") — returns detected code via result.Lang.
+    //   - Drop-in OfflineRecognizer architecture: same DI shape and capture pipeline as Cohere.
+    //
+    // Routing: served via SttRoutingMode.MultilingualFirst (CJK-tuned bundle).
+    public static readonly ModelDescriptor SherpaSenseVoiceSmallInt8 = new(
+        "sherpa-sense-voice-zh-en-ja-ko-yue-int8",
+        "SenseVoice Small int8 (sherpa-onnx, CJK+EN)",
+        "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17.tar.bz2",
+        234_000_000, // ~228 MB compressed; matches release listing
+        ModelType.SpeechToText)
+    {
+        ArchiveType = ModelArchiveType.TarBz2,
+        ExtractedFiles =
+        [
+            "model.int8.onnx",
+            "tokens.txt"
+        ]
+    };
+
     public static readonly ModelDescriptor SileroVad = new(
         "silero-vad",
         "Silero VAD v5 (Voice Activity Detection)",
@@ -179,17 +206,17 @@ public static class ModelRegistry
         ModelType.VoiceActivityDetection);
 
     public static IReadOnlyList<ModelDescriptor> SpeechToTextModels { get; } =
-        [SherpaCohereTranscribe14LangInt8];
+        [SherpaCohereTranscribe14LangInt8, SherpaSenseVoiceSmallInt8];
 
     public static IReadOnlyList<ModelDescriptor> OptionalModels { get; } =
-        [Gemma4_E4B, Qwen25_15B, SherpaCohereTranscribe14LangInt8, SileroVad];
+        [Gemma4_E4B, Qwen25_15B, SherpaCohereTranscribe14LangInt8, SherpaSenseVoiceSmallInt8, SileroVad];
 
     public static IReadOnlyList<ModelDescriptor> AllModels { get; } =
     [
         Gemma4_26B_A4B, Gemma4_E4B,
         Qwen35_9B, Qwen25_7B,
         MarianZhEn, MarianEnZh, MarianJaEn,
-        FastTextLid, Qwen25_15B, SherpaCohereTranscribe14LangInt8, SileroVad
+        FastTextLid, Qwen25_15B, SherpaCohereTranscribe14LangInt8, SherpaSenseVoiceSmallInt8, SileroVad
     ];
 
     public static ModelDescriptor? FindTranslationModel(string sourceLanguage, string targetLanguage) =>

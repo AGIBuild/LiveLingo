@@ -34,7 +34,12 @@ LiveLingo pops up as a sleek floating overlay — right where you're working. Ty
 
 ### 🔒 100% Offline & Private
 
-Your text never leaves your computer. LiveLingo runs a local AI model ([Qwen2.5-1.5B](https://huggingface.co/Qwen)) — no API keys, no cloud services, no "we may use your data to improve our products" surprises.
+Your text — and your voice — never leaves your computer. LiveLingo runs local AI
+models for both translation and speech recognition: [Gemma 4 26B-A4B
+MoE](https://huggingface.co/google) (Mixture-of-Experts, ~26 B-class quality at
+~4 B-class latency) for translation, and [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)
+(Cohere Transcribe 14-Lang or SenseVoice CJK-tuned) for speech-to-text.
+No API keys, no cloud services, no "we may use your data to improve our products" surprises.
 
 ### ⚡ Ridiculously Fast
 
@@ -50,6 +55,20 @@ Two modes to fit your workflow:
 
 - **Paste Only** — drops the translation into your clipboard
 - **Paste & Send** — pastes AND hits Enter for you (perfect for chat apps)
+
+### 🎙️ Voice Input
+
+Talk to LiveLingo instead of typing. Powered by sherpa-onnx with two
+interchangeable engines:
+
+- **Accuracy First** — Cohere Transcribe (14 languages, top of the Open ASR
+  Leaderboard, ~1.6 GB)
+- **Multilingual First** — SenseVoice Small (中 / 粤 / 英 / 日 / 韩, on-model
+  language detection, ~228 MB)
+
+Switch engines anytime from *Settings → Speech* — the active model card shows
+exactly what will run, with a one-click jump to the *Models* tab when a
+download is missing.
 
 ### 🪟 Beautiful Floating Overlay
 
@@ -122,11 +141,18 @@ Download the latest release for your platform:
 
 ### First Launch
 
-1. **Download the AI model** — LiveLingo will prompt you on first run. It's a one-time ~1 GB download.
-2. **Set your hotkey** — Default is `Ctrl+Alt+T` (Windows) or `Option+Cmd+T` (macOS). Customize it anytime.
-3. **Start translating** — Press the hotkey anywhere, type your text, and go.
+1. **Download the AI models** — LiveLingo will prompt you on first run.
+   Translation needs Gemma 4 26B-A4B MoE (~17 GB; falls back to Gemma 4 E4B
+   ~5.4 GB on low-RAM devices). Voice input is optional — pull either
+   Cohere Transcribe (~1.6 GB) or SenseVoice Small (~228 MB) from
+   *Settings → Models* when you're ready.
+2. **Set your hotkey** — Default is `Ctrl+Alt+T` (Windows) or `Option+Cmd+T`
+   (macOS). Customize it anytime.
+3. **Start translating** — Press the hotkey anywhere, type or speak your
+   text, and go.
 
-> **macOS users:** Grant Accessibility and Input Monitoring permissions when prompted. LiveLingo needs these to register global hotkeys and inject text.
+> **macOS users:** Grant Accessibility and Input Monitoring permissions when
+> prompted. LiveLingo needs these to register global hotkeys and inject text.
 
 ---
 

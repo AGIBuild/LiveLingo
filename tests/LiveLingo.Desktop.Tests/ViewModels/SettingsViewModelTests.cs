@@ -4,6 +4,7 @@ using LiveLingo.Desktop.Services.Localization;
 using LiveLingo.Desktop.Messaging;
 using LiveLingo.Desktop.Platform;
 using LiveLingo.Desktop.ViewModels;
+using LiveLingo.Desktop.ViewModels.Settings;
 using CommunityToolkit.Mvvm.Messaging;
 using LiveLingo.Core;
 using LiveLingo.Core.Engines;
@@ -675,7 +676,7 @@ public class SettingsViewModelTests
 
         vm.OpenModelsTabCommand.Execute(null);
 
-        Assert.Equal(2, vm.SelectedTabIndex);
+        Assert.Equal((int)SettingsTab.Models, vm.SelectedTabIndex);
     }
 
     [Fact]
@@ -1242,7 +1243,76 @@ public class SettingsViewModelTests
 
         vm.OpenAdvancedTabForTokenCommand.Execute(null);
 
-        Assert.Equal(3, vm.SelectedTabIndex);
+        Assert.Equal((int)SettingsTab.Advanced, vm.SelectedTabIndex);
+    }
+
+    [Fact]
+    public void SttRoutingModeOptions_ContainsAllSttRoutingModes()
+    {
+        var vm = new SettingsViewModel(CreateSettings());
+
+        Assert.Equal(3, vm.SttRoutingModeOptions.Count);
+        Assert.Contains(vm.SttRoutingModeOptions, o => o.Value == nameof(LiveLingo.Core.Speech.SttRoutingMode.AccuracyFirst));
+        Assert.Contains(vm.SttRoutingModeOptions, o => o.Value == nameof(LiveLingo.Core.Speech.SttRoutingMode.StreamingFirst));
+        Assert.Contains(vm.SttRoutingModeOptions, o => o.Value == nameof(LiveLingo.Core.Speech.SttRoutingMode.MultilingualFirst));
+    }
+
+    [Fact]
+    public void ActiveSttModelDisplayName_ReflectsCohereTranscribe_ByDefault()
+    {
+        var vm = new SettingsViewModel(CreateSettings());
+
+        Assert.Equal(ModelRegistry.SherpaCohereTranscribe14LangInt8.DisplayName, vm.ActiveSttModelDisplayName);
+    }
+
+    [Fact]
+    public void ActiveSttModelChange_RaisesPropertyChanged_ForBoundLabels()
+    {
+        var vm = new SettingsViewModel(CreateSettings());
+        var changed = new HashSet<string?>();
+        vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        vm.WorkingCopy.Speech.RoutingMode = nameof(LiveLingo.Core.Speech.SttRoutingMode.StreamingFirst);
+
+        Assert.Contains(nameof(SettingsViewModel.ActiveSttModelDisplayName), changed);
+        Assert.Contains(nameof(SettingsViewModel.ActiveSttModelSizeText), changed);
+        Assert.Contains(nameof(SettingsViewModel.IsActiveSttModelInstalled), changed);
+        Assert.True(vm.IsDirty);
+    }
+
+    [Fact]
+    public void ActiveSttModelDisplayName_SwitchesToSenseVoice_WhenRoutingChangesToMultilingualFirst()
+    {
+        // Verifies P2.d wiring end-to-end: changing the routing mode in the working copy
+        // must flow through SpeechModelRouting and land on the SenseVoice descriptor.
+        var vm = new SettingsViewModel(CreateSettings());
+
+        vm.WorkingCopy.Speech.RoutingMode = nameof(LiveLingo.Core.Speech.SttRoutingMode.MultilingualFirst);
+
+        Assert.Equal(ModelRegistry.SherpaSenseVoiceSmallInt8.DisplayName, vm.ActiveSttModelDisplayName);
+    }
+
+    [Fact]
+    public void IsActiveSttModelInstalled_ReturnsTrue_WhenModelManagerListsActiveModel()
+    {
+        var modelManager = Substitute.For<IModelManager>();
+        var stt = ModelRegistry.SherpaCohereTranscribe14LangInt8;
+        modelManager.ListInstalled().Returns([
+            new InstalledModel(stt.Id, stt.DisplayName, "/tmp/x", stt.SizeBytes, ModelType.SpeechToText, DateTime.UtcNow)
+        ]);
+        var vm = new SettingsViewModel(CreateSettings(), modelManager);
+
+        Assert.True(vm.IsActiveSttModelInstalled);
+    }
+
+    [Fact]
+    public void IsActiveSttModelInstalled_ReturnsFalse_WhenModelManagerHasNoMatch()
+    {
+        var modelManager = Substitute.For<IModelManager>();
+        modelManager.ListInstalled().Returns([]);
+        var vm = new SettingsViewModel(CreateSettings(), modelManager);
+
+        Assert.False(vm.IsActiveSttModelInstalled);
     }
 
     [Fact]

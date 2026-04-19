@@ -30,6 +30,7 @@
         "Pack",
         "PackMac",
         "PackMsi",
+        "ProbeStt",
         "ProbeTranslation",
         "ProbeTranslationAll",
         "Publish",
@@ -127,6 +128,10 @@
           "description": "Minimum line coverage percentage",
           "format": "int32"
         },
+        "EnableSttProbe": {
+          "type": "boolean",
+          "description": "Enable sherpa-onnx STT regression probe target"
+        },
         "EnableTranslationProbe": {
           "type": "boolean",
           "description": "Enable translation regression probe target"
@@ -151,6 +156,18 @@
         "ProbeSourceText": {
           "type": "string",
           "description": "Source text used by translation probe"
+        },
+        "ProbeSttExpected": {
+          "type": "string",
+          "description": "Expected substring in the STT probe transcription result"
+        },
+        "ProbeSttLang": {
+          "type": "string",
+          "description": "Optional language hint (ISO-639-1) for the STT probe, e.g. en / zh / ja"
+        },
+        "ProbeWavPath": {
+          "type": "string",
+          "description": "Path to a 16 kHz mono wav file used by the STT probe"
         },
         "Runtime": {
           "type": "string",
