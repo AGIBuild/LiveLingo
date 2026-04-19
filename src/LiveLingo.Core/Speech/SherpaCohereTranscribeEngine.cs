@@ -93,6 +93,11 @@ internal sealed class SherpaCohereTranscribeEngine : ISpeechToTextEngine
             config.ModelConfig.Debug = 0;
             config.ModelConfig.CohereTranscribe.Encoder = encoderPath;
             config.ModelConfig.CohereTranscribe.Decoder = decoderPath;
+            // Cohere Transcribe ships built-in punctuation + inverse text normalization;
+            // both are off by default and cost nothing at inference time, so always enable
+            // them to deliver readable, formatted text to translation downstream.
+            config.ModelConfig.CohereTranscribe.UsePunct = 1;
+            config.ModelConfig.CohereTranscribe.UseItn = 1;
 
             _logger?.LogInformation(
                 "Initializing sherpa-onnx Cohere Transcribe recognizer: encoder={Encoder}, decoder={Decoder}, tokens={Tokens}, threads={Threads}",
