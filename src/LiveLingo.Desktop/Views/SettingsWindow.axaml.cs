@@ -224,6 +224,7 @@ public partial class SettingsWindow : Window
         SetContent("SaveBtn", loc.T("settings.save"));
         SetHeader("TabGeneral", loc.T("settings.tab.general"));
         SetHeader("TabTranslation", loc.T("settings.tab.translation"));
+        SetHeader("TabSpeech", loc.T("settings.tab.speech"));
         SetHeader("TabModels", loc.T("settings.tab.models"));
         SetHeader("TabAdvanced", loc.T("settings.tab.advanced"));
         SetHeader("TabAI", loc.T("settings.tab.ai"));

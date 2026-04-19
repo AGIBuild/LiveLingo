@@ -11,6 +11,7 @@ using LiveLingo.Desktop.Services.LanguageCatalog;
 using LiveLingo.Desktop.Services.Localization;
 using LiveLingo.Desktop.Platform;
 using LiveLingo.Desktop.ViewModels;
+using LiveLingo.Desktop.ViewModels.Settings;
 using LiveLingo.Desktop.Views;
 using LiveLingo.Core;
 using LiveLingo.Core.Engines;
@@ -131,20 +132,20 @@ public class AppStartupSmokeTests
         SetPrivateField(app, "_serviceProvider", provider);
         SetPrivateField(app, "_messenger", provider.GetRequiredService<IMessenger>());
 
-        app.ShowSettings(3);
+        app.ShowSettings((int)SettingsTab.Advanced);
 
         var firstWindow = GetPrivateField<SettingsWindow>(app, "_settingsWindow");
         var firstVm = Assert.IsType<SettingsViewModel>(firstWindow.DataContext);
         Assert.True(firstWindow.IsVisible);
-        Assert.Equal(3, firstVm.SelectedTabIndex);
+        Assert.Equal((int)SettingsTab.Advanced, firstVm.SelectedTabIndex);
 
-        app.ShowSettings(2);
+        app.ShowSettings((int)SettingsTab.Models);
 
         var reusedWindow = GetPrivateField<SettingsWindow>(app, "_settingsWindow");
         var reusedVm = Assert.IsType<SettingsViewModel>(reusedWindow.DataContext);
         Assert.Same(firstWindow, reusedWindow);
         Assert.Same(firstVm, reusedVm);
-        Assert.Equal(2, reusedVm.SelectedTabIndex);
+        Assert.Equal((int)SettingsTab.Models, reusedVm.SelectedTabIndex);
 
         reusedWindow.Close();
         provider.Dispose();
@@ -173,7 +174,7 @@ public class AppStartupSmokeTests
         var settingsWindow = GetPrivateField<SettingsWindow>(app, "_settingsWindow");
         var settingsVm = Assert.IsType<SettingsViewModel>(settingsWindow.DataContext);
         Assert.True(settingsWindow.IsVisible);
-        Assert.Equal(3, settingsVm.SelectedTabIndex);
+        Assert.Equal((int)SettingsTab.Advanced, settingsVm.SelectedTabIndex);
 
         settingsWindow.Close();
         provider.Dispose();
@@ -204,7 +205,7 @@ public class AppStartupSmokeTests
 
         var settingsWindow = GetPrivateField<SettingsWindow>(app, "_settingsWindow");
         var settingsVm = Assert.IsType<SettingsViewModel>(settingsWindow.DataContext);
-        Assert.Equal(3, settingsVm.SelectedTabIndex);
+        Assert.Equal((int)SettingsTab.Advanced, settingsVm.SelectedTabIndex);
 
         settingsVm.WorkingCopy.Advanced.HuggingFaceToken = "hf_end_to_end_token";
         await settingsVm.SaveCommand.ExecuteAsync(null);

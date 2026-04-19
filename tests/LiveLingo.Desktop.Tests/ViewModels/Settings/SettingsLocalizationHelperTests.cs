@@ -66,7 +66,7 @@ public sealed class SettingsLocalizationHelperTests
     }
 
     [Fact]
-    public void BuildSelectableOptions_HasFiveLists_AllPopulated()
+    public void BuildSelectableOptions_AllListsPopulated()
     {
         var helper = new SettingsLocalizationHelper(loc: null);
 
@@ -75,6 +75,7 @@ public sealed class SettingsLocalizationHelperTests
         Assert.Equal(2, options.InjectionModes.Count);
         Assert.Equal(4, options.PostProcessModes.Count);
         Assert.Equal(4, options.RoutingModes.Count);
+        Assert.Equal(3, options.SttRoutingModes.Count);
         Assert.Equal(4, options.CloudProviderPresets.Count);
         Assert.Equal(5, options.LogLevels.Count);
     }

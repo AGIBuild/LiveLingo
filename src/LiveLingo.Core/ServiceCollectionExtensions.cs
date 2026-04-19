@@ -212,6 +212,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<ITextProcessor, ColloquializeProcessor>();
 
         services.AddSingleton<ISpeechToTextEngine, SherpaCohereTranscribeEngine>();
+        services.AddSingleton<ISpeechToTextEngine, SherpaSenseVoiceTranscribeEngine>();
         services.AddSingleton<ISpeechEngineSelector>(sp => new DefaultSpeechEngineSelector(
             sp.GetRequiredService<CoreOptions>(),
             sp.GetServices<ISpeechToTextEngine>(),

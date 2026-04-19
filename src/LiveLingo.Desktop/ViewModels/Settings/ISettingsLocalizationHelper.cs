@@ -27,5 +27,6 @@ internal sealed record LocalizedSettingsOptions(
     IReadOnlyList<SelectableOption> InjectionModes,
     IReadOnlyList<SelectableOption> PostProcessModes,
     IReadOnlyList<SelectableOption> RoutingModes,
+    IReadOnlyList<SelectableOption> SttRoutingModes,
     IReadOnlyList<SelectableOption> CloudProviderPresets,
     IReadOnlyList<SelectableOption> LogLevels);

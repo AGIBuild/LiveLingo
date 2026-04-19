@@ -15,6 +15,7 @@ using LiveLingo.Core;
 using LiveLingo.Core.Engines;
 using LiveLingo.Core.Models;
 using LiveLingo.Core.Processing;
+using LiveLingo.Core.Speech;
 using Microsoft.Extensions.Logging;
 
 namespace LiveLingo.Desktop.ViewModels;
@@ -58,6 +59,7 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
     public IReadOnlyList<SelectableOption> PostProcessModeOptions { get; private set; } = [];
     public IReadOnlyList<SelectableOption> LogLevelOptions { get; private set; } = [];
     public IReadOnlyList<SelectableOption> RoutingModeOptions { get; private set; } = [];
+    public IReadOnlyList<SelectableOption> SttRoutingModeOptions { get; private set; } = [];
     public IReadOnlyList<SelectableOption> CloudProviderPresetOptions { get; private set; } = [];
     public static IReadOnlyList<UILanguageOption> UILanguages { get; } =
         [new("en-US", "English"), new("zh-CN", "简体中文")];
@@ -85,6 +87,52 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
         "No downloaded model available. Go to Models tab to download.");
     public string TranslationOpenModelsTab => L("settings.translation.openModelsTab", "Go to Models");
     public bool ShowNoInstalledModelsHint => AvailableTranslationModels.Count == 0;
+
+    public string SpeechSectionRouting => L("settings.speech.routing", "Speech-to-Text Routing");
+    public string SpeechRoutingModeLabel => L("settings.speech.routingMode", "Routing Mode:");
+    public string SpeechRoutingModeHint => L(
+        "settings.speech.routingModeHint",
+        "All routing modes currently resolve to Cohere Transcribe (top-of-leaderboard accuracy). Streaming-first and Multilingual-first will pick distinct engines once additional bundles ship.");
+    public string SpeechSectionActiveModel => L("settings.speech.activeModel", "Active STT Model");
+    public string SpeechActiveModelLabel => L("settings.speech.modelName", "Model:");
+    public string SpeechActiveModelSizeLabel => L("settings.speech.modelSize", "Size:");
+    public string SpeechActiveModelStatusLabel => L("settings.speech.modelStatus", "Status:");
+    public string SpeechActiveModelInstalledLabel => L("settings.speech.modelInstalled", "✓ Installed");
+    public string SpeechActiveModelMissingLabel => L(
+        "settings.speech.modelMissing",
+        "Not downloaded — open the Models tab to download.");
+    public string SpeechOpenModelsTabLabel => L("settings.speech.openModelsTab", "Go to Models");
+
+    public string ActiveSttModelDisplayName
+    {
+        get
+        {
+            var descriptor = ResolveActiveSttModel();
+            return descriptor.DisplayName;
+        }
+    }
+
+    public string ActiveSttModelSizeText
+    {
+        get
+        {
+            var descriptor = ResolveActiveSttModel();
+            return ModelItemViewModel.FormatBytes(descriptor.SizeBytes);
+        }
+    }
+
+    public bool IsActiveSttModelInstalled
+    {
+        get
+        {
+            var descriptor = ResolveActiveSttModel();
+            if (_modelManager is null)
+                return false;
+            return _modelManager.ListInstalled()
+                .Any(m => string.Equals(m.Id, descriptor.Id, StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
     public string ModelsDownloadLabel => L("settings.models.download", "Download");
     public string ModelsCancelLabel => L("settings.models.cancel", "Cancel");
     public string ModelsInstalledLabel => L("settings.models.installed", "✓ Installed");
@@ -340,6 +388,7 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
         HookGroup(model.Translation.CloudProvider, OnWorkingCopyNestedChanged);
         HookGroup(model.Translation.OllamaProvider, OnWorkingCopyNestedChanged);
         HookGroup(model.Processing, OnWorkingCopyNestedChanged);
+        HookGroup(model.Speech, OnWorkingCopyNestedChanged);
         HookGroup(model.UI, OnWorkingCopyNestedChanged);
         HookGroup(model.Update, OnWorkingCopyNestedChanged);
         HookGroup(model.Advanced, OnWorkingCopyNestedChanged);
@@ -353,6 +402,7 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
         UnhookGroup(model.Translation.CloudProvider, OnWorkingCopyNestedChanged);
         UnhookGroup(model.Translation.OllamaProvider, OnWorkingCopyNestedChanged);
         UnhookGroup(model.Processing, OnWorkingCopyNestedChanged);
+        UnhookGroup(model.Speech, OnWorkingCopyNestedChanged);
         UnhookGroup(model.UI, OnWorkingCopyNestedChanged);
         UnhookGroup(model.Update, OnWorkingCopyNestedChanged);
         UnhookGroup(model.Advanced, OnWorkingCopyNestedChanged);
@@ -361,12 +411,15 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
     private void OnWorkingCopyRootChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName is nameof(SettingsModel.Hotkeys) or nameof(SettingsModel.Translation) or
-            nameof(SettingsModel.Processing) or nameof(SettingsModel.UI) or
-            nameof(SettingsModel.Update) or nameof(SettingsModel.Advanced))
+            nameof(SettingsModel.Processing) or nameof(SettingsModel.Speech) or
+            nameof(SettingsModel.UI) or nameof(SettingsModel.Update) or nameof(SettingsModel.Advanced))
         {
             UnhookNestedGroups(WorkingCopy);
             HookNestedGroups(WorkingCopy);
         }
+
+        if (e.PropertyName == nameof(SettingsModel.Speech))
+            RaiseActiveSttModelChanged();
 
         MarkDirtyIfNeeded();
     }
@@ -407,8 +460,26 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
                 OllamaProviderStatusMessage = null;
             }
         }
+        else if (sender is SpeechSettings)
+        {
+            if (e.PropertyName is nameof(SpeechSettings.RoutingMode) or nameof(SpeechSettings.ActiveModelId))
+                RaiseActiveSttModelChanged();
+        }
 
         MarkDirtyIfNeeded();
+    }
+
+    private void RaiseActiveSttModelChanged()
+    {
+        OnPropertyChanged(nameof(ActiveSttModelDisplayName));
+        OnPropertyChanged(nameof(ActiveSttModelSizeText));
+        OnPropertyChanged(nameof(IsActiveSttModelInstalled));
+    }
+
+    private ModelDescriptor ResolveActiveSttModel()
+    {
+        var routing = SpeechModelRouting.ParseRoutingMode(WorkingCopy.Speech.RoutingMode);
+        return SpeechModelRouting.Resolve(routing, WorkingCopy.Speech.ActiveModelId);
     }
 
     private void MarkDirtyIfNeeded()
@@ -521,10 +592,10 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
     private void RefreshTranslationModels() => RefreshTranslationModelsInternal();
 
     [RelayCommand]
-    private void OpenModelsTab() => SelectedTabIndex = 2;
+    private void OpenModelsTab() => SelectedTabIndex = (int)SettingsTab.Models;
 
     [RelayCommand]
-    private void OpenAdvancedTabForToken() => SelectedTabIndex = 3;
+    private void OpenAdvancedTabForToken() => SelectedTabIndex = (int)SettingsTab.Advanced;
 
     [RelayCommand]
     private void OpenHuggingFaceTokenSettingsPage() =>
@@ -669,7 +740,10 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
     private void OnModelItemPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName is nameof(ModelItemViewModel.IsInstalled))
+        {
             RefreshTranslationModelsInternal();
+            RaiseActiveSttModelChanged();
+        }
     }
 
     private void RefreshTranslationModelsInternal()
@@ -694,6 +768,7 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
         InjectionModeOptions = options.InjectionModes;
         PostProcessModeOptions = options.PostProcessModes;
         RoutingModeOptions = options.RoutingModes;
+        SttRoutingModeOptions = options.SttRoutingModes;
         CloudProviderPresetOptions = options.CloudProviderPresets;
         LogLevelOptions = options.LogLevels;
     }

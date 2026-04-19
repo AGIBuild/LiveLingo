@@ -65,7 +65,7 @@ public static class CoreOptionsSync
             : settings.Translation.OllamaProvider.PostProcessingModelId.Trim();
 
         target.InferenceThreads = settings.Advanced.InferenceThreads;
-        target.SpeechRoutingMode = ParseSpeechRoutingMode(settings.Speech.RoutingMode);
+        target.SpeechRoutingMode = SpeechModelRouting.ParseRoutingMode(settings.Speech.RoutingMode);
         target.ActiveSttModelId = string.IsNullOrWhiteSpace(settings.Speech.ActiveModelId)
             ? null
             : settings.Speech.ActiveModelId.Trim();
@@ -137,8 +137,4 @@ public static class CoreOptionsSync
             ? parsed
             : TranslationRoutingMode.PreferLocal;
 
-    private static SttRoutingMode ParseSpeechRoutingMode(string? routingMode) =>
-        Enum.TryParse<SttRoutingMode>(routingMode, ignoreCase: true, out var parsed)
-            ? parsed
-            : SttRoutingMode.AccuracyFirst;
 }

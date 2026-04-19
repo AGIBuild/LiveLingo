@@ -201,6 +201,66 @@
                     </ScrollViewer>
                 </TabItem>
 
+                <!-- Speech -->
+                <TabItem Name="TabSpeech" Header="Speech" Classes="themed">
+                    <ScrollViewer>
+                        <StackPanel Spacing="6" Margin="0,4">
+                            <TextBlock Classes="section" Text="{Binding SpeechSectionRouting}"/>
+                            <Grid ColumnDefinitions="130,*">
+                                <TextBlock Classes="label" Text="{Binding SpeechRoutingModeLabel}"/>
+                                <ComboBox Grid.Column="1"
+                                          ItemsSource="{Binding SttRoutingModeOptions}"
+                                          DisplayMemberBinding="{Binding DisplayName}"
+                                          SelectedValue="{Binding WorkingCopy.Speech.RoutingMode, Mode=TwoWay}"
+                                          SelectedValueBinding="{Binding Value}"
+                                          MinWidth="220"
+                                          HorizontalAlignment="Left"
+                                          Classes="themed"/>
+                            </Grid>
+                            <TextBlock Classes="hint" Text="{Binding SpeechRoutingModeHint}" TextWrapping="Wrap"/>
+
+                            <Separator Classes="themed"/>
+
+                            <TextBlock Classes="section" Text="{Binding SpeechSectionActiveModel}"/>
+                            <Border Padding="12,10" CornerRadius="8"
+                                    Background="{StaticResource BgSurfaceBrush}">
+                                <Grid RowDefinitions="Auto,Auto,Auto" RowSpacing="4"
+                                      ColumnDefinitions="100,*">
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Classes="label"
+                                               Text="{Binding SpeechActiveModelLabel}"/>
+                                    <TextBlock Grid.Row="0" Grid.Column="1"
+                                               Text="{Binding ActiveSttModelDisplayName}"
+                                               Foreground="{StaticResource FgPrimaryBrush}"
+                                               TextWrapping="Wrap"/>
+
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Classes="label"
+                                               Text="{Binding SpeechActiveModelSizeLabel}"/>
+                                    <TextBlock Grid.Row="1" Grid.Column="1"
+                                               Text="{Binding ActiveSttModelSizeText}"
+                                               Foreground="{StaticResource FgSecondaryBrush}"/>
+
+                                    <TextBlock Grid.Row="2" Grid.Column="0" Classes="label"
+                                               Text="{Binding SpeechActiveModelStatusLabel}"/>
+                                    <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal"
+                                                Spacing="10" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding SpeechActiveModelInstalledLabel}"
+                                                   Foreground="{StaticResource SuccessBrush}"
+                                                   IsVisible="{Binding IsActiveSttModelInstalled}"/>
+                                        <TextBlock Text="{Binding SpeechActiveModelMissingLabel}"
+                                                   Foreground="{StaticResource DangerBrush}"
+                                                   TextWrapping="Wrap"
+                                                   IsVisible="{Binding !IsActiveSttModelInstalled}"/>
+                                        <Button Classes="themed sm" Padding="10,4"
+                                                Content="{Binding SpeechOpenModelsTabLabel}"
+                                                Command="{Binding OpenModelsTabCommand}"
+                                                IsVisible="{Binding !IsActiveSttModelInstalled}"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+                </TabItem>
+
                 <!-- Models -->
                 <TabItem Name="TabModels" Header="Models" Classes="themed">
                     <ScrollViewer>

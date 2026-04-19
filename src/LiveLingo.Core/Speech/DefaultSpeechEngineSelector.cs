@@ -48,19 +48,17 @@ internal sealed class DefaultSpeechEngineSelector : ISpeechEngineSelector
     public ModelDescriptor GetActiveModel()
     {
         var overrideId = _options.ActiveSttModelId;
-        if (!string.IsNullOrWhiteSpace(overrideId))
-        {
-            var match = ModelRegistry.SpeechToTextModels
-                .FirstOrDefault(m => string.Equals(m.Id, overrideId, StringComparison.OrdinalIgnoreCase));
-            if (match is not null)
-                return match;
+        var resolved = SpeechModelRouting.Resolve(CurrentMode, overrideId);
 
+        if (!string.IsNullOrWhiteSpace(overrideId) &&
+            !string.Equals(resolved.Id, overrideId, StringComparison.OrdinalIgnoreCase))
+        {
             _logger?.LogWarning(
                 "Configured ActiveSttModelId='{Id}' not found in SpeechToTextModels; falling back to routing-mode default.",
                 overrideId);
         }
 
-        return ResolveDefaultModel(CurrentMode);
+        return resolved;
     }
 
     public ISpeechToTextEngine GetEngine()
@@ -74,14 +72,4 @@ internal sealed class DefaultSpeechEngineSelector : ISpeechEngineSelector
             model.Id);
         return _stub;
     }
-
-    private static ModelDescriptor ResolveDefaultModel(SttRoutingMode mode) => mode switch
-    {
-        // For now every routing mode resolves to Cohere Transcribe; phase 2 will plug in
-        // streaming Zipformer / multilingual Parakeet without changing this contract.
-        SttRoutingMode.AccuracyFirst => ModelRegistry.SherpaCohereTranscribe14LangInt8,
-        SttRoutingMode.StreamingFirst => ModelRegistry.SherpaCohereTranscribe14LangInt8,
-        SttRoutingMode.MultilingualFirst => ModelRegistry.SherpaCohereTranscribe14LangInt8,
-        _ => ModelRegistry.SherpaCohereTranscribe14LangInt8
-    };
 }
