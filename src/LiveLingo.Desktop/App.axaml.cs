@@ -169,9 +169,30 @@ public partial class App : Application
                     });
             }
             _ = RunStartupHealthChecksAsync(settingsService);
+            _ = RunObsoleteModelCleanupAsync();
         }
 
         base.OnFrameworkInitializationCompleted();
+    }
+
+    private async Task RunObsoleteModelCleanupAsync()
+    {
+        var modelManager = _serviceProvider!.GetRequiredService<IModelManager>();
+        var logger = _serviceProvider!.GetRequiredService<ILogger<App>>();
+        try
+        {
+            var freedBytes = await modelManager.CleanObsoleteModelsAsync(ObsoleteModelRegistry.Ids);
+            if (freedBytes > 0)
+            {
+                logger.LogInformation(
+                    "Reclaimed {MB} MB by removing obsolete model directories",
+                    freedBytes / 1_048_576);
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Obsolete model cleanup failed (non-fatal)");
+        }
     }
 
     private void SetupTrayIcon(

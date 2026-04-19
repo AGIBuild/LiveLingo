@@ -22,6 +22,7 @@ public sealed class ModelManager : IModelManager
     private readonly ModelDownloadOrchestrator _orchestrator;
     private readonly InstalledModelStore _installedStore;
     private readonly ModelStoragePathMigrator _pathMigrator;
+    private readonly ObsoleteModelCleaner _obsoleteCleaner;
 
     public ModelManager(IOptions<CoreOptions> options, HttpClient http, ILogger<ModelManager> logger)
     {
@@ -37,6 +38,7 @@ public sealed class ModelManager : IModelManager
         _orchestrator = new ModelDownloadOrchestrator(opts, assetDownloader, inflight, logger);
         _installedStore = new InstalledModelStore(opts, logger);
         _pathMigrator = new ModelStoragePathMigrator(opts, logger);
+        _obsoleteCleaner = new ObsoleteModelCleaner(opts, logger);
     }
 
     public Task EnsureModelAsync(
@@ -61,4 +63,9 @@ public sealed class ModelManager : IModelManager
         _pathMigrator.MigrateAsync(newPath, ct);
 
     public void ResetHuggingfaceTransportFallback() => _mirrorPolicy.Reset();
+
+    public Task<long> CleanObsoleteModelsAsync(
+        IEnumerable<string> obsoleteModelIds,
+        CancellationToken ct = default) =>
+        _obsoleteCleaner.CleanAsync(obsoleteModelIds, ct);
 }

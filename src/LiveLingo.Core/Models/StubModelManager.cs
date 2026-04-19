@@ -21,4 +21,11 @@ public sealed class StubModelManager : IModelManager
     public void ResetHuggingfaceTransportFallback()
     {
     }
+
+    public Task<long> CleanObsoleteModelsAsync(
+        IEnumerable<string> obsoleteModelIds, CancellationToken ct = default)
+    {
+        ct.ThrowIfCancellationRequested();
+        return Task.FromResult(0L);
+    }
 }
