@@ -244,7 +244,8 @@ public class SetupWizardViewModelTests
         var coordinator = Substitute.For<ILlmModelLoadCoordinator>();
         coordinator.RequestRetryPrimaryTranslationModelAsync(Arg.Any<CancellationToken>())
             .Returns(Task.CompletedTask);
-        var installed = ModelRegistry.GetRequiredModelsForLanguagePair("zh", "en")
+        var installed = ModelRegistry.CandidateTranslationModels
+            .Take(1)
             .Select(m => new InstalledModel(m.Id, m.DisplayName, "/p", m.SizeBytes, m.Type, DateTime.UtcNow))
             .ToArray();
         var (vm, _, _, _) = Create(llmCoordinator: coordinator, installedModels: installed);
@@ -334,7 +335,8 @@ public class SetupWizardViewModelTests
     public async Task DownloadModelAsync_SkipsWhenAlreadyInstalled()
     {
         var (_, _, models, coordinator) = Create();
-        var installed = ModelRegistry.GetRequiredModelsForLanguagePair("zh", "en")
+        var installed = ModelRegistry.CandidateTranslationModels
+            .Take(1)
             .Select(m => new InstalledModel(m.Id, m.DisplayName, "/path", m.SizeBytes, m.Type, DateTime.UtcNow))
             .ToArray();
         models.ListInstalled().Returns(installed);
@@ -470,14 +472,14 @@ public class SetupWizardViewModelTests
     }
 
     [Fact]
-    public async Task CopyUrlCommand_CopiesRequiredModelDownloadUrl()
+    public async Task CopyUrlCommand_CopiesSelectedCandidateModelDownloadUrl()
     {
         var clipboard = Substitute.For<IClipboardService>();
         var (vm, _, _, _) = Create(startStep: 2, clipboard: clipboard);
 
         await vm.CopyUrlCommand.ExecuteAsync(null);
 
-        await clipboard.Received(1).SetTextAsync(ModelRegistry.Gemma4_26B_A4B.DownloadUrl, Arg.Any<CancellationToken>());
+        await clipboard.Received(1).SetTextAsync(vm.SelectedCandidateModel!.DownloadUrl, Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -494,7 +496,8 @@ public class SetupWizardViewModelTests
     [Fact]
     public void SourceLanguageChange_RefreshesModelInstalledState()
     {
-        var installed = ModelRegistry.GetRequiredModelsForLanguagePair("zh", "en")
+        var installed = ModelRegistry.CandidateTranslationModels
+            .Take(1)
             .Select(m => new InstalledModel(m.Id, m.DisplayName, "/path", m.SizeBytes, m.Type, DateTime.UtcNow))
             .ToArray();
         var (vm, _, models, coordinator) = Create(installedModels: installed);

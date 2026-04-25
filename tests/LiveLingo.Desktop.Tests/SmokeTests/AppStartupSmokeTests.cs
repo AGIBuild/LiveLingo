@@ -31,7 +31,8 @@ public class AppStartupSmokeTests
         var mm = Substitute.For<IModelManager>();
         if (requiredModelsInstalled)
         {
-            var installed = ModelRegistry.GetRequiredModelsForLanguagePair("zh", "en")
+            var installed = ModelRegistry.CandidateTranslationModels
+                .Take(1)
                 .Select(m => new InstalledModel(
                     m.Id, m.DisplayName, "/path", m.SizeBytes, m.Type, DateTime.UtcNow))
                 .ToArray();
@@ -823,10 +824,9 @@ public class AppStartupSmokeTests
     {
         var mm = CreateModelManager(requiredModelsInstalled: false);
         var installed = mm.ListInstalled();
-        var allReady = ModelRegistry.RequiredModels.All(
-            req => installed.Any(m => m.Id == req.Id));
+        var hasAny = ModelRegistry.HasAnyTranslationModelInstalled(installed);
 
-        Assert.False(allReady);
+        Assert.False(hasAny);
     }
 
     [Fact]
@@ -834,10 +834,10 @@ public class AppStartupSmokeTests
     {
         var mm = CreateModelManager(requiredModelsInstalled: true);
         var installed = mm.ListInstalled();
-        var allReady = ModelRegistry.RequiredModels.All(
-            req => installed.Any(m => m.Id == req.Id));
+        var hasAny = ModelRegistry.HasAnyTranslationModelInstalled(installed,
+            descriptor => mm.HasAllExpectedLocalAssets(descriptor));
 
-        Assert.True(allReady);
+        Assert.True(hasAny);
     }
 
     [Fact]

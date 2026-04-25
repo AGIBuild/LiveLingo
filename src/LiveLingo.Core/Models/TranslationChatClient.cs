@@ -267,7 +267,8 @@ public sealed class TranslationChatClient : IChatClient
         {
             var isHighQuality = props.TryGetValue("isHighQualityMode", out var hq) == true && hq is true;
             routingContext = TranslationRoutingContext.FromText(
-                string.Empty, src, tgt, isHighQuality) with { TextLength = textLength };
+                string.Empty, src, tgt, isHighQuality) with
+            { TextLength = textLength };
         }
 
         return (src, tgt, taskType, routingContext);

@@ -303,9 +303,16 @@ public static class ModelSelectionPolicy
             return active;
         }
 
-        var fallback = catalog.FindById(ModelRegistry.Gemma4_26B_A4B.Id)
-            ?? catalog.FindById(ModelRegistry.Qwen35_9B.Id)
-            ?? throw new InvalidOperationException("Default translation profile is missing from the model catalog.");
+        // Try each candidate translation model in priority order until one is found in the catalog.
+        ModelProfile? fallback = null;
+        foreach (var candidate in ModelRegistry.CandidateTranslationModels)
+        {
+            fallback = catalog.FindById(candidate.Id);
+            if (fallback is not null) break;
+        }
+
+        if (fallback is null)
+            throw new InvalidOperationException("No translation profile is available in the model catalog.");
 
         return SupportsLanguagePair(fallback, sourceLanguage, targetLanguage)
             ? fallback

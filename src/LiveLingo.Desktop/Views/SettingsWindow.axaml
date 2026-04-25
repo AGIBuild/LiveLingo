@@ -6,7 +6,7 @@
         x:Class="LiveLingo.Desktop.Views.SettingsWindow"
         x:DataType="vm:SettingsViewModel"
         Title="LiveLingo Settings"
-        Width="540" Height="520"
+        Width="1080" Height="840"
         CanResize="False"
         WindowStartupLocation="CenterScreen"
         TransparencyLevelHint="AcrylicBlur"

@@ -48,7 +48,7 @@ public sealed class LocalLlamaModelHost : IDisposable, ILlmModelLoadCoordinator,
         _idleTimer = new Timer(OnIdleTimeout, null, Timeout.Infinite, Timeout.Infinite);
 
         _activeModelDescriptor = ResolvePreferredModelDescriptor(ModelTaskType.Translation);
-        
+
         _serverManager.StateChanged += s => StateChanged?.Invoke(s);
     }
 
@@ -218,7 +218,7 @@ public sealed class LocalLlamaModelHost : IDisposable, ILlmModelLoadCoordinator,
             return false;
         if (ex is OperationCanceledException)
             return false;
-        
+
         for (var e = ex; e != null; e = e.InnerException)
         {
             if (e is TimeoutException)

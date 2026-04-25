@@ -67,7 +67,7 @@ public class UnitPlannerTests
 
         Assert.Equal(2, units.Count);
         Assert.Equal("a\nb", units[0].SourceText);
-        Assert.Equal("ccc",  units[1].SourceText);
+        Assert.Equal("ccc", units[1].SourceText);
     }
 
     [Fact]

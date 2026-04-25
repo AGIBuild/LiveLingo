@@ -186,15 +186,22 @@ internal sealed class HttpRangeDownloader
                          FileShare.None))
         {
             var buffer = new byte[CopyBufferSize];
-            int bytesRead;
-            while ((bytesRead = await httpStream.ReadAsync(buffer, ct).ConfigureAwait(false)) > 0)
+            try
             {
-                await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), ct).ConfigureAwait(false);
-                downloadedForAsset += bytesRead;
-                progress?.Report(new ModelDownloadProgress(modelId, downloadedBeforeAsset + downloadedForAsset, totalBytes));
+                int bytesRead;
+                while ((bytesRead = await httpStream.ReadAsync(buffer, ct).ConfigureAwait(false)) > 0)
+                {
+                    await fileStream.WriteAsync(buffer.AsMemory(0, bytesRead), ct).ConfigureAwait(false);
+                    downloadedForAsset += bytesRead;
+                    progress?.Report(new ModelDownloadProgress(modelId, downloadedBeforeAsset + downloadedForAsset, totalBytes));
+                }
             }
-
-            await fileStream.FlushAsync(ct).ConfigureAwait(false);
+            finally
+            {
+                // Flush with CancellationToken.None so buffered bytes are preserved
+                // in the .part file even when the download is cancelled, enabling resume.
+                await fileStream.FlushAsync(CancellationToken.None).ConfigureAwait(false);
+            }
         }
 
         File.Move(partPath, finalPath, overwrite: true);

@@ -20,11 +20,11 @@ public static class TranslationPromptBuilder
         string targetLanguageName,
         LocalModelChatTemplate template,
         IReadOnlyList<GlossaryEntry>? glossaryHints = null) => template switch
-    {
-        LocalModelChatTemplate.Gemma => BuildGemmaOptimized(sourceText, sourceLanguageName, targetLanguageName, glossaryHints),
-        LocalModelChatTemplate.Qwen => BuildQwenOptimized(sourceText, sourceLanguageName, targetLanguageName, glossaryHints),
-        _ => BuildDefault(sourceText, sourceLanguageName, targetLanguageName, glossaryHints)
-    };
+        {
+            LocalModelChatTemplate.Gemma => BuildGemmaOptimized(sourceText, sourceLanguageName, targetLanguageName, glossaryHints),
+            LocalModelChatTemplate.Qwen => BuildQwenOptimized(sourceText, sourceLanguageName, targetLanguageName, glossaryHints),
+            _ => BuildDefault(sourceText, sourceLanguageName, targetLanguageName, glossaryHints)
+        };
 
     /// <summary>
     /// Standard prompt used for generic instruct models and cloud providers.

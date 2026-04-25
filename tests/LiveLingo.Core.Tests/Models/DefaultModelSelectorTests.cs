@@ -228,7 +228,7 @@ public sealed class DefaultModelSelectorTests
                     HasValidation: true,
                     IsHealthy: true,
                     Message: null,
-                    AvailableModelIds: new HashSet<string>(["gpt-4.1"], StringComparer.OrdinalIgnoreCase)))); 
+                    AvailableModelIds: new HashSet<string>(["gpt-4.1"], StringComparer.OrdinalIgnoreCase))));
 
         var ex = Assert.Throws<InvalidOperationException>(() => selector.SelectTranslationProfile("zh", "en"));
 

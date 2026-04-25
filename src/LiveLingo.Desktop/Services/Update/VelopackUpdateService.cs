@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Velopack;
+using Velopack.Sources;
 
 namespace LiveLingo.Desktop.Services.Update;
 
@@ -12,14 +13,24 @@ public sealed class VelopackUpdateService : IUpdateService
     public VelopackUpdateService(string updateUrl, ILogger<VelopackUpdateService> logger)
     {
         _logger = logger;
-        _updateManager = new UpdateManager(updateUrl);
+        var source = IsGitHubUrl(updateUrl)
+            ? new GithubSource(updateUrl, accessToken: null, prerelease: false)
+            : (IUpdateSource)new SimpleWebSource(updateUrl);
+        _updateManager = new UpdateManager(source);
     }
 
+    public bool IsInstalled => _updateManager.IsInstalled;
     public bool IsUpdateAvailable => _updateInfo is not null;
     public string? AvailableVersion => _updateInfo?.TargetFullRelease?.Version?.ToString();
 
     public async Task<bool> CheckForUpdateAsync(CancellationToken ct = default)
     {
+        if (!_updateManager.IsInstalled)
+        {
+            _logger.LogDebug("Skipping update check — app is not installed via Velopack");
+            return false;
+        }
+
         try
         {
             _updateInfo = await _updateManager.CheckForUpdatesAsync();
@@ -31,7 +42,7 @@ public sealed class VelopackUpdateService : IUpdateService
         {
             _logger.LogWarning(ex, "Update check failed");
             _updateInfo = null;
-            return false;
+            throw;
         }
     }
 
@@ -49,4 +60,7 @@ public sealed class VelopackUpdateService : IUpdateService
         _logger.LogInformation("Applying update and restarting...");
         _updateManager.ApplyUpdatesAndRestart(_updateInfo);
     }
+
+    private static bool IsGitHubUrl(string url) =>
+        url.StartsWith("https://github.com/", StringComparison.OrdinalIgnoreCase);
 }

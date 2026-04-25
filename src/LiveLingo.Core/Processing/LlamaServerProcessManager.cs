@@ -11,7 +11,7 @@ public sealed class LlamaServerProcessManager : ILlamaServerProcessManager
     private readonly INativeRuntimeUpdater _updater;
     private readonly ILogger<LlamaServerProcessManager> _logger;
     private readonly SemaphoreSlim _lock = new(1, 1);
-    
+
     private Process? _process;
     private string? _currentModelPath;
     private string? _currentEndpointUrl;
@@ -72,7 +72,7 @@ public sealed class LlamaServerProcessManager : ILlamaServerProcessManager
             };
 
             _process = new Process { StartInfo = startInfo, EnableRaisingEvents = true };
-            
+
             _process.OutputDataReceived += (sender, e) =>
             {
                 if (!string.IsNullOrWhiteSpace(e.Data))
@@ -80,7 +80,7 @@ public sealed class LlamaServerProcessManager : ILlamaServerProcessManager
                     HandleServerLog(e.Data, tcs);
                 }
             };
-            
+
             _process.ErrorDataReceived += (sender, e) =>
             {
                 if (!string.IsNullOrWhiteSpace(e.Data))
@@ -105,11 +105,11 @@ public sealed class LlamaServerProcessManager : ILlamaServerProcessManager
 
             // Wait until server reports it's ready or fails
             using var reg = ct.Register(() => tcs.TrySetCanceled());
-            
+
             // Timeout just in case it hangs
             var timeoutTask = Task.Delay(TimeSpan.FromSeconds(60), ct);
             var completedTask = await Task.WhenAny(tcs.Task, timeoutTask);
-            
+
             if (completedTask == timeoutTask)
             {
                 await StopServerInternalAsync();
@@ -140,7 +140,7 @@ public sealed class LlamaServerProcessManager : ILlamaServerProcessManager
         {
             tcs.TrySetResult();
         }
-        else if (logLine.Contains("ERR", StringComparison.OrdinalIgnoreCase) || 
+        else if (logLine.Contains("ERR", StringComparison.OrdinalIgnoreCase) ||
                  logLine.Contains("failed", StringComparison.OrdinalIgnoreCase) ||
                  logLine.Contains("error", StringComparison.OrdinalIgnoreCase))
         {
@@ -201,7 +201,7 @@ public sealed class LlamaServerProcessManager : ILlamaServerProcessManager
                 _process = null;
             }
         }
-        
+
         _currentEndpointUrl = null;
         _currentModelPath = null;
         return Task.CompletedTask;

@@ -192,10 +192,10 @@ public partial class OverlayWindow : Window
         Resources["OvFrameBrush"] = MakeBrush(frameAlpha, 0x1C, 0x1C, 0x1E);
         Resources["OvPanelBrush"] = MakeBrush(panelAlpha, 0x1C, 0x1C, 0x1E);
 
-        Resources["OvFgPrimaryBrush"]   = new SolidColorBrush(Lerp(0xFF, 0xFF, 0xFF, 0xE5, 0xE5, 0xE7, t));
+        Resources["OvFgPrimaryBrush"] = new SolidColorBrush(Lerp(0xFF, 0xFF, 0xFF, 0xE5, 0xE5, 0xE7, t));
         Resources["OvFgSecondaryBrush"] = new SolidColorBrush(Lerp(0xF0, 0xF0, 0xF2, 0xC7, 0xC7, 0xCC, t));
-        Resources["OvFgTertiaryBrush"]  = new SolidColorBrush(Lerp(0xE0, 0xE0, 0xE4, 0xAE, 0xAE, 0xB2, t));
-        Resources["OvFgMutedBrush"]     = new SolidColorBrush(Lerp(0xD5, 0xD5, 0xD9, 0xA1, 0xA1, 0xA6, t));
+        Resources["OvFgTertiaryBrush"] = new SolidColorBrush(Lerp(0xE0, 0xE0, 0xE4, 0xAE, 0xAE, 0xB2, t));
+        Resources["OvFgMutedBrush"] = new SolidColorBrush(Lerp(0xD5, 0xD5, 0xD9, 0xA1, 0xA1, 0xA6, t));
     }
 
     private static SolidColorBrush MakeBrush(byte a, byte r, byte g, byte b)

@@ -391,7 +391,8 @@ public partial class App : Application
 
         var iconBorder = new Border
         {
-            Width = 72, Height = 72,
+            Width = 72,
+            Height = 72,
             CornerRadius = new CornerRadius(16),
             Background = bgElevated,
             BorderBrush = borderSubtle,
@@ -833,12 +834,9 @@ public partial class App : Application
     private static bool IsRequiredModelReady(IModelManager modelManager, SettingsModel settings)
     {
         var installed = modelManager.ListInstalled();
-        var requiredModels = ModelRegistry.GetRequiredModelsForLanguagePair(
-            settings.Translation.DefaultSourceLanguage,
-            settings.Translation.DefaultTargetLanguage);
-        return requiredModels.All(req =>
-            installed.Any(m => m.Id == req.Id) &&
-            modelManager.HasAllExpectedLocalAssets(req));
+        return ModelRegistry.HasAnyTranslationModelInstalled(
+            installed,
+            descriptor => modelManager.HasAllExpectedLocalAssets(descriptor));
     }
 
     private SetupWizardWindow? _wizardWindow;
@@ -886,7 +884,8 @@ public partial class App : Application
     {
         _ = Task.Run(async () =>
         {
-            await updateService.CheckForUpdateAsync();
+            try { await updateService.CheckForUpdateAsync(); }
+            catch (Exception ex) { Log.Warning(ex, "Background update check failed"); }
         });
 
         var interval = TimeSpan.FromHours(Math.Max(1, intervalHours));
@@ -894,7 +893,8 @@ public partial class App : Application
         {
             _ = Task.Run(async () =>
             {
-                await updateService.CheckForUpdateAsync();
+                try { await updateService.CheckForUpdateAsync(); }
+                catch (Exception ex) { Log.Warning(ex, "Periodic update check failed"); }
             });
         }, null, interval, interval);
     }
