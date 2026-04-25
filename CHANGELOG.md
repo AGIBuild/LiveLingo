@@ -5,6 +5,35 @@ All notable changes to LiveLingo are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-04-25
+
+### Changed
+
+- **Flexible translation model requirement**: any downloaded candidate model
+  (Gemma 4 26B-A4B, Gemma 4 E4B, Qwen 3.5 9B, Qwen 2.5 7B) now satisfies the
+  setup wizard; users can choose which to download instead of being forced to
+  use Gemma 4 26B.
+- **Setup wizard model selector**: Step 2 now shows a ComboBox of candidate
+  translation models so users pick the model that fits their disk / bandwidth.
+- **ModelSelectionPolicy** iterates candidate models in priority order instead
+  of hard-coding a single model.
+- **Settings window** enlarged to 1080×840 for better readability.
+
+### Fixed
+
+- **Model download resume on cancel**: `FlushAsync` in `HttpRangeDownloader`
+  now uses `CancellationToken.None` inside a `finally` block so the `.part`
+  file is always flushed to disk, enabling resume after user cancellation or
+  network drops.
+- **Archive extraction file-lock**: `ModelArchiveExtractor` now closes the
+  archive `FileStream` and `IReader` via block-scoped `using` before calling
+  `File.Delete`, preventing "used by another process" errors on Windows.
+- **Auto-update "URL not found"**: default `UpdateUrl` changed from empty
+  string to the GitHub repo URL; existing settings with blank URL are
+  backfilled on load via `JsonSettingsService`.
+- **Velopack NotInstalledException in dev mode**: `CheckForUpdateAsync` now
+  returns early when `UpdateManager.IsInstalled` is false.
+
 ## [Unreleased]
 
 The voice-input arc — replacing the legacy Whisper engine with a sherpa-onnx-based

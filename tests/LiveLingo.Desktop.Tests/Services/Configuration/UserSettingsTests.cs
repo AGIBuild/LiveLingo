@@ -19,7 +19,7 @@ public class UserSettingsTests
         Assert.Equal(0.95, s.UI.OverlayOpacity);
         Assert.Equal("PasteAndSend", s.UI.DefaultInjectionMode);
         Assert.Null(s.UI.LastOverlayPosition);
-        Assert.Equal("", s.Update.UpdateUrl);
+        Assert.Equal(UpdateSettings.DefaultUpdateUrl, s.Update.UpdateUrl);
         Assert.Equal(4, s.Update.CheckIntervalHours);
         Assert.Null(s.Advanced.ModelStoragePath);
         Assert.Equal(0, s.Advanced.InferenceThreads);

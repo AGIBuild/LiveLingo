@@ -137,8 +137,29 @@ public static class ModelRegistry
     public static IReadOnlyList<ModelDescriptor> TranslationModels { get; } =
         [Gemma4_26B_A4B, Gemma4_E4B, Qwen35_9B, Qwen25_7B, MarianZhEn, MarianEnZh, MarianJaEn];
 
-    public static IReadOnlyList<ModelDescriptor> RequiredModels { get; } =
-        [Gemma4_26B_A4B];
+    /// <summary>
+    /// Chat-capable translation models that the setup wizard offers for download.
+    /// Ordered by recommendation: best quality first, smaller/lighter alternatives follow.
+    /// Any single installed model from this list is sufficient for translation to work.
+    /// </summary>
+    public static IReadOnlyList<ModelDescriptor> CandidateTranslationModels { get; } =
+        [Gemma4_26B_A4B, Gemma4_E4B, Qwen35_9B, Qwen25_7B];
+
+    /// <summary>
+    /// Returns true when at least one chat-capable translation model is installed.
+    /// </summary>
+    public static bool HasAnyTranslationModelInstalled(
+        IEnumerable<InstalledModel> installed,
+        Func<ModelDescriptor, bool>? hasAllAssets = null)
+    {
+        var installedIds = installed
+            .Select(m => m.Id)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        return CandidateTranslationModels.Any(candidate =>
+            installedIds.Contains(candidate.Id)
+            && (hasAllAssets is null || hasAllAssets(candidate)));
+    }
 
     // ── Speech-to-Text ──────────────────────────────────────────────────────────
     //
@@ -222,7 +243,11 @@ public static class ModelRegistry
     public static ModelDescriptor? FindTranslationModel(string sourceLanguage, string targetLanguage) =>
         Gemma4_26B_A4B;
 
-    public static IReadOnlyList<ModelDescriptor> GetRequiredModelsForLanguagePair(
+    /// <summary>
+    /// Returns the list of candidate translation models available for download.
+    /// Any single model from this list is sufficient for translation to work.
+    /// </summary>
+    public static IReadOnlyList<ModelDescriptor> GetCandidateModelsForLanguagePair(
         string? sourceLanguage,
-        string? targetLanguage) => [Gemma4_26B_A4B];
+        string? targetLanguage) => CandidateTranslationModels;
 }

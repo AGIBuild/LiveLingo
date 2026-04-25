@@ -45,10 +45,13 @@ public static class ServiceCollectionExtensions
                     Delay = TimeSpan.FromSeconds(2),
                     ShouldHandle = args => ValueTask.FromResult(
                         args.Outcome.Exception is HttpRequestException or IOException ||
-                        args.Outcome.Result is { IsSuccessStatusCode: false, StatusCode: System.Net.HttpStatusCode.RequestTimeout
+                        args.Outcome.Result is
+                        {
+                            IsSuccessStatusCode: false, StatusCode: System.Net.HttpStatusCode.RequestTimeout
                             or System.Net.HttpStatusCode.BadGateway
                             or System.Net.HttpStatusCode.ServiceUnavailable
-                            or System.Net.HttpStatusCode.GatewayTimeout })
+                            or System.Net.HttpStatusCode.GatewayTimeout
+                        })
                 });
                 pipeline.AddTimeout(TimeSpan.FromMinutes(3));
             });
@@ -72,10 +75,13 @@ public static class ServiceCollectionExtensions
                     Delay = TimeSpan.FromSeconds(2),
                     ShouldHandle = args => ValueTask.FromResult(
                         args.Outcome.Exception is HttpRequestException or IOException or TaskCanceledException ||
-                        args.Outcome.Result is { IsSuccessStatusCode: false, StatusCode: System.Net.HttpStatusCode.RequestTimeout
+                        args.Outcome.Result is
+                        {
+                            IsSuccessStatusCode: false, StatusCode: System.Net.HttpStatusCode.RequestTimeout
                             or System.Net.HttpStatusCode.BadGateway
                             or System.Net.HttpStatusCode.ServiceUnavailable
-                            or System.Net.HttpStatusCode.GatewayTimeout })
+                            or System.Net.HttpStatusCode.GatewayTimeout
+                        })
                 });
                 pipeline.AddTimeout(TimeSpan.FromMinutes(10));
             });
@@ -100,9 +106,12 @@ public static class ServiceCollectionExtensions
                     Delay = TimeSpan.FromMilliseconds(500),
                     ShouldHandle = args => ValueTask.FromResult(
                         args.Outcome.Exception is HttpRequestException or IOException or TaskCanceledException ||
-                        args.Outcome.Result is { IsSuccessStatusCode: false,
+                        args.Outcome.Result is
+                        {
+                            IsSuccessStatusCode: false,
                             StatusCode: System.Net.HttpStatusCode.ServiceUnavailable
-                                or System.Net.HttpStatusCode.GatewayTimeout })
+                                or System.Net.HttpStatusCode.GatewayTimeout
+                        })
                 });
                 pipeline.AddTimeout(TimeSpan.FromSeconds(120));
             });
@@ -116,12 +125,15 @@ public static class ServiceCollectionExtensions
                     Delay = TimeSpan.FromMilliseconds(500),
                     ShouldHandle = args => ValueTask.FromResult(
                         args.Outcome.Exception is HttpRequestException or IOException or TaskCanceledException or TimeoutRejectedException ||
-                        args.Outcome.Result is { IsSuccessStatusCode: false,
+                        args.Outcome.Result is
+                        {
+                            IsSuccessStatusCode: false,
                             StatusCode: System.Net.HttpStatusCode.RequestTimeout
                                 or System.Net.HttpStatusCode.TooManyRequests
                                 or System.Net.HttpStatusCode.BadGateway
                                 or System.Net.HttpStatusCode.ServiceUnavailable
-                                or System.Net.HttpStatusCode.GatewayTimeout })
+                                or System.Net.HttpStatusCode.GatewayTimeout
+                        })
                 });
                 pipeline.AddTimeout(TimeSpan.FromSeconds(60));
             });
@@ -137,9 +149,12 @@ public static class ServiceCollectionExtensions
                     Delay = TimeSpan.FromMilliseconds(500),
                     ShouldHandle = args => ValueTask.FromResult(
                         args.Outcome.Exception is HttpRequestException or IOException or TaskCanceledException ||
-                        args.Outcome.Result is { IsSuccessStatusCode: false,
+                        args.Outcome.Result is
+                        {
+                            IsSuccessStatusCode: false,
                             StatusCode: System.Net.HttpStatusCode.ServiceUnavailable
-                                or System.Net.HttpStatusCode.GatewayTimeout })
+                                or System.Net.HttpStatusCode.GatewayTimeout
+                        })
                 });
                 pipeline.AddTimeout(TimeSpan.FromSeconds(180));
             });

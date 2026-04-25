@@ -78,7 +78,7 @@ public class NativeRuntimeUpdater(
 
             var nativeDir = Path.Combine(options.Value.ModelStoragePath, "native", tagName);
             var serverExecutable = FindServerExecutable(nativeDir);
-            
+
             if (serverExecutable is not null)
             {
                 return serverExecutable;
@@ -89,7 +89,7 @@ public class NativeRuntimeUpdater(
 
             logger.LogInformation("Downloading newer llama.cpp runtime: {Url}", downloadUrl);
             Directory.CreateDirectory(nativeDir);
-            
+
             // Use a stable name so we can resume partial downloads on retry.
             var archivePath = Path.Combine(nativeDir, assetName);
             try
@@ -101,7 +101,7 @@ public class NativeRuntimeUpdater(
                 logger.LogWarning(ex, "Failed to download llama-server from {Url}", downloadUrl);
                 return null;
             }
-            
+
             if (ext == "zip")
             {
                 ZipFile.ExtractToDirectory(archivePath, nativeDir, true);
@@ -121,9 +121,9 @@ public class NativeRuntimeUpdater(
             {
                 // Best-effort cleanup only.
             }
-            
+
             serverExecutable = FindServerExecutable(nativeDir);
-            
+
             if (serverExecutable is not null)
             {
                 // Ensure executable permissions on Unix
@@ -134,7 +134,7 @@ public class NativeRuntimeUpdater(
                 logger.LogInformation("llama-server updated and ready at {Path}", serverExecutable);
                 return serverExecutable;
             }
-            
+
             logger.LogWarning("Could not find llama-server executable in the downloaded archive.");
             return null;
         }
@@ -246,7 +246,7 @@ public class NativeRuntimeUpdater(
 
         var exeName = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "llama-server.exe" : "llama-server";
         var files = Directory.GetFiles(nativeDir, exeName, SearchOption.AllDirectories);
-        
+
         return files.FirstOrDefault();
     }
 }

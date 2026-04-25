@@ -241,7 +241,9 @@ public partial class OverlayPosition : ObservableObject
 
 public partial class UpdateSettings : ObservableObject
 {
-    [ObservableProperty] private string _updateUrl = string.Empty;
+    public const string DefaultUpdateUrl = "https://github.com/user/LiveLingo";
+
+    [ObservableProperty] private string _updateUrl = DefaultUpdateUrl;
     [ObservableProperty] private int _checkIntervalHours = 4;
 
     public UpdateSettings DeepClone() => new()

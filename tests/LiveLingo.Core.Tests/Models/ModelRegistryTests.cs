@@ -18,12 +18,45 @@ public class ModelRegistryTests
     }
 
     [Fact]
-    public void RequiredModels_DefaultsToGemma4_26B_A4B()
+    public void CandidateTranslationModels_ContainsExpectedModels()
     {
-        Assert.NotEmpty(ModelRegistry.RequiredModels);
-        Assert.Contains(ModelRegistry.Gemma4_26B_A4B, ModelRegistry.RequiredModels);
-        Assert.DoesNotContain(ModelRegistry.FastTextLid, ModelRegistry.RequiredModels);
-        Assert.DoesNotContain(ModelRegistry.Qwen25_15B, ModelRegistry.RequiredModels);
+        Assert.Equal(4, ModelRegistry.CandidateTranslationModels.Count);
+        Assert.Contains(ModelRegistry.Gemma4_26B_A4B, ModelRegistry.CandidateTranslationModels);
+        Assert.Contains(ModelRegistry.Gemma4_E4B, ModelRegistry.CandidateTranslationModels);
+        Assert.Contains(ModelRegistry.Qwen35_9B, ModelRegistry.CandidateTranslationModels);
+        Assert.Contains(ModelRegistry.Qwen25_7B, ModelRegistry.CandidateTranslationModels);
+        Assert.DoesNotContain(ModelRegistry.FastTextLid, ModelRegistry.CandidateTranslationModels);
+        Assert.DoesNotContain(ModelRegistry.Qwen25_15B, ModelRegistry.CandidateTranslationModels);
+    }
+
+    [Fact]
+    public void HasAnyTranslationModelInstalled_ReturnsFalse_WhenNoneInstalled()
+    {
+        var installed = Array.Empty<InstalledModel>();
+        Assert.False(ModelRegistry.HasAnyTranslationModelInstalled(installed));
+    }
+
+    [Fact]
+    public void HasAnyTranslationModelInstalled_ReturnsTrue_WhenAnyCandidateInstalled()
+    {
+        var installed = new[]
+        {
+            new InstalledModel(ModelRegistry.Gemma4_E4B.Id, ModelRegistry.Gemma4_E4B.DisplayName,
+                "/p", ModelRegistry.Gemma4_E4B.SizeBytes, ModelType.Translation, DateTime.UtcNow)
+        };
+        Assert.True(ModelRegistry.HasAnyTranslationModelInstalled(installed));
+    }
+
+    [Fact]
+    public void HasAnyTranslationModelInstalled_RespectsAssetCheck()
+    {
+        var installed = new[]
+        {
+            new InstalledModel(ModelRegistry.Gemma4_E4B.Id, ModelRegistry.Gemma4_E4B.DisplayName,
+                "/p", ModelRegistry.Gemma4_E4B.SizeBytes, ModelType.Translation, DateTime.UtcNow)
+        };
+        Assert.False(ModelRegistry.HasAnyTranslationModelInstalled(installed, _ => false));
+        Assert.True(ModelRegistry.HasAnyTranslationModelInstalled(installed, _ => true));
     }
 
     [Fact]
@@ -94,12 +127,13 @@ public class ModelRegistryTests
         Assert.Equal(expectedId, model.Id);
     }
 
-    [Theory]
-    [InlineData("ko", "en")]
-    [InlineData("de", "fr")]
-    public void FindTranslationModel_ReturnsNull_WhenNotFound(string src, string tgt)
+    [Fact]
+    public void GetCandidateModelsForLanguagePair_ReturnsAllCandidates()
     {
-        Assert.NotNull(ModelRegistry.FindTranslationModel(src, tgt));
+        var candidates = ModelRegistry.GetCandidateModelsForLanguagePair("zh", "en");
+        Assert.Equal(ModelRegistry.CandidateTranslationModels.Count, candidates.Count);
+        Assert.Contains(ModelRegistry.Gemma4_26B_A4B, candidates);
+        Assert.Contains(ModelRegistry.Gemma4_E4B, candidates);
     }
 
     [Fact]

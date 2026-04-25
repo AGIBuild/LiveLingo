@@ -692,8 +692,8 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
     private void OpenPrimaryTranslationModelOnHuggingFace()
     {
         if (_platformServices is null) return;
-        var primaryModel = ModelRegistry.RequiredModels.Count > 0
-            ? ModelRegistry.RequiredModels[0]
+        var primaryModel = ModelRegistry.CandidateTranslationModels.Count > 0
+            ? ModelRegistry.CandidateTranslationModels[0]
             : ModelRegistry.Gemma4_26B_A4B;
         if (!HuggingFaceWebUrls.TryGetModelCardUrl(primaryModel.DownloadUrl, out var url)) return;
         _platformServices.OpenUrl(url);

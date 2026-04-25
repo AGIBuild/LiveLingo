@@ -34,32 +34,34 @@ internal sealed class ModelArchiveExtractor
             "Extracting model archive {ModelId}: format={ArchiveType}, source={Archive}, target={Target}",
             descriptor.Id, descriptor.ArchiveType, archivePath, targetDirectory);
 
-        using var stream = File.OpenRead(archivePath);
-        using var reader = ReaderFactory.Open(stream);
         var topLevelPrefix = ResolveTopLevelPrefix(descriptor);
 
-        while (reader.MoveToNextEntry())
+        using (var stream = File.OpenRead(archivePath))
+        using (var reader = ReaderFactory.Open(stream))
         {
-            if (reader.Entry.IsDirectory)
-                continue;
-
-            var entryPath = NormalizeEntryPath(reader.Entry.Key ?? string.Empty, topLevelPrefix);
-            if (string.IsNullOrEmpty(entryPath))
-                continue;
-
-            var destinationPath = Path.GetFullPath(Path.Combine(targetDirectory, entryPath));
-            EnsureWithinTarget(targetDirectory, destinationPath);
-
-            var destDir = Path.GetDirectoryName(destinationPath);
-            if (!string.IsNullOrEmpty(destDir))
-                Directory.CreateDirectory(destDir);
-
-            reader.WriteEntryToFile(destinationPath, new ExtractionOptions
+            while (reader.MoveToNextEntry())
             {
-                Overwrite = true,
-                PreserveFileTime = false,
-                ExtractFullPath = false
-            });
+                if (reader.Entry.IsDirectory)
+                    continue;
+
+                var entryPath = NormalizeEntryPath(reader.Entry.Key ?? string.Empty, topLevelPrefix);
+                if (string.IsNullOrEmpty(entryPath))
+                    continue;
+
+                var destinationPath = Path.GetFullPath(Path.Combine(targetDirectory, entryPath));
+                EnsureWithinTarget(targetDirectory, destinationPath);
+
+                var destDir = Path.GetDirectoryName(destinationPath);
+                if (!string.IsNullOrEmpty(destDir))
+                    Directory.CreateDirectory(destDir);
+
+                reader.WriteEntryToFile(destinationPath, new ExtractionOptions
+                {
+                    Overwrite = true,
+                    PreserveFileTime = false,
+                    ExtractFullPath = false
+                });
+            }
         }
 
         File.Delete(archivePath);

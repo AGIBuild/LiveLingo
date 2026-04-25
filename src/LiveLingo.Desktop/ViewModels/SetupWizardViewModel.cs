@@ -49,6 +49,7 @@ public partial class SetupWizardViewModel : ObservableObject, IDisposable
     [ObservableProperty] private bool _hasError;
     [ObservableProperty] private LanguageInfo? _selectedSourceLanguage;
     [ObservableProperty] private LanguageInfo? _selectedTargetLanguage;
+    [ObservableProperty] private ModelDescriptor? _selectedCandidateModel;
 
     public int TotalSteps { get; }
     public int StartStep { get; }
@@ -76,16 +77,17 @@ public partial class SetupWizardViewModel : ObservableObject, IDisposable
     public bool IsStep1 => CurrentStep == 1;
     public bool IsStep2 => CurrentStep == 2;
     public IReadOnlyList<LanguageInfo> AvailableLanguages { get; }
-    public string Step2Title => T("wizard.step2.title", "Download Required Models");
+    public string Step2Title => T("wizard.step2.title", "Download Translation Model");
     public string Step2Description => T(
         "wizard.step2.description",
-        "LiveLingo requires the baseline translation model for your selected language pair. This is a one-time download.");
-    public string Step2CardTitle => T("wizard.step2.card.title", GetPrimaryRequiredModelDisplayName());
-    public string Step2CardSubtitle => T("wizard.step2.card.subtitle", "Baseline translation model (required)");
+        "Choose and download a translation model. Any model from the list below is sufficient for translation to work.");
+    public string Step2CardTitle => SelectedCandidateModel?.DisplayName ?? T("wizard.step2.card.title", "Translation Model");
+    public string Step2CardSubtitle => T("wizard.step2.card.subtitle", "Translation model");
     public string Step2DownloadButton => T("wizard.step2.downloadButton", "Download");
     public string Step2ReadyLabel => T("wizard.step2.ready", "✓ Ready");
     public string Step2CancelButton => T("wizard.step2.cancelButton", "Cancel");
     public string CopyUrlButtonLabel => T("wizard.download.copyUrl", "Copy URL");
+    public IReadOnlyList<ModelDescriptor> CandidateModels { get; } = ModelRegistry.CandidateTranslationModels;
     public string Step2HuggingFaceIntroHint => T(
         "wizard.step2.huggingFace.intro",
         "This download uses Hugging Face. If the model is gated or the download fails with access denied, add a read access token under Settings → Advanced (create one at huggingface.co/settings/tokens), click Save, then retry.");
@@ -101,7 +103,8 @@ public partial class SetupWizardViewModel : ObservableObject, IDisposable
         "Open model page (accept access if required)…");
     public bool ShowOpenRequiredModelOnHuggingFace =>
         _platform is not null
-        && GetRequiredModelsForCurrentPair().Any(m => HuggingFaceWebUrls.TryGetModelCardUrl(m.DownloadUrl, out _));
+        && SelectedCandidateModel is not null
+        && HuggingFaceWebUrls.TryGetModelCardUrl(SelectedCandidateModel.DownloadUrl, out _);
     public bool ShowOpenModelPageOnDownloadFailure => HasError && ShowOpenRequiredModelOnHuggingFace;
     public bool HasHuggingFaceTokenConfigured => !string.IsNullOrWhiteSpace(_coreOptions?.HuggingFaceToken);
     public bool ShowHuggingFaceTokenMissingCallout => !HasHuggingFaceTokenConfigured;
@@ -145,6 +148,7 @@ public partial class SetupWizardViewModel : ObservableObject, IDisposable
             string.Equals(l.Code, SourceLanguage, StringComparison.OrdinalIgnoreCase)) ?? AvailableLanguages[0];
         SelectedTargetLanguage = AvailableLanguages.FirstOrDefault(l =>
             string.Equals(l.Code, TargetLanguage, StringComparison.OrdinalIgnoreCase)) ?? AvailableLanguages[1];
+        SelectedCandidateModel = CandidateModels.FirstOrDefault();
 
         _messenger.Register<SetupWizardViewModel, SettingsChangedMessage>(
             this,
@@ -170,19 +174,20 @@ public partial class SetupWizardViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void OpenRequiredModelOnHuggingFace()
     {
-        if (_platform is null) return;
-        foreach (var m in GetRequiredModelsForCurrentPair())
-        {
-            if (HuggingFaceWebUrls.TryGetModelCardUrl(m.DownloadUrl, out var url))
-            {
-                _platform.OpenUrl(url);
-                return;
-            }
-        }
+        if (_platform is null || SelectedCandidateModel is null) return;
+        if (HuggingFaceWebUrls.TryGetModelCardUrl(SelectedCandidateModel.DownloadUrl, out var url))
+            _platform.OpenUrl(url);
     }
 
     partial void OnHasErrorChanged(bool value) =>
         OnPropertyChanged(nameof(ShowOpenModelPageOnDownloadFailure));
+
+    partial void OnSelectedCandidateModelChanged(ModelDescriptor? value)
+    {
+        OnPropertyChanged(nameof(Step2CardTitle));
+        OnPropertyChanged(nameof(ShowOpenRequiredModelOnHuggingFace));
+        RefreshModelInstalledState();
+    }
 
     partial void OnSourceLanguageChanged(string value) => RefreshModelInstalledState();
     partial void OnTargetLanguageChanged(string value) => RefreshModelInstalledState();
@@ -228,6 +233,7 @@ public partial class SetupWizardViewModel : ObservableObject, IDisposable
     private async Task DownloadModelAsync()
     {
         if (_modelManager is null || IsDownloading || IsModelInstalled) return;
+        if (SelectedCandidateModel is null) return;
 
         IsDownloading = true;
         HasError = false;
@@ -237,83 +243,62 @@ public partial class SetupWizardViewModel : ObservableObject, IDisposable
 
         try
         {
-            var requiredModels = GetRequiredModelsForCurrentPair();
-            if (requiredModels.Count == 0)
+            var descriptor = SelectedCandidateModel;
+            _activeDescriptor = descriptor;
+            _activeIndex = 0;
+            _activeTotal = 1;
+
+            DownloadProgress = 0;
+            DownloadStatus = FormatProgressStatus(descriptor, 0, 1, 0d);
+            _logger?.LogInformation(
+                "Setup wizard model download started: {ModelId}",
+                descriptor.Id);
+
+            await _downloadCoordinator.StartAsync(descriptor);
+
+            var finalState = _downloadCoordinator.GetState(descriptor.Id);
+            if (finalState.Status == ModelDownloadStatus.Cancelled)
             {
-                IsModelInstalled = true;
-                DownloadProgress = 100;
-                DownloadStatus = T("wizard.download.noneRequired", "No required models.");
+                HasError = false;
+                DownloadStatus = T("wizard.download.cancelled", "Cancelled");
+                _logger?.LogWarning("Setup wizard model download cancelled by user.");
                 return;
             }
 
-            for (var index = 0; index < requiredModels.Count; index++)
+            if (finalState.Status == ModelDownloadStatus.Failed)
             {
-                var descriptor = requiredModels[index];
-                _activeDescriptor = descriptor;
-                _activeIndex = index;
-                _activeTotal = requiredModels.Count;
-
-                DownloadProgress = 0;
-                DownloadStatus = FormatProgressStatus(descriptor, index, requiredModels.Count, 0d);
-                _logger?.LogInformation(
-                    "Setup wizard model download started: {ModelId} ({Current}/{Total})",
-                    descriptor.Id,
-                    index + 1,
-                    requiredModels.Count);
-
-                // StartAsync collapses to the in-flight task if Settings (or any
-                // other surface) is already downloading the same model — UI state
-                // for both surfaces stays consistent through the StateChanged event.
-                await _downloadCoordinator.StartAsync(descriptor);
-
-                var finalState = _downloadCoordinator.GetState(descriptor.Id);
-                if (finalState.Status == ModelDownloadStatus.Cancelled)
+                HasError = true;
+                if (finalState.ErrorMessage == ModelDownloadErrorCodes.HuggingFaceAuthorization)
                 {
-                    HasError = false;
-                    DownloadStatus = T("wizard.download.cancelled", "Cancelled");
-                    _logger?.LogWarning("Setup wizard model download cancelled by user.");
-                    return;
+                    DownloadStatus = T(
+                        "wizard.download.errorAuth",
+                        "Download failed: Hugging Face access denied. Add a read token under Settings → Advanced (huggingface.co/settings/tokens), click Save, then retry.");
+                    _logger?.LogError(
+                        "Setup wizard model download failed: Hugging Face authorization for {ModelId}.",
+                        descriptor.Id);
                 }
-
-                if (finalState.Status == ModelDownloadStatus.Failed)
+                else
                 {
-                    HasError = true;
-                    if (finalState.ErrorMessage == ModelDownloadErrorCodes.HuggingFaceAuthorization)
-                    {
-                        DownloadStatus = T(
-                            "wizard.download.errorAuth",
-                            "Download failed: Hugging Face access denied. Add a read token under Settings → Advanced (huggingface.co/settings/tokens), click Save, then retry.");
-                        _logger?.LogError(
-                            "Setup wizard model download failed: Hugging Face authorization for {ModelId}.",
-                            descriptor.Id);
-                    }
-                    else
-                    {
-                        DownloadStatus = T(
-                            "wizard.download.error",
-                            "Download failed. You can download it manually from Hugging Face and place it in the models directory.",
-                            finalState.ErrorMessage ?? string.Empty);
-                        _logger?.LogError(
-                            "Setup wizard model download failed: {ModelId} reason={Reason}",
-                            descriptor.Id,
-                            finalState.ErrorMessage);
-                    }
-                    return;
+                    DownloadStatus = T(
+                        "wizard.download.error",
+                        "Download failed. You can download it manually from Hugging Face and place it in the models directory.",
+                        finalState.ErrorMessage ?? string.Empty);
+                    _logger?.LogError(
+                        "Setup wizard model download failed: {ModelId} reason={Reason}",
+                        descriptor.Id,
+                        finalState.ErrorMessage);
                 }
-
-                DownloadProgress = 100;
-                DownloadStatus = T(
-                    "wizard.download.modelDone",
-                    "{0} ({1}/{2}) done",
-                    descriptor.DisplayName,
-                    index + 1,
-                    requiredModels.Count);
-                _logger?.LogInformation(
-                    "Setup wizard model download completed: {ModelId} ({Current}/{Total})",
-                    descriptor.Id,
-                    index + 1,
-                    requiredModels.Count);
+                return;
             }
+
+            DownloadProgress = 100;
+            DownloadStatus = T(
+                "wizard.download.modelDone",
+                "{0} done",
+                descriptor.DisplayName);
+            _logger?.LogInformation(
+                "Setup wizard model download completed: {ModelId}",
+                descriptor.Id);
 
             IsModelInstalled = true;
             HasError = false;
@@ -325,7 +310,6 @@ public partial class SetupWizardViewModel : ObservableObject, IDisposable
             IsDownloading = false;
         }
     }
-
     [RelayCommand]
     private void CancelDownload()
     {
@@ -373,12 +357,8 @@ public partial class SetupWizardViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private async Task CopyUrlAsync()
     {
-        if (_clipboard is null) return;
-        var requiredModels = GetRequiredModelsForCurrentPair();
-        if (requiredModels.Count > 0)
-        {
-            await _clipboard.SetTextAsync(requiredModels[0].DownloadUrl);
-        }
+        if (_clipboard is null || SelectedCandidateModel is null) return;
+        await _clipboard.SetTextAsync(SelectedCandidateModel.DownloadUrl);
     }
 
     [RelayCommand]
@@ -405,13 +385,8 @@ public partial class SetupWizardViewModel : ObservableObject, IDisposable
         _messenger.Send(new AppUiRequestMessage(new AppUiRequest(this, AppUiRequestKind.CloseSetupWizard)));
     }
 
-    private IReadOnlyList<ModelDescriptor> GetRequiredModelsForCurrentPair() =>
-        ModelRegistry.GetRequiredModelsForLanguagePair(SourceLanguage, TargetLanguage);
-
-    private static string GetPrimaryRequiredModelDisplayName() =>
-        ModelRegistry.RequiredModels.Count > 0
-            ? ModelRegistry.RequiredModels[0].DisplayName
-            : "Translation Model";
+    private IReadOnlyList<ModelDescriptor> GetSelectedModelsForDownload() =>
+        SelectedCandidateModel is not null ? [SelectedCandidateModel] : [];
 
     private void RefreshModelInstalledState()
     {
@@ -421,12 +396,10 @@ public partial class SetupWizardViewModel : ObservableObject, IDisposable
             return;
         }
 
-        var installedIds = _modelManager.ListInstalled()
-            .Select(m => m.Id)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        IsModelInstalled = GetRequiredModelsForCurrentPair()
-            .All(model => installedIds.Contains(model.Id) && _modelManager.HasAllExpectedLocalAssets(model));
+        var installed = _modelManager.ListInstalled();
+        IsModelInstalled = ModelRegistry.HasAnyTranslationModelInstalled(
+            installed,
+            descriptor => _modelManager.HasAllExpectedLocalAssets(descriptor));
     }
 
     private string T(string key, string fallback, params object[] args)

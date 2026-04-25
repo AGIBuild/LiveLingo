@@ -120,6 +120,17 @@
                                Text="{Binding Step2HuggingFaceTokenOkHint}"
                                IsVisible="{Binding HasHuggingFaceTokenConfigured}"/>
 
+                    <ComboBox MinWidth="320" Classes="themed"
+                              ItemsSource="{Binding CandidateModels}"
+                              SelectedItem="{Binding SelectedCandidateModel}"
+                              IsEnabled="{Binding !IsDownloading}">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding DisplayName}"/>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+
                     <Border Padding="16,14" CornerRadius="8"
                             Background="{StaticResource BgSurfaceBrush}">
                         <StackPanel Spacing="10">
