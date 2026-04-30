@@ -27,7 +27,7 @@ class BuildTask : NukeBuild
     readonly string Runtime = "win-x64";
 
     [Parameter("Package version in semver2 format")]
-    readonly string Version = "1.4.1";
+    readonly string Version = "1.4.2";
 
     [Parameter("Minimum line coverage percentage")]
     readonly int CoverageThreshold = 80;
