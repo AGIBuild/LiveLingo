@@ -164,67 +164,101 @@ public sealed class FallbackTranslationInvoker(
                 // internal and let us transparently fall through to the next
                 // candidate without ever reaching the caller's enumerator.
                 var attemptSw = Stopwatch.StartNew();
-                using var firstTokenCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                firstTokenCts.CancelAfter(candidate.FirstTokenBudget);
                 var assembler = new StringBuilder();
                 TimeSpan? firstTokenLatency = null;
                 var hasYielded = false;
                 Exception? attemptError = null;
                 var attemptStatus = StreamAttemptStatus.Succeeded;
+                PreparedModelStreamingInvocation? preparedInvocation = null;
 
-                await using (var enumerator = invocationService
-                    .InvokeStreamingAsync(requestBuilder(candidate), firstTokenCts.Token)
-                    .GetAsyncEnumerator(firstTokenCts.Token))
+                try
                 {
-                    while (true)
+                    preparedInvocation = await invocationService
+                        .PrepareStreamingAsync(requestBuilder(candidate), ct)
+                        .ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    attemptError = ex;
+                    attemptStatus = StreamAttemptStatus.FailedBeforeFirstToken;
+                }
+
+                if (preparedInvocation is not null)
+                {
+                    var hasFallbackCandidate = i < plan.Candidates.Count - 1;
+                    CancellationTokenSource? firstTokenCts = null;
+                    try
                     {
-                        bool hasNext;
-                        try
+                        var streamingToken = ct;
+                        if (hasFallbackCandidate)
                         {
-                            hasNext = await enumerator.MoveNextAsync().ConfigureAwait(false);
-                        }
-                        catch (OperationCanceledException) when (ct.IsCancellationRequested)
-                        {
-                            throw;
-                        }
-                        catch (OperationCanceledException ex) when (!hasYielded)
-                        {
-                            attemptError = ex;
-                            attemptStatus = StreamAttemptStatus.FirstTokenTimeout;
-                            break;
-                        }
-                        catch (Exception ex) when (!hasYielded)
-                        {
-                            attemptError = ex;
-                            attemptStatus = StreamAttemptStatus.FailedBeforeFirstToken;
-                            break;
-                        }
-                        catch (Exception ex)
-                        {
-                            attemptError = ex;
-                            attemptStatus = StreamAttemptStatus.FailedAfterFirstToken;
-                            break;
+                            firstTokenCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                            firstTokenCts.CancelAfter(candidate.FirstTokenBudget);
+                            streamingToken = firstTokenCts.Token;
                         }
 
-                        if (!hasNext)
-                        {
-                            attemptStatus = StreamAttemptStatus.Succeeded;
-                            break;
-                        }
+                        await using var enumerator = preparedInvocation
+                            .InvokeStreamingAsync(streamingToken)
+                            .GetAsyncEnumerator(streamingToken);
 
-                        var delta = enumerator.Current;
-                        if (string.IsNullOrEmpty(delta)) continue;
-
-                        if (!hasYielded)
+                        while (attemptStatus == StreamAttemptStatus.Succeeded)
                         {
-                            firstTokenLatency = attemptSw.Elapsed;
-                            // First token arrived — cancel the first-token watchdog;
-                            // subsequent reads run on the outer token only.
-                            firstTokenCts.CancelAfter(Timeout.InfiniteTimeSpan);
-                            hasYielded = true;
+                            bool hasNext;
+                            try
+                            {
+                                hasNext = await enumerator.MoveNextAsync().ConfigureAwait(false);
+                            }
+                            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                            {
+                                throw;
+                            }
+                            catch (OperationCanceledException ex)
+                                when (!hasYielded && firstTokenCts?.IsCancellationRequested == true)
+                            {
+                                attemptError = ex;
+                                attemptStatus = StreamAttemptStatus.FirstTokenTimeout;
+                                break;
+                            }
+                            catch (Exception ex) when (!hasYielded)
+                            {
+                                attemptError = ex;
+                                attemptStatus = StreamAttemptStatus.FailedBeforeFirstToken;
+                                break;
+                            }
+                            catch (Exception ex)
+                            {
+                                attemptError = ex;
+                                attemptStatus = StreamAttemptStatus.FailedAfterFirstToken;
+                                break;
+                            }
+
+                            if (!hasNext)
+                            {
+                                attemptStatus = StreamAttemptStatus.Succeeded;
+                                break;
+                            }
+
+                            var delta = enumerator.Current;
+                            if (string.IsNullOrEmpty(delta)) continue;
+
+                            if (!hasYielded)
+                            {
+                                firstTokenLatency = attemptSw.Elapsed;
+                                // First token arrived; subsequent reads run on the caller's normal token.
+                                firstTokenCts?.CancelAfter(Timeout.InfiniteTimeSpan);
+                                hasYielded = true;
+                            }
+                            assembler.Append(delta);
+                            yield return new TranslationStreamingUpdate(candidate, delta);
                         }
-                        assembler.Append(delta);
-                        yield return new TranslationStreamingUpdate(candidate, delta);
+                    }
+                    finally
+                    {
+                        firstTokenCts?.Dispose();
                     }
                 }
                 attemptSw.Stop();

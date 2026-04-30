@@ -1,14 +1,19 @@
 using System.Diagnostics;
 using System.Net;
+using System.Net.Http;
 using System.Net.Sockets;
-using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 
 namespace LiveLingo.Core.Processing;
 
 public sealed class LlamaServerProcessManager : ILlamaServerProcessManager
 {
+    private static readonly TimeSpan ServerStartTimeout = TimeSpan.FromSeconds(60);
+    private static readonly TimeSpan HealthPollInterval = TimeSpan.FromMilliseconds(250);
+    private static readonly TimeSpan HealthProbeTimeout = TimeSpan.FromSeconds(2);
+
     private readonly INativeRuntimeUpdater _updater;
+    private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<LlamaServerProcessManager> _logger;
     private readonly SemaphoreSlim _lock = new(1, 1);
 
@@ -22,9 +27,13 @@ public sealed class LlamaServerProcessManager : ILlamaServerProcessManager
 
     public event Action<ModelLoadState>? StateChanged;
 
-    public LlamaServerProcessManager(INativeRuntimeUpdater updater, ILogger<LlamaServerProcessManager> logger)
+    public LlamaServerProcessManager(
+        INativeRuntimeUpdater updater,
+        IHttpClientFactory httpClientFactory,
+        ILogger<LlamaServerProcessManager> logger)
     {
         _updater = updater;
+        _httpClientFactory = httpClientFactory;
         _logger = logger;
     }
 
@@ -59,7 +68,7 @@ public sealed class LlamaServerProcessManager : ILlamaServerProcessManager
             var port = GetAvailablePort();
             _currentEndpointUrl = $"http://127.0.0.1:{port}";
 
-            var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var exitTcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
             var startInfo = new ProcessStartInfo
             {
@@ -77,7 +86,7 @@ public sealed class LlamaServerProcessManager : ILlamaServerProcessManager
             {
                 if (!string.IsNullOrWhiteSpace(e.Data))
                 {
-                    HandleServerLog(e.Data, tcs);
+                    HandleServerLog(e.Data);
                 }
             };
 
@@ -85,7 +94,7 @@ public sealed class LlamaServerProcessManager : ILlamaServerProcessManager
             {
                 if (!string.IsNullOrWhiteSpace(e.Data))
                 {
-                    HandleServerLog(e.Data, tcs);
+                    HandleServerLog(e.Data);
                 }
             };
 
@@ -95,7 +104,7 @@ public sealed class LlamaServerProcessManager : ILlamaServerProcessManager
                 _currentEndpointUrl = null;
                 _currentModelPath = null;
                 SetState(ModelLoadState.Unloaded);
-                tcs.TrySetException(new InvalidOperationException($"llama-server exited prematurely with code {_process?.ExitCode}"));
+                exitTcs.TrySetException(new InvalidOperationException($"llama-server exited prematurely with code {_process?.ExitCode}"));
             };
 
             _logger.LogInformation("Starting llama-server on port {Port} for model {ModelPath}", port, modelPath);
@@ -103,20 +112,7 @@ public sealed class LlamaServerProcessManager : ILlamaServerProcessManager
             _process.BeginOutputReadLine();
             _process.BeginErrorReadLine();
 
-            // Wait until server reports it's ready or fails
-            using var reg = ct.Register(() => tcs.TrySetCanceled());
-
-            // Timeout just in case it hangs
-            var timeoutTask = Task.Delay(TimeSpan.FromSeconds(60), ct);
-            var completedTask = await Task.WhenAny(tcs.Task, timeoutTask);
-
-            if (completedTask == timeoutTask)
-            {
-                await StopServerInternalAsync();
-                throw new TimeoutException("llama-server did not start within the expected time.");
-            }
-
-            await tcs.Task; // throw if fault/cancelled
+            await WaitForServerHealthAsync(_currentEndpointUrl, exitTcs.Task, ct).ConfigureAwait(false);
 
             _currentModelPath = modelPath;
             SetState(ModelLoadState.Loaded);
@@ -133,24 +129,86 @@ public sealed class LlamaServerProcessManager : ILlamaServerProcessManager
         }
     }
 
-    private void HandleServerLog(string logLine, TaskCompletionSource tcs)
+    private async Task WaitForServerHealthAsync(string endpoint, Task exitTask, CancellationToken ct)
     {
-        // llama-server typically says "server is listening on http..." when ready.
-        if (logLine.Contains("server is listening", StringComparison.OrdinalIgnoreCase))
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        var timeoutTask = Task.Delay(ServerStartTimeout, timeoutCts.Token);
+        var client = _httpClientFactory.CreateClient(nameof(LlamaServerProcessManager));
+
+        while (true)
         {
-            tcs.TrySetResult();
-        }
-        else if (logLine.Contains("ERR", StringComparison.OrdinalIgnoreCase) ||
-                 logLine.Contains("failed", StringComparison.OrdinalIgnoreCase) ||
-                 logLine.Contains("error", StringComparison.OrdinalIgnoreCase))
-        {
-            // Specifically log errors to avoid spamming Serilog with normal progress
-            // Ignore some common false positives
-            if (!logLine.Contains("failed to initialize", StringComparison.OrdinalIgnoreCase) || logLine.Contains("llama_model_load"))
+            ct.ThrowIfCancellationRequested();
+            if (exitTask.IsCompleted)
+                await exitTask.ConfigureAwait(false);
+
+            if (await TryProbeHealthAsync(client, endpoint, ct).ConfigureAwait(false))
+                return;
+
+            var delayTask = Task.Delay(HealthPollInterval, ct);
+            var completedTask = await Task.WhenAny(delayTask, timeoutTask, exitTask).ConfigureAwait(false);
+            if (completedTask == exitTask)
+                await exitTask.ConfigureAwait(false);
+            if (completedTask == timeoutTask)
             {
-                _logger.LogError("llama-server: {Log}", logLine);
+                ct.ThrowIfCancellationRequested();
+                throw new TimeoutException("llama-server did not start within the expected time.");
             }
         }
+    }
+
+    private async Task<bool> TryProbeHealthAsync(HttpClient client, string endpoint, CancellationToken ct)
+    {
+        using var probeCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        probeCts.CancelAfter(HealthProbeTimeout);
+
+        try
+        {
+            using var response = await client
+                .GetAsync($"{endpoint}/health", HttpCompletionOption.ResponseHeadersRead, probeCts.Token)
+                .ConfigureAwait(false);
+
+            if (response.StatusCode == HttpStatusCode.OK)
+                return true;
+
+            if (response.StatusCode != HttpStatusCode.ServiceUnavailable)
+            {
+                _logger.LogDebug(
+                    "llama-server health probe returned {StatusCode}.",
+                    response.StatusCode);
+            }
+
+            return false;
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            return false;
+        }
+        catch (HttpRequestException)
+        {
+            return false;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+    }
+
+    private void HandleServerLog(string logLine)
+    {
+        if (IsServerErrorLog(logLine))
+            _logger.LogError("llama-server: {Log}", logLine);
+    }
+
+    internal static bool IsServerErrorLog(string logLine)
+    {
+        var trimmed = logLine.Trim();
+        return trimmed.StartsWith("error", StringComparison.OrdinalIgnoreCase)
+               || trimmed.StartsWith("err:", StringComparison.OrdinalIgnoreCase)
+               || trimmed.Contains(" error:", StringComparison.OrdinalIgnoreCase)
+               || trimmed.Contains(" error ", StringComparison.OrdinalIgnoreCase)
+               || trimmed.Contains(" failed", StringComparison.OrdinalIgnoreCase)
+               || trimmed.StartsWith("failed", StringComparison.OrdinalIgnoreCase)
+               || trimmed.Contains(" exception", StringComparison.OrdinalIgnoreCase);
     }
 
     internal static string BuildArguments(string modelPath, int contextSize, int inferenceThreads, int port) =>

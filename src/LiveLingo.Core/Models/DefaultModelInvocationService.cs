@@ -27,9 +27,18 @@ public sealed class DefaultModelInvocationService : IModelInvocationService
         ModelInvocationRequest request,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
-        var (session, provider) = await ResolveAsync(request, ct).ConfigureAwait(false);
-        await foreach (var delta in provider.InvokeStreamingAsync(session, request, ct).ConfigureAwait(false))
+        var invocation = await PrepareStreamingAsync(request, ct).ConfigureAwait(false);
+        await foreach (var delta in invocation.InvokeStreamingAsync(ct).ConfigureAwait(false))
             yield return delta;
+    }
+
+    public async Task<PreparedModelStreamingInvocation> PrepareStreamingAsync(
+        ModelInvocationRequest request,
+        CancellationToken ct = default)
+    {
+        var (session, provider) = await ResolveAsync(request, ct).ConfigureAwait(false);
+        return new PreparedModelStreamingInvocation(
+            streamCt => provider.InvokeStreamingAsync(session, request, streamCt));
     }
 
     private async Task<(ModelRuntimeSession Session, IModelProvider Provider)> ResolveAsync(
