@@ -250,6 +250,68 @@ public sealed class FallbackTranslationInvokerTests
     }
 
     [Fact]
+    public async Task InvokeStreamingAsync_DoesNotSpendFirstTokenBudgetWhilePreparingRuntime()
+    {
+        var shortBudgetPlan = new TranslationRoutePlan(
+        [
+            new TranslationRouteCandidate(LocalProfile, TranslationRouteTier.Local, TimeSpan.FromMilliseconds(50)),
+            new TranslationRouteCandidate(CloudProfile, TranslationRouteTier.Cloud, TimeSpan.FromSeconds(3))
+        ]);
+        var prepareCount = 0;
+        var service = new StubInvocationService
+        {
+            PrepareBehaviour = async (req, ct) =>
+            {
+                prepareCount++;
+                if (req.Profile.Id == LocalProfile.Id)
+                    await Task.Delay(TimeSpan.FromMilliseconds(150), ct).ConfigureAwait(false);
+
+                return new PreparedModelStreamingInvocation(_ => StreamingSequence($"{req.Profile.Id} answer"));
+            }
+        };
+        var (invoker, telemetry) = CreateInvoker(service);
+
+        var collected = new List<(string id, string delta)>();
+        await foreach (var update in invoker.InvokeStreamingAsync(shortBudgetPlan, BuildRequest, qualityGuard: null))
+            collected.Add((update.Candidate.Profile.Id, update.Delta));
+
+        Assert.Single(collected);
+        Assert.Equal((LocalProfile.Id, "local-model answer"), collected[0]);
+        Assert.Equal(1, prepareCount);
+
+        var trace = SingleTrace(telemetry);
+        var attempt = Assert.Single(trace.Attempts);
+        Assert.Equal(TranslationRouteAttemptOutcome.Succeeded, attempt.Outcome);
+        Assert.Equal(LocalProfile.Id, trace.WinningCandidate?.Profile.Id);
+    }
+
+    [Fact]
+    public async Task InvokeStreamingAsync_DoesNotApplyFirstTokenFallbackBudgetToLastCandidate()
+    {
+        var localOnlyPlan = new TranslationRoutePlan(
+        [
+            new TranslationRouteCandidate(LocalProfile, TranslationRouteTier.Local, TimeSpan.FromMilliseconds(50))
+        ]);
+        var service = new StubInvocationService
+        {
+            StreamBehaviour = (_, ct) => DelayBeforeFirstToken(TimeSpan.FromMilliseconds(150), ct)
+        };
+        var (invoker, telemetry) = CreateInvoker(service);
+
+        var collected = new List<(string id, string delta)>();
+        await foreach (var update in invoker.InvokeStreamingAsync(localOnlyPlan, BuildRequest, qualityGuard: null))
+            collected.Add((update.Candidate.Profile.Id, update.Delta));
+
+        Assert.Single(collected);
+        Assert.Equal((LocalProfile.Id, "late"), collected[0]);
+
+        var trace = SingleTrace(telemetry);
+        var attempt = Assert.Single(trace.Attempts);
+        Assert.Equal(TranslationRouteAttemptOutcome.Succeeded, attempt.Outcome);
+        Assert.Null(attempt.FailureReason);
+    }
+
+    [Fact]
     public async Task InvokeStreamingAsync_ThrowsWhenFailureHappensAfterFirstToken()
     {
         var service = new StubInvocationService
@@ -394,11 +456,25 @@ public sealed class FallbackTranslationInvokerTests
     private sealed class StubInvocationService : IModelInvocationService
     {
         public Func<ModelInvocationRequest, CancellationToken, IAsyncEnumerable<string>>? StreamBehaviour { get; set; }
+        public Func<ModelInvocationRequest, CancellationToken, Task<PreparedModelStreamingInvocation>>? PrepareBehaviour { get; set; }
         public Func<ModelInvocationRequest, ModelInvocationResult>? InvokeBehaviour { get; set; }
 
         public Task<ModelInvocationResult> InvokeAsync(ModelInvocationRequest request, CancellationToken ct = default)
             => Task.FromResult(InvokeBehaviour?.Invoke(request)
                                ?? throw new InvalidOperationException("InvokeBehaviour not configured."));
+
+        public Task<PreparedModelStreamingInvocation> PrepareStreamingAsync(
+            ModelInvocationRequest request,
+            CancellationToken ct = default)
+        {
+            if (PrepareBehaviour is not null)
+                return PrepareBehaviour(request, ct);
+
+            return Task.FromResult(new PreparedModelStreamingInvocation(
+                streamCt => StreamBehaviour is null
+                    ? throw new InvalidOperationException("StreamBehaviour not configured.")
+                    : StreamBehaviour(request, streamCt)));
+        }
 
         public IAsyncEnumerable<string> InvokeStreamingAsync(ModelInvocationRequest request, CancellationToken ct = default)
             => StreamBehaviour is null
