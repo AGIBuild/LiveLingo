@@ -182,7 +182,31 @@ public class LocalizationServiceTests
             "dialog.update.available.download",
             "dialog.update.available.later",
             "dialog.update.failed",
-            "dialog.ok"
+            "dialog.ok",
+            "composer.placeholder",
+            "composer.output.translate",
+            "composer.output.original",
+            "composer.language.English",
+            "composer.language.Chinese",
+            "composer.swap",
+            "composer.target.some",
+            "composer.target.none",
+            "composer.status.empty",
+            "composer.status.working",
+            "composer.status.ready",
+            "composer.status.failed",
+            "composer.status.queued",
+            "composer.copy",
+            "composer.write",
+            "composer.retry",
+            "composer.result.empty",
+            "composer.banner.modelMissing",
+            "composer.banner.download",
+            "composer.banner.downloading",
+            "composer.banner.downloadFailed",
+            "composer.banner.downloadRetry",
+            "composer.banner.targetLost",
+            "composer.banner.writeFailed"
         ];
         foreach (var key in criticalKeys)
         {
