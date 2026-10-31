@@ -85,6 +85,16 @@ public class TextUnitsTests
         Assert.Equal(expected, TextUnits.Split(text).Select(u => u.Body));
     }
 
+    [Theory]
+    [InlineData("先改接口；再补测试", new[] { "先改接口；", "再补测试" })]
+    [InlineData("真的吗？！好的……继续", new[] { "真的吗？！", "好的……", "继续" })]
+    [InlineData("他说“行！”，然后走了", new[] { "他说“行！”", "，然后走了" })]
+    [InlineData("括号（见上文。）后面", new[] { "括号（见上文。）", "后面" })]
+    public void Split_EndsSentencesAtSemicolonsEllipsesAndRepeatedTerminators(string text, string[] expected)
+    {
+        Assert.Equal(expected, TextUnits.Split(text).Select(u => u.Body));
+    }
+
     [Fact]
     public void Split_KeepsTrailingWhitespaceOfTheLastCompleteUnit()
     {

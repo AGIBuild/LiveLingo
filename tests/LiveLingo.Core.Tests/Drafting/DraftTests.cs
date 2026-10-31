@@ -341,4 +341,40 @@ public class DraftTests
         draft.Retry(0, UnitKind.Clean);
         Assert.Equal("好。", draft.Units[0].Clean.Text);
     }
+
+    [Fact]
+    public void Pending_IsLiveSpeechThatIsNeverPartOfTheCommittedText()
+    {
+        var draft = new Draft(hasTarget: true);
+        var ticket = draft.Append("好的。");
+        draft.Complete(ticket, UnitKind.Clean, "好的。");
+
+        draft.SetPending("然后更");
+
+        Assert.Equal("然后更", draft.Pending);
+        Assert.Equal("好的。", draft.Text());
+        Assert.Equal("好的。", draft.RequestCommit().Snapshot!.Text);
+    }
+
+    [Fact]
+    public void Pending_DoesNotChangeTheSourceRevision_AndIsClearedByReset()
+    {
+        var draft = new Draft(hasTarget: true);
+        var revision = draft.SourceRevision;
+
+        draft.SetPending("你好");
+        Assert.Equal(revision, draft.SourceRevision);
+
+        draft.Reset(hasTarget: true);
+        Assert.Equal("", draft.Pending);
+    }
+
+    [Fact]
+    public void Pending_CannotChangeAFrozenDraft()
+    {
+        var (draft, _) = Ready();
+        draft.RequestCommit();
+
+        Assert.Throws<InvalidOperationException>(() => draft.SetPending("晚到"));
+    }
 }
