@@ -1,0 +1,42 @@
+src/LiveLingo.Desktop/App.axaml.cs
+  s_6d6e9175f38e45::t_7ef09bb04752a4 343
+tests/LiveLingo.Desktop.Tests/Composer/ComposerWindowTests.cs
+  s_6d6e9175f38e45::t_caef313deb684c 144-172
+src/LiveLingo.Desktop/Composer/ComposerViewModel.cs
+  s_6d6e9175f38e45::t_220d2d4655e8dd 466
+  s_6d6e9175f38e45::t_7ef09bb04752a4 87-89,461-462
+src/LiveLingo.Desktop/Composer/ComposerWindow.axaml.cs
+  s_6d6e9175f38e45::t_7ef09bb04752a4 97-100
+src/LiveLingo.Desktop/Composer/ComposerWindow.axaml
+  s_6d6e9175f38e45::t_055160ee0d23c9 61-64,66
+  s_6d6e9175f38e45::t_281960f847abe3 33-36,51-54,130-134
+  s_6d6e9175f38e45::t_7ef09bb04752a4 65,70,74,169,189-190,195,202,209
+tests/LiveLingo.Desktop.Tests/Composer/ComposerViewModelTests.cs
+  s_6d6e9175f38e45::t_220d2d4655e8dd 326-353
+.nuke/build.schema.json
+  s_21a175a4627c3e::t_ba55b97d164014 34,135,137,141
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "438ee0d9d144ecf4fe8f81f2106d692636b3bfd4",
+  "prompts": {},
+  "sessions": {
+    "s_21a175a4627c3e": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "4ef2b4d6-155d-4256-a10a-eb29c11a4638",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    },
+    "s_6d6e9175f38e45": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "f74d37e5-1d96-4ddc-a3f9-5ae24ff39e38",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
