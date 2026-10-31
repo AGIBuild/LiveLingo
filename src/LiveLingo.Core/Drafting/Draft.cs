@@ -21,6 +21,12 @@ public sealed class Draft
     public bool TargetLost { get; set; }
     public bool Recording { get; set; }
 
+    /// <summary>
+    /// Speech that has been recognized but not settled into units yet (the live hypothesis). It is shown after the
+    /// units and is never part of <see cref="Text"/>; the dictation session replaces it as recognition advances.
+    /// </summary>
+    public string Pending { get; private set; } = "";
+
     /// <summary>Increases whenever the source text changes (not when results arrive).</summary>
     public int SourceRevision { get; private set; }
 
@@ -38,7 +44,14 @@ public sealed class Draft
         HasTarget = hasTarget;
         TargetLost = false;
         Recording = false;
+        Pending = "";
         Snapshot = null;
+    }
+
+    public void SetPending(string text)
+    {
+        EnsureEditable();
+        Pending = text;
     }
 
     public JobTicket Append(string raw)

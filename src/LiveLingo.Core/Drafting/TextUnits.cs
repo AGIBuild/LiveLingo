@@ -11,6 +11,9 @@ public static partial class TextUnits
 
     private const int StructuredLineCount = 3;
 
+    private const string Terminators = "。！？!?；…";
+    private const string Closers = "”’」』）)\"'】";
+
     private static readonly HashSet<string> Abbreviations = new(StringComparer.OrdinalIgnoreCase)
         { "Dr", "Mr", "Mrs", "Ms", "Prof", "e.g", "i.e", "vs" };
 
@@ -64,7 +67,7 @@ public static partial class TextUnits
             if (!EndsSentenceAt(text, i, start))
                 continue;
 
-            while (i + 1 < text.Length && text[i + 1] is '"' or '”' or '’' or '」' or '』') i++;
+            while (i + 1 < text.Length && (Terminators.Contains(text[i + 1]) || Closers.Contains(text[i + 1]))) i++;
             var sentence = text[start..(i + 1)];
             if (sentence.Trim().Length > 0)
                 units.Add(MakeUnit(sentence, complete: true, first: units.Count == 0, endsLine: false));
@@ -124,7 +127,7 @@ public static partial class TextUnits
 
     private static bool EndsSentenceAt(string text, int i, int sentenceStart)
     {
-        if (text[i] is '。' or '！' or '？' or '!' or '?')
+        if (Terminators.Contains(text[i]))
             return true;
         if (text[i] != '.' || (i + 1 != text.Length && !char.IsWhiteSpace(text[i + 1])))
             return false;
