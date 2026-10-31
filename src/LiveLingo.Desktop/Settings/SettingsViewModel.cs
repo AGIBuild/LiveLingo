@@ -14,12 +14,15 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     private readonly ISettingsService _settings;
     private readonly ISecretStore _secrets;
+    private readonly IModelManager _models;
     private readonly SettingsModel _draft;
+    private IReadOnlyList<string> _legacyIds = [];
 
-    public SettingsViewModel(ISettingsService settings, ISecretStore secrets)
+    public SettingsViewModel(ISettingsService settings, ISecretStore secrets, IModelManager models)
     {
         _settings = settings;
         _secrets = secrets;
+        _models = models;
         _draft = settings.CloneCurrent();
         _summonHotkey = _draft.Hotkeys.Summon;
         _language = _draft.Appearance.Language;
@@ -72,9 +75,36 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     partial void OnCloudCleanChanged(bool value) => CloudInvalid = false;
 
-    /// <summary>Reads whether a key is stored; the window calls it when it opens.</summary>
-    public async Task InitializeAsync() =>
+    /// <summary>Reads whether a key is stored and which models from earlier versions are on disk; the window calls it when it opens.</summary>
+    public async Task InitializeAsync()
+    {
         HasStoredKey = !string.IsNullOrEmpty(await _secrets.GetSecretAsync(CloudSettings.ApiKeySecretId).ConfigureAwait(true));
+
+        var current = ModelCatalog.All.Select(model => model.Id).ToHashSet();
+        var legacy = await Task.Run(() => _models.ListInstalled().Where(model => !current.Contains(model.Id)).ToList())
+            .ConfigureAwait(true);
+        _legacyIds = legacy.Select(model => model.Id).ToList();
+        LegacyBytes = legacy.Sum(model => model.SizeBytes);
+        LegacyCount = legacy.Count;
+    }
+
+    /// <summary>Models that earlier versions downloaded and this one no longer uses; they are only removed on request.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasLegacyModels))]
+    private int _legacyCount;
+
+    [ObservableProperty] private long _legacyBytes;
+
+    public bool HasLegacyModels => LegacyCount > 0;
+
+    [RelayCommand]
+    private async Task RemoveLegacyModelsAsync()
+    {
+        await _models.CleanObsoleteModelsAsync(_legacyIds).ConfigureAwait(true);
+        _legacyIds = [];
+        LegacyCount = 0;
+        LegacyBytes = 0;
+    }
 
     [RelayCommand]
     private async Task SaveAsync()

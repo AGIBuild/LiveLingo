@@ -80,6 +80,8 @@
   "settings.cloud.keyStored": "A key is stored. Leave the box empty to keep it.",
   "settings.cloud.forget": "Remove key and turn cloud off",
   "settings.cloud.invalid": "Enter an https endpoint, a model name and an API key to use the cloud.",
+  "settings.legacy": "Models downloaded by an earlier version ({0} items, {1} GB) are no longer used. Removing them frees the space; nothing is deleted unless you ask.",
+  "settings.legacy.remove": "Remove old models",
   "settings.save": "Save",
   "settings.cancel": "Cancel"
 }

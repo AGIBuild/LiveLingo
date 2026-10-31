@@ -267,7 +267,7 @@ public partial class App : Application
         }
 
         var services = _serviceProvider!;
-        var vm = new SettingsViewModel(services.GetRequiredService<ISettingsService>(), services.GetRequiredService<ISecretStore>());
+        var vm = new SettingsViewModel(services.GetRequiredService<ISettingsService>(), services.GetRequiredService<ISecretStore>(), services.GetRequiredService<IModelManager>());
         _settingsWindow = new SettingsWindow(vm, services.GetRequiredService<ILocalizationService>());
         _settingsWindow.Closed += (_, _) => _settingsWindow = null;
         _settingsWindow.Show();

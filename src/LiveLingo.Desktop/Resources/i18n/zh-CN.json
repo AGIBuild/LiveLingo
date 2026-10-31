@@ -80,6 +80,8 @@
   "settings.cloud.keyStored": "已保存密钥。留空表示继续使用。",
   "settings.cloud.forget": "删除密钥并关闭云端",
   "settings.cloud.invalid": "使用云端需要填写 https 端点、模型名称和 API 密钥。",
+  "settings.legacy": "旧版本下载的模型（{0} 个，{1} GB）已不再使用。删除后可释放空间；不点击就不会删除。",
+  "settings.legacy.remove": "删除旧模型",
   "settings.save": "保存",
   "settings.cancel": "取消"
 }

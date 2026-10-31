@@ -51,6 +51,11 @@
             <SelectableTextBlock x:Name="CloudError" FontSize="12" Foreground="#FF8A7E" TextWrapping="Wrap" IsVisible="{Binding CloudInvalid}"/>
         </StackPanel>
 
+        <StackPanel x:Name="LegacyPanel" Spacing="8" IsVisible="{Binding HasLegacyModels}">
+            <SelectableTextBlock x:Name="LegacyText" TextWrapping="Wrap"/>
+            <Button x:Name="LegacyRemoveButton" Command="{Binding RemoveLegacyModelsCommand}" HorizontalAlignment="Left"/>
+        </StackPanel>
+
         <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
             <Button x:Name="CancelButton" Command="{Binding CancelCommand}" MinWidth="88" HorizontalContentAlignment="Center"/>
             <Button x:Name="SaveButton" Command="{Binding SaveCommand}" Classes="accent" MinWidth="88" HorizontalContentAlignment="Center"/>
