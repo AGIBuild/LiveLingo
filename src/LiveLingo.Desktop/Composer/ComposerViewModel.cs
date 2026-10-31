@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using LiveLingo.Core.Drafting;
 using LiveLingo.Core.Models;
 using LiveLingo.Core.Translation;
+using LiveLingo.Core.Transcription;
 using LiveLingo.Desktop.Platform;
 
 namespace LiveLingo.Desktop.Composer;
@@ -23,6 +24,7 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
     private readonly IModelDownloadCoordinator _downloads;
     private readonly IPlatformServices _platform;
     private readonly IVoiceInput _voice;
+    private readonly IAudioFileTranscriber _transcriber;
     private readonly IReadOnlyList<string> _glossary;
     private readonly TargetWindowInfo? _target;
     private readonly SynchronizationContext? _notifyOn;
@@ -42,6 +44,7 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
         IModelDownloadCoordinator downloads,
         IPlatformServices platform,
         IVoiceInput voice,
+        IAudioFileTranscriber transcriber,
         IReadOnlyList<string> glossary,
         TargetWindowInfo? target,
         SynchronizationContext? notifyOn = null,
@@ -54,6 +57,7 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
         _downloads = downloads;
         _platform = platform;
         _voice = voice;
+        _transcriber = transcriber;
         _glossary = glossary;
         _target = target;
         _notifyOn = notifyOn;
@@ -180,7 +184,7 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
 
     public async Task StartListeningAsync()
     {
-        if (IsListening || IsStartingListening || _committed is not null)
+        if (IsListening || IsStartingListening || IsTranscribing || HasTimeline || _committed is not null)
             return;
 
         if (_platform.MicrophonePermission.Status == MicrophoneAccess.Denied)
@@ -288,6 +292,8 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
     {
         if (IsListening)
             await StopListeningAsync().ConfigureAwait(true);
+        else if (IsTranscribing)
+            _transcribing?.Cancel();
         else if (IsWriteQueued)
             CancelQueuedWrite();
         else
@@ -307,8 +313,7 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
     [RelayCommand]
     private async Task DownloadModelsAsync()
     {
-        var wanted = _plan.For(Output).Concat(_wantsVoice ? _plan.Voice : []).DistinctBy(model => model.Id);
-        foreach (var model in wanted.Where(model => !_models.HasAllExpectedLocalAssets(model)))
+        foreach (var model in WantedModels().Where(model => !_models.HasAllExpectedLocalAssets(model)))
         {
             await _downloads.StartAsync(model).ConfigureAwait(true);
             if (!_models.HasAllExpectedLocalAssets(model))
@@ -323,7 +328,9 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
         Banner = BannerState.None;
         ApplyDraftOutput();
         RetryFailed();
-        if (_wantsVoice && IsInstalled(_plan.Voice))
+        if (_pendingImport is { } path && IsInstalled(_plan.Transcription))
+            await RunImportAsync(path).ConfigureAwait(true);
+        else if (_wantsVoice && IsInstalled(_plan.Voice))
             await StartListeningAsync().ConfigureAwait(true);
     }
 
@@ -373,7 +380,8 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
 
     private void CancelQueuedWrite() => IsWriteQueued = false;
 
-    private void UpdateEditable() => IsEditable = _committed is null && !IsListening && !IsStartingListening;
+    private void UpdateEditable() =>
+        IsEditable = _committed is null && !IsListening && !IsStartingListening && !IsTranscribing && !HasTimeline;
 
     private async Task CompleteAsync(CommitSnapshot snapshot)
     {
@@ -452,7 +460,7 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
 
     private void OnDownloadStateChanged(ModelDownloadState state)
     {
-        var wanted = _plan.For(Output).Concat(_wantsVoice ? _plan.Voice : []).DistinctBy(model => model.Id).ToList();
+        var wanted = WantedModels();
         if (wanted.All(model => model.Id != state.ModelId))
             return;
 
@@ -481,16 +489,20 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
             Lines: BuildLines(draft),
             Content: draft.ContentReadiness(),
             Count: draft.Units.Count,
+            Whole: draft.Route == DraftRoute.Whole,
             HasPending: draft.Pending.Length > 0,
             Text: draft.ContentReadiness().IsReady ? draft.Text() : "",
             Kept: Output == ComposerOutput.Clean ? draft.Units.Count(unit => unit.Clean.Warning.Length > 0) : 0));
 
         Lines = snapshot.Lines;
+        IsWide = HasTimeline || snapshot.Whole;
         Status = StatusOf(snapshot.Count + (snapshot.HasPending ? 1 : 0), snapshot.Content);
         ResultText = Status == ComposerStatus.Ready ? snapshot.Text : "";
         KeptOriginalCount = snapshot.Kept;
         CanCopy = _committed is not null || Status == ComposerStatus.Ready;
         CanWrite = CanCopy && _committed is null;
+        OnPropertyChanged(nameof(CanImport));
+        OnPropertyChanged(nameof(CanExport));
 
         var needsModels = !ModelsReady && Output != ComposerOutput.Original;
         if (needsModels && Banner.Kind is BannerKind.None)
@@ -499,10 +511,16 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
 
     private string MissingSizeLabel()
     {
-        var wanted = _plan.For(Output).Concat(_wantsVoice ? _plan.Voice : []).DistinctBy(model => model.Id);
-        var bytes = wanted.Where(model => !_models.HasAllExpectedLocalAssets(model)).Sum(model => model.SizeBytes);
+        var bytes = WantedModels().Where(model => !_models.HasAllExpectedLocalAssets(model)).Sum(model => model.SizeBytes);
         return $"{bytes / 1_000_000_000d:0.0} GB";
     }
+
+    /// <summary>The models the selected output needs, plus those of voice or import once the user asked for them.</summary>
+    private List<ModelDescriptor> WantedModels() => _plan.For(Output)
+        .Concat(_wantsVoice ? _plan.Voice : [])
+        .Concat(_pendingImport is not null ? _plan.Transcription : [])
+        .DistinctBy(model => model.Id)
+        .ToList();
 
     private IReadOnlyList<ResultLine> BuildLines(Draft draft)
     {
@@ -512,7 +530,7 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
             var unit = draft.Units[i];
             if (Output == ComposerOutput.Original)
             {
-                lines.Add(new ResultLine(i, unit.Raw, LineState.Ready, ""));
+                lines.Add(new ResultLine(i, unit.Raw, LineState.Ready, "", TimeLabel(i)));
                 continue;
             }
 
@@ -526,13 +544,15 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
                     _ => LineState.Pending
                 }
                 : LineState.Pending;
-            lines.Add(new ResultLine(i, result.Text ?? "", state, result.Error));
+            lines.Add(new ResultLine(i, result.Text ?? "", state, result.Error, TimeLabel(i)));
         }
         return lines;
     }
 
     private ComposerStatus StatusOf(int itemCount, Readiness content)
     {
+        if (IsTranscribing)
+            return ComposerStatus.Transcribing;
         if (IsStartingListening)
             return ComposerStatus.Starting;
         if (IsListening)

@@ -6,12 +6,14 @@ namespace LiveLingo.Desktop.Composer;
 /// <summary>Turns view-model states into localized text, so the window only binds strings.</summary>
 public sealed class ComposerTexts(ILocalizationService loc)
 {
-    public string Status(ComposerStatus status, bool writeQueued, int keptOriginal = 0)
+    public string Status(ComposerStatus status, bool writeQueued, int keptOriginal = 0, int percent = 0)
     {
         if (writeQueued)
             return loc.T("composer.status.queued");
         if (status == ComposerStatus.Ready && keptOriginal > 0)
             return loc.T("composer.status.keptOriginal", keptOriginal);
+        if (status == ComposerStatus.Transcribing)
+            return loc.T("composer.status.transcribing", percent);
 
         return loc.T(status switch
         {
@@ -32,6 +34,11 @@ public sealed class ComposerTexts(ILocalizationService loc)
     public string RetryLabel => loc.T("composer.retry");
     public string Placeholder => loc.T("composer.placeholder");
     public string MicLabel => loc.T("composer.mic");
+    public string ImportLabel => loc.T("composer.import");
+    public string ImportTitle => loc.T("composer.import.title");
+    public string ImportFileType => loc.T("composer.import.fileType");
+    public string ExportLabel => loc.T("composer.export");
+    public string ExportTitle => loc.T("composer.export.title");
 
     public string TranslateLabel(TargetLanguage target) =>
         loc.T("composer.output.translate", loc.T("composer.language." + target));
@@ -50,6 +57,8 @@ public sealed class ComposerTexts(ILocalizationService loc)
         BannerKind.MicrophoneDenied => loc.T("composer.banner.micDenied"),
         BannerKind.NoMicrophone => loc.T("composer.banner.noMic", banner.Detail),
         BannerKind.NoSound => loc.T("composer.banner.noSound"),
+        BannerKind.FileFailed => loc.T("composer.banner.fileFailed", banner.Detail),
+        BannerKind.NoSpeechFound => loc.T("composer.banner.noSpeech"),
         _ => throw new ArgumentOutOfRangeException(nameof(banner))
     };
 

@@ -11,6 +11,7 @@ using LiveLingo.Core.Dictation;
 using LiveLingo.Core.Drafting;
 using LiveLingo.Core.Inference;
 using LiveLingo.Core.Models;
+using LiveLingo.Core.Transcription;
 using LiveLingo.Core.Translation;
 using LiveLingo.Desktop.Composer;
 using LiveLingo.Desktop.Settings;
@@ -233,6 +234,7 @@ public partial class App : Application
             services.GetRequiredService<IModelDownloadCoordinator>(),
             platform,
             voice,
+            services.GetRequiredService<IAudioFileTranscriber>(),
             glossary.Terms,
             target,
             context);
@@ -247,7 +249,7 @@ public partial class App : Application
         window.Closed += async (_, _) =>
         {
             _composer = null;
-            _unsentDraft.Close(vm.SourceText, written);
+            _unsentDraft.Close(vm.HasTimeline ? "" : vm.SourceText, written);
             await vm.DisposeAsync();
             await cleanup.DisposeAsync();
             await scheduler.DisposeAsync();

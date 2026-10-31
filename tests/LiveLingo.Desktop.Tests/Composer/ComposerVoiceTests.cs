@@ -263,8 +263,8 @@ public class ComposerVoiceTests
         Assert.Equal(ComposerOutput.Clean, h.Vm.Output);
         Assert.Equal(ComposerOutput.Clean, new ComposerViewModel(
             h.Session, h.Scheduler,
-            new ComposerModelPlan([], [], []),
-            h.Models, h.Downloads, h.Platform, h.Voice, [], null).Output);
+            new ComposerModelPlan([], [], [], []),
+            h.Models, h.Downloads, h.Platform, h.Voice, h.Transcriber, [], null).Output);
     }
 
     [Fact]

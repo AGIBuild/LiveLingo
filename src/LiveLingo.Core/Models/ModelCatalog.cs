@@ -115,6 +115,9 @@ public static class ModelCatalog
     /// <summary>Everything voice dictation needs besides the cleaner and the translator.</summary>
     public static IReadOnlyList<ModelDescriptor> Speech { get; } = [SpeechLive, SpeechSecondPass, SpeechVad];
 
+    /// <summary>What importing a recording needs: no live recognizer, since the whole file is known.</summary>
+    public static IReadOnlyList<ModelDescriptor> Transcription { get; } = [SpeechSecondPass, SpeechVad];
+
     private static readonly ModelDescriptor LlamaMacArm64 = new(
         LlamaRuntimeId + "-osx-arm64",
         "llama.cpp b11980 (macOS arm64)",

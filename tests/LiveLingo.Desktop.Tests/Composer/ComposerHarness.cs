@@ -2,12 +2,29 @@ using LiveLingo.Core;
 using LiveLingo.Core.Cleanup;
 using LiveLingo.Core.Drafting;
 using LiveLingo.Core.Models;
+using LiveLingo.Core.Transcription;
 using LiveLingo.Core.Translation;
 using LiveLingo.Desktop.Composer;
 using LiveLingo.Desktop.Platform;
 using NSubstitute;
 
 namespace LiveLingo.Desktop.Tests.Composer;
+
+/// <summary>Returns scripted segments (or fails) for an imported recording.</summary>
+internal sealed class ScriptedTranscriber : IAudioFileTranscriber
+{
+    public Func<string, IProgress<double>?, CancellationToken, Task<IReadOnlyList<TimedSegment>>> Handler { get; set; } =
+        (_, _, _) => Task.FromResult<IReadOnlyList<TimedSegment>>([]);
+
+    public List<string> Paths { get; } = [];
+
+    public Task<IReadOnlyList<TimedSegment>> TranscribeAsync(
+        string path, IReadOnlyList<string> glossary, IProgress<double>? progress, CancellationToken ct)
+    {
+        Paths.Add(path);
+        return Handler(path, progress, ct);
+    }
+}
 
 internal sealed class FakeClock : TimeProvider
 {
@@ -106,6 +123,7 @@ internal sealed class Harness : IAsyncDisposable
     public ScriptedTranslator Translator { get; } = new();
     public ScriptedCleaner Cleaner { get; } = new();
     public FakeVoiceInput Voice { get; } = new();
+    public ScriptedTranscriber Transcriber { get; } = new();
     public TranslationScheduler Scheduler { get; }
     public CleanupScheduler Cleanup { get; }
     public IModelManager Models { get; } = Substitute.For<IModelManager>();
@@ -140,10 +158,10 @@ internal sealed class Harness : IAsyncDisposable
         Permission.Status.Returns(MicrophoneAccess.Granted);
         Tracker.IsAlive(Arg.Any<TargetWindowInfo>()).Returns(true);
         var plan = new ComposerModelPlan(
-            [Runtime, CleanerModel], [Runtime, TranslatorModel], ModelCatalog.Speech);
+            [Runtime, CleanerModel], [Runtime, TranslatorModel], ModelCatalog.Speech, ModelCatalog.Transcription);
         Vm = new ComposerViewModel(
-            Session, Scheduler, plan, Models, Downloads, Platform, Voice, [], hasTarget ? Target : null, notifyOn,
-            Time);
+            Session, Scheduler, plan, Models, Downloads, Platform, Voice, Transcriber, [], hasTarget ? Target : null,
+            notifyOn, Time);
         Vm.Output = output;
         Vm.Completed += () => Events.Add("completed");
         Vm.CloseRequested += () => Events.Add("close");
