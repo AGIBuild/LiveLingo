@@ -15,7 +15,10 @@
       "**/Drafting/**/*.cs",
       "**/Translation/**/*.cs",
       "**/Dictation/**/*.cs",
-      "**/Cleanup/**/*.cs"
+      "**/Cleanup/**/*.cs",
+      "**/Inference/**/*.cs",
+      "!**/Inference/LlamaProcessLauncher.cs",
+      "!**/Inference/LlamaServerAdapters.cs"
     ],
     "mutation-level": "Standard",
     "verbosity": "info",

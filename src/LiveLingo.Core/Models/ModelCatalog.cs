@@ -1,5 +1,11 @@
 namespace LiveLingo.Core.Models;
 
+public enum TranslatorTier
+{
+    Fast,
+    Quality
+}
+
 /// <summary>
 /// The only place that lists what the app may download. Every URL pins an immutable revision
 /// (a release tag or a commit hash) and every asset carries its SHA256.
@@ -69,6 +75,13 @@ public static class ModelCatalog
     {
         ArchiveType = ModelArchiveType.Zip,
         ExtractedFiles = ["llama-server.exe"]
+    };
+
+    public static ModelDescriptor Translator(TranslatorTier tier) => tier switch
+    {
+        TranslatorTier.Fast => TranslatorFast,
+        TranslatorTier.Quality => TranslatorQuality,
+        _ => throw new ArgumentOutOfRangeException(nameof(tier))
     };
 
     /// <param name="runtimeIdentifier">.NET runtime identifier, for example <c>osx-arm64</c> or <c>win-x64</c>.</param>

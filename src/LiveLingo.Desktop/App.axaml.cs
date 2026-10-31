@@ -89,7 +89,7 @@ public partial class App : Application
             desktop.Exit += (_, _) =>
             {
                 _updateCheckTimer?.Dispose();
-                _serviceProvider?.Dispose();
+                _serviceProvider?.DisposeAsync().AsTask().GetAwaiter().GetResult();
                 Log.CloseAndFlush();
             };
 

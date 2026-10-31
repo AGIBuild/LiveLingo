@@ -1,40 +1,11 @@
 using LiveLingo.Core.Drafting;
+using LiveLingo.Core.Tests.Support;
 using LiveLingo.Core.Translation;
 
 namespace LiveLingo.Core.Tests.Translation;
 
 public class TranslationSchedulerTests
 {
-    private sealed class ManualTimer(TimerCallback callback, object? state) : ITimer
-    {
-        public TimeSpan Due { get; private set; } = Timeout.InfiniteTimeSpan;
-        public bool Disposed { get; private set; }
-
-        public bool Change(TimeSpan dueTime, TimeSpan period)
-        {
-            Due = dueTime;
-            return true;
-        }
-
-        public void Fire() => callback(state);
-
-        public void Dispose() => Disposed = true;
-
-        public ValueTask DisposeAsync()
-        {
-            Disposed = true;
-            return ValueTask.CompletedTask;
-        }
-    }
-
-    private sealed class ManualTimeProvider : TimeProvider
-    {
-        public ManualTimer Timer { get; private set; } = null!;
-
-        public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period) =>
-            Timer = new ManualTimer(callback, state);
-    }
-
     private sealed class FakeTranslator : ITranslator
     {
         public sealed record Call(
