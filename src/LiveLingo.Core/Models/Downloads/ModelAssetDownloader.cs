@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using LiveLingo.Core.Models.Installations;
 using LiveLingo.HfGguf;
 using Microsoft.Extensions.Logging;
@@ -7,7 +8,8 @@ namespace LiveLingo.Core.Models.Downloads;
 /// <summary>
 /// Routes a single asset download to the right transport — Hugging Face's
 /// resolve API for HF URLs, plain HTTP Range otherwise — and short-circuits
-/// when the file (or a complete <c>.part</c>) is already on disk.
+/// when the file (or a complete <c>.part</c>) is already on disk. A freshly downloaded file is verified
+/// against its pinned SHA256 and deleted when it does not match.
 /// </summary>
 internal sealed class ModelAssetDownloader
 {
@@ -52,15 +54,31 @@ internal sealed class ModelAssetDownloader
             return existingFileSize;
         }
 
-        if (HuggingFaceResolveUrl.TryParse(asset.DownloadUrl, out _, out _, out _))
-        {
-            return await _hfDownloader
+        var downloadedBytes = HuggingFaceResolveUrl.TryParse(asset.DownloadUrl, out _, out _, out _)
+            ? await _hfDownloader
+                .DownloadAsync(modelId, relativePath, finalPath, asset, downloadedBeforeAsset, totalBytes, progress, ct)
+                .ConfigureAwait(false)
+            : await _httpDownloader
                 .DownloadAsync(modelId, relativePath, finalPath, asset, downloadedBeforeAsset, totalBytes, progress, ct)
                 .ConfigureAwait(false);
-        }
 
-        return await _httpDownloader
-            .DownloadAsync(modelId, relativePath, finalPath, asset, downloadedBeforeAsset, totalBytes, progress, ct)
-            .ConfigureAwait(false);
+        await VerifyAsync(modelId, relativePath, finalPath, asset.Sha256, ct).ConfigureAwait(false);
+        return downloadedBytes;
+    }
+
+    private async Task VerifyAsync(string modelId, string relativePath, string path, string expected, CancellationToken ct)
+    {
+        string actual;
+        await using (var file = File.OpenRead(path))
+            actual = Convert.ToHexStringLower(await SHA256.HashDataAsync(file, ct).ConfigureAwait(false));
+
+        if (string.Equals(actual, expected, StringComparison.OrdinalIgnoreCase))
+            return;
+
+        File.Delete(path);
+        _logger.LogError(
+            "Integrity check failed: model={ModelId}, asset={AssetPath}, expected={Expected}, actual={Actual}",
+            modelId, relativePath, expected, actual);
+        throw new ModelIntegrityException(modelId, relativePath, expected, actual);
     }
 }

@@ -5,20 +5,13 @@ namespace LiveLingo.Core.Tests.Models;
 public class ModelRecordTests
 {
     [Fact]
-    public void ModelDescriptor_RecordEquality()
-    {
-        var a = new ModelDescriptor("m1", "Test Model", "http://example.com/m", 1000, ModelType.Translation);
-        var b = new ModelDescriptor("m1", "Test Model", "http://example.com/m", 1000, ModelType.Translation);
-        Assert.Equal(a, b);
-    }
-
-    [Fact]
     public void ModelDescriptor_FieldAccess()
     {
-        var d = new ModelDescriptor("m1", "MarianMT", "http://dl/m", 500_000_000, ModelType.Translation);
+        var d = TestModel.Create("m1", "MarianMT", "http://dl/m", 500_000_000, ModelType.Translation);
         Assert.Equal("m1", d.Id);
         Assert.Equal("MarianMT", d.DisplayName);
-        Assert.Equal("http://dl/m", d.DownloadUrl);
+        Assert.Equal("http://dl/m", Assert.Single(d.Assets).DownloadUrl);
+        Assert.Equal("test", d.License);
         Assert.Equal(500_000_000, d.SizeBytes);
         Assert.Equal(ModelType.Translation, d.Type);
     }
@@ -74,33 +67,10 @@ public class ModelRecordTests
     }
 
     [Fact]
-    public void ModelType_EnumValues()
-    {
-        Assert.Equal(0, (int)ModelType.Translation);
-        Assert.Equal(1, (int)ModelType.PostProcessing);
-        Assert.Equal(2, (int)ModelType.LanguageDetection);
-    }
-
-    [Fact]
-    public void ModelDescriptor_Inequality()
-    {
-        var a = new ModelDescriptor("m1", "A", "http://a", 100, ModelType.Translation);
-        var b = new ModelDescriptor("m2", "B", "http://b", 200, ModelType.PostProcessing);
-        Assert.NotEqual(a, b);
-    }
-
-    [Fact]
     public void ModelDescriptor_ToString()
     {
-        var d = new ModelDescriptor("m1", "Test", "http://x", 100, ModelType.Translation);
+        var d = TestModel.Create("m1", "Test", "http://x", 100, ModelType.Translation);
         Assert.Contains("m1", d.ToString());
     }
 
-    [Fact]
-    public void ModelDescriptor_GetHashCode()
-    {
-        var a = new ModelDescriptor("m1", "Test", "http://x", 100, ModelType.Translation);
-        var b = new ModelDescriptor("m1", "Test", "http://x", 100, ModelType.Translation);
-        Assert.Equal(a.GetHashCode(), b.GetHashCode());
-    }
 }

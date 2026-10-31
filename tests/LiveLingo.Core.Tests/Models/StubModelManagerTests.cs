@@ -9,7 +9,7 @@ public class StubModelManagerTests
     [Fact]
     public async Task EnsureModelAsync_CompletesSuccessfully()
     {
-        var desc = new ModelDescriptor("test", "Test", "http://x", 100, ModelType.Translation);
+        var desc = TestModel.Create("test", "Test", "http://x", 100, ModelType.Translation);
         await _mgr.EnsureModelAsync(desc, null, CancellationToken.None);
     }
 
@@ -19,7 +19,7 @@ public class StubModelManagerTests
         using var cts = new CancellationTokenSource();
         await cts.CancelAsync();
 
-        var desc = new ModelDescriptor("test", "Test", "http://x", 100, ModelType.Translation);
+        var desc = TestModel.Create("test", "Test", "http://x", 100, ModelType.Translation);
         await Assert.ThrowsAsync<OperationCanceledException>(
             () => _mgr.EnsureModelAsync(desc, null, cts.Token));
     }
