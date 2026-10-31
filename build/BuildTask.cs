@@ -41,6 +41,9 @@ class BuildTask : NukeBuild
     [Parameter("Model storage directory used by end-to-end probes (defaults to the app's model directory)")]
     readonly string ProbeModelPath = string.Empty;
 
+    [Parameter("Directory with scenarios.json and audio/<id>.wav used by ProbeVoice (see poc/voice-dictation/corpus)")]
+    readonly string ProbeCorpus = string.Empty;
+
     AbsolutePath SourceDir => RootDirectory / "src";
     AbsolutePath TestsDir => RootDirectory / "tests";
     AbsolutePath PublishDir => RootDirectory / "publish";
@@ -218,6 +221,29 @@ class BuildTask : NukeBuild
                 $"--configuration {Configuration} " +
                 $"--no-build " +
                 $"--filter \"FullyQualifiedName~TranslationProbeTests\" " +
+                $"--logger \"console;verbosity=detailed\" " +
+                $"--nologo",
+                environmentVariables: env);
+        });
+
+    // End-to-end probe of the voice chain: speech models, dictation session and cleanup on recorded audio.
+    Target ProbeVoice => _ => _
+        .DependsOn(Build)
+        .Requires(() => ProbeCorpus)
+        .Executes(() =>
+        {
+            var env = new Dictionary<string, string>
+            {
+                ["LIVELINGO_ENABLE_VOICE_PROBE"] = "1",
+                ["LIVELINGO_PROBE_CORPUS"] = ProbeCorpus,
+                ["LIVELINGO_PROBE_MODEL_PATH"] = ProbeModelPath
+            }.AsReadOnly();
+
+            DotNet(
+                $"test \"{TestsDir / "LiveLingo.Core.Tests" / "LiveLingo.Core.Tests.csproj"}\" " +
+                $"--configuration {Configuration} " +
+                $"--no-build " +
+                $"--filter \"FullyQualifiedName~VoiceProbeTests\" " +
                 $"--logger \"console;verbosity=detailed\" " +
                 $"--nologo",
                 environmentVariables: env);
