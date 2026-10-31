@@ -377,4 +377,37 @@ public class DraftTests
 
         Assert.Throws<InvalidOperationException>(() => draft.SetPending("晚到"));
     }
+
+    [Fact]
+    public void FailPending_MarksEveryUnitThatStillWaits_ForThatKindOnly()
+    {
+        var draft = new Draft(hasTarget: true);
+        var first = draft.Append("一。");
+        draft.Append("二。");
+        var third = draft.Append("三。");
+        draft.Complete(third, UnitKind.Translation, "Three.");
+        draft.Complete(first, UnitKind.Clean, "一。");
+
+        draft.FailPending(first, UnitKind.Translation, "offline");
+
+        Assert.Equal("offline", draft.Units[0].Translation.Error);
+        Assert.Equal("offline", draft.Units[1].Translation.Error);
+        Assert.Equal("Three.", draft.Units[2].Translation.Text);
+        Assert.Equal("", draft.Units[2].Translation.Error);
+        Assert.Null(draft.Units[1].Clean.Text);
+        Assert.Equal("", draft.Units[1].Clean.Error);
+    }
+
+    [Fact]
+    public void FailPending_WithAStaleTicket_ChangesNothing()
+    {
+        var draft = new Draft(hasTarget: true);
+        var ticket = draft.Append("一。");
+        draft.Reset(hasTarget: true);
+        draft.Append("二。");
+
+        draft.FailPending(ticket, UnitKind.Translation, "offline");
+
+        Assert.Equal("", draft.Units[0].Translation.Error);
+    }
 }
