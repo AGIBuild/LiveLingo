@@ -140,6 +140,113 @@ public class WavReaderTests
     {
         var bytes = Wav(16000, 1, 16, 1, Pcm16(1)).Take(36).ToArray();
 
-        Assert.Throws<UnsupportedAudioException>(() => WavReader.Read(new MemoryStream(bytes)));
+        var error = Assert.Throws<UnsupportedAudioException>(() => WavReader.Read(new MemoryStream(bytes)));
+        Assert.Contains("no audio data", error.Message);
+    }
+
+    [Fact]
+    public void ReadFile_ReadsAFileFromDisk()
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"livelingo-{Guid.NewGuid():N}.wav");
+        File.WriteAllBytes(path, Wav(16000, 1, 16, 1, Pcm16(16384)));
+        try
+        {
+            Assert.Equal([0.5f], WavReader.ReadFile(path));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Theory]
+    [InlineData("RIFFx")]
+    [InlineData("RIFF\0\0\0\0WAVX")]
+    [InlineData("XXXX\0\0\0\0WAVE")]
+    public void ADamagedHeader_IsRejectedAsNotAWavFile(string header)
+    {
+        var bytes = System.Text.Encoding.Latin1.GetBytes(header + "padding-padding");
+
+        var error = Assert.Throws<UnsupportedAudioException>(() => WavReader.Read(new MemoryStream(bytes)));
+        Assert.Contains("uncompressed WAV", error.Message);
+    }
+
+    [Fact]
+    public void AHeaderWithoutAnyChunk_HasNoAudioData()
+    {
+        var bytes = "RIFF\0\0\0\0WAVE"u8.ToArray();
+
+        Assert.Contains("no audio data", Assert.Throws<UnsupportedAudioException>(() => WavReader.Read(new MemoryStream(bytes))).Message);
+    }
+
+    [Fact]
+    public void DataBeforeTheFormat_IsRejected()
+    {
+        var bytes = "RIFF\0\0\0\0WAVEdata\0\0\0\0"u8.ToArray();
+
+        Assert.Contains("no format", Assert.Throws<UnsupportedAudioException>(() => WavReader.Read(new MemoryStream(bytes))).Message);
+    }
+
+    [Fact]
+    public void AnEmptyDataChunkAtTheEndOfTheFile_IsAnEmptyRecording()
+    {
+        Assert.Empty(WavReader.Read(new MemoryStream(Wav(16000, 1, 16, 1, []))));
+    }
+
+    [Fact]
+    public void ADataChunkLongerThanTheFile_IsReadUpToTheEnd()
+    {
+        var bytes = Wav(16000, 1, 16, 1, Pcm16(16384, 8192));
+        BitConverter.GetBytes(uint.MaxValue).CopyTo(bytes, bytes.Length - 4 - 4);
+
+        Assert.Equal([0.5f, 0.25f], WavReader.Read(new MemoryStream(bytes)));
+    }
+
+    [Fact]
+    public void AFormatChunkThatIsTooShort_IsRejected()
+    {
+        var bytes = "RIFF\0\0\0\0WAVEfmt \x08\0\0\0\x01\0\x01\0\x80\x3e\0\0"u8.ToArray();
+
+        Assert.Contains("damaged", Assert.Throws<UnsupportedAudioException>(() => WavReader.Read(new MemoryStream(bytes))).Message);
+    }
+
+    [Fact]
+    public void ARateOfZero_IsRejected()
+    {
+        Assert.Throws<UnsupportedAudioException>(() => WavReader.Read(new MemoryStream(Wav(0, 1, 16, 1, Pcm16(1)))));
+    }
+
+    [Fact]
+    public void ExtensibleWithoutTheExtension_IsRejected_AndAMinimalExtensionIsEnough()
+    {
+        Assert.Throws<UnsupportedAudioException>(() => WavReader.Read(new MemoryStream(Wav(16000, 1, 32, 0xFFFE, new byte[4]))));
+
+        // exactly 26 bytes: the base 16, cbSize, valid bits, channel mask and the first two bytes of the sub-format
+        byte[] minimal = [10, 0, 32, 0, 0, 0, 0, 0, 3, 0];
+        var wav = Wav(16000, 1, 32, 0xFFFE, BitConverter.GetBytes(0.5f), formatExtension: minimal);
+        Assert.Equal([0.5f], WavReader.Read(new MemoryStream(wav)));
+    }
+
+    [Fact]
+    public void Pcm24_KeepsTheSignAndEveryByte()
+    {
+        // 0x123456 is positive with distinct bytes; 0xFF8000 is -32768/8388608
+        byte[] data = [0x56, 0x34, 0x12, 0x00, 0x80, 0xFF];
+
+        var samples = WavReader.Read(new MemoryStream(Wav(16000, 1, 24, 1, data)));
+
+        Assert.Equal(0x123456 / 8388608f, samples[0], 6);
+        Assert.Equal(-32768 / 8388608f, samples[1], 6);
+    }
+
+    [Fact]
+    public void Pcm32_IsScaledByItsFullRange()
+    {
+        var data = BitConverter.GetBytes(int.MinValue / 2).Concat(BitConverter.GetBytes(int.MaxValue / 2)).ToArray();
+
+        var samples = WavReader.Read(new MemoryStream(Wav(16000, 1, 32, 1, data)));
+
+        Assert.Equal(-0.5f, samples[0], 4);
+        Assert.Equal(0.5f, samples[1], 4);
     }
 }

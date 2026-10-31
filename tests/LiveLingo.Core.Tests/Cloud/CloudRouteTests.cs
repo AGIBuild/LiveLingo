@@ -62,4 +62,21 @@ public class CloudRouteTests
 
         Assert.DoesNotContain("sk-secret-value", route.ToString());
     }
+
+    [Fact]
+    public void EveryRejection_SaysWhatIsWrong()
+    {
+        Assert.Contains("absolute URL", Assert.Throws<ArgumentException>(() => CloudRoute.Create("not a url", "m", "k")).Message);
+        Assert.Contains("https", Assert.Throws<ArgumentException>(() => CloudRoute.Create("http://api.example.com", "m", "k")).Message);
+        Assert.Contains("model", Assert.Throws<ArgumentException>(() => CloudRoute.Create("https://a.io", " ", "k")).Message);
+        Assert.Contains("API key", Assert.Throws<ArgumentException>(() => CloudRoute.Create("https://a.io", "m", " ")).Message);
+    }
+
+    [Fact]
+    public void ToString_NamesTheEndpointAndTheModel()
+    {
+        var text = CloudRoute.Create("https://api.example.com/v1", "gpt-x", "k").ToString();
+
+        Assert.Equal("CloudRoute { Endpoint = https://api.example.com/v1/chat/completions, Model = gpt-x }", text);
+    }
 }

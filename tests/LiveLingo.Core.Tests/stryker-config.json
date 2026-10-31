@@ -7,9 +7,9 @@
       "progress"
     ],
     "thresholds": {
-      "high": 80,
-      "low": 60,
-      "break": 0
+      "high": 90,
+      "low": 80,
+      "break": 80
     },
     "mutate": [
       "**/Drafting/**/*.cs",
