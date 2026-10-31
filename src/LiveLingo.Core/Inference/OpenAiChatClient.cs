@@ -9,9 +9,12 @@ public sealed class OpenAiChatClient(HttpClient http) : IChatCompletionClient
     public async Task<ChatCompletion> CompleteAsync(ChatRequest request, CancellationToken ct)
     {
         var clock = Stopwatch.StartNew();
+        var messages = request.System is null
+            ? new[] { new { role = "user", content = request.Prompt } }
+            : [new { role = "system", content = request.System }, new { role = "user", content = request.Prompt }];
         var payload = new Dictionary<string, object>(request.Extra)
         {
-            ["messages"] = new[] { new { role = "user", content = request.Prompt } },
+            ["messages"] = messages,
             ["stream"] = true,
             ["stream_options"] = new { include_usage = true },
             ["temperature"] = request.Temperature,

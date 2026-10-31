@@ -3,7 +3,8 @@ namespace LiveLingo.Core.Inference;
 /// <summary>Each role runs in its own llama-server process so models can be loaded, switched and unloaded independently.</summary>
 public enum InferenceRole
 {
-    Translator
+    Translator,
+    Cleaner
 }
 
 public sealed record LlamaServerLaunch(string ExecutablePath, IReadOnlyList<string> Arguments, Uri Endpoint);

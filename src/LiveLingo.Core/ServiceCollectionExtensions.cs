@@ -1,3 +1,4 @@
+using LiveLingo.Core.Cleanup;
 using LiveLingo.Core.Inference;
 using LiveLingo.Core.Models;
 using LiveLingo.Core.Translation;
@@ -63,6 +64,10 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<LlamaServerHostOptions>(),
             TimeProvider.System,
             sp.GetRequiredService<ILogger<LlamaServerHost>>()));
+        services.AddSingleton<ITextCleaner>(sp => new LlmTextCleaner(new LocalChatClient(
+            sp.GetRequiredService<LlamaServerHost>(),
+            InferenceRole.Cleaner,
+            () => ModelCatalog.Cleaner)));
         services.AddSingleton<ITranslator>(sp => new LlmTranslator(new LocalChatClient(
             sp.GetRequiredService<LlamaServerHost>(),
             InferenceRole.Translator,

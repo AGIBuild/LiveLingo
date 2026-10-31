@@ -1,11 +1,14 @@
 namespace LiveLingo.Core.Inference;
 
+/// <param name="Prompt">The user message.</param>
 /// <param name="Extra">Server-specific sampling fields (for example llama-server's top_k); empty for plain OpenAI endpoints.</param>
+/// <param name="System">Optional system message sent before the user message.</param>
 public sealed record ChatRequest(
     string Prompt,
     int MaxTokens,
     double Temperature,
-    IReadOnlyDictionary<string, object> Extra);
+    IReadOnlyDictionary<string, object> Extra,
+    string? System = null);
 
 public sealed record ChatCompletion(string Text, double FirstVisibleMs, double TotalMs, int OutputTokens);
 

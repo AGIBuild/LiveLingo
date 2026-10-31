@@ -14,6 +14,10 @@ public static class ModelCatalog
 {
     public const string LlamaRuntimeId = "llama-cpp-b11980";
 
+    private const string SherpaRelease = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/";
+    private const string SpeechLiveArchive = "sherpa-onnx-x-asr-480ms-streaming-zipformer-transducer-zh-en-punct-int8-2026-06-05";
+    private const string SpeechSecondPassArchive = "sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25";
+
     private const string LlamaRelease = "https://github.com/ggml-org/llama.cpp/releases/download/b11980/";
 
     public static readonly ModelDescriptor TranslatorFast = new(
@@ -41,6 +45,75 @@ public static class ModelCatalog
                 4_624_648_896,
                 "9f96256500f3fc1ab4d64336b58f52a949a95ad7516b0c229476eef782f9f77b")
         ]);
+
+    public static readonly ModelDescriptor Cleaner = new(
+        "qwen3.5-4b-q4km",
+        "Qwen3.5 4B (text cleanup)",
+        ModelType.PostProcessing,
+        "Apache-2.0",
+        [
+            new ModelAsset(
+                "Qwen3.5-4B-Q4_K_M.gguf",
+                "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/e87f176479d0855a907a41277aca2f8ee7a09523/Qwen3.5-4B-Q4_K_M.gguf",
+                2_740_937_888,
+                "00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4")
+        ]);
+
+    /// <summary>Streaming X-ASR (480 ms chunks) that produces the live text while the user speaks.</summary>
+    public static readonly ModelDescriptor SpeechLive = new(
+        "x-asr-480ms-streaming-int8",
+        "X-ASR 480 ms streaming (live text)",
+        ModelType.SpeechToText,
+        "Apache-2.0",
+        [
+            new ModelAsset(
+                SpeechLiveArchive + ".tar.bz2",
+                SherpaRelease + SpeechLiveArchive + ".tar.bz2",
+                133_895_136,
+                "fa5f63d618e5a01526e275a358bb7772e403f84808a4769fba52cffd8160bf74")
+        ])
+    {
+        ArchiveType = ModelArchiveType.TarBz2,
+        ExtractedFiles = ["encoder.int8.onnx", "decoder.onnx", "joiner.int8.onnx", "tokens.txt"]
+    };
+
+    /// <summary>Qwen3-ASR 0.6B that re-decodes each closed segment for the settled text.</summary>
+    public static readonly ModelDescriptor SpeechSecondPass = new(
+        "qwen3-asr-0.6b-int8",
+        "Qwen3-ASR 0.6B (settled text)",
+        ModelType.SpeechToText,
+        "Apache-2.0",
+        [
+            new ModelAsset(
+                SpeechSecondPassArchive + ".tar.bz2",
+                SherpaRelease + SpeechSecondPassArchive + ".tar.bz2",
+                878_702_423,
+                "393f8a14e2f5fb96746aaab342997a40641001fbd5bf9592a080a8329178ee96")
+        ])
+    {
+        ArchiveType = ModelArchiveType.TarBz2,
+        ExtractedFiles =
+        [
+            "conv_frontend.onnx", "encoder.int8.onnx", "decoder.int8.onnx",
+            "tokenizer/merges.txt", "tokenizer/tokenizer_config.json", "tokenizer/vocab.json"
+        ]
+    };
+
+    public static readonly ModelDescriptor SpeechVad = new(
+        "silero-vad",
+        "Silero VAD (speech boundaries)",
+        ModelType.VoiceActivityDetection,
+        "MIT",
+        [
+            new ModelAsset(
+                "silero_vad.onnx",
+                SherpaRelease + "silero_vad.onnx",
+                643_854,
+                "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6")
+        ]);
+
+    /// <summary>Everything voice dictation needs besides the cleaner and the translator.</summary>
+    public static IReadOnlyList<ModelDescriptor> Speech { get; } = [SpeechLive, SpeechSecondPass, SpeechVad];
 
     private static readonly ModelDescriptor LlamaMacArm64 = new(
         LlamaRuntimeId + "-osx-arm64",
@@ -96,5 +169,5 @@ public static class ModelCatalog
         LlamaRuntimeFor(System.Runtime.InteropServices.RuntimeInformation.RuntimeIdentifier);
 
     public static IReadOnlyList<ModelDescriptor> All { get; } =
-        [TranslatorFast, TranslatorQuality, LlamaMacArm64, LlamaWinX64];
+        [TranslatorFast, TranslatorQuality, Cleaner, SpeechLive, SpeechSecondPass, SpeechVad, LlamaMacArm64, LlamaWinX64];
 }
