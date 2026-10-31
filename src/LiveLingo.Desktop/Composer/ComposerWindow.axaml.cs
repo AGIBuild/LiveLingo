@@ -31,6 +31,7 @@ public partial class ComposerWindow : Window
     private readonly ComposerTexts _texts;
     private readonly TargetWindowInfo? _target;
     private readonly string _retryLabel;
+    private readonly RecentDrafts _recent;
     private bool _wide;
 
     public ComposerWindow()
@@ -38,15 +39,18 @@ public partial class ComposerWindow : Window
         throw new InvalidOperationException("ComposerWindow needs a view model.");
     }
 
-    public ComposerWindow(ComposerViewModel vm, ComposerTexts texts, TargetWindowInfo? target)
+    public ComposerWindow(ComposerViewModel vm, ComposerTexts texts, TargetWindowInfo? target, RecentDrafts recent)
     {
         InitializeComponent();
         _vm = vm;
         _texts = texts;
         _target = target;
+        _recent = recent;
         _retryLabel = texts.RetryLabel;
         DataContext = vm;
 
+        RecentButton.Content = texts.RecentLabel;
+        RecentButton.IsVisible = recent.Items.Count > 0;
         CopyButton.Content = texts.CopyLabel;
         WriteButton.Content = texts.WriteLabel;
         CleanButton.Content = texts.CleanLabel;
@@ -141,6 +145,27 @@ public partial class ComposerWindow : Window
             line.State == LineState.Failed,
             _retryLabel,
             line.Time);
+    }
+
+    private void OnRecentClick(object? sender, RoutedEventArgs e)
+    {
+        var menu = new MenuFlyout();
+        foreach (var draft in _recent.Items)
+        {
+            var item = new MenuItem { Header = ComposerTexts.RecentItem(draft), IsEnabled = _vm.CanReplaceDraft };
+            item.Click += (_, _) => _vm.SourceText = draft.Text;
+            menu.Items.Add(item);
+        }
+
+        menu.Items.Add(new Separator());
+        var clear = new MenuItem { Header = _texts.RecentClearLabel };
+        clear.Click += (_, _) =>
+        {
+            _recent.Clear();
+            RecentButton.IsVisible = false;
+        };
+        menu.Items.Add(clear);
+        menu.ShowAt(RecentButton);
     }
 
     private async void OnImportClick(object? sender, RoutedEventArgs e)

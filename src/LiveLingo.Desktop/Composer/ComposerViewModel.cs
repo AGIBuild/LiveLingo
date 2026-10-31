@@ -501,7 +501,7 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
         KeptOriginalCount = snapshot.Kept;
         CanCopy = _committed is not null || Status == ComposerStatus.Ready;
         CanWrite = CanCopy && _committed is null;
-        OnPropertyChanged(nameof(CanImport));
+        OnPropertyChanged(nameof(CanReplaceDraft));
         OnPropertyChanged(nameof(CanExport));
 
         var needsModels = !ModelsReady && Output != ComposerOutput.Original;

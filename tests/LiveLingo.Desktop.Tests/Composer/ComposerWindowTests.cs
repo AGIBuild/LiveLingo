@@ -11,13 +11,14 @@ namespace LiveLingo.Desktop.Tests.Composer;
 
 public class ComposerWindowTests
 {
-    private static (ComposerWindow Window, Harness Harness) Open(bool modelsInstalled = true, ComposerOutput output = ComposerOutput.Translate)
+    private static (ComposerWindow Window, Harness Harness) Open(
+        bool modelsInstalled = true, ComposerOutput output = ComposerOutput.Translate, RecentDrafts? recent = null)
     {
         var h = new Harness(modelsInstalled, notifyOn: SynchronizationContext.Current, output: output);
         var loc = Substitute.For<ILocalizationService>();
         loc.T(Arg.Any<string>()).Returns(call => call.Arg<string>());
         loc.T(Arg.Any<string>(), Arg.Any<object[]>()).Returns(call => call.ArgAt<string>(0));
-        var window = new ComposerWindow(h.Vm, new ComposerTexts(loc), Harness.Target);
+        var window = new ComposerWindow(h.Vm, new ComposerTexts(loc), Harness.Target, recent ?? new RecentDrafts());
         window.Show();
         return (window, h);
     }
@@ -168,6 +169,22 @@ public class ComposerWindowTests
         Assert.True(block.IsVisible);
         Assert.Equal("T:先检查缓存。T:再更新索引。", block.Text);
         Assert.False(window.FindControl<ItemsControl>("ResultList")!.IsVisible);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public async Task TheRecentButton_ShowsOnlyWhenThereAreEarlierDrafts()
+    {
+        var (empty, h1) = Open();
+        await using var _1 = h1;
+        Assert.False(Find<Button>(empty, "RecentButton").IsVisible);
+        empty.Close();
+
+        var recent = new RecentDrafts();
+        recent.Close("昨天的想法", written: true);
+        var (window, h2) = Open(recent: recent);
+        await using var _2 = h2;
+        Assert.True(Find<Button>(window, "RecentButton").IsVisible);
         window.Close();
     }
 

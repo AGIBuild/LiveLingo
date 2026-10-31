@@ -222,6 +222,8 @@ public class LocalizationServiceTests
             "composer.import.fileType",
             "composer.export",
             "composer.export.title",
+            "composer.recent",
+            "composer.recent.clear",
             "composer.banner.fileFailed",
             "composer.banner.noSpeech",
             "tray.settings",
