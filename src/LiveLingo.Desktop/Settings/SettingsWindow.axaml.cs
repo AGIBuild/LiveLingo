@@ -33,6 +33,12 @@ public partial class SettingsWindow : Window
         CloudKeyStored.Text = loc.T("settings.cloud.keyStored");
         CloudForgetButton.Content = loc.T("settings.cloud.forget");
         CloudError.Text = loc.T("settings.cloud.invalid");
+        LegacyRemoveButton.Content = loc.T("settings.legacy.remove");
+        vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName is nameof(SettingsViewModel.LegacyCount) or nameof(SettingsViewModel.LegacyBytes))
+                LegacyText.Text = loc.T("settings.legacy", vm.LegacyCount, (vm.LegacyBytes / 1_000_000_000d).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture));
+        };
         CancelButton.Content = loc.T("settings.cancel");
         SaveButton.Content = loc.T("settings.save");
         vm.CloseRequested += Close;

@@ -245,6 +245,8 @@ public class LocalizationServiceTests
             "settings.cloud.keyStored",
             "settings.cloud.forget",
             "settings.cloud.invalid",
+            "settings.legacy",
+            "settings.legacy.remove",
             "settings.save",
             "settings.cancel"
         ];

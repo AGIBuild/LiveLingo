@@ -1,3 +1,4 @@
+using LiveLingo.Core.Models;
 using LiveLingo.Desktop.Platform;
 using LiveLingo.Desktop.Services.Configuration;
 using LiveLingo.Desktop.Settings;
@@ -8,7 +9,7 @@ namespace LiveLingo.Desktop.Tests.Settings;
 public class SettingsViewModelTests
 {
     private static (SettingsViewModel Vm, ISecretStore Secrets, List<SettingsModel> Saved) Create(
-        SettingsModel? current = null, string? storedKey = null)
+        SettingsModel? current = null, string? storedKey = null, IModelManager? models = null)
     {
         var model = current ?? new SettingsModel();
         var saved = new List<SettingsModel>();
@@ -17,7 +18,7 @@ public class SettingsViewModelTests
         service.When(s => s.Replace(Arg.Any<SettingsModel>())).Do(call => saved.Add(call.Arg<SettingsModel>()));
         var secrets = Substitute.For<ISecretStore>();
         secrets.GetSecretAsync(CloudSettings.ApiKeySecretId, Arg.Any<CancellationToken>()).Returns(storedKey);
-        return (new SettingsViewModel(service, secrets), secrets, saved);
+        return (new SettingsViewModel(service, secrets, models ?? Substitute.For<IModelManager>()), secrets, saved);
     }
 
     [Fact]
@@ -226,5 +227,59 @@ public class SettingsViewModelTests
         Assert.False(vm.HasStoredKey);
         Assert.False(vm.CloudTranslate);
         Assert.False(vm.CloudClean);
+    }
+
+    // ---- models from earlier versions -------------------------------------------
+
+    private static InstalledModel Installed(string id, long bytes) =>
+        new(id, id, "/models/" + id, bytes, ModelType.Translation, DateTime.UnixEpoch);
+
+    [Fact]
+    public async Task OnlyModelsOutsideTheCatalog_AreOfferedForRemoval()
+    {
+        var models = Substitute.For<IModelManager>();
+        models.ListInstalled().Returns([
+            Installed(ModelCatalog.TranslatorFast.Id, 1_000_000_000),
+            Installed("qwen3.5-9b-old", 5_500_000_000),
+            Installed("whisper-large-old", 3_000_000_000)]);
+        var (vm, _, _) = Create(models: models);
+        Assert.False(vm.HasLegacyModels);
+
+        await vm.InitializeAsync();
+
+        Assert.True(vm.HasLegacyModels);
+        Assert.Equal(2, vm.LegacyCount);
+        Assert.Equal(8_500_000_000, vm.LegacyBytes);
+    }
+
+    [Fact]
+    public async Task NothingIsDeleted_UntilTheUserAsks()
+    {
+        var models = Substitute.For<IModelManager>();
+        models.ListInstalled().Returns([Installed("old-a", 10), Installed("old-b", 20)]);
+        var (vm, _, _) = Create(models: models);
+
+        await vm.InitializeAsync();
+        await models.DidNotReceiveWithAnyArgs().CleanObsoleteModelsAsync(default!, default);
+
+        await vm.RemoveLegacyModelsCommand.ExecuteAsync(null);
+
+        await models.Received(1).CleanObsoleteModelsAsync(
+            Arg.Is<IEnumerable<string>>(ids => ids.OrderBy(id => id).SequenceEqual(new[] { "old-a", "old-b" })),
+            Arg.Any<CancellationToken>());
+        Assert.False(vm.HasLegacyModels);
+        Assert.Equal(0, vm.LegacyBytes);
+    }
+
+    [Fact]
+    public async Task WithOnlyCurrentModels_NothingIsOffered()
+    {
+        var models = Substitute.For<IModelManager>();
+        models.ListInstalled().Returns([Installed(ModelCatalog.Cleaner.Id, 1)]);
+        var (vm, _, _) = Create(models: models);
+
+        await vm.InitializeAsync();
+
+        Assert.False(vm.HasLegacyModels);
     }
 }

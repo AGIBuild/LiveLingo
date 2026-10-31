@@ -39,11 +39,16 @@ public sealed class JsonSettingsService : ISettingsService
                 {
                     var json = await File.ReadAllTextAsync(_filePath, ct).ConfigureAwait(false);
                     using var document = JsonDocument.Parse(json);
-                    if (!document.RootElement.TryGetProperty("schemaVersion", out var schemaNode) ||
-                        !schemaNode.TryGetInt32(out var schemaVersion) ||
-                        schemaVersion != SettingsModel.CurrentSchemaVersion)
+                    var schemaVersion = document.RootElement.TryGetProperty("schemaVersion", out var schemaNode) &&
+                                        schemaNode.ValueKind == JsonValueKind.Number &&
+                                        schemaNode.TryGetInt32(out var found)
+                        ? found
+                        : (int?)null;
+                    if (schemaVersion != SettingsModel.CurrentSchemaVersion)
                     {
-                        _current = SettingsModel.CreateDefault();
+                        _current = schemaVersion == SettingsMigration.LegacySchemaVersion
+                            ? SettingsMigration.FromLegacy(document.RootElement)
+                            : SettingsModel.CreateDefault();
                         shouldPersistDefaults = true;
                     }
                     else

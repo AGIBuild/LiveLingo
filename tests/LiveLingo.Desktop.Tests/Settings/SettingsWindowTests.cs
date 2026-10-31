@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
+using LiveLingo.Core.Models;
 using LiveLingo.Desktop.Platform;
 using LiveLingo.Desktop.Services.Configuration;
 using LiveLingo.Desktop.Tests.Composer;
@@ -22,7 +23,7 @@ public class SettingsWindowTests
         service.When(s => s.Replace(Arg.Any<SettingsModel>())).Do(call => saved.Add(call.Arg<SettingsModel>()));
         var loc = Substitute.For<ILocalizationService>();
         loc.T(Arg.Any<string>()).Returns(call => call.Arg<string>());
-        var vm = new SettingsViewModel(service, Substitute.For<ISecretStore>());
+        var vm = new SettingsViewModel(service, Substitute.For<ISecretStore>(), Substitute.For<IModelManager>());
         var window = new SettingsWindow(vm, loc);
         window.Show();
 
@@ -44,7 +45,7 @@ public class SettingsWindowTests
         secrets.GetSecretAsync(CloudSettings.ApiKeySecretId, Arg.Any<CancellationToken>()).Returns("sk");
         var loc = Substitute.For<ILocalizationService>();
         loc.T(Arg.Any<string>()).Returns(call => call.Arg<string>());
-        var window = new SettingsWindow(new SettingsViewModel(service, secrets), loc);
+        var window = new SettingsWindow(new SettingsViewModel(service, secrets, Substitute.For<IModelManager>()), loc);
         window.Show();
 
         Assert.Equal('•', window.FindControl<TextBox>("CloudApiKeyBox")!.PasswordChar);
