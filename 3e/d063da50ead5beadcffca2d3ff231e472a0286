@@ -1,0 +1,22 @@
+tests/LiveLingo.Core.Tests/Probes/TranslationProbeTests.cs
+  s_6d6e9175f38e45::t_ceaf812f1cd58f 1-61
+build/BuildTask.cs
+  s_6d6e9175f38e45::t_fb2ff4f3d01609 41-43,205-223
+  s_6d6e9175f38e45::t_78afe50eec0f79 224-225
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3ed063da50ead5beadcffca2d3ff231e472a0286",
+  "prompts": {},
+  "sessions": {
+    "s_6d6e9175f38e45": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "f74d37e5-1d96-4ddc-a3f9-5ae24ff39e38",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
