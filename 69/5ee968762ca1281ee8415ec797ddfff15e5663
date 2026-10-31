@@ -1,0 +1,26 @@
+tests/LiveLingo.Core.Tests/Inference/OpenAiChatClientTests.cs
+  s_6d6e9175f38e45::t_83fab9a033c75e 44,58,82,92,101,112,121
+  s_6d6e9175f38e45::t_2213380c7434fa 1-43,45-57,59-81,83-91,93-100,102-111,113-120,122-134
+src/LiveLingo.Core/Inference/IChatCompletionClient.cs
+  s_6d6e9175f38e45::t_aec979c2601e65 1-18
+src/LiveLingo.Core/Inference/OpenAiChatClient.cs
+  s_6d6e9175f38e45::t_ec747a5d515759 1-84
+src/LiveLingo.Core/Drafting/Draft.cs
+  s_6d6e9175f38e45::t_87dc5893a32a86 24-26,33
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "695ee968762ca1281ee8415ec797ddfff15e5663",
+  "prompts": {},
+  "sessions": {
+    "s_6d6e9175f38e45": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "f74d37e5-1d96-4ddc-a3f9-5ae24ff39e38",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
