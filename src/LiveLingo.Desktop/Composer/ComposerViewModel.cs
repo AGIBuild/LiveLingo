@@ -84,6 +84,9 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
     [ObservableProperty] private bool _canCopy;
     [ObservableProperty] private bool _isEditable = true;
     [ObservableProperty] private bool _modelsReady;
+    /// <summary>The text that will be written once everything is ready; empty while sentences are still pending or failed.</summary>
+    [ObservableProperty] private string _resultText = "";
+
     [ObservableProperty] private bool _isListening;
 
     /// <summary>True while the speech models are loading after the microphone was pressed (takes a few seconds).</summary>
@@ -455,10 +458,12 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
             Lines: BuildLines(draft),
             Content: draft.ContentReadiness(),
             Count: draft.Units.Count,
-            HasPending: draft.Pending.Length > 0));
+            HasPending: draft.Pending.Length > 0,
+            Text: draft.ContentReadiness().IsReady ? draft.Text() : ""));
 
         Lines = snapshot.Lines;
         Status = StatusOf(snapshot.Count + (snapshot.HasPending ? 1 : 0), snapshot.Content);
+        ResultText = Status == ComposerStatus.Ready ? snapshot.Text : "";
         CanCopy = _committed is not null || Status == ComposerStatus.Ready;
         CanWrite = CanCopy && _committed is null;
 

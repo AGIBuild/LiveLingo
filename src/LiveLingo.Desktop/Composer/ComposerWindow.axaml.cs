@@ -94,6 +94,10 @@ public partial class ComposerWindow : Window
         BannerProgress.Value = banner.Progress;
 
         ResultBox.IsVisible = _vm.Lines.Count > 0;
+        // A finished result is one selectable block, so any part (or all) of what will be written can be copied.
+        ResultTextBlock.Text = _vm.ResultText;
+        ResultTextBlock.IsVisible = _vm.ResultText.Length > 0;
+        ResultList.IsVisible = _vm.ResultText.Length == 0;
         ResultList.ItemsSource = _vm.Lines.Select(ToView).ToList();
     }
 
