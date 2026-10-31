@@ -1,0 +1,49 @@
+src/LiveLingo.Core/LiveLingo.Core.csproj
+  s_6d6e9175f38e45::t_9e58e31c09e8ff 19
+src/LiveLingo.Core/Cleanup/LlmTextCleaner.cs
+  s_6d6e9175f38e45::t_51b15b0d054192 1-64
+src/LiveLingo.Core/ServiceCollectionExtensions.cs
+  s_6d6e9175f38e45::t_6289ec13ed3e0a 1,67-70
+src/LiveLingo.Core/Speech/Native/SherpaQwen3Recognizer.cs
+  s_6d6e9175f38e45::t_9e58e31c09e8ff 1-38
+tests/LiveLingo.Core.Tests/ServiceCollectionExtensionsTests.cs
+  s_6d6e9175f38e45::t_6289ec13ed3e0a 1,24
+tests/LiveLingo.Core.Tests/Models/ModelCatalogTests.cs
+  s_6d6e9175f38e45::t_fa0456366e48f9 67-86
+src/LiveLingo.Core/Inference/IChatCompletionClient.cs
+  s_6d6e9175f38e45::t_51b15b0d054192 3,5,10-11
+src/LiveLingo.Core/Inference/LlamaServerContracts.cs
+  s_6d6e9175f38e45::t_51b15b0d054192 6-7
+src/LiveLingo.Core/Inference/OpenAiChatClient.cs
+  s_6d6e9175f38e45::t_51b15b0d054192 12-14,17
+src/LiveLingo.Core/Speech/Native/SherpaLiveRecognizer.cs
+  s_6d6e9175f38e45::t_9e58e31c09e8ff 1-72
+tests/LiveLingo.Core.Tests/Cleanup/LlmTextCleanerTests.cs
+  s_6d6e9175f38e45::t_51b15b0d054192 1-75
+src/LiveLingo.Core/Speech/Native/SherpaSileroVad.cs
+  s_6d6e9175f38e45::t_9e58e31c09e8ff 1-50
+src/LiveLingo.Core/Models/ModelCatalog.cs
+  s_6d6e9175f38e45::t_9e58e31c09e8ff 17-20,60-112,114-116,172
+  s_6d6e9175f38e45::t_51b15b0d054192 49-59,113,117
+tests/LiveLingo.Core.Tests/Probes/CleanupProbeTests.cs
+  s_6d6e9175f38e45::t_6289ec13ed3e0a 1-91
+tests/LiveLingo.Core.Tests/Inference/OpenAiChatClientTests.cs
+  s_6d6e9175f38e45::t_51b15b0d054192 73-88
+  s_6d6e9175f38e45::t_b79dca0e109ccd 72
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f69493ed809bb0e5b61cd1b202bf639f5a10a730",
+  "prompts": {},
+  "sessions": {
+    "s_6d6e9175f38e45": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "f74d37e5-1d96-4ddc-a3f9-5ae24ff39e38",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
