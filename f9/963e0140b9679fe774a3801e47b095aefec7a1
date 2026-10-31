@@ -1,0 +1,44 @@
+src/LiveLingo.Core/Dictation/DictationSession.cs
+  s_6d6e9175f38e45::t_55a3100fa0b1e1 253-255
+  s_6d6e9175f38e45::t_2b1a2b9f3a8093 1-252,256-376
+tests/LiveLingo.Core.Tests/Drafting/TextUnitsTests.cs
+  s_6d6e9175f38e45::t_ff59acce201910 88-97
+tests/LiveLingo.Core.Tests/Drafting/DraftTests.cs
+  s_6d6e9175f38e45::t_a6048578392d30 344-379
+tests/LiveLingo.Core.Tests/Dictation/DictationSessionTests.cs
+  s_6d6e9175f38e45::t_a60a411d50db2c 1-318
+src/LiveLingo.Core/Dictation/Contracts.cs
+  s_6d6e9175f38e45::t_b29ece9e0b7cf6 1-49
+src/LiveLingo.Core/Dictation/DictationOptions.cs
+  s_6d6e9175f38e45::t_2b1a2b9f3a8093 1-48
+tests/LiveLingo.Core.Tests/Dictation/TextTests.cs
+  s_6d6e9175f38e45::t_b29ece9e0b7cf6 1-53,55-64
+  s_6d6e9175f38e45::t_30e8f0042ac029 54
+src/LiveLingo.Core/Dictation/AudioBuffer.cs
+  s_6d6e9175f38e45::t_0155120e3f4f31 1-53
+src/LiveLingo.Core/Dictation/TextTidy.cs
+  s_6d6e9175f38e45::t_0155120e3f4f31 1-33
+tests/LiveLingo.Core.Tests/Support/ScriptedSpeech.cs
+  s_6d6e9175f38e45::t_a60a411d50db2c 1-118
+src/LiveLingo.Core/Drafting/TextUnits.cs
+  s_6d6e9175f38e45::t_64bda4a91d1e05 14-16,70,130
+src/LiveLingo.Core/Drafting/Draft.cs
+  s_6d6e9175f38e45::t_a6048578392d30 24-29,47,51-54
+  s_6d6e9175f38e45::t_65e59f51dbac79 55-56
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f9963e0140b9679fe774a3801e47b095aefec7a1",
+  "prompts": {},
+  "sessions": {
+    "s_6d6e9175f38e45": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "f74d37e5-1d96-4ddc-a3f9-5ae24ff39e38",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
