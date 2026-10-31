@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\Dictation.Core\Dictation.Core.csproj" />
+    <ProjectReference Include="..\Dictation.Asr.Sherpa\Dictation.Asr.Sherpa.csproj" />
+    <ProjectReference Include="..\Dictation.Cleanup.Llama\Dictation.Cleanup.Llama.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

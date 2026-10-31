@@ -428,3 +428,10 @@ stryker-run.log
 # Nuke temp
 .nuke/temp/
 .DS_Store
+
+# POC data (audio corpora, results, models are not committed)
+poc/**/corpus*/
+poc/**/results/
+poc/**/models/
+*.wav
+*.gguf

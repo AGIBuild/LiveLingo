@@ -156,6 +156,14 @@ Download the latest release for your platform:
 
 ---
 
+## Design and validation
+
+- [Validated voice dictation architecture and migration design](docs/superpowers/specs/2026-10-29-voice-dictation-design.md)
+- [Text translation and live speech translation POC plan](docs/superpowers/plans/2026-10-29-translation-poc.md)
+- [Independent local translation POC and measured findings](poc/text-translation/REPORT.md)
+
+These documents distinguish verified POC findings from proposed changes. They do not mean the product has already adopted the new pipelines.
+
 ## 🤝 Contributing
 
 Contributions are welcome! Whether it's a bug fix, new language support, or a feature idea — check the [Contributing Guide](CONTRIBUTING.md) to get started.
