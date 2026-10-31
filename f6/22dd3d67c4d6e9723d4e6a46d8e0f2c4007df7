@@ -1,0 +1,85 @@
+src/LiveLingo.Core/Cloud/CloudNotConfiguredException.cs
+  s_6d6e9175f38e45::t_72d22268b9753b 1-4
+tests/LiveLingo.Desktop.Tests/Composer/ComposerModelPlanTests.cs
+  s_6d6e9175f38e45::t_c06a6aa95fe8f6 1-43
+tests/LiveLingo.Core.Tests/stryker-config.json
+  s_6d6e9175f38e45::t_fdf36438abf8ae 19
+src/LiveLingo.Core/Cloud/CloudRoute.cs
+  s_6d6e9175f38e45::t_e5ba682869b78a 1-43
+src/LiveLingo.Desktop/Services/Cloud/SettingsCloudRoutes.cs
+  s_6d6e9175f38e45::t_963b4d2da9ed5c 1-37
+src/LiveLingo.Desktop/Resources/i18n/zh-CN.json
+  s_6d6e9175f38e45::t_2320ef1eb9ac1c 63-72
+docs/superpowers/plans/2026-10-31-composer-implementation.md
+  s_6d6e9175f38e45::t_453167ef999201 60-61
+tests/LiveLingo.Core.Tests/Inference/ServiceFailureTests.cs
+  s_6d6e9175f38e45::t_02a4940a06a1f5 1-24
+src/LiveLingo.Desktop/App.axaml.cs
+  s_6d6e9175f38e45::t_18bf6832645ff3 261
+  s_6d6e9175f38e45::t_dbcef8ee892e86 9,88-89
+  s_6d6e9175f38e45::t_4e3bac0f0a7751 20
+  s_6d6e9175f38e45::t_dab14522898bf4 215-216,227-230
+  s_6d6e9175f38e45::t_3703b8aa32ebec 90
+src/LiveLingo.Core/Cloud/RoutedChatClient.cs
+  s_6d6e9175f38e45::t_593326984b3b62 1-11,18-37
+  s_6d6e9175f38e45::t_d8a75e96896aa2 12-17
+tests/LiveLingo.Desktop.Tests/Services/Cloud/SettingsCloudRoutesTests.cs
+  s_6d6e9175f38e45::t_7a43392711d6f9 2-93
+  s_6d6e9175f38e45::t_017be7e8a687cf 1
+tests/LiveLingo.Core.Tests/Cloud/CloudRouteTests.cs
+  s_6d6e9175f38e45::t_94963300650bf8 1-65
+src/LiveLingo.Desktop/Settings/SettingsViewModel.cs
+  s_6d6e9175f38e45::t_e931fe36fef5b6 3,16,19,22,28-31,45-62,65-78,80,92-105,110-113,118-141
+  s_6d6e9175f38e45::t_4e465cdb352602 142
+src/LiveLingo.Core/ServiceCollectionExtensions.cs
+  s_6d6e9175f38e45::t_bbc448f52b8885 2,71,74,76-79,81-86,90-91
+  s_6d6e9175f38e45::t_c4b7d1cca78f0a 72-73
+tests/LiveLingo.Desktop.Tests/Settings/SettingsWindowTests.cs
+  s_6d6e9175f38e45::t_352ca284b1ee61 33,51
+  s_6d6e9175f38e45::t_49b921e93394fa 25,36-38,40-50
+  s_6d6e9175f38e45::t_1f468a2890eb2f 3,5
+  s_6d6e9175f38e45::t_e4c553a8814478 15,39
+src/LiveLingo.Desktop/Settings/SettingsWindow.axaml.cs
+  s_6d6e9175f38e45::t_f827d3f6c3300f 26-35,40
+src/LiveLingo.Desktop/Settings/SettingsWindow.axaml
+  s_6d6e9175f38e45::t_09d656a7263928 9,13,59
+  s_6d6e9175f38e45::t_1f5d413eb87ada 36-53
+src/LiveLingo.Desktop/Composer/ComposerModelPlan.cs
+  s_6d6e9175f38e45::t_5090769234e8e5 19-23
+src/LiveLingo.Core/Inference/ServiceFailure.cs
+  s_6d6e9175f38e45::t_f9d361284ed6bc 1,10,13
+tests/LiveLingo.Core.Tests/Inference/OpenAiChatClientTests.cs
+  s_6d6e9175f38e45::t_d66aca057484e6 13,20,37-41,89-130
+  s_6d6e9175f38e45::t_01c0818456956d 131
+src/LiveLingo.Core/Inference/LlamaServerHost.cs
+  s_6d6e9175f38e45::t_d66aca057484e6 200,202-203
+tests/LiveLingo.Core.Tests/Cloud/RoutedChatClientTests.cs
+  s_6d6e9175f38e45::t_96d2f1d87af7c0 1-104
+src/LiveLingo.Core/Inference/OpenAiChatClient.cs
+  s_6d6e9175f38e45::t_d66aca057484e6 7-19,27,35-37,43-44
+tests/LiveLingo.Desktop.Tests/Settings/SettingsViewModelTests.cs
+  s_6d6e9175f38e45::t_486701763a8513 1,10-11,18-20,31-33,41-43,47,57,68,75,84,91,125-229
+src/LiveLingo.Desktop/Services/Configuration/SettingsModel.cs
+  s_6d6e9175f38e45::t_5a7e6e112e153e 13,25,31-45
+  s_6d6e9175f38e45::t_3c728daf215183 46-47
+src/LiveLingo.Desktop/Resources/i18n/en-US.json
+  s_6d6e9175f38e45::t_3a1fbce2c4ac1c 63-72
+tests/LiveLingo.Desktop.Tests/Services/Localization/LocalizationServiceTests.cs
+  s_6d6e9175f38e45::t_81ea140d1d090c 228-237
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f622dd3d67c4d6e9723d4e6a46d8e0f2c4007df7",
+  "prompts": {},
+  "sessions": {
+    "s_6d6e9175f38e45": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "f74d37e5-1d96-4ddc-a3f9-5ae24ff39e38",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
