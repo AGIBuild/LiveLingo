@@ -77,7 +77,8 @@
 | S3 Windows 实机 | 未做 | 需要 Windows 16 GB 机器：PortAudio 采集、热键、注入、CPU / Vulkan 速度 |
 | S5 许可 | 完成 | 见上 |
 | S7 旧模型 | 完成 | 见上 |
-| 安装包与签名 | 未做 | 需要证书与公证账号；`Pack` 目标沿用，未验证 |
+| 安装包与签名 | 部分 | `./build.sh PackMac --Runtime osx-arm64` 成功：`.pkg` 内的 `Info.plist` 含麦克风说明，`libportaudio` / `libonnxruntime` / `libsherpa-onnx-c-api` 与 `THIRD_PARTY_NOTICES.md` 都在包内。**未签名、未公证、未安装运行**（需要证书与公证账号）；Windows 的 `Pack` / `PackMsi` 未在本机验证 |
+| CI 门禁 | 通过 | `./build.sh Test`：Core 421、Desktop 296、HfGguf 9 全绿；行覆盖 91.1%、分支覆盖 86.3%。`./build.sh Mutate`：变异得分 81.79%（门槛 80%）。修复了变异目标从未能运行的问题（Nuke 传 `--break-at 80` 而配置 `low: 60`；命令行 `--mutate` 还覆盖了配置里的范围），现在范围与阈值只由 `stryker-config.json` 决定 |
 | 文档 | 完成 | README 改写为 2.0；CHANGELOG 增加 2.0.0 草案；CONTRIBUTING 更新旧模型清理与设置迁移 |
 | 真实语料对照 POC | 部分 | 语音：6 个场景回放通过（M2）；录音导入在 81 s 合成长录音上跑通，识别有同音错字（合成语音所致），未做 CER 对照；没有真实人声语料 |
 
