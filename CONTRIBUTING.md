@@ -121,6 +121,13 @@ LiveLingo uses [Nuke](https://nuke.build/) for build automation. All targets are
 ./build.sh PackMac --Runtime osx-arm64 --Version 1.0.0 # macOS .pkg installer
 ```
 
+End-to-end probes download the pinned models (SHA256-verified) and use real inference; they are not part of the unit-test gate:
+
+```bash
+./build.sh ProbeTranslation                                   # runtime + translator on llama-server
+./build.sh ProbeVoice --ProbeCorpus poc/voice-dictation/corpus # speech models + dictation + cleanup on recorded audio
+```
+
 Use `--Configuration Release` for release builds. On CI, configuration defaults to Release automatically.
 
 ### Obsolete model cleanup
