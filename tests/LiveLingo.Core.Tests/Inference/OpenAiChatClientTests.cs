@@ -10,12 +10,14 @@ public class OpenAiChatClientTests
     {
         public string? RequestBody { get; private set; }
         public bool? ConnectionClose { get; private set; }
+        public System.Net.Http.Headers.AuthenticationHeaderValue? Authorization { get; private set; }
         public Uri? RequestUri { get; private set; }
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {
             RequestUri = request.RequestUri;
             ConnectionClose = request.Headers.ConnectionClose;
+            Authorization = request.Headers.Authorization;
             RequestBody = request.Content is null ? null : await request.Content.ReadAsStringAsync(ct);
             return respond(request);
         }
@@ -32,8 +34,11 @@ public class OpenAiChatClientTests
     private const string Stop = "data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}";
     private const string Usage = "data: {\"choices\":[],\"usage\":{\"completion_tokens\":7}}";
 
-    private static OpenAiChatClient ClientFor(StubHandler handler) =>
-        new(new HttpClient(handler) { BaseAddress = new Uri("http://127.0.0.1:9/") });
+    private static readonly Uri Endpoint = new("http://127.0.0.1:9/v1/chat/completions");
+
+    private static OpenAiChatClient ClientFor(
+        StubHandler handler, string? model = null, string? bearer = null, bool extras = true) =>
+        new(new HttpClient(handler), Endpoint, model, bearer, extras);
 
     private static readonly IReadOnlyDictionary<string, object> NoExtra = new Dictionary<string, object>();
 
@@ -79,6 +84,49 @@ public class OpenAiChatClientTests
         await ClientFor(handler).CompleteAsync(new ChatRequest("p", 8, 0, NoExtra), CancellationToken.None);
 
         Assert.True(handler.ConnectionClose);
+    }
+
+    [Fact]
+    public async Task CompleteAsync_PostsToTheGivenEndpoint_WithoutCredentialsByDefault()
+    {
+        var handler = new StubHandler(_ => Sse(Delta("ok"), Stop, "data: [DONE]"));
+        var client = new OpenAiChatClient(
+            new HttpClient(handler), new Uri("https://example.openai.azure.com/openai/v1/chat/completions"));
+
+        await client.CompleteAsync(new ChatRequest("p", 8, 0, NoExtra), CancellationToken.None);
+
+        Assert.Equal("https://example.openai.azure.com/openai/v1/chat/completions", handler.RequestUri!.ToString());
+        Assert.Null(handler.Authorization);
+        using var body = System.Text.Json.JsonDocument.Parse(handler.RequestBody!);
+        Assert.False(body.RootElement.TryGetProperty("model", out _));
+    }
+
+    [Fact]
+    public async Task CompleteAsync_SendsTheModelAndBearerToken_WhenConfigured()
+    {
+        var handler = new StubHandler(_ => Sse(Delta("ok"), Stop, "data: [DONE]"));
+
+        await ClientFor(handler, model: "gpt-4.1-mini", bearer: "sk-test")
+            .CompleteAsync(new ChatRequest("p", 8, 0, NoExtra), CancellationToken.None);
+
+        Assert.Equal("Bearer", handler.Authorization!.Scheme);
+        Assert.Equal("sk-test", handler.Authorization.Parameter);
+        using var body = System.Text.Json.JsonDocument.Parse(handler.RequestBody!);
+        Assert.Equal("gpt-4.1-mini", body.RootElement.GetProperty("model").GetString());
+    }
+
+    [Fact]
+    public async Task CompleteAsync_DropsServerSpecificSampling_WhenTheEndpointIsNotLlamaServer()
+    {
+        var handler = new StubHandler(_ => Sse(Delta("ok"), Stop, "data: [DONE]"));
+        var extra = new Dictionary<string, object> { ["top_k"] = 20, ["cache_prompt"] = false, ["seed"] = 42 };
+
+        await ClientFor(handler, extras: false).CompleteAsync(new ChatRequest("p", 8, 0, extra), CancellationToken.None);
+
+        using var body = System.Text.Json.JsonDocument.Parse(handler.RequestBody!);
+        Assert.False(body.RootElement.TryGetProperty("top_k", out _));
+        Assert.False(body.RootElement.TryGetProperty("cache_prompt", out _));
+        Assert.True(body.RootElement.GetProperty("stream").GetBoolean());
     }
 
     [Fact]

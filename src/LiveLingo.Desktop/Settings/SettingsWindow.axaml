@@ -6,9 +6,11 @@
         x:DataType="local:SettingsViewModel"
         Width="560"
         SizeToContent="Height"
+        MaxHeight="760"
         CanResize="False"
         WindowStartupLocation="CenterScreen"
         RequestedThemeVariant="Dark">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
     <StackPanel Margin="24" Spacing="16">
         <StackPanel Spacing="6">
             <SelectableTextBlock x:Name="HotkeyLabel" FontWeight="SemiBold"/>
@@ -31,9 +33,28 @@
             <SelectableTextBlock x:Name="GlossaryHint" FontSize="12" Opacity="0.7" TextWrapping="Wrap"/>
         </StackPanel>
 
+        <StackPanel Spacing="8">
+            <SelectableTextBlock x:Name="CloudLabel" FontWeight="SemiBold"/>
+            <SelectableTextBlock x:Name="CloudHint" FontSize="12" Opacity="0.7" TextWrapping="Wrap"/>
+            <CheckBox x:Name="CloudTranslateBox" IsChecked="{Binding CloudTranslate, Mode=TwoWay}"/>
+            <CheckBox x:Name="CloudCleanBox" IsChecked="{Binding CloudClean, Mode=TwoWay}"/>
+            <SelectableTextBlock x:Name="CloudBaseUrlLabel" FontSize="12"/>
+            <TextBox x:Name="CloudBaseUrlBox" Text="{Binding CloudBaseUrl, Mode=TwoWay}"/>
+            <SelectableTextBlock x:Name="CloudModelLabel" FontSize="12"/>
+            <TextBox x:Name="CloudModelBox" Text="{Binding CloudModel, Mode=TwoWay}"/>
+            <SelectableTextBlock x:Name="CloudApiKeyLabel" FontSize="12"/>
+            <TextBox x:Name="CloudApiKeyBox" PasswordChar="•" Text="{Binding CloudApiKey, Mode=TwoWay}"/>
+            <StackPanel Orientation="Horizontal" Spacing="12" IsVisible="{Binding HasStoredKey}">
+                <SelectableTextBlock x:Name="CloudKeyStored" FontSize="12" Opacity="0.7" VerticalAlignment="Center"/>
+                <Button x:Name="CloudForgetButton" Command="{Binding ForgetCloudKeyCommand}" HorizontalContentAlignment="Center"/>
+            </StackPanel>
+            <SelectableTextBlock x:Name="CloudError" FontSize="12" Foreground="#FF8A7E" TextWrapping="Wrap" IsVisible="{Binding CloudInvalid}"/>
+        </StackPanel>
+
         <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
             <Button x:Name="CancelButton" Command="{Binding CancelCommand}" MinWidth="88" HorizontalContentAlignment="Center"/>
             <Button x:Name="SaveButton" Command="{Binding SaveCommand}" Classes="accent" MinWidth="88" HorizontalContentAlignment="Center"/>
         </StackPanel>
     </StackPanel>
+    </ScrollViewer>
 </Window>

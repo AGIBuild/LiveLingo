@@ -10,6 +10,7 @@ public partial class SettingsModel : ObservableObject
     [ObservableProperty] private HotkeySettings _hotkeys = new();
     [ObservableProperty] private AppearanceSettings _appearance = new();
     [ObservableProperty] private ComposerSettings _composer = new();
+    [ObservableProperty] private CloudSettings _cloud = new();
     [ObservableProperty] private UpdateSettings _update = new();
     [ObservableProperty] private AdvancedSettings _advanced = new();
 
@@ -21,9 +22,27 @@ public partial class SettingsModel : ObservableObject
         Hotkeys = Hotkeys.DeepClone(),
         Appearance = Appearance.DeepClone(),
         Composer = Composer.DeepClone(),
+        Cloud = Cloud.DeepClone(),
         Update = Update.DeepClone(),
         Advanced = Advanced.DeepClone()
     };
+}
+
+/// <summary>
+/// Optional cloud models (Microsoft Foundry or any OpenAI-compatible service). Off by default: nothing is sent
+/// anywhere until the user switches a feature on. Only text is sent, never audio. The API key is not stored here;
+/// it lives in the system secret store under <see cref="ApiKeySecretId"/>.
+/// </summary>
+public partial class CloudSettings : ObservableObject
+{
+    public const string ApiKeySecretId = "cloud-api-key";
+
+    [ObservableProperty] private string _baseUrl = "";
+    [ObservableProperty] private string _model = "";
+    [ObservableProperty] private bool _translate;
+    [ObservableProperty] private bool _clean;
+
+    public CloudSettings DeepClone() => new() { BaseUrl = BaseUrl, Model = Model, Translate = Translate, Clean = Clean };
 }
 
 public partial class HotkeySettings : ObservableObject

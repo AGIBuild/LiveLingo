@@ -1,4 +1,5 @@
 using LiveLingo.Core.Cleanup;
+using LiveLingo.Core.Cloud;
 using LiveLingo.Core.Dictation;
 using LiveLingo.Core.Inference;
 using LiveLingo.Core.Models;
@@ -67,15 +68,25 @@ public static class ServiceCollectionExtensions
             TimeProvider.System,
             sp.GetRequiredService<ILogger<LlamaServerHost>>()));
         services.AddSingleton<IDictationSessionFactory, SherpaDictationSessionFactory>();
-        services.AddSingleton<ITextCleaner>(sp => new LlmTextCleaner(new LocalChatClient(
-            sp.GetRequiredService<LlamaServerHost>(),
+
+        // Everything stays on the machine unless the host registers routes (after this call) that send a role to the cloud.
+        services.AddSingleton<ICloudRoutes, LocalOnlyRoutes>();
+        services.AddSingleton<ITextCleaner>(sp => new LlmTextCleaner(new RoutedChatClient(
             InferenceRole.Cleaner,
-            () => ModelCatalog.Cleaner)));
-        services.AddSingleton<ITranslator>(sp => new LlmTranslator(new LocalChatClient(
-            sp.GetRequiredService<LlamaServerHost>(),
+            sp.GetRequiredService<ICloudRoutes>(),
+            new LocalChatClient(sp.GetRequiredService<LlamaServerHost>(), InferenceRole.Cleaner, () => ModelCatalog.Cleaner),
+            CloudHttp)));
+        services.AddSingleton<ITranslator>(sp => new LlmTranslator(new RoutedChatClient(
             InferenceRole.Translator,
-            () => ModelCatalog.Translator(sp.GetRequiredService<CoreOptions>().TranslatorTier))));
+            sp.GetRequiredService<ICloudRoutes>(),
+            new LocalChatClient(
+                sp.GetRequiredService<LlamaServerHost>(),
+                InferenceRole.Translator,
+                () => ModelCatalog.Translator(sp.GetRequiredService<CoreOptions>().TranslatorTier)),
+            CloudHttp)));
 
         return services;
     }
+
+    private static readonly HttpClient CloudHttp = new() { Timeout = TimeSpan.FromSeconds(120) };
 }

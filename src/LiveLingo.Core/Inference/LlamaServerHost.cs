@@ -197,9 +197,10 @@ public sealed class LlamaServerHost : IAsyncDisposable
             throw;
         }
 
-        var http = new HttpClient { BaseAddress = endpoint, Timeout = TimeSpan.FromSeconds(120) };
+        var http = new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
         var idleTimer = _time.CreateTimer(_ => OnIdle(role), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
-        var instance = new Instance(model, process, http, new OpenAiChatClient(http), idleTimer);
+        var instance = new Instance(
+            model, process, http, new OpenAiChatClient(http, new Uri(endpoint, "v1/chat/completions")), idleTimer);
         lock (_gate)
             _instances[role] = instance;
         return instance;
