@@ -1,0 +1,41 @@
+src/LiveLingo.Core/Translation/TranslationScheduler.cs
+  s_6d6e9175f38e45::t_20c7cf71fc6fc9 144,147
+src/LiveLingo.Core/Drafting/Draft.cs
+  s_6d6e9175f38e45::t_20c7cf71fc6fc9 142-158
+tests/LiveLingo.Core.Tests/Drafting/DraftTests.cs
+  s_6d6e9175f38e45::t_20c7cf71fc6fc9 380-412
+tests/LiveLingo.Core.Tests/Support/ManualTimeProvider.cs
+  s_6d6e9175f38e45::t_321d8f8baa0361 29-30,33-35
+  s_6d6e9175f38e45::t_451e7ee65d093d 36
+src/LiveLingo.Core/Cleanup/ITextCleaner.cs
+  s_6d6e9175f38e45::t_6946a96312c7b2 1-21
+tests/LiveLingo.Core.Tests/Dictation/FidelityGateTests.cs
+  s_6d6e9175f38e45::t_4b23ca1c96d174 1-176
+src/LiveLingo.Core/Inference/ServiceFailure.cs
+  s_6d6e9175f38e45::t_20c7cf71fc6fc9 1-13
+src/LiveLingo.Core/Cleanup/CleanupScheduler.cs
+  s_6d6e9175f38e45::t_ed5d120a57eaf6 98-100
+  s_6d6e9175f38e45::t_7d0ccde3d99be3 112,115
+  s_6d6e9175f38e45::t_6946a96312c7b2 1-97,101-111,113-114,116-187
+tests/LiveLingo.Core.Tests/Cleanup/CleanupSchedulerTests.cs
+  s_6d6e9175f38e45::t_7d0ccde3d99be3 107-108
+  s_6d6e9175f38e45::t_321d8f8baa0361 1-106,109-339
+src/LiveLingo.Core/Dictation/FidelityGate.cs
+  s_6d6e9175f38e45::t_4b23ca1c96d174 1-199
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6cf453d0a8d2cdc33c07d24135b9acdfdc31a6ca",
+  "prompts": {},
+  "sessions": {
+    "s_6d6e9175f38e45": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "f74d37e5-1d96-4ddc-a3f9-5ae24ff39e38",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
