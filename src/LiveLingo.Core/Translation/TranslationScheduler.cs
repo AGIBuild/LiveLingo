@@ -1,6 +1,5 @@
 using LiveLingo.Core.Drafting;
 using LiveLingo.Core.Inference;
-using LiveLingo.Core.Models;
 
 namespace LiveLingo.Core.Translation;
 
@@ -142,10 +141,10 @@ public sealed class TranslationScheduler : IAsyncDisposable
             {
                 // The unit changed or the scheduler is stopping; the next scan decides what to do.
             }
-            catch (Exception ex) when (IsServiceFailure(ex))
+            catch (Exception ex) when (ServiceFailure.IsUnavailable(ex))
             {
                 // The service is unavailable for every unit: fail them together instead of trying each one in turn.
-                _session.Mutate(draft => FailPending(draft, ticket, ex.Message));
+                _session.Mutate(draft => draft.FailPending(ticket, UnitKind.Translation, ex.Message));
             }
             catch (Exception ex)
             {
@@ -157,20 +156,6 @@ public sealed class TranslationScheduler : IAsyncDisposable
                     _inFlight = null;
                 cancel.Dispose();
             }
-        }
-    }
-
-    private static bool IsServiceFailure(Exception ex) =>
-        ex is HttpRequestException or LlamaServerStartException or ModelNotReadyException;
-
-    private static void FailPending(Draft draft, JobTicket current, string reason)
-    {
-        draft.Fail(current, UnitKind.Translation, reason);
-        for (var i = 0; i < draft.Units.Count; i++)
-        {
-            var result = draft.Units[i].Translation;
-            if (result.Text is null && result.Error.Length == 0)
-                draft.Fail(draft.TicketFor(i), UnitKind.Translation, reason);
         }
     }
 

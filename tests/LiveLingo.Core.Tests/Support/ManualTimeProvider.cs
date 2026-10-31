@@ -26,7 +26,13 @@ public sealed class ManualTimer(TimerCallback callback, object? state) : ITimer
 
 public sealed class ManualTimeProvider : TimeProvider
 {
+    private DateTimeOffset _now = new(2026, 10, 31, 12, 0, 0, TimeSpan.Zero);
+
     public List<ManualTimer> Timers { get; } = [];
+
+    public override DateTimeOffset GetUtcNow() => _now;
+
+    public void Advance(TimeSpan by) => _now += by;
 
     public ManualTimer Timer => Timers[^1];
 

@@ -139,6 +139,23 @@ public sealed class Draft
             result.Clear();
     }
 
+    /// <summary>
+    /// Fails the ticket's unit and every other unit that is still waiting for this kind of result, with the same
+    /// reason. Used when the service itself is unavailable, so units are not attempted one by one.
+    /// </summary>
+    public void FailPending(JobTicket current, UnitKind kind, string reason)
+    {
+        if (!Fail(current, kind, reason))
+            return;
+
+        foreach (var unit in _units)
+        {
+            var result = unit.Result(kind);
+            if (result.Text is null && result.Error.Length == 0)
+                result.Error = reason;
+        }
+    }
+
     public void Edit(int index, UnitKind kind, string text)
     {
         EnsureEditable();
