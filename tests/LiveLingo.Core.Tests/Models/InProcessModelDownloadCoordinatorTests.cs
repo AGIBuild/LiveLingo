@@ -14,7 +14,7 @@ namespace LiveLingo.Core.Tests.Models;
 /// </summary>
 public class InProcessModelDownloadCoordinatorTests
 {
-    private static readonly ModelDescriptor Descriptor = new(
+    private static readonly ModelDescriptor Descriptor = TestModel.Create(
         "coord-test", "Coord Test",
         "https://example.com/m.bin",
         1024, ModelType.Translation);

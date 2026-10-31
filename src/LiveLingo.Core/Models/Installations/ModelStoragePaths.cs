@@ -23,15 +23,8 @@ internal static class ModelStoragePaths
     public static string NormalizeRelativePath(string relativePath) =>
         relativePath.Replace('\\', Path.DirectorySeparatorChar);
 
-    /// <summary>
-    /// Returns the asset list to materialise for the given descriptor,
-    /// synthesising a single-file fallback when the descriptor declares no
-    /// explicit assets.
-    /// </summary>
-    public static IReadOnlyList<ModelAsset> GetExpectedAssets(ModelDescriptor descriptor) =>
-        descriptor.Assets.Count > 0
-            ? descriptor.Assets
-            : [new ModelAsset(GetFileNameFromUrl(descriptor.DownloadUrl), descriptor.DownloadUrl, descriptor.SizeBytes)];
+    /// <summary>The assets to materialise for the given descriptor.</summary>
+    public static IReadOnlyList<ModelAsset> GetExpectedAssets(ModelDescriptor descriptor) => descriptor.Assets;
 
     /// <summary>
     /// Files that must be present inside <paramref name="modelDir"/> for the model to be
@@ -46,12 +39,5 @@ internal static class ModelStoragePaths
         return GetExpectedAssets(descriptor)
             .Select(asset => NormalizeRelativePath(asset.RelativePath))
             .ToArray();
-    }
-
-    public static string GetFileNameFromUrl(string url)
-    {
-        var uri = new Uri(url);
-        var name = Path.GetFileName(uri.AbsolutePath);
-        return string.IsNullOrEmpty(name) ? "model.bin" : name;
     }
 }

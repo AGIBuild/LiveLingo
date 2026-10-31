@@ -9,7 +9,7 @@ namespace LiveLingo.Core.Tests.Models;
 
 public class ModelManagerTests : IDisposable
 {
-    private static readonly ModelDescriptor Sample = new(
+    private static readonly ModelDescriptor Sample = TestModel.Create(
         "sample-gguf", "Sample", "https://example.com/repo/resolve/main/Sample-Q4_K_M.gguf", 1, ModelType.Translation);
 
     private readonly string _tempDir;
@@ -64,7 +64,7 @@ public class ModelManagerTests : IDisposable
     [Fact]
     public async Task EnsureModelAsync_DownloadsModel()
     {
-        var desc = new ModelDescriptor("test-model", "Test", "http://fake/model", 100, ModelType.Translation);
+        var desc = TestModel.Create("test-model", "Test", "http://fake/model", 100, ModelType.Translation);
 
         await _manager.EnsureModelAsync(desc, null, CancellationToken.None);
 
@@ -75,7 +75,7 @@ public class ModelManagerTests : IDisposable
     [Fact]
     public async Task EnsureModelAsync_SkipsIfAlreadyInstalled()
     {
-        var desc = new ModelDescriptor("test-model", "Test", "http://fake/model", 100, ModelType.Translation);
+        var desc = TestModel.Create("test-model", "Test", "http://fake/model", 100, ModelType.Translation);
 
         await _manager.EnsureModelAsync(desc, null, CancellationToken.None);
         await _manager.EnsureModelAsync(desc, null, CancellationToken.None);
@@ -86,7 +86,7 @@ public class ModelManagerTests : IDisposable
     [Fact]
     public async Task EnsureModelAsync_ReportsProgress()
     {
-        var desc = new ModelDescriptor("progress-test", "Test", "http://fake/model", 100, ModelType.Translation);
+        var desc = TestModel.Create("progress-test", "Test", "http://fake/model", 100, ModelType.Translation);
         var reports = new List<ModelDownloadProgress>();
         var progress = new Progress<ModelDownloadProgress>(r => reports.Add(r));
 
@@ -100,7 +100,7 @@ public class ModelManagerTests : IDisposable
     [Fact]
     public async Task ListInstalled_ReturnsModels_AfterDownload()
     {
-        var desc = new ModelDescriptor("list-test", "List Test", "http://fake/model", 100, ModelType.Translation);
+        var desc = TestModel.Create("list-test", "List Test", "http://fake/model", 100, ModelType.Translation);
         await _manager.EnsureModelAsync(desc, null, CancellationToken.None);
 
         var installed = _manager.ListInstalled();
@@ -111,7 +111,7 @@ public class ModelManagerTests : IDisposable
     [Fact]
     public async Task DeleteModelAsync_RemovesModel()
     {
-        var desc = new ModelDescriptor("delete-test", "Del", "http://fake/model", 100, ModelType.Translation);
+        var desc = TestModel.Create("delete-test", "Del", "http://fake/model", 100, ModelType.Translation);
         await _manager.EnsureModelAsync(desc, null, CancellationToken.None);
 
         Assert.NotEmpty(_manager.ListInstalled());
@@ -130,7 +130,7 @@ public class ModelManagerTests : IDisposable
     [Fact]
     public async Task GetTotalDiskUsage_ReturnsNonZero_AfterDownload()
     {
-        var desc = new ModelDescriptor("size-test", "Size", "http://fake/model", 100, ModelType.Translation);
+        var desc = TestModel.Create("size-test", "Size", "http://fake/model", 100, ModelType.Translation);
         await _manager.EnsureModelAsync(desc, null, CancellationToken.None);
 
         Assert.True(_manager.GetTotalDiskUsage() > 0);
@@ -186,11 +186,11 @@ public class ModelManagerTests : IDisposable
     [Fact]
     public async Task EnsureModelAsync_ResumesDownload_WhenPartFileExists()
     {
-        var desc = new ModelDescriptor("resume-test", "Resume", "http://fake/model.bin", 200, ModelType.Translation);
+        var desc = TestModel.Create("resume-test", "Resume", "http://fake/model.bin", 200, ModelType.Translation);
         var modelDir = Path.Combine(_tempDir, "resume-test");
         Directory.CreateDirectory(modelDir);
         var partPath = Path.Combine(modelDir, "model.bin.part");
-        await File.WriteAllBytesAsync(partPath, new byte[50]);
+        await File.WriteAllBytesAsync(partPath, TestModel.Content(50));
 
         bool rangeRequested = false;
         var handler = new FakeHttpMessageHandler(req =>
@@ -217,11 +217,11 @@ public class ModelManagerTests : IDisposable
         var options = Options.Create(new CoreOptions { ModelStoragePath = _tempDir });
         var mgr = new ModelManager(options, new HttpClient(handler), Substitute.For<ILogger<ModelManager>>());
 
-        var desc = new ModelDescriptor("resume-complete", "Resume Complete", "http://fake/model.bin", 100, ModelType.Translation);
+        var desc = TestModel.Create("resume-complete", "Resume Complete", "http://fake/model.bin", 100, ModelType.Translation);
         var modelDir = Path.Combine(_tempDir, "resume-complete");
         Directory.CreateDirectory(modelDir);
         var partPath = Path.Combine(modelDir, "model.bin.part");
-        await File.WriteAllBytesAsync(partPath, new byte[100]);
+        await File.WriteAllBytesAsync(partPath, TestModel.Content(100));
 
         await mgr.EnsureModelAsync(desc, null, CancellationToken.None);
 
@@ -244,7 +244,7 @@ public class ModelManagerTests : IDisposable
     [Fact]
     public async Task EnsureModelAsync_SkipsDownload_LogsDebug_WhenAlreadyInstalled()
     {
-        var desc = new ModelDescriptor("log-test", "Test", "http://fake/model", 100, ModelType.Translation);
+        var desc = TestModel.Create("log-test", "Test", "http://fake/model", 100, ModelType.Translation);
 
         await _manager.EnsureModelAsync(desc, null, CancellationToken.None);
         await _manager.EnsureModelAsync(desc, null, CancellationToken.None);
@@ -260,7 +260,7 @@ public class ModelManagerTests : IDisposable
     [Fact]
     public async Task EnsureModelAsync_LogsDebug_WhenAlreadyInstalled_WithModelId()
     {
-        var desc = new ModelDescriptor("dbg-log", "Test", "http://fake/model", 100, ModelType.Translation);
+        var desc = TestModel.Create("dbg-log", "Test", "http://fake/model", 100, ModelType.Translation);
         await _manager.EnsureModelAsync(desc, null, CancellationToken.None);
         _logger.ClearReceivedCalls();
 
@@ -277,7 +277,7 @@ public class ModelManagerTests : IDisposable
     [Fact]
     public async Task EnsureModelAsync_LogsDebug_AfterDownload()
     {
-        var desc = new ModelDescriptor("info-log", "Test", "http://fake/model", 100, ModelType.Translation);
+        var desc = TestModel.Create("info-log", "Test", "http://fake/model", 100, ModelType.Translation);
         await _manager.EnsureModelAsync(desc, null, CancellationToken.None);
 
         _logger.Received().Log(
@@ -291,7 +291,7 @@ public class ModelManagerTests : IDisposable
     [Fact]
     public async Task DeleteModelAsync_LogsDebug()
     {
-        var desc = new ModelDescriptor("del-log", "Del", "http://fake/model", 100, ModelType.Translation);
+        var desc = TestModel.Create("del-log", "Del", "http://fake/model", 100, ModelType.Translation);
         await _manager.EnsureModelAsync(desc, null, CancellationToken.None);
         _logger.ClearReceivedCalls();
 
@@ -325,7 +325,7 @@ public class ModelManagerTests : IDisposable
     [Fact]
     public async Task EnsureModelAsync_ProgressReports_AccumulateBytes()
     {
-        var desc = new ModelDescriptor("progress-accum", "Test", "http://fake/model", 200, ModelType.Translation);
+        var desc = TestModel.Create("progress-accum", "Test", "http://fake/model", 200, ModelType.Translation);
         var reports = new List<ModelDownloadProgress>();
         var syncProgress = new SyncProgress<ModelDownloadProgress>(r => reports.Add(r));
 
@@ -339,7 +339,7 @@ public class ModelManagerTests : IDisposable
     [Fact]
     public async Task EnsureModelAsync_NewDownload_UsesCreateMode()
     {
-        var desc = new ModelDescriptor("create-mode", "Test", "http://fake/model", 100, ModelType.Translation);
+        var desc = TestModel.Create("create-mode", "Test", "http://fake/model", 100, ModelType.Translation);
         await _manager.EnsureModelAsync(desc, null, CancellationToken.None);
 
         var manifestPath = Path.Combine(_tempDir, "create-mode", "manifest.json");
@@ -352,7 +352,7 @@ public class ModelManagerTests : IDisposable
     [Fact]
     public async Task EnsureModelAsync_WritesManifestContent()
     {
-        var desc = new ModelDescriptor("manifest-write", "MW Test", "http://fake/model", 100, ModelType.Translation);
+        var desc = TestModel.Create("manifest-write", "MW Test", "http://fake/model", 100, ModelType.Translation);
         await _manager.EnsureModelAsync(desc, null, CancellationToken.None);
 
         var manifestPath = Path.Combine(_tempDir, "manifest-write", "manifest.json");
@@ -456,7 +456,7 @@ public class ModelManagerTests : IDisposable
     [Fact]
     public async Task EnsureModelAsync_WritesFileContent()
     {
-        var desc = new ModelDescriptor("content-test", "Test", "http://fake/model.bin", 100, ModelType.Translation);
+        var desc = TestModel.Create("content-test", "Test", "http://fake/model.bin", 100, ModelType.Translation);
         await _manager.EnsureModelAsync(desc, null, CancellationToken.None);
 
         var modelFile = Path.Combine(_tempDir, "content-test", "model.bin");
@@ -472,7 +472,7 @@ public class ModelManagerTests : IDisposable
         var handler = new FakeHttpMessageHandler(_ => callCount++);
         var options = Options.Create(new CoreOptions { ModelStoragePath = _tempDir });
         var mgr = new ModelManager(options, new HttpClient(handler), _logger);
-        var desc = new ModelDescriptor("skip-test", "Test", "http://fake/model", 100, ModelType.Translation);
+        var desc = TestModel.Create("skip-test", "Test", "http://fake/model", 100, ModelType.Translation);
 
         await mgr.EnsureModelAsync(desc, null, CancellationToken.None);
         var firstCount = callCount;
@@ -487,7 +487,7 @@ public class ModelManagerTests : IDisposable
     [InlineData("http://example.com/", "model.bin")]
     public async Task EnsureModelAsync_ExtractsCorrectFileName(string url, string expectedFile)
     {
-        var desc = new ModelDescriptor("fname-test", "Test", url, 100, ModelType.Translation);
+        var desc = TestModel.Create("fname-test", "Test", url, 100, ModelType.Translation);
         await _manager.EnsureModelAsync(desc, null, CancellationToken.None);
 
         var modelDir = Path.Combine(_tempDir, "fname-test");
@@ -500,14 +500,14 @@ public class ModelManagerTests : IDisposable
     [Fact]
     public async Task EnsureModelAsync_DownloadsAllAssets_WhenDescriptorProvidesAssets()
     {
-        var desc = new ModelDescriptor("asset-test", "Asset Test", "http://fake/fallback.bin", 300, ModelType.Translation)
+        var desc = TestModel.Create("asset-test", "Asset Test", "http://fake/fallback.bin", 300, ModelType.Translation) with
         {
             Assets =
             [
-                new ModelAsset("onnx/encoder_model.onnx", "http://fake/encoder.onnx", 100),
-                new ModelAsset("onnx/decoder_model_merged.onnx", "http://fake/decoder.onnx", 100),
-                new ModelAsset("source.spm", "http://fake/source.spm", 50),
-                new ModelAsset("target.spm", "http://fake/target.spm", 50),
+                TestModel.Asset("onnx/encoder_model.onnx", "http://fake/encoder.onnx", 100),
+                TestModel.Asset("onnx/decoder_model_merged.onnx", "http://fake/decoder.onnx", 100),
+                TestModel.Asset("source.spm", "http://fake/source.spm", 50),
+                TestModel.Asset("target.spm", "http://fake/target.spm", 50),
             ]
         };
 
@@ -603,7 +603,7 @@ public class ModelManagerTests : IDisposable
         var options = Options.Create(new CoreOptions { ModelStoragePath = _tempDir });
         var mgr = new ModelManager(options, new HttpClient(handler), _logger);
 
-        var desc = new ModelDescriptor("fallback-test", "Fallback Test",
+        var desc = TestModel.Create("fallback-test", "Fallback Test",
             "https://huggingface.co/test/model/resolve/main/model.bin", 100, ModelType.SpeechToText);
 
         await mgr.EnsureModelAsync(desc, null, CancellationToken.None);
@@ -627,7 +627,7 @@ public class ModelManagerTests : IDisposable
         });
         var mgr = new ModelManager(options, new HttpClient(handler), _logger);
 
-        var desc = new ModelDescriptor("bearer-test", "Bearer",
+        var desc = TestModel.Create("bearer-test", "Bearer",
             "https://huggingface.co/test/model/resolve/main/model.bin", 100, ModelType.Translation);
 
         await mgr.EnsureModelAsync(desc, null, CancellationToken.None);
@@ -644,7 +644,7 @@ public class ModelManagerTests : IDisposable
         var options = Options.Create(new CoreOptions { ModelStoragePath = _tempDir });
         var mgr = new ModelManager(options, new HttpClient(handler), _logger);
 
-        var desc = new ModelDescriptor("auth-denied-test", "AuthDenied",
+        var desc = TestModel.Create("auth-denied-test", "AuthDenied",
             "https://huggingface.co/org/repo/resolve/main/file.gguf", 100, ModelType.Translation);
 
         var ex = await Assert.ThrowsAsync<ModelDownloadAuthorizationException>(
@@ -665,7 +665,7 @@ public class ModelManagerTests : IDisposable
         });
         var mgr = new ModelManager(options, new HttpClient(handler), _logger);
 
-        var desc = new ModelDescriptor("mirror-test", "Mirror Test",
+        var desc = TestModel.Create("mirror-test", "Mirror Test",
             "https://huggingface.co/test/model/resolve/main/model.bin", 100, ModelType.Translation);
 
         await mgr.EnsureModelAsync(desc, null, CancellationToken.None);
@@ -686,8 +686,8 @@ public class ModelManagerTests : IDisposable
         });
         var mgr = new ModelManager(options, new HttpClient(handler), _logger);
 
-        var desc = new ModelDescriptor("nonhf-test", "NonHF Test",
-            "https://dl.fbaipublicfiles.com/fasttext/model.ftz", 100, ModelType.LanguageDetection);
+        var desc = TestModel.Create("nonhf-test", "NonHF Test",
+            "https://dl.fbaipublicfiles.com/fasttext/model.ftz", 100, ModelType.Runtime);
 
         await mgr.EnsureModelAsync(desc, null, CancellationToken.None);
 
@@ -711,7 +711,7 @@ public class ModelManagerTests : IDisposable
         });
         var mgr = new ModelManager(options, new HttpClient(handler), _logger);
 
-        var desc = new ModelDescriptor("nofallback-test", "NoFallback",
+        var desc = TestModel.Create("nofallback-test", "NoFallback",
             "https://huggingface.co/test/model.bin", 100, ModelType.Translation);
 
         await Assert.ThrowsAsync<HttpRequestException>(
@@ -731,7 +731,7 @@ public class ModelManagerTests : IDisposable
             HttpRequestMessage request, CancellationToken ct)
         {
             _inspector?.Invoke(request);
-            var content = new byte[100];
+            var content = TestModel.Content(100);
             Array.Fill(content, (byte)'x');
             var response = new HttpResponseMessage(HttpStatusCode.OK)
             {
@@ -754,7 +754,7 @@ public class ModelManagerTests : IDisposable
             HttpRequestMessage request, CancellationToken ct)
         {
             _inspector?.Invoke(request);
-            var content = new byte[100];
+            var content = TestModel.Content(100);
             Array.Fill(content, (byte)'x');
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
             {
