@@ -10,7 +10,6 @@ internal sealed class MacPlatformServices : IPlatformServices
     public IWindowTracker WindowTracker { get; }
     public ITextInjector TextInjector { get; }
     public IClipboardService Clipboard { get; }
-    public IAudioCaptureService AudioCapture { get; }
 
     public MacPlatformServices()
     {
@@ -18,7 +17,6 @@ internal sealed class MacPlatformServices : IPlatformServices
         Hotkey = new MacHotkeyService();
         WindowTracker = new MacWindowTracker();
         TextInjector = new MacTextInjector(Clipboard);
-        AudioCapture = new MacAudioCaptureService();
     }
 
     public void OpenUrl(string url) => BrowserLauncher.OpenUrl(url);
@@ -26,6 +24,5 @@ internal sealed class MacPlatformServices : IPlatformServices
     public void Dispose()
     {
         Hotkey.Dispose();
-        AudioCapture.Dispose();
     }
 }
