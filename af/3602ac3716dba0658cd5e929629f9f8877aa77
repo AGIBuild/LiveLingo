@@ -1,0 +1,58 @@
+tests/LiveLingo.Core.Tests/Inference/OpenAiChatClientTests.cs
+  s_6d6e9175f38e45::t_f6d30a6b6e6338 12,18,74-81
+  s_6d6e9175f38e45::t_f411138e59fd88 82-83
+test.runsettings
+  s_6d6e9175f38e45::t_8888b4c24d9cb8 8
+src/LiveLingo.Core/Speech/Native/SherpaDictationSessionFactory.cs
+  s_6d6e9175f38e45::t_38c6d392cb6f8f 1-30
+src/LiveLingo.Desktop/Platform/IMicrophone.cs
+  s_6d6e9175f38e45::t_2a3fbbc28d84eb 1-32
+src/LiveLingo.Desktop/Platform/IPlatformServices.cs
+  s_6d6e9175f38e45::t_2a3fbbc28d84eb 9-10
+tests/LiveLingo.Core.Tests/ServiceCollectionExtensionsTests.cs
+  s_6d6e9175f38e45::t_38c6d392cb6f8f 2,26
+src/LiveLingo.Desktop/Platform/macOS/MacPlatformServices.cs
+  s_6d6e9175f38e45::t_2a3fbbc28d84eb 13-14,28
+src/LiveLingo.Core/Dictation/IDictationSessionFactory.cs
+  s_6d6e9175f38e45::t_38c6d392cb6f8f 1-13
+src/LiveLingo.Core/ServiceCollectionExtensions.cs
+  s_6d6e9175f38e45::t_38c6d392cb6f8f 2,5,69
+tests/LiveLingo.Core.Tests/Support/ScriptedSpeech.cs
+  s_6d6e9175f38e45::t_38c6d392cb6f8f 24-25,54,66-67,96,103,105
+src/LiveLingo.Desktop/Platform/macOS/MacNativeMethods.cs
+  s_6d6e9175f38e45::t_2a3fbbc28d84eb 169-171
+tests/LiveLingo.Core.Tests/Dictation/DictationSessionTests.cs
+  s_6d6e9175f38e45::t_38c6d392cb6f8f 18-19,29,31,321-350
+src/LiveLingo.Desktop/Platform/Windows/WindowsMicrophonePermission.cs
+  s_6d6e9175f38e45::t_2a3fbbc28d84eb 1-22
+src/LiveLingo.Core/Inference/OpenAiChatClient.cs
+  s_6d6e9175f38e45::t_f6d30a6b6e6338 27-28
+src/LiveLingo.Desktop/Platform/Windows/WindowsPlatformServices.cs
+  s_6d6e9175f38e45::t_2a3fbbc28d84eb 11-12,26
+src/LiveLingo.Core/Dictation/DictationSession.cs
+  s_6d6e9175f38e45::t_38c6d392cb6f8f 107-123
+src/LiveLingo.Desktop/Platform/PortAudioMicrophone.cs
+  s_6d6e9175f38e45::t_2a3fbbc28d84eb 1-66
+src/LiveLingo.Desktop/LiveLingo.Desktop.csproj
+  s_6d6e9175f38e45::t_2a3fbbc28d84eb 34
+src/LiveLingo.Desktop/Platform/macOS/MacMicrophonePermission.cs
+  s_6d6e9175f38e45::t_2a3fbbc28d84eb 1-47
+docs/superpowers/plans/2026-10-31-composer-implementation.md
+  s_6d6e9175f38e45::t_06d592aee04991 42-53
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "af3602ac3716dba0658cd5e929629f9f8877aa77",
+  "prompts": {},
+  "sessions": {
+    "s_6d6e9175f38e45": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "f74d37e5-1d96-4ddc-a3f9-5ae24ff39e38",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
