@@ -1,0 +1,25 @@
+tests/LiveLingo.Desktop.Tests/Composer/UnsentDraftTests.cs
+  s_6d6e9175f38e45::t_f846ac8a880937 1-41
+src/LiveLingo.Desktop/App.axaml.cs
+  s_6d6e9175f38e45::t_264cf6d63c0a12 40,242-246,250
+src/LiveLingo.Desktop/Composer/UnsentDraft.cs
+  s_6d6e9175f38e45::t_7b7f0ee21e7d2e 1-21
+docs/superpowers/plans/2026-10-31-composer-implementation.md
+  s_6d6e9175f38e45::t_3871d1f5d317d4 61-62
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "6ecc9c8e6d40a35c2d4c4b771e3050d94c87b562",
+  "prompts": {},
+  "sessions": {
+    "s_6d6e9175f38e45": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "f74d37e5-1d96-4ddc-a3f9-5ae24ff39e38",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
