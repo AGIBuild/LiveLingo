@@ -1,0 +1,28 @@
+tests/LiveLingo.Core.Tests/Translation/ProtectedTextTests.cs
+  s_6d6e9175f38e45::t_3a95586cd84441 1-46
+tests/LiveLingo.Core.Tests/Translation/TranslationPromptTests.cs
+  s_6d6e9175f38e45::t_474ec23fc178d8 1-15,17-59
+  s_6d6e9175f38e45::t_034fab872207fe 16
+src/LiveLingo.Core/Translation/ProtectedText.cs
+  s_6d6e9175f38e45::t_4456d1969b365d 1-42
+src/LiveLingo.Core/Translation/TranslationPrompt.cs
+  s_6d6e9175f38e45::t_94cd878d3bfc8e 1-36
+src/LiveLingo.Core/Translation/TranslationRequest.cs
+  s_6d6e9175f38e45::t_9286f1eb7f0f06 1-18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f848ef6d3c3b2713824cdc05efbe6fadf2da7b7c",
+  "prompts": {},
+  "sessions": {
+    "s_6d6e9175f38e45": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "f74d37e5-1d96-4ddc-a3f9-5ae24ff39e38",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
