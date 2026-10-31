@@ -1,0 +1,46 @@
+src/LiveLingo.Desktop/Services/Configuration/SettingsMigration.cs
+  s_6d6e9175f38e45::t_0b9aaca675c776 1-76
+tests/LiveLingo.Desktop.Tests/Settings/SettingsWindowTests.cs
+  s_6d6e9175f38e45::t_84757b0a6a9307 26,48
+  s_6d6e9175f38e45::t_2599395f5466bc 3
+src/LiveLingo.Desktop/Services/Configuration/JsonSettingsService.cs
+  s_6d6e9175f38e45::t_d4aca603c85ba7 42-47,49
+  s_6d6e9175f38e45::t_c67f3582f30bfa 50-51
+src/LiveLingo.Desktop/App.axaml.cs
+  s_6d6e9175f38e45::t_924891f859457f 270
+tests/LiveLingo.Desktop.Tests/Services/Localization/LocalizationServiceTests.cs
+  s_6d6e9175f38e45::t_ec641e6ea3248f 248-249
+src/LiveLingo.Desktop/Resources/i18n/zh-CN.json
+  s_6d6e9175f38e45::t_f544c77979b0f9 83-84
+src/LiveLingo.Desktop/Resources/i18n/en-US.json
+  s_6d6e9175f38e45::t_968a4d98d834fe 83-84
+tests/LiveLingo.Desktop.Tests/Services/Configuration/SettingsMigrationTests.cs
+  s_6d6e9175f38e45::t_f282e55903f398 1-98,104-120
+  s_6d6e9175f38e45::t_33e8bcf38af115 99-103
+src/LiveLingo.Desktop/Settings/SettingsWindow.axaml.cs
+  s_6d6e9175f38e45::t_fb7a31fb7d2265 36-41
+src/LiveLingo.Desktop/Settings/SettingsWindow.axaml
+  s_6d6e9175f38e45::t_06bd5f5a946a45 54-58
+tests/LiveLingo.Desktop.Tests/Settings/SettingsViewModelTests.cs
+  s_6d6e9175f38e45::t_9a7e29393436fb 231-284
+  s_6d6e9175f38e45::t_a1a96d536ec2f5 1,12,21
+src/LiveLingo.Desktop/Settings/SettingsViewModel.cs
+  s_6d6e9175f38e45::t_08c56da7eb991b 17,19,21,25,78-80,83-107
+  s_6d6e9175f38e45::t_09f9f15e6a7597 108
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "52134bf91803ccfbf018010c307beafcb0bf4be1",
+  "prompts": {},
+  "sessions": {
+    "s_6d6e9175f38e45": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "f74d37e5-1d96-4ddc-a3f9-5ae24ff39e38",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
