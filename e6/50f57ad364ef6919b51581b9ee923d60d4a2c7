@@ -1,0 +1,27 @@
+test.runsettings
+  s_6d6e9175f38e45::t_f3dd3e0b1c6601 8
+README.md
+  s_6d6e9175f38e45::t_45ca6a16cc6b37 21-28
+build/BuildTask.cs
+  s_6d6e9175f38e45::t_9af4783ee4c83a 227-229
+CONTRIBUTING.md
+  s_6d6e9175f38e45::t_499aa42cdc72fb 44-47,49,53,56-57,60
+  s_6d6e9175f38e45::t_d892c2bf17cc80 199-200,208-210,256-259
+  s_6d6e9175f38e45::t_27fdf8fba56850 128-131,137-138,159
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e650f57ad364ef6919b51581b9ee923d60d4a2c7",
+  "prompts": {},
+  "sessions": {
+    "s_6d6e9175f38e45": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "f74d37e5-1d96-4ddc-a3f9-5ae24ff39e38",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
