@@ -166,6 +166,9 @@ internal static class MacNativeMethods
     [DllImport(ObjC, EntryPoint = "objc_msgSend")]
     public static extern int objc_msgSend_int(IntPtr receiver, IntPtr selector);
 
+    [DllImport(ObjC, EntryPoint = "objc_msgSend")]
+    public static extern long objc_msgSend_long(IntPtr receiver, IntPtr selector, IntPtr arg1);
+
     #endregion
 
     #region CGWindowList

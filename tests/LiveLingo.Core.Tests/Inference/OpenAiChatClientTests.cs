@@ -9,11 +9,13 @@ public class OpenAiChatClientTests
     private sealed class StubHandler(Func<HttpRequestMessage, HttpResponseMessage> respond) : HttpMessageHandler
     {
         public string? RequestBody { get; private set; }
+        public bool? ConnectionClose { get; private set; }
         public Uri? RequestUri { get; private set; }
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {
             RequestUri = request.RequestUri;
+            ConnectionClose = request.Headers.ConnectionClose;
             RequestBody = request.Content is null ? null : await request.Content.ReadAsStringAsync(ct);
             return respond(request);
         }
@@ -67,6 +69,16 @@ public class OpenAiChatClientTests
         var message = root.GetProperty("messages")[0];
         Assert.Equal("user", message.GetProperty("role").GetString());
         Assert.Equal("原文\n第二行", message.GetProperty("content").GetString());
+    }
+
+    [Fact]
+    public async Task CompleteAsync_ClosesTheConnection_SoAServerThatDropsIdleSocketsNeverBreaksTheNextRequest()
+    {
+        var handler = new StubHandler(_ => Sse(Delta("ok"), Stop, "data: [DONE]"));
+
+        await ClientFor(handler).CompleteAsync(new ChatRequest("p", 8, 0, NoExtra), CancellationToken.None);
+
+        Assert.True(handler.ConnectionClose);
     }
 
     [Fact]

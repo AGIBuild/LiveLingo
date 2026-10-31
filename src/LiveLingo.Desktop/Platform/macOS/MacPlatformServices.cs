@@ -10,6 +10,8 @@ internal sealed class MacPlatformServices : IPlatformServices
     public IWindowTracker WindowTracker { get; }
     public ITextInjector TextInjector { get; }
     public IClipboardService Clipboard { get; }
+    public IMicrophone Microphone { get; } = new PortAudioMicrophone();
+    public IMicrophonePermission MicrophonePermission { get; } = new MacMicrophonePermission();
 
     public MacPlatformServices()
     {
@@ -23,6 +25,7 @@ internal sealed class MacPlatformServices : IPlatformServices
 
     public void Dispose()
     {
+        Microphone.Dispose();
         Hotkey.Dispose();
     }
 }

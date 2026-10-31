@@ -1,6 +1,8 @@
 using LiveLingo.Core.Cleanup;
+using LiveLingo.Core.Dictation;
 using LiveLingo.Core.Inference;
 using LiveLingo.Core.Models;
+using LiveLingo.Core.Speech.Native;
 using LiveLingo.Core.Translation;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http.Resilience;
@@ -64,6 +66,7 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<LlamaServerHostOptions>(),
             TimeProvider.System,
             sp.GetRequiredService<ILogger<LlamaServerHost>>()));
+        services.AddSingleton<IDictationSessionFactory, SherpaDictationSessionFactory>();
         services.AddSingleton<ITextCleaner>(sp => new LlmTextCleaner(new LocalChatClient(
             sp.GetRequiredService<LlamaServerHost>(),
             InferenceRole.Cleaner,

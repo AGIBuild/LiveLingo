@@ -8,6 +8,8 @@ internal sealed class WindowsPlatformServices : IPlatformServices
     public IWindowTracker WindowTracker { get; }
     public ITextInjector TextInjector { get; }
     public IClipboardService Clipboard { get; }
+    public IMicrophone Microphone { get; } = new PortAudioMicrophone();
+    public IMicrophonePermission MicrophonePermission { get; } = new WindowsMicrophonePermission();
 
     public WindowsPlatformServices()
     {
@@ -21,6 +23,7 @@ internal sealed class WindowsPlatformServices : IPlatformServices
 
     public void Dispose()
     {
+        Microphone.Dispose();
         Hotkey.Dispose();
     }
 }
