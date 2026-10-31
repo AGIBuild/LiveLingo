@@ -28,6 +28,32 @@ internal sealed class MacWindowTracker : IWindowTracker
         }
     }
 
+    public bool IsAlive(TargetWindowInfo target)
+    {
+        var windowList = CGWindowListCopyWindowInfo(kCGWindowListOptionAll, 0);
+        if (windowList == IntPtr.Zero)
+            return false;
+
+        var kWindowNumber = CreateCFString("kCGWindowNumber");
+        try
+        {
+            var count = CFArrayGetCount(windowList);
+            for (var i = 0; i < count; i++)
+            {
+                var number = CFDictionaryGetValue(CFArrayGetValueAtIndex(windowList, i), kWindowNumber);
+                if (number != IntPtr.Zero && CFNumberGetValue(number, kCFNumberSInt32Type, out int windowNumber)
+                    && windowNumber == (int)target.Handle)
+                    return true;
+            }
+            return false;
+        }
+        finally
+        {
+            CFRelease(kWindowNumber);
+            CFRelease(windowList);
+        }
+    }
+
     private static (int pid, string name) GetFrontmostApp()
     {
         var nsWorkspace = objc_getClass("NSWorkspace");
