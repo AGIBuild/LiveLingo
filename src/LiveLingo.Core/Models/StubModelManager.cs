@@ -18,10 +18,6 @@ public sealed class StubModelManager : IModelManager
     public string GetModelDirectory(string modelId) => Path.Combine(Path.GetTempPath(), modelId);
     public Task MigrateStoragePathAsync(string newPath, CancellationToken ct) => Task.CompletedTask;
 
-    public void ResetHuggingfaceTransportFallback()
-    {
-    }
-
     public Task<long> CleanObsoleteModelsAsync(
         IEnumerable<string> obsoleteModelIds, CancellationToken ct = default)
     {

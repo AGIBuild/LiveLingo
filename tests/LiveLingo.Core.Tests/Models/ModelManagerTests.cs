@@ -590,26 +590,25 @@ public class ModelManagerTests : IDisposable
     }
 
     [Fact]
-    public async Task EnsureModelAsync_FallsBackToMirror_WhenHuggingFaceUnreachable()
+    public async Task EnsureModelAsync_NeverFallsBackToAnotherHost_WhenHuggingFaceIsUnreachable()
     {
         var requestedUrls = new List<string>();
         var handler = new FallbackHttpMessageHandler(req =>
         {
             requestedUrls.Add(req.RequestUri!.ToString());
-            if (req.RequestUri.Host == "huggingface.co")
-                throw new HttpRequestException("DNS failure",
-                    new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.HostNotFound));
+            throw new HttpRequestException("DNS failure",
+                new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.HostNotFound));
         });
         var options = Options.Create(new CoreOptions { ModelStoragePath = _tempDir });
         var mgr = new ModelManager(options, new HttpClient(handler), _logger);
 
-        var desc = TestModel.Create("fallback-test", "Fallback Test",
+        var desc = TestModel.Create("unreachable-test", "Unreachable",
             "https://huggingface.co/test/model/resolve/main/model.bin", 100, ModelType.SpeechToText);
 
-        await mgr.EnsureModelAsync(desc, null, CancellationToken.None);
+        await Assert.ThrowsAsync<HttpRequestException>(() => mgr.EnsureModelAsync(desc, null, CancellationToken.None));
 
-        Assert.Contains(requestedUrls, u => u.Contains("hf-mirror.com"));
-        Assert.True(File.Exists(Path.Combine(_tempDir, "fallback-test", "manifest.json")));
+        Assert.All(requestedUrls, url => Assert.Contains("huggingface.co", url));
+        Assert.False(File.Exists(Path.Combine(_tempDir, "unreachable-test", "manifest.json")));
     }
 
     [Fact]
