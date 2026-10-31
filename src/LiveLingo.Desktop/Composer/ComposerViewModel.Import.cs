@@ -24,8 +24,8 @@ public sealed partial class ComposerViewModel
     /// <summary>The source and the result sit side by side: a whole document or a transcript has room to breathe.</summary>
     [ObservableProperty] private bool _isWide;
 
-    /// <summary>A recording replaces the draft, so it can only be imported into an empty, idle composer.</summary>
-    public bool CanImport =>
+    /// <summary>Importing a recording or restoring an earlier draft replaces the draft, so both need an empty, idle composer.</summary>
+    public bool CanReplaceDraft =>
         _committed is null && !IsListening && !IsStartingListening && !IsTranscribing && !HasTimeline
         && string.IsNullOrWhiteSpace(SourceText);
 
@@ -46,7 +46,7 @@ public sealed partial class ComposerViewModel
     /// <summary>Transcribes a WAV recording on this machine and shows it as a timeline.</summary>
     public async Task ImportAsync(string path)
     {
-        if (!CanImport)
+        if (!CanReplaceDraft)
             return;
 
         CancelQueuedWrite();

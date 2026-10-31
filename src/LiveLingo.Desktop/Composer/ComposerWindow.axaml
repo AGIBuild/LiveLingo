@@ -152,9 +152,10 @@
             BoxShadow="0 14 44 0 #40000000">
         <StackPanel Spacing="10">
 
-            <Grid ColumnDefinitions="*,Auto">
+            <Grid ColumnDefinitions="*,Auto,Auto">
                 <TextBlock x:Name="TargetText" Classes="muted" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
-                <Border Grid.Column="1" CornerRadius="10" Background="{DynamicResource ComposerHover}" Padding="2">
+                <Button x:Name="RecentButton" Grid.Column="1" Classes="segment" Margin="0,0,8,0" IsVisible="False" Click="OnRecentClick"/>
+                <Border Grid.Column="2" CornerRadius="10" Background="{DynamicResource ComposerHover}" Padding="2">
                     <StackPanel Orientation="Horizontal" Spacing="2">
                         <Button x:Name="CleanButton" Classes="segment" Click="OnCleanClick"/>
                         <Button x:Name="TranslateButton" Classes="segment" Click="OnTranslateClick"/>
@@ -214,7 +215,7 @@
                           Stretch="Uniform" Width="18" Height="20"
                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Button>
-                <Button x:Name="ImportButton" Grid.Column="1" Margin="0,0,10,0" Click="OnImportClick" IsVisible="{Binding CanImport}"/>
+                <Button x:Name="ImportButton" Grid.Column="1" Margin="0,0,10,0" Click="OnImportClick" IsVisible="{Binding CanReplaceDraft}"/>
                 <TextBlock x:Name="StatusText" Grid.Column="2" Classes="muted" VerticalAlignment="Center"/>
                 <Button x:Name="ExportButton" Grid.Column="3" Margin="0,0,6,0" Click="OnExportClick" IsVisible="{Binding HasTimeline}" IsEnabled="{Binding CanExport}"/>
                 <Button x:Name="CopyButton" Grid.Column="4" Margin="0,0,6,0" Command="{Binding CopyCommand}"/>

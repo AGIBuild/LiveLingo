@@ -52,6 +52,8 @@ public class ComposerTextsTests
     [InlineData(BannerKind.MicrophoneDenied, "", 0, "[composer.banner.micDenied]", "[composer.banner.micDeniedAction]")]
     [InlineData(BannerKind.NoMicrophone, "no device", 0, "[composer.banner.noMic:no device]", "")]
     [InlineData(BannerKind.NoSound, "", 0, "[composer.banner.noSound]", "")]
+    [InlineData(BannerKind.FileFailed, "bad file", 0, "[composer.banner.fileFailed:bad file]", "")]
+    [InlineData(BannerKind.NoSpeechFound, "", 0, "[composer.banner.noSpeech]", "")]
     public void Banner_ProvidesMessageAndAction(BannerKind kind, string detail, double progress, string message, string action)
     {
         var texts = Create();
@@ -82,6 +84,16 @@ public class ComposerTextsTests
     }
 
     [Fact]
+    public void RecentItem_ShowsTheTimeAndTheFirstWordsOfTheFirstLine()
+    {
+        var at = new DateTimeOffset(2026, 10, 31, 4, 5, 0, TimeSpan.Zero);
+        var local = at.ToLocalTime().ToString("HH:mm");
+
+        Assert.Equal(local + " · hello", ComposerTexts.RecentItem(new RecentDraft(at, "\n  hello  \nsecond", false)));
+        Assert.Equal(local + " · " + new string('a', 28) + "…", ComposerTexts.RecentItem(new RecentDraft(at, new string('a', 40), true)));
+    }
+
+    [Fact]
     public void Labels_AreLocalized()
     {
         var texts = Create();
@@ -103,5 +115,6 @@ public class ComposerTextsTests
         Assert.Equal("[composer.status.keptOriginal:2]", texts.Status(ComposerStatus.Ready, false, 2));
         Assert.Equal("[composer.status.ready]", texts.Status(ComposerStatus.Ready, false, 0));
         Assert.Equal("[composer.status.working]", texts.Status(ComposerStatus.Working, false, 2));
+        Assert.Equal("[composer.status.transcribing:42]", texts.Status(ComposerStatus.Transcribing, false, 0, 42));
     }
 }

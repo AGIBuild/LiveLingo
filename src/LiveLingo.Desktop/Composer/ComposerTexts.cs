@@ -39,6 +39,16 @@ public sealed class ComposerTexts(ILocalizationService loc)
     public string ImportFileType => loc.T("composer.import.fileType");
     public string ExportLabel => loc.T("composer.export");
     public string ExportTitle => loc.T("composer.export.title");
+    public string RecentLabel => loc.T("composer.recent");
+    public string RecentClearLabel => loc.T("composer.recent.clear");
+
+    /// <summary>"12:03 · first words of the draft" for the recent-drafts menu.</summary>
+    public static string RecentItem(RecentDraft draft)
+    {
+        var firstLine = draft.Text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)[0];
+        var preview = firstLine.Length > 28 ? firstLine[..28] + "…" : firstLine;
+        return $"{draft.At.ToLocalTime():HH:mm} · {preview}";
+    }
 
     public string TranslateLabel(TargetLanguage target) =>
         loc.T("composer.output.translate", loc.T("composer.language." + target));

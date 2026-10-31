@@ -38,7 +38,7 @@ public partial class App : Application
     private IUpdateService? _updateService;
     private string? _registeredGesture;
     private ComposerWindow? _composer;
-    private readonly UnsentDraft _unsentDraft = new();
+    private readonly RecentDrafts _recentDrafts = new();
     private SettingsWindow? _settingsWindow;
 
     public override void Initialize()
@@ -240,16 +240,16 @@ public partial class App : Application
             context);
 
         var loc = services.GetRequiredService<ILocalizationService>();
-        var window = new ComposerWindow(vm, new ComposerTexts(loc), target);
+        var window = new ComposerWindow(vm, new ComposerTexts(loc), target, _recentDrafts);
         var written = false;
         vm.Completed += () => written = true;
-        var restored = _unsentDraft.Take();
+        var restored = _recentDrafts.TakeUnsent();
         if (restored.Length > 0)
             vm.SourceText = restored;
         window.Closed += async (_, _) =>
         {
             _composer = null;
-            _unsentDraft.Close(vm.HasTimeline ? "" : vm.SourceText, written);
+            _recentDrafts.Close(vm.HasTimeline ? "" : vm.SourceText, written);
             await vm.DisposeAsync();
             await cleanup.DisposeAsync();
             await scheduler.DisposeAsync();

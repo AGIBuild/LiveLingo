@@ -146,7 +146,7 @@ public class ComposerImportTests
         Assert.False(h.Vm.HasTimeline);
         Assert.Equal(BannerKind.None, h.Vm.Banner.Kind);
         Assert.DoesNotContain("close", h.Events);
-        Assert.True(h.Vm.CanImport);
+        Assert.True(h.Vm.CanReplaceDraft);
     }
 
     [Fact]
@@ -218,7 +218,7 @@ public class ComposerImportTests
     {
         await using var h = Create();
         h.Vm.SourceText = "typed text";
-        Assert.False(h.Vm.CanImport);
+        Assert.False(h.Vm.CanReplaceDraft);
 
         await h.Vm.ImportAsync("a.wav");
 
@@ -236,6 +236,6 @@ public class ComposerImportTests
 
         Assert.Equal(0, h.Voice.Starts);
         Assert.Equal(["a.wav"], h.Transcriber.Paths);
-        Assert.False(h.Vm.CanImport);
+        Assert.False(h.Vm.CanReplaceDraft);
     }
 }

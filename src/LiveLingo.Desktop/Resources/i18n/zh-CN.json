@@ -57,6 +57,8 @@
   "composer.import.fileType": "WAV 音频",
   "composer.export": "导出 SRT",
   "composer.export.title": "导出字幕",
+  "composer.recent": "最近",
+  "composer.recent.clear": "清除最近草稿",
   "composer.banner.fileFailed": "文件无法使用：{0}",
   "composer.banner.noSpeech": "这段录音里没有识别到语音。",
   "tray.settings": "设置",
