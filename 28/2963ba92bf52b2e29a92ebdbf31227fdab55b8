@@ -1,0 +1,56 @@
+test.runsettings
+  s_6d6e9175f38e45::t_1fb4c74f9e4ae6 8
+src/LiveLingo.Core/Inference/LlamaServerContracts.cs
+  s_6d6e9175f38e45::t_5bba14e1b6670c 1-33
+build/BuildTask.cs
+  s_6d6e9175f38e45::t_1fb4c74f9e4ae6 228-229
+src/LiveLingo.Core/Models/ModelCatalog.cs
+  s_6d6e9175f38e45::t_c1120baf27306f 3-8,80-84
+  s_6d6e9175f38e45::t_ac16fea68a7e05 85-86
+src/LiveLingo.Core/Inference/LlamaProcessLauncher.cs
+  s_6d6e9175f38e45::t_a3b703f0499e7a 1-55
+src/LiveLingo.Core/Inference/LocalChatClient.cs
+  s_6d6e9175f38e45::t_f6a48181695e0e 1-13
+src/LiveLingo.Core/ServiceCollectionExtensions.cs
+  s_6d6e9175f38e45::t_e7b8953fca2b97 1,3,6,47-64
+  s_6d6e9175f38e45::t_602ca82daa46f0 65
+tests/LiveLingo.Core.Tests/Inference/LocalChatClientTests.cs
+  s_6d6e9175f38e45::t_31cabee1f369de 1-39
+src/LiveLingo.Desktop/App.axaml.cs
+  s_6d6e9175f38e45::t_87e4211539b680 92
+src/LiveLingo.Core/CoreOptions.cs
+  s_6d6e9175f38e45::t_5b173a57799981 1-2
+  s_6d6e9175f38e45::t_95a0ee3476c200 13-15
+tests/LiveLingo.Core.Tests/ServiceCollectionExtensionsTests.cs
+  s_6d6e9175f38e45::t_87e4211539b680 12,17,26,31
+  s_6d6e9175f38e45::t_1fb4c74f9e4ae6 1,3,21-22
+tests/LiveLingo.Core.Tests/Support/ManualTimeProvider.cs
+  s_6d6e9175f38e45::t_7b8cd977c1d29e 1-39
+tests/LiveLingo.Core.Tests/Inference/LlamaServerHostTests.cs
+  s_6d6e9175f38e45::t_391ae65bdc6e43 1-317
+tests/LiveLingo.Core.Tests/stryker-config.json
+  s_6d6e9175f38e45::t_1fb4c74f9e4ae6 18-21
+tests/LiveLingo.Core.Tests/Translation/TranslationSchedulerTests.cs
+  s_6d6e9175f38e45::t_fb0488ccf67190 2
+src/LiveLingo.Core/Inference/LlamaServerAdapters.cs
+  s_6d6e9175f38e45::t_ae2c9d3f52cebe 1-37
+src/LiveLingo.Core/Inference/LlamaServerHost.cs
+  s_6d6e9175f38e45::t_36214fabf69526 59,63,78,88,160,163,239,272
+  s_6d6e9175f38e45::t_df07d6509a1166 1-58,60-62,64-77,79-87,89-159,161-162,164-238,240-271,273-281
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "282963ba92bf52b2e29a92ebdbf31227fdab55b8",
+  "prompts": {},
+  "sessions": {
+    "s_6d6e9175f38e45": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "f74d37e5-1d96-4ddc-a3f9-5ae24ff39e38",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
