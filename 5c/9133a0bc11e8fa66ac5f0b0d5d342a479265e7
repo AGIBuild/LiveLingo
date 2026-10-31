@@ -1,0 +1,51 @@
+src/LiveLingo.Desktop/Settings/SettingsViewModel.cs
+  s_6d6e9175f38e45::t_4be360185b8463 1-63
+src/LiveLingo.Desktop/Resources/i18n/en-US.json
+  s_6d6e9175f38e45::t_84f46a487c052a 53-64
+src/LiveLingo.Desktop/Services/Configuration/SettingsModel.cs
+  s_6d6e9175f38e45::t_4be360185b8463 12,23,36-44
+  s_6d6e9175f38e45::t_a9dc55a83ee3ce 45-46
+src/LiveLingo.Core/Translation/Glossary.cs
+  s_6d6e9175f38e45::t_a8797221ca37da 1-84
+tests/LiveLingo.Desktop.Tests/Settings/SettingsViewModelTests.cs
+  s_6d6e9175f38e45::t_4be360185b8463 1-115
+tests/LiveLingo.Core.Tests/Translation/TranslationSchedulerTests.cs
+  s_6d6e9175f38e45::t_ed925ecf9f7740 49-50,105-120
+  s_6d6e9175f38e45::t_2f4ce2c5722818 121
+tests/LiveLingo.Core.Tests/Translation/GlossaryTests.cs
+  s_6d6e9175f38e45::t_a8797221ca37da 1-52
+src/LiveLingo.Desktop/Settings/SettingsWindow.axaml.cs
+  s_6d6e9175f38e45::t_84f46a487c052a 1-31
+src/LiveLingo.Desktop/Resources/i18n/zh-CN.json
+  s_6d6e9175f38e45::t_84f46a487c052a 53-64
+src/LiveLingo.Desktop/App.axaml.cs
+  s_6d6e9175f38e45::t_b82f173e629c89 15,38,125-127,162-164,173,210,213-214,216,226,243-257,275
+src/LiveLingo.Core/Translation/TranslationScheduler.cs
+  s_6d6e9175f38e45::t_ed925ecf9f7740 17,36-37,39,139
+src/LiveLingo.Desktop/Settings/SettingsWindow.axaml
+  s_6d6e9175f38e45::t_84f46a487c052a 1-28,30-39
+  s_6d6e9175f38e45::t_5e6e7871eb15fa 29
+tests/LiveLingo.Desktop.Tests/Services/Localization/LocalizationServiceTests.cs
+  s_6d6e9175f38e45::t_25d13d2420a9d3 218-229
+tests/LiveLingo.Desktop.Tests/Settings/SettingsWindowTests.cs
+  s_6d6e9175f38e45::t_25d13d2420a9d3 1-26,28-35
+  s_6d6e9175f38e45::t_5e6e7871eb15fa 27
+docs/superpowers/plans/2026-10-31-composer-implementation.md
+  s_6d6e9175f38e45::t_284e8b00505738 54-61
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5c9133a0bc11e8fa66ac5f0b0d5d342a479265e7",
+  "prompts": {},
+  "sessions": {
+    "s_6d6e9175f38e45": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "f74d37e5-1d96-4ddc-a3f9-5ae24ff39e38",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
