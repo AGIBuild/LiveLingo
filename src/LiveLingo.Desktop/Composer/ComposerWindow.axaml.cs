@@ -29,28 +29,26 @@ public partial class ComposerWindow : Window
         throw new InvalidOperationException("ComposerWindow needs a view model.");
     }
 
-    public ComposerWindow(
-        ComposerViewModel vm,
-        ComposerTexts texts,
-        TargetWindowInfo? target,
-        string copyLabel,
-        string writeLabel,
-        string originalLabel,
-        string placeholder,
-        string retryLabel)
+    public ComposerWindow(ComposerViewModel vm, ComposerTexts texts, TargetWindowInfo? target)
     {
         InitializeComponent();
         _vm = vm;
         _texts = texts;
         _target = target;
-        _retryLabel = retryLabel;
+        _retryLabel = texts.RetryLabel;
         DataContext = vm;
 
-        CopyButton.Content = copyLabel;
-        WriteButton.Content = writeLabel;
-        OriginalButton.Content = originalLabel;
-        SourceBox.Watermark = placeholder;
+        CopyButton.Content = texts.CopyLabel;
+        WriteButton.Content = texts.WriteLabel;
+        CleanButton.Content = texts.CleanLabel;
+        OriginalButton.Content = texts.OriginalLabel;
+        SourceBox.Watermark = texts.Placeholder;
+        Avalonia.Controls.ToolTip.SetTip(MicButton, texts.MicLabel);
+        Avalonia.Automation.AutomationProperties.SetName(MicButton, texts.MicLabel);
 
+        MicButton.AddHandler(PointerPressedEvent, OnMicPressed, RoutingStrategies.Tunnel);
+        MicButton.AddHandler(PointerReleasedEvent, OnMicReleased, RoutingStrategies.Tunnel);
+        MicButton.AddHandler(KeyDownEvent, OnMicKeyDown, RoutingStrategies.Tunnel);
         vm.PropertyChanged += OnViewModelChanged;
         vm.Completed += Close;
         vm.CloseRequested += Close;
@@ -76,10 +74,11 @@ public partial class ComposerWindow : Window
     {
         TargetText.Text = _texts.Target(_vm.TargetName, _vm.HasTarget);
         TranslateButton.Content = _texts.TranslateLabel(_vm.TargetLanguage);
-        var translating = _vm.Output == ComposerOutput.Translate;
-        TranslateButton.Classes.Set("active", translating);
-        OriginalButton.Classes.Set("active", !translating);
-        SwapButton.IsVisible = translating;
+        CleanButton.Classes.Set("active", _vm.Output == ComposerOutput.Clean);
+        TranslateButton.Classes.Set("active", _vm.Output == ComposerOutput.Translate);
+        OriginalButton.Classes.Set("active", _vm.Output == ComposerOutput.Original);
+        SwapButton.IsVisible = _vm.Output == ComposerOutput.Translate;
+        MicButton.Classes.Set("listening", _vm.IsListening || _vm.IsStartingListening);
 
         StatusText.Text = _texts.Status(_vm.Status, _vm.IsWriteQueued);
         CopyButton.IsEnabled = _vm.CanCopy;
@@ -122,13 +121,42 @@ public partial class ComposerWindow : Window
         }
     }
 
+    private void OnCleanClick(object? sender, RoutedEventArgs e) => _vm.Output = ComposerOutput.Clean;
+
+    private async void OnMicPressed(object? sender, PointerPressedEventArgs e)
+    {
+        e.Handled = true;
+        await _vm.PressMicAsync();
+    }
+
+    private async void OnMicReleased(object? sender, PointerReleasedEventArgs e)
+    {
+        e.Handled = true;
+        await _vm.ReleaseMicAsync();
+    }
+
+    private async void OnMicKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key is not (Key.Space or Key.Enter))
+            return;
+
+        e.Handled = true;
+        await _vm.ToggleListeningCommand.ExecuteAsync(null);
+    }
+
     private void OnTranslateClick(object? sender, RoutedEventArgs e) => _vm.Output = ComposerOutput.Translate;
 
     private void OnOriginalClick(object? sender, RoutedEventArgs e) => _vm.Output = ComposerOutput.Original;
 
     private void OnSwapClick(object? sender, RoutedEventArgs e) => _vm.SwapLanguageCommand.Execute(null);
 
-    private void OnBannerActionClick(object? sender, RoutedEventArgs e) => _vm.DownloadModelsCommand.Execute(null);
+    private void OnBannerActionClick(object? sender, RoutedEventArgs e)
+    {
+        if (_vm.Banner.Kind == BannerKind.MicrophoneDenied)
+            _vm.OpenMicrophoneSettingsCommand.Execute(null);
+        else
+            _vm.DownloadModelsCommand.Execute(null);
+    }
 
     private void OnRetryClick(object? sender, RoutedEventArgs e)
     {

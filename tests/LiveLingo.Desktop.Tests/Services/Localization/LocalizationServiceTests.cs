@@ -206,7 +206,14 @@ public class LocalizationServiceTests
             "composer.banner.downloadFailed",
             "composer.banner.downloadRetry",
             "composer.banner.targetLost",
-            "composer.banner.writeFailed"
+            "composer.banner.writeFailed",
+            "composer.output.clean",
+            "composer.status.listening",
+            "composer.status.starting",
+            "composer.mic",
+            "composer.banner.micDenied",
+            "composer.banner.micDeniedAction",
+            "composer.banner.noMic"
         ];
         foreach (var key in criticalKeys)
         {

@@ -22,6 +22,8 @@ public class ComposerTextsTests
     [InlineData(ComposerStatus.Ready, false, "[composer.status.ready]")]
     [InlineData(ComposerStatus.Failed, false, "[composer.status.failed]")]
     [InlineData(ComposerStatus.Working, true, "[composer.status.queued]")]
+    [InlineData(ComposerStatus.Starting, false, "[composer.status.starting]")]
+    [InlineData(ComposerStatus.Listening, false, "[composer.status.listening]")]
     public void Status_IsLocalized_AndQueuedWins(ComposerStatus status, bool queued, string expected)
     {
         Assert.Equal(expected, Create().Status(status, queued));
@@ -47,6 +49,8 @@ public class ComposerTextsTests
     [InlineData(BannerKind.DownloadFailed, "disk full", 0, "[composer.banner.downloadFailed:disk full]", "[composer.banner.downloadRetry]")]
     [InlineData(BannerKind.TargetLost, "", 0, "[composer.banner.targetLost]", "")]
     [InlineData(BannerKind.WriteFailed, "no focus", 0, "[composer.banner.writeFailed:no focus]", "")]
+    [InlineData(BannerKind.MicrophoneDenied, "", 0, "[composer.banner.micDenied]", "[composer.banner.micDeniedAction]")]
+    [InlineData(BannerKind.NoMicrophone, "no device", 0, "[composer.banner.noMic:no device]", "")]
     public void Banner_ProvidesMessageAndAction(BannerKind kind, string detail, double progress, string message, string action)
     {
         var texts = Create();
@@ -74,5 +78,19 @@ public class ComposerTextsTests
         Assert.Equal("boom", texts.Line(new ResultLine(0, "", LineState.Failed, "boom")));
         Assert.Equal("[composer.result.empty]", texts.Line(new ResultLine(0, "", LineState.Empty, "")));
         Assert.Equal("", texts.Line(new ResultLine(0, "", LineState.Pending, "")));
+    }
+
+    [Fact]
+    public void Labels_AreLocalized()
+    {
+        var texts = Create();
+
+        Assert.Equal("[composer.output.clean]", texts.CleanLabel);
+        Assert.Equal("[composer.output.original]", texts.OriginalLabel);
+        Assert.Equal("[composer.copy]", texts.CopyLabel);
+        Assert.Equal("[composer.write]", texts.WriteLabel);
+        Assert.Equal("[composer.retry]", texts.RetryLabel);
+        Assert.Equal("[composer.placeholder]", texts.Placeholder);
+        Assert.Equal("[composer.mic]", texts.MicLabel);
     }
 }

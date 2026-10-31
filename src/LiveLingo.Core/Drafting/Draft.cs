@@ -197,6 +197,10 @@ public sealed class Draft
         return string.IsNullOrWhiteSpace(result.Text) ? UnitState.Empty : UnitState.Ready;
     }
 
+    /// <summary>What the user said or wrote, in order: the units' original text and then the live hypothesis.</summary>
+    public string SourceText() =>
+        TextUnits.Join(_units.Select(unit => (unit.Lead, unit.Raw, unit.Trail)).Append(("", Pending, "")));
+
     public string Text() =>
         TextUnits.Join(_units.Select(unit => (unit.Lead, BodyOf(unit, Output), unit.Trail)));
 

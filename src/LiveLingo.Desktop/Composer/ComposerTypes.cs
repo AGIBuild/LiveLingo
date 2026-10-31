@@ -3,6 +3,8 @@ namespace LiveLingo.Desktop.Composer;
 /// <summary>The output pill: what is written into the target.</summary>
 public enum ComposerOutput
 {
+    /// <summary>The cleaned-up text: fillers, repetitions and homophone errors fixed, meaning untouched.</summary>
+    Clean,
     Translate,
     Original
 }
@@ -11,6 +13,12 @@ public enum ComposerStatus
 {
     /// <summary>Nothing typed yet.</summary>
     Empty,
+
+    /// <summary>The microphone was pressed and the speech models are loading.</summary>
+    Starting,
+
+    /// <summary>The microphone is open and speech is being recognized.</summary>
+    Listening,
 
     /// <summary>The selected output is still being produced.</summary>
     Working,
@@ -46,7 +54,13 @@ public enum BannerKind
     TargetLost,
 
     /// <summary>Writing into the target failed; the result can still be copied.</summary>
-    WriteFailed
+    WriteFailed,
+
+    /// <summary>The system denied microphone access; the banner offers to open the settings.</summary>
+    MicrophoneDenied,
+
+    /// <summary>There is no input device or it could not be opened.</summary>
+    NoMicrophone
 }
 
 /// <param name="Detail">Size, error text or other detail for the view to show next to the localized message.</param>

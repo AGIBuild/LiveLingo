@@ -35,11 +35,18 @@
   "composer.write": "Write",
   "composer.retry": "Retry",
   "composer.result.empty": "(empty)",
-  "composer.banner.modelMissing": "Translation needs a local model first (about {0}). It is downloaded only if you agree.",
+  "composer.banner.modelMissing": "A local model must be downloaded first (about {0}). It is downloaded only if you agree.",
   "composer.banner.download": "Download",
-  "composer.banner.downloading": "Downloading the translation model {0}%",
+  "composer.banner.downloading": "Downloading models {0}%",
   "composer.banner.downloadFailed": "Download failed: {0}",
   "composer.banner.downloadRetry": "Retry",
   "composer.banner.targetLost": "The original input window is gone; you can still copy the result.",
-  "composer.banner.writeFailed": "Writing failed: {0}. The result is kept; you can copy it."
+  "composer.banner.writeFailed": "Writing failed: {0}. The result is kept; you can copy it.",
+  "composer.output.clean": "Clean",
+  "composer.status.listening": "Listening…",
+  "composer.status.starting": "Loading speech models…",
+  "composer.mic": "Tap to start or stop, hold to talk",
+  "composer.banner.micDenied": "Microphone access is off. Allow LiveLingo to use the microphone in System Settings.",
+  "composer.banner.micDeniedAction": "Open Settings",
+  "composer.banner.noMic": "Cannot use the microphone: {0}"
 }
