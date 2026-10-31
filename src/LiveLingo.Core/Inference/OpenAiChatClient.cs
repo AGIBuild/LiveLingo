@@ -24,6 +24,8 @@ public sealed class OpenAiChatClient(HttpClient http) : IChatCompletionClient
         {
             Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json")
         };
+        // llama-server drops idle keep-alive sockets; reusing one fails the next request with a connection error.
+        message.Headers.ConnectionClose = true;
         using var response = await http.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 

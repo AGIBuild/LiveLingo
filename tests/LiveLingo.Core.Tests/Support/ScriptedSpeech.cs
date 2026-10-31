@@ -21,6 +21,8 @@ public sealed class ScriptedLive : ILiveRecognizer
     /// <summary>How many times the stream was reset. A short pause must not reset it.</summary>
     public int Closes { get; private set; }
 
+    public bool Disposed { get; private set; }
+
     public string CurrentText
     {
         get
@@ -49,7 +51,7 @@ public sealed class ScriptedLive : ILiveRecognizer
         return text;
     }
 
-    public void Dispose() { }
+    public void Dispose() => Disposed = true;
 }
 
 public sealed class ScriptedVad : IVoiceActivityDetector
@@ -60,6 +62,8 @@ public sealed class ScriptedVad : IVoiceActivityDetector
     private int _next;
 
     public ScriptedVad(IReadOnlyList<ScriptedSegment> script) => _script = script;
+
+    public bool Disposed { get; private set; }
 
     public void Accept(ReadOnlySpan<float> samples) => _total += samples.Length;
 
@@ -89,15 +93,16 @@ public sealed class ScriptedVad : IVoiceActivityDetector
         // The script never leaves speech unreported once its silence has been pushed.
     }
 
-    public void Dispose() { }
+    public void Dispose() => Disposed = true;
 }
 
 public sealed class ScriptedSegmentRecognizer : ISegmentRecognizer
 {
     private readonly Func<string> _next;
     public ScriptedSegmentRecognizer(Func<string> next) => _next = next;
+    public bool Disposed { get; private set; }
     public string Recognize(ReadOnlySpan<float> samples) => _next();
-    public void Dispose() { }
+    public void Dispose() => Disposed = true;
 }
 
 /// <summary>Returns fixed text and remembers how much audio each call received.</summary>

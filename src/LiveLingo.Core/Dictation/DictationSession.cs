@@ -104,7 +104,23 @@ public sealed class DictationSession : IAsyncDisposable
             return _stopTask ??= Task.Run(StopCoreAsync);
     }
 
-    public async ValueTask DisposeAsync() => await StopAsync().ConfigureAwait(false);
+    /// <summary>
+    /// Stops the session and releases the recognizers it was given. If a worker is still decoding after the stop
+    /// timeout, they are released as soon as it finishes: native recognizers must not be freed while in use.
+    /// </summary>
+    public async ValueTask DisposeAsync()
+    {
+        await StopAsync().ConfigureAwait(false);
+        _ = Task.WhenAll(_recognitionTask, _secondPassTask).ContinueWith(
+            _ => ReleaseRecognizers(), TaskScheduler.Default);
+    }
+
+    private void ReleaseRecognizers()
+    {
+        _live.Dispose();
+        _vad.Dispose();
+        _secondPass?.Dispose();
+    }
 
     // ---- recognition worker -------------------------------------------------
 

@@ -15,6 +15,8 @@ public class DictationSessionTests
         public ScriptedLive Live { get; }
         public DictationSession Session { get; }
 
+        public ScriptedVad Vad { get; }
+
         public Harness(
             IReadOnlyList<ScriptedSegment> script,
             ISegmentRecognizer? secondPass = null,
@@ -24,8 +26,9 @@ public class DictationSessionTests
             int stopTimeoutMs = 5000)
         {
             Live = new ScriptedLive(script);
+            Vad = new ScriptedVad(script);
             Session = new DictationSession(
-                Live, new ScriptedVad(script), secondPass, Draft,
+                Live, Vad, secondPass, Draft,
                 new DictationOptions
                 {
                     HardPauseMs = hardPauseMs,
@@ -314,5 +317,35 @@ public class DictationSessionTests
 
         Assert.Equal(2, h.Raws.Count);
         Assert.Equal("我改过的。", h.Draft.Read(d => d.Units[0].Clean.Text));
+    }
+
+    [Fact]
+    public async Task Dispose_ReleasesTheRecognizersItWasGiven()
+    {
+        var secondPass = new ScriptedSegmentRecognizer(() => "好的。");
+        var h = new Harness([A], secondPass);
+        h.Push(2800);
+
+        await h.DisposeAsync();
+
+        Assert.True(h.Live.Disposed);
+        Assert.True(h.Vad.Disposed);
+        Assert.True(secondPass.Disposed);
+    }
+
+    [Fact]
+    public async Task Dispose_WaitsForASlowSecondPassBeforeReleasingTheNativeRecognizers()
+    {
+        var release = new ManualResetEventSlim();
+        var secondPass = new ScriptedSegmentRecognizer(() => { release.Wait(5000); return "好的。"; });
+        var h = new Harness([A], secondPass, stopTimeoutMs: 200);
+        h.Push(2800);
+
+        await h.DisposeAsync();
+        Assert.False(secondPass.Disposed);
+
+        release.Set();
+        Assert.True(await Until(() => secondPass.Disposed));
+        Assert.True(h.Live.Disposed);
     }
 }

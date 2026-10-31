@@ -1,4 +1,5 @@
 using LiveLingo.Core.Cleanup;
+using LiveLingo.Core.Dictation;
 using LiveLingo.Core.Inference;
 using LiveLingo.Core.Models;
 using LiveLingo.Core.Translation;
@@ -22,6 +23,7 @@ public class ServiceCollectionExtensionsTests
         Assert.NotNull(sp.GetService<LlamaServerHost>());
         Assert.IsType<LlmTranslator>(sp.GetService<ITranslator>());
         Assert.IsType<LlmTextCleaner>(sp.GetService<ITextCleaner>());
+        Assert.NotNull(sp.GetService<IDictationSessionFactory>());
     }
 
     [Fact]

@@ -39,6 +39,18 @@
 5. **镜像回退**：删除了旧代码里“Hugging Face 不可达时自动改走 hf-mirror.com”的隐式回退；只用用户显式配置的镜像。
 6. **已知风险**：应用崩溃（非正常退出）会留下孤儿 llama-server 进程；需要在 M1 验收中确认并加启动时清理或父进程监控。
 
+## M2 进度（随实施更新）
+
+| 任务 | 状态 | 说明 |
+|---|---|---|
+| 2.3 DictationSession → Draft | 完成 | 17 个行为测试（POC 的音频侧用例逐条移植）；分句复用唯一的 `TextUnits`（新增 `；`、`…`、连续终结符）；识别器由会话持有并释放 |
+| 2.4 CleanupScheduler + FidelityGate | 完成 | 门禁 23 个测试原样移植；调度含“后文等待 2 s”、服务级失败整体失败、用户编辑优先 |
+| 2.4 整理改走 llama-server（S2） | **完成，结论：可用** | 117 句对照：门禁一致 109/117（93%）；双方都通过时文本逐字相同 80/98（82%，差异多为空格与标点）；拒绝 14 vs POC 16；均值 649 ms/句（M3 Pro）。过程中发现并修复：连接复用导致 5/117 请求失败（现每次请求 `Connection: close`） |
+| 2.1 麦克风 / 权限 | 部分 | `IMicrophone`（PortAudio，唯一实现）与 `IMicrophonePermission`（macOS AVFoundation / Windows 注册表）已建；**未在真机上验证采集与权限提示** |
+| 2.2 Sherpa 适配器 | 部分 | X-ASR 流式、Qwen3-ASR、Silero 已迁入 Core 并登记带 SHA256 的目录；`SherpaDictationSessionFactory` 已建；**未用真实音频回放对照 POC（S4）** |
+| 2.5 交互与横幅 | 未做 | 麦克风点按 / 按住、录音中实时文字、语音模型下载横幅 |
+| 2.6 回放对照 | 未做 | 需把 POC 回放工具接到新管线 |
+
 ## M0 地基
 
 ### Task 0.1 分支与基线提交
