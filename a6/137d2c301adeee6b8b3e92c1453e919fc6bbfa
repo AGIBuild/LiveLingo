@@ -1,0 +1,53 @@
+tests/LiveLingo.Desktop.Tests/Composer/ComposerWindowTests.cs
+  s_6d6e9175f38e45::t_e96804825cb411 14-15,21,175-187
+  s_6d6e9175f38e45::t_830f868281cc64 188-190
+tests/LiveLingo.Desktop.Tests/Composer/ComposerTextsTests.cs
+  s_6d6e9175f38e45::t_aec297967e7a84 55-56
+  s_6d6e9175f38e45::t_af3291329fe638 87-95
+  s_6d6e9175f38e45::t_011790504c6120 118
+  s_6d6e9175f38e45::t_c5e6b999f18be5 86
+src/LiveLingo.Desktop/Resources/i18n/en-US.json
+  s_6d6e9175f38e45::t_223c28086e419b 60-61
+tests/LiveLingo.Desktop.Tests/Composer/RecentDraftsTests.cs
+  s_6d6e9175f38e45::t_6a6d0300af851f 1-99
+tests/LiveLingo.Desktop.Tests/Services/Localization/LocalizationServiceTests.cs
+  s_6d6e9175f38e45::t_f5754cb4c707bf 225-226
+tests/LiveLingo.Desktop.Tests/Composer/ComposerImportTests.cs
+  s_6d6e9175f38e45::t_a55fdd949ef1be 149,221,239
+src/LiveLingo.Desktop/Composer/ComposerWindow.axaml.cs
+  s_6d6e9175f38e45::t_bbe27cbb6198c8 34,42,48,52-53,150-168
+  s_6d6e9175f38e45::t_6b93e04ff8af7d 169-170
+src/LiveLingo.Desktop/Composer/ComposerViewModel.cs
+  s_6d6e9175f38e45::t_b383921629555d 504
+src/LiveLingo.Desktop/Composer/ComposerTexts.cs
+  s_6d6e9175f38e45::t_32d678b4798955 42-51
+src/LiveLingo.Desktop/Resources/i18n/zh-CN.json
+  s_6d6e9175f38e45::t_f17728f2647031 60-61
+src/LiveLingo.Desktop/Composer/RecentDrafts.cs
+  s_6d6e9175f38e45::t_8752f4fe63b73b 1-42
+src/LiveLingo.Desktop/App.axaml.cs
+  s_6d6e9175f38e45::t_776045997c4054 41,243,246,252
+src/LiveLingo.Desktop/Composer/ComposerWindow.axaml
+  s_6d6e9175f38e45::t_ac495e60f7b6c0 155,157-158
+  s_6d6e9175f38e45::t_48bcb781669600 218
+src/LiveLingo.Desktop/Composer/ComposerViewModel.Import.cs
+  s_6d6e9175f38e45::t_aad59ab16e82fc 27-28,49
+docs/superpowers/plans/2026-10-31-composer-implementation.md
+  s_6d6e9175f38e45::t_d728ba965ee362 61-64
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a6137d2c301adeee6b8b3e92c1453e919fc6bbfa",
+  "prompts": {},
+  "sessions": {
+    "s_6d6e9175f38e45": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "f74d37e5-1d96-4ddc-a3f9-5ae24ff39e38",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
