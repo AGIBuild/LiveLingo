@@ -1,0 +1,100 @@
+src/LiveLingo.Desktop/Composer/ComposerTexts.cs
+  s_6d6e9175f38e45::t_03bf317d2ba003 60-61
+  s_6d6e9175f38e45::t_acbc1c2957cfd9 9,15-16,37-41
+tests/LiveLingo.Desktop.Tests/Services/Localization/LocalizationServiceTests.cs
+  s_6d6e9175f38e45::t_3fd4b325fe0017 219-226
+src/LiveLingo.Desktop/Composer/ComposerViewModel.cs
+  s_6d6e9175f38e45::t_7137e31b7e70b3 383-384,463
+  s_6d6e9175f38e45::t_242b13593cb540 492,498
+  s_6d6e9175f38e45::t_e0606cabf04780 514,518-523
+  s_6d6e9175f38e45::t_96919e50801f66 533,554-555
+  s_6d6e9175f38e45::t_dc812b10a33e8d 6,547
+  s_6d6e9175f38e45::t_195190b4015918 27,47
+  s_6d6e9175f38e45::t_3d12e3c9c934fd 60,187
+  s_6d6e9175f38e45::t_f860d31240ffed 295-296,316,331-333
+  s_6d6e9175f38e45::t_68de058f65c822 504-505
+  s_6d6e9175f38e45::t_fa9b41d241a2ec 524
+src/LiveLingo.Desktop/Resources/i18n/en-US.json
+  s_6d6e9175f38e45::t_5cb506b31abfcb 54-61
+src/LiveLingo.Core/Transcription/IAudioFileTranscriber.cs
+  s_6d6e9175f38e45::t_9c95eb5334c971 1-13
+src/LiveLingo.Core/Models/ModelCatalog.cs
+  s_6d6e9175f38e45::t_aab7ad46dfce0f 118-120
+src/LiveLingo.Core/Speech/Native/SherpaAudioFileTranscriber.cs
+  s_6d6e9175f38e45::t_8b3e2eab371177 1-30
+src/LiveLingo.Desktop/Composer/ComposerTypes.cs
+  s_6d6e9175f38e45::t_2de213b30c8a4a 72-73
+  s_6d6e9175f38e45::t_9c66ce41213a37 23-25,45-46
+  s_6d6e9175f38e45::t_5160112634cdc3 70-71,74-76
+tests/LiveLingo.Desktop.Tests/Composer/ComposerWindowTests.cs
+  s_6d6e9175f38e45::t_eaee01bf6624d3 173-198
+tests/LiveLingo.Desktop.Tests/Composer/ComposerImportTests.cs
+  s_6d6e9175f38e45::t_f7876f115336c6 1-59,94-174,176-241
+  s_6d6e9175f38e45::t_7852883d6a1caa 60-93,175
+tests/LiveLingo.Core.Tests/Transcription/SrtWriterTests.cs
+  s_6d6e9175f38e45::t_295f7b46cf7d26 1-43
+src/LiveLingo.Core/Transcription/FileTranscriber.cs
+  s_6d6e9175f38e45::t_21a8f1bdf6ee18 11-19,28-40,48-54,69-87
+  s_6d6e9175f38e45::t_85c2834e2a9ab5 1-10,20-27,41-47,55-68,88-89
+src/LiveLingo.Core/Transcription/WavReader.cs
+  s_6d6e9175f38e45::t_a90c72c7f58cca 1-133
+tests/LiveLingo.Core.Tests/Transcription/WavReaderTests.cs
+  s_6d6e9175f38e45::t_b6e1cc3f0efec5 1-145
+tests/LiveLingo.Core.Tests/Transcription/FileTranscriberTests.cs
+  s_6d6e9175f38e45::t_261d29f58544f4 52,58,60-63
+  s_6d6e9175f38e45::t_0b13c92af16e99 1-51,53-57,59,64-66,86-130
+  s_6d6e9175f38e45::t_d5590b38badc5b 80
+  s_6d6e9175f38e45::t_57fc8742050038 67-79,81-85
+src/LiveLingo.Desktop/Resources/i18n/zh-CN.json
+  s_6d6e9175f38e45::t_2ae6d37e0caaba 54-61
+src/LiveLingo.Desktop/Composer/ComposerWindow.axaml
+  s_6d6e9175f38e45::t_1e489d7472a4f8 175-176,189-190,196-200,206,208,210,217-221
+src/LiveLingo.Desktop/Composer/ComposerWindow.axaml.cs
+  s_6d6e9175f38e45::t_1a0530f5046b89 18-22,27-29,34,54-55
+  s_6d6e9175f38e45::t_17679e1e89ee6a 6,109-110,112-113,115-132,142-168
+  s_6d6e9175f38e45::t_25f3ec29c301f0 94
+tests/LiveLingo.Desktop.Tests/Composer/ComposerHarness.cs
+  s_6d6e9175f38e45::t_611ca7f752264d 126,161,163-164
+  s_6d6e9175f38e45::t_b842f8c1c00f76 5,13-27
+  s_6d6e9175f38e45::t_f7879edce4ea36 28
+src/LiveLingo.Desktop/Composer/ComposerViewModel.Import.cs
+  s_6d6e9175f38e45::t_74577877ae8e4d 1-89,91-124,141
+  s_6d6e9175f38e45::t_4ae1ac3f763b2f 90,125-140
+src/LiveLingo.Core/Transcription/SrtWriter.cs
+  s_6d6e9175f38e45::t_1ab4e460762a11 1-29
+tests/LiveLingo.Core.Tests/Probes/TranscriptionProbeTests.cs
+  s_6d6e9175f38e45::t_649cfc25dffb05 1-46
+src/LiveLingo.Desktop/App.axaml.cs
+  s_6d6e9175f38e45::t_611ca7f752264d 14
+  s_6d6e9175f38e45::t_dbbb1eb3de25d6 237
+  s_6d6e9175f38e45::t_fe1268058164df 252
+src/LiveLingo.Core/ServiceCollectionExtensions.cs
+  s_6d6e9175f38e45::t_aabbd86bfaa88c 72
+  s_6d6e9175f38e45::t_32fa102a5424e5 7
+tests/LiveLingo.Desktop.Tests/Composer/ComposerVoiceTests.cs
+  s_6d6e9175f38e45::t_958065c94f2edd 266-267
+src/LiveLingo.Desktop/Composer/ComposerModelPlan.cs
+  s_6d6e9175f38e45::t_eb1d648a5346b1 5,9-10,25-26
+src/LiveLingo.Core/Transcription/TimedSegment.cs
+  s_6d6e9175f38e45::t_7222771eb130fc 1-4
+tests/LiveLingo.Desktop.Tests/Composer/ScratchShotTests.cs
+  s_6d6e9175f38e45::t_3e60a679d24a2d 1-37
+tests/LiveLingo.Desktop.Tests/TestAppBuilder.cs
+  s_6d6e9175f38e45::t_972bb1b73028d1 14-15
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e4e753b64f5de1774002541bad3f5cc9de6b5695",
+  "prompts": {},
+  "sessions": {
+    "s_6d6e9175f38e45": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "f74d37e5-1d96-4ddc-a3f9-5ae24ff39e38",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
