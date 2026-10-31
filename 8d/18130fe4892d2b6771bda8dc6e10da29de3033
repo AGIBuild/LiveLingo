@@ -1,0 +1,21 @@
+tests/LiveLingo.Core.Tests/Drafting/TextUnitsTests.cs
+  s_6d6e9175f38e45::t_9029f5ade80971 1-136
+src/LiveLingo.Core/Drafting/TextUnits.cs
+  s_6d6e9175f38e45::t_18b98d73c79ab0 2,7,9-102,105,125-144,146-148,150-151,153-154
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8d18130fe4892d2b6771bda8dc6e10da29de3033",
+  "prompts": {},
+  "sessions": {
+    "s_6d6e9175f38e45": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "f74d37e5-1d96-4ddc-a3f9-5ae24ff39e38",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
