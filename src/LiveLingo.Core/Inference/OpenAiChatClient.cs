@@ -4,7 +4,19 @@ using System.Text.Json;
 
 namespace LiveLingo.Core.Inference;
 
-public sealed class OpenAiChatClient(HttpClient http) : IChatCompletionClient
+/// <param name="endpoint">The full chat-completions URL (for example <c>http://127.0.0.1:8080/v1/chat/completions</c>).</param>
+/// <param name="model">Model or deployment name; local llama-server serves one model and needs none.</param>
+/// <param name="bearerToken">API key sent as a bearer token; null for the local server.</param>
+/// <param name="sendProviderExtras">
+/// Whether <see cref="ChatRequest.Extra"/> is sent. Those fields are llama-server sampling options that hosted
+/// OpenAI-compatible services reject.
+/// </param>
+public sealed class OpenAiChatClient(
+    HttpClient http,
+    Uri endpoint,
+    string? model = null,
+    string? bearerToken = null,
+    bool sendProviderExtras = true) : IChatCompletionClient
 {
     public async Task<ChatCompletion> CompleteAsync(ChatRequest request, CancellationToken ct)
     {
@@ -12,7 +24,7 @@ public sealed class OpenAiChatClient(HttpClient http) : IChatCompletionClient
         var messages = request.System is null
             ? new[] { new { role = "user", content = request.Prompt } }
             : [new { role = "system", content = request.System }, new { role = "user", content = request.Prompt }];
-        var payload = new Dictionary<string, object>(request.Extra)
+        var payload = new Dictionary<string, object>(sendProviderExtras ? request.Extra : new Dictionary<string, object>())
         {
             ["messages"] = messages,
             ["stream"] = true,
@@ -20,12 +32,16 @@ public sealed class OpenAiChatClient(HttpClient http) : IChatCompletionClient
             ["temperature"] = request.Temperature,
             ["max_tokens"] = request.MaxTokens
         };
-        using var message = new HttpRequestMessage(HttpMethod.Post, "v1/chat/completions")
+        if (model is not null)
+            payload["model"] = model;
+        using var message = new HttpRequestMessage(HttpMethod.Post, endpoint)
         {
             Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json")
         };
         // llama-server drops idle keep-alive sockets; reusing one fails the next request with a connection error.
         message.Headers.ConnectionClose = true;
+        if (bearerToken is not null)
+            message.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", bearerToken);
         using var response = await http.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 

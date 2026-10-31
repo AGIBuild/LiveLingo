@@ -16,8 +16,10 @@ public sealed record ComposerModelPlan(
         _ => throw new ArgumentOutOfRangeException(nameof(output))
     };
 
-    public static ComposerModelPlan Create(TranslatorTier tier) => new(
-        [ModelCatalog.LlamaRuntime, ModelCatalog.Cleaner],
-        [ModelCatalog.LlamaRuntime, ModelCatalog.Translator(tier)],
+    /// <param name="cleanInCloud">Cleanup runs on the user's cloud endpoint, so no local cleaner is needed.</param>
+    /// <param name="translateInCloud">Translation runs on the user's cloud endpoint, so no local translator is needed.</param>
+    public static ComposerModelPlan Create(TranslatorTier tier, bool cleanInCloud, bool translateInCloud) => new(
+        cleanInCloud ? [] : [ModelCatalog.LlamaRuntime, ModelCatalog.Cleaner],
+        translateInCloud ? [] : [ModelCatalog.LlamaRuntime, ModelCatalog.Translator(tier)],
         ModelCatalog.Speech);
 }

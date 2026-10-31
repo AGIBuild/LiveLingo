@@ -60,6 +60,16 @@
   "settings.quality": "使用质量档翻译模型（7B，约 4.6 GB，需要更多内存；默认的 1.8B 约 1.1 GB）",
   "settings.glossary": "术语表",
   "settings.glossary.hint": "每行一个。只写词，表示原样保留（语音识别、整理和保真检查都会用）；写“中文=English”还会固定译法。以 # 开头的行是注释。",
+  "settings.cloud": "云端模型（可选）",
+  "settings.cloud.hint": "默认关闭，一切都留在本机。打开某个开关后，只有该步骤的文字会发送到你自己的端点（兼容 OpenAI，例如 Microsoft Foundry），不会发送音频。",
+  "settings.cloud.translate": "翻译使用云端",
+  "settings.cloud.clean": "整理使用云端",
+  "settings.cloud.baseUrl": "端点（https，到版本路径为止，例如 …/openai/v1）",
+  "settings.cloud.model": "模型或部署名称",
+  "settings.cloud.apiKey": "API 密钥（保存在系统密钥库）",
+  "settings.cloud.keyStored": "已保存密钥。留空表示继续使用。",
+  "settings.cloud.forget": "删除密钥并关闭云端",
+  "settings.cloud.invalid": "使用云端需要填写 https 端点、模型名称和 API 密钥。",
   "settings.save": "保存",
   "settings.cancel": "取消"
 }

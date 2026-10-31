@@ -6,6 +6,7 @@ using Avalonia.Platform;
 using Avalonia.Threading;
 using LiveLingo.Core;
 using LiveLingo.Core.Cleanup;
+using LiveLingo.Core.Cloud;
 using LiveLingo.Core.Dictation;
 using LiveLingo.Core.Drafting;
 using LiveLingo.Core.Inference;
@@ -16,6 +17,7 @@ using LiveLingo.Desktop.Settings;
 using LiveLingo.Desktop.Platform;
 using LiveLingo.Desktop.Platform.macOS;
 using LiveLingo.Desktop.Platform.Windows;
+using LiveLingo.Desktop.Services.Cloud;
 using LiveLingo.Desktop.Services.Configuration;
 using LiveLingo.Desktop.Services.Localization;
 using LiveLingo.Desktop.Services.Update;
@@ -82,6 +84,9 @@ public partial class App : Application
         {
             services.AddSingleton<ISecretStore, InMemorySecretStore>();
         }
+
+        // Registered after AddLiveLingoCore so it replaces the local-only default: roles go to the cloud only when the user enabled them.
+        services.AddSingleton<ICloudRoutes, SettingsCloudRoutes>();
 
         _serviceProvider = services.BuildServiceProvider();
         _serviceProvider.GetRequiredService<ServerPidRegistry>().ReapOrphans();
@@ -207,7 +212,8 @@ public partial class App : Application
 
         var services = _serviceProvider!;
         var context = SynchronizationContext.Current;
-        var glossary = Glossary.Parse(services.GetRequiredService<ISettingsService>().Current.Composer.Glossary);
+        var settings = services.GetRequiredService<ISettingsService>().Current;
+        var glossary = Glossary.Parse(settings.Composer.Glossary);
         var session = new DraftSession(hasTarget: target is not null, notifyOn: context);
         var scheduler = new TranslationScheduler(
             session, services.GetRequiredService<ITranslator>(), TargetLanguage.English, TailIdleDelay,
@@ -218,7 +224,10 @@ public partial class App : Application
         var vm = new ComposerViewModel(
             session,
             scheduler,
-            ComposerModelPlan.Create(services.GetRequiredService<CoreOptions>().TranslatorTier),
+            ComposerModelPlan.Create(
+                services.GetRequiredService<CoreOptions>().TranslatorTier,
+                cleanInCloud: settings.Cloud.Clean,
+                translateInCloud: settings.Cloud.Translate),
             services.GetRequiredService<IModelManager>(),
             services.GetRequiredService<IModelDownloadCoordinator>(),
             platform,
@@ -249,7 +258,7 @@ public partial class App : Application
         }
 
         var services = _serviceProvider!;
-        var vm = new SettingsViewModel(services.GetRequiredService<ISettingsService>());
+        var vm = new SettingsViewModel(services.GetRequiredService<ISettingsService>(), services.GetRequiredService<ISecretStore>());
         _settingsWindow = new SettingsWindow(vm, services.GetRequiredService<ILocalizationService>());
         _settingsWindow.Closed += (_, _) => _settingsWindow = null;
         _settingsWindow.Show();

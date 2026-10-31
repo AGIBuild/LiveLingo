@@ -225,6 +225,16 @@ public class LocalizationServiceTests
             "settings.quality",
             "settings.glossary",
             "settings.glossary.hint",
+            "settings.cloud",
+            "settings.cloud.hint",
+            "settings.cloud.translate",
+            "settings.cloud.clean",
+            "settings.cloud.baseUrl",
+            "settings.cloud.model",
+            "settings.cloud.apiKey",
+            "settings.cloud.keyStored",
+            "settings.cloud.forget",
+            "settings.cloud.invalid",
             "settings.save",
             "settings.cancel"
         ];

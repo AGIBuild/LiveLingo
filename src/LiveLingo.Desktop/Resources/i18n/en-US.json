@@ -60,6 +60,16 @@
   "settings.quality": "Use the quality translation model (7B, about 4.6 GB, needs more memory; the default 1.8B is about 1.1 GB)",
   "settings.glossary": "Glossary",
   "settings.glossary.hint": "One per line. A plain word is kept exactly as written (speech recognition, cleanup and the fidelity check use it); “中文=English” also fixes the translation. Lines starting with # are comments.",
+  "settings.cloud": "Cloud model (optional)",
+  "settings.cloud.hint": "Off by default: everything stays on this computer. When you turn a switch on, only the text of that step is sent to your own endpoint (OpenAI-compatible, e.g. Microsoft Foundry); audio is never sent.",
+  "settings.cloud.translate": "Translate in the cloud",
+  "settings.cloud.clean": "Clean up in the cloud",
+  "settings.cloud.baseUrl": "Endpoint (https, up to the version path, e.g. …/openai/v1)",
+  "settings.cloud.model": "Model or deployment name",
+  "settings.cloud.apiKey": "API key (stored in the system secret store)",
+  "settings.cloud.keyStored": "A key is stored. Leave the box empty to keep it.",
+  "settings.cloud.forget": "Remove key and turn cloud off",
+  "settings.cloud.invalid": "Enter an https endpoint, a model name and an API key to use the cloud.",
   "settings.save": "Save",
   "settings.cancel": "Cancel"
 }
