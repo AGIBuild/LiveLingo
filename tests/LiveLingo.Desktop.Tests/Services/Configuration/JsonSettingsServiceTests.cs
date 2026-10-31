@@ -20,7 +20,7 @@ public class JsonSettingsServiceTests : IDisposable
         var svc = new JsonSettingsService(_settingsPath);
         await svc.LoadAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal("Ctrl+Alt+T", svc.Current.Hotkeys.OverlayToggle);
+        Assert.Equal("Ctrl+Alt+T", svc.Current.Hotkeys.Summon);
     }
 
     [Fact]
@@ -29,13 +29,13 @@ public class JsonSettingsServiceTests : IDisposable
         var svc = new JsonSettingsService(_settingsPath);
         await svc.LoadAsync(TestContext.Current.CancellationToken);
         var replacement = svc.CloneCurrent();
-        replacement.Hotkeys.OverlayToggle = "Alt+X";
+        replacement.Hotkeys.Summon = "Alt+X";
         svc.Replace(replacement);
 
         var svc2 = new JsonSettingsService(_settingsPath);
         await svc2.LoadAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal("Alt+X", svc2.Current.Hotkeys.OverlayToggle);
+        Assert.Equal("Alt+X", svc2.Current.Hotkeys.Summon);
     }
 
     [Fact]
@@ -46,7 +46,7 @@ public class JsonSettingsServiceTests : IDisposable
         var svc = new JsonSettingsService(_settingsPath);
         await svc.LoadAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal("Ctrl+Alt+T", svc.Current.Hotkeys.OverlayToggle);
+        Assert.Equal("Ctrl+Alt+T", svc.Current.Hotkeys.Summon);
     }
 
     [Fact]
@@ -93,13 +93,13 @@ public class JsonSettingsServiceTests : IDisposable
         var svc = new JsonSettingsService(_settingsPath);
         await svc.LoadAsync(TestContext.Current.CancellationToken);
         var replacement = svc.CloneCurrent();
-        replacement.Translation.DefaultSourceLanguage = "ja";
+        replacement.Appearance.Language = "zh-CN";
         svc.Replace(replacement);
 
         var svc2 = new JsonSettingsService(_settingsPath);
         await svc2.LoadAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal("ja", svc2.Current.Translation.DefaultSourceLanguage);
+        Assert.Equal("zh-CN", svc2.Current.Appearance.Language);
     }
 
     [Fact]
@@ -109,27 +109,7 @@ public class JsonSettingsServiceTests : IDisposable
         await svc.SaveAsync(TestContext.Current.CancellationToken);
 
         var json = await File.ReadAllTextAsync(_settingsPath, TestContext.Current.CancellationToken);
-        Assert.Contains("overlayToggle", json);
-    }
-
-    [Fact]
-    public async Task Replace_StripsSecretsFromPersistedJson()
-    {
-        var svc = new JsonSettingsService(_settingsPath);
-        await svc.LoadAsync(TestContext.Current.CancellationToken);
-        var replacement = svc.CloneCurrent();
-        replacement.Translation.CloudProvider.ApiKey = "sk-secret";
-        replacement.Translation.CloudProvider.ApiKeySecretId = "cloud-slot";
-        replacement.Advanced.HuggingFaceToken = "hf-secret";
-        replacement.Advanced.HuggingFaceTokenSecretId = "hf-slot";
-
-        svc.Replace(replacement);
-
-        var json = await File.ReadAllTextAsync(_settingsPath, TestContext.Current.CancellationToken);
-        Assert.DoesNotContain("sk-secret", json, StringComparison.Ordinal);
-        Assert.DoesNotContain("hf-secret", json, StringComparison.Ordinal);
-        Assert.Contains("cloud-slot", json, StringComparison.Ordinal);
-        Assert.Contains("hf-slot", json, StringComparison.Ordinal);
+        Assert.Contains("summon", json);
     }
 
     [Fact]
@@ -137,9 +117,9 @@ public class JsonSettingsServiceTests : IDisposable
     {
         var json = """
         {
-            "schemaVersion": 2,
-            "hotkeys": { "overlayToggle": "Alt+X" },
-            "translation": { "defaultSourceLanguage": "ja" }
+            "schemaVersion": 3,
+            "hotkeys": { "summon": "Alt+X" },
+            "appearance": { "language": "zh-CN" }
         }
         """;
         await File.WriteAllTextAsync(_settingsPath, json, TestContext.Current.CancellationToken);
@@ -147,8 +127,8 @@ public class JsonSettingsServiceTests : IDisposable
         var svc = new JsonSettingsService(_settingsPath);
         await svc.LoadAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal("Alt+X", svc.Current.Hotkeys.OverlayToggle);
-        Assert.Equal("ja", svc.Current.Translation.DefaultSourceLanguage);
+        Assert.Equal("Alt+X", svc.Current.Hotkeys.Summon);
+        Assert.Equal("zh-CN", svc.Current.Appearance.Language);
     }
 
     [Fact]
@@ -156,8 +136,8 @@ public class JsonSettingsServiceTests : IDisposable
     {
         var json = """
         {
-            "hotkeys": { "overlayToggle": "Alt+X" },
-            "translation": { "defaultSourceLanguage": "ja" }
+            "hotkeys": { "summon": "Alt+X" },
+            "appearance": { "language": "zh-CN" }
         }
         """;
         await File.WriteAllTextAsync(_settingsPath, json, TestContext.Current.CancellationToken);
@@ -166,11 +146,11 @@ public class JsonSettingsServiceTests : IDisposable
         await svc.LoadAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(SettingsModel.CurrentSchemaVersion, svc.Current.SchemaVersion);
-        Assert.Equal("Ctrl+Alt+T", svc.Current.Hotkeys.OverlayToggle);
-        Assert.Equal("zh", svc.Current.Translation.DefaultSourceLanguage);
+        Assert.Equal("Ctrl+Alt+T", svc.Current.Hotkeys.Summon);
+        Assert.Equal("en-US", svc.Current.Appearance.Language);
 
         var persisted = await File.ReadAllTextAsync(_settingsPath, TestContext.Current.CancellationToken);
-        Assert.Contains("\"schemaVersion\": 2", persisted);
+        Assert.Contains("\"schemaVersion\": 3", persisted);
     }
 
     [Fact]
@@ -178,11 +158,11 @@ public class JsonSettingsServiceTests : IDisposable
     {
         var svc = new JsonSettingsService(_settingsPath);
         var replacement = new SettingsModel();
-        replacement.Hotkeys.OverlayToggle = "Alt+Z";
+        replacement.Hotkeys.Summon = "Alt+Z";
 
         svc.Replace(replacement);
 
-        Assert.Equal("Alt+Z", svc.Current.Hotkeys.OverlayToggle);
+        Assert.Equal("Alt+Z", svc.Current.Hotkeys.Summon);
     }
 
     [Fact]
@@ -192,9 +172,9 @@ public class JsonSettingsServiceTests : IDisposable
         await svc.LoadAsync(TestContext.Current.CancellationToken);
 
         var clone = svc.CloneCurrent();
-        clone.UI.OverlayOpacity = 0.5;
+        clone.Appearance.Animations = false;
 
-        Assert.NotEqual(clone.UI.OverlayOpacity, svc.Current.UI.OverlayOpacity);
+        Assert.True(svc.Current.Appearance.Animations);
     }
 
     [Fact]
@@ -236,7 +216,7 @@ public class JsonSettingsServiceTests : IDisposable
             {
                 SynchronizationContext.SetSynchronizationContext(new BlockingSynchronizationContext());
                 var model = new SettingsModel();
-                model.Translation.ActiveTranslationModelId = "opus-mt-zh-en";
+                model.Advanced.LogLevel = "Debug";
                 svc.Replace(model);
                 finished = true;
             }
@@ -283,7 +263,7 @@ public class JsonSettingsServiceTests : IDisposable
         var svc = new JsonSettingsService(_settingsPath);
         await svc.LoadAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal("Ctrl+Alt+T", svc.Current.Hotkeys.OverlayToggle);
+        Assert.Equal("Ctrl+Alt+T", svc.Current.Hotkeys.Summon);
     }
 
     [Fact]

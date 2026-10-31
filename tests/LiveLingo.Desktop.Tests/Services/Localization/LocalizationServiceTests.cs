@@ -116,8 +116,8 @@ public class LocalizationServiceTests
     public void DefaultConstructor_LoadsEmbeddedResources()
     {
         var sut = new LocalizationService();
-        var result = sut.T("tray.settings");
-        Assert.Equal("Settings", result);
+        var result = sut.T("tray.quit");
+        Assert.Equal("Quit", result);
     }
 
     [Fact]
@@ -125,8 +125,8 @@ public class LocalizationServiceTests
     {
         var sut = new LocalizationService();
         sut.SetCulture("zh-CN");
-        var result = sut.T("tray.settings");
-        Assert.Equal("设置", result);
+        var result = sut.T("tray.quit");
+        Assert.Equal("退出", result);
     }
 
     [Fact]
@@ -158,40 +158,31 @@ public class LocalizationServiceTests
     }
 
     [Fact]
-    public void AllKnownSettingsKeys_AreCoveredByDefaultResources()
+    public void ShellKeys_AreCoveredByBothLanguages()
     {
-        // Guards against regressions where SettingsViewModel adds a new T("settings.xxx")
-        // without populating the matching entry in en-US.json / zh-CN.json.
+        // Guards against shell code adding a T("...") call without entries in en-US.json and zh-CN.json.
         var sut = new LocalizationService();
         string[] criticalKeys =
         [
-            "settings.translation.routing",
-            "settings.translation.routingMode",
-            "settings.translation.routeUnsupportedPairs",
-            "settings.routing.localOnly",
-            "settings.routing.preferLocal",
-            "settings.routing.preferCloud",
-            "settings.routing.cloudOnly",
-            "settings.ai.cloudProvider",
-            "settings.ai.cloudEnabled",
-            "settings.ai.cloudPreset",
-            "settings.ai.cloudPreset.custom",
-            "settings.ai.cloudPreset.openai",
-            "settings.ai.cloudPreset.openrouter",
-            "settings.ai.cloudPreset.groq",
-            "settings.ai.cloudProviderType",
-            "settings.ai.cloudProviderValue",
-            "settings.ai.cloudBaseUrl",
-            "settings.ai.cloudApiKey",
-            "settings.ai.cloudTranslationModel",
-            "settings.ai.cloudPostModel",
-            "settings.ai.cloudTestConnection",
-            "settings.ai.cloudFetchModels",
-            "settings.ai.cloudDiscoveredModels",
-            "settings.ai.cloudUseTranslation",
-            "settings.ai.cloudUsePost",
-            "settings.ai.cloudRoutePost",
-            "settings.ai.cloudHint"
+            "tray.openComposer",
+            "tray.checkUpdates",
+            "tray.quit",
+            "app.name",
+            "app.permission.title",
+            "app.permission.body",
+            "app.permission.openAccessibility",
+            "app.permission.openInputMonitoring",
+            "app.hotkey.registrationFailed.title",
+            "app.hotkey.registrationFailed.body",
+            "dialog.update.title",
+            "dialog.update.notConfigured",
+            "dialog.update.latest",
+            "dialog.update.available.title",
+            "dialog.update.available.body",
+            "dialog.update.available.download",
+            "dialog.update.available.later",
+            "dialog.update.failed",
+            "dialog.ok"
         ];
         foreach (var key in criticalKeys)
         {

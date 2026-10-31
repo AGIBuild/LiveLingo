@@ -9,6 +9,9 @@ namespace LiveLingo.Core.Tests.Models;
 
 public class ModelManagerTests : IDisposable
 {
+    private static readonly ModelDescriptor Sample = new(
+        "sample-gguf", "Sample", "https://example.com/repo/resolve/main/Sample-Q4_K_M.gguf", 1, ModelType.Translation);
+
     private readonly string _tempDir;
     private readonly ModelManager _manager;
     private readonly ILogger<ModelManager> _logger;
@@ -35,21 +38,21 @@ public class ModelManagerTests : IDisposable
     [Fact]
     public void HasAllExpectedLocalAssets_False_WhenExpectedFileMissing()
     {
-        var modelDir = _manager.GetModelDirectory(ModelRegistry.Qwen35_9B.Id);
+        var modelDir = _manager.GetModelDirectory(Sample.Id);
         Directory.CreateDirectory(modelDir);
         File.WriteAllText(Path.Combine(modelDir, "stale-other.gguf"), "x");
-        Assert.False(_manager.HasAllExpectedLocalAssets(ModelRegistry.Qwen35_9B));
+        Assert.False(_manager.HasAllExpectedLocalAssets(Sample));
     }
 
     [Fact]
     public void HasAllExpectedLocalAssets_True_WhenExpectedGgufExists()
     {
-        var modelDir = _manager.GetModelDirectory(ModelRegistry.Qwen35_9B.Id);
+        var modelDir = _manager.GetModelDirectory(Sample.Id);
         Directory.CreateDirectory(modelDir);
         File.WriteAllText(
-            Path.Combine(modelDir, "Qwen3.5-9B-abliterated-Q4_K_M.gguf"),
+            Path.Combine(modelDir, "Sample-Q4_K_M.gguf"),
             "x");
-        Assert.True(_manager.HasAllExpectedLocalAssets(ModelRegistry.Qwen35_9B));
+        Assert.True(_manager.HasAllExpectedLocalAssets(Sample));
     }
 
     [Fact]

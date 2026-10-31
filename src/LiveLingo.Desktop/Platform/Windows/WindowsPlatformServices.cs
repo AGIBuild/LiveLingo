@@ -8,7 +8,6 @@ internal sealed class WindowsPlatformServices : IPlatformServices
     public IWindowTracker WindowTracker { get; }
     public ITextInjector TextInjector { get; }
     public IClipboardService Clipboard { get; }
-    public IAudioCaptureService AudioCapture { get; }
 
     public WindowsPlatformServices()
     {
@@ -16,7 +15,6 @@ internal sealed class WindowsPlatformServices : IPlatformServices
         Hotkey = new Win32HotkeyService();
         WindowTracker = new Win32WindowTracker();
         TextInjector = new Win32TextInjector(Clipboard);
-        AudioCapture = new Win32AudioCaptureService();
     }
 
     public void OpenUrl(string url) => BrowserLauncher.OpenUrl(url);
@@ -24,6 +22,5 @@ internal sealed class WindowsPlatformServices : IPlatformServices
     public void Dispose()
     {
         Hotkey.Dispose();
-        AudioCapture.Dispose();
     }
 }

@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging;
 namespace LiveLingo.Core.Models.Installations;
 
 /// <summary>
-/// Removes on-disk residue of model ids that <see cref="ModelRegistry"/> no longer registers.
+/// Removes on-disk residue of model ids that the model catalog no longer registers.
 /// Idempotent — a missing directory is a no-op so this can run on every startup without
 /// keeping any "already-cleaned" sentinel state.
 /// </summary>
