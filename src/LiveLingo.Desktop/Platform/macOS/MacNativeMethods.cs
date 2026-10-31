@@ -170,6 +170,7 @@ internal static class MacNativeMethods
 
     #region CGWindowList
 
+    public const int kCGWindowListOptionAll = 0;
     public const int kCGWindowListOptionOnScreenOnly = 1;
     public const int kCGWindowListExcludeDesktopElements = 16;
 

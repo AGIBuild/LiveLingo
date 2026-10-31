@@ -40,6 +40,8 @@ internal sealed class Win32WindowTracker : IWindowTracker
         }
     }
 
+    public bool IsAlive(TargetWindowInfo target) => IsWindow(target.Handle);
+
     private static nint FindInputChild(nint mainWindow, uint threadId)
     {
         var renderer = FindChromeRenderer(mainWindow);
