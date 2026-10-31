@@ -34,6 +34,7 @@ public sealed class ComposerTexts(ILocalizationService loc)
     public string RetryLabel => loc.T("composer.retry");
     public string Placeholder => loc.T("composer.placeholder");
     public string MicLabel => loc.T("composer.mic");
+    public string SwapLabel => loc.T("composer.swap");
     public string ImportLabel => loc.T("composer.import");
     public string ImportTitle => loc.T("composer.import.title");
     public string ImportFileType => loc.T("composer.import.fileType");

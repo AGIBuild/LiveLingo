@@ -46,6 +46,7 @@
   "composer.status.listening": "正在听…",
   "composer.status.starting": "正在加载语音模型…",
   "composer.mic": "点按开始或结束，按住说话",
+  "composer.swap": "互换翻译方向",
   "composer.banner.micDenied": "没有麦克风权限。请在系统设置里允许 LiveLingo 使用麦克风。",
   "composer.banner.micDeniedAction": "打开系统设置",
   "composer.banner.noMic": "无法使用麦克风：{0}",

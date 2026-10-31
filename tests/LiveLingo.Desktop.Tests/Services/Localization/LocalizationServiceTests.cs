@@ -211,6 +211,7 @@ public class LocalizationServiceTests
             "composer.status.listening",
             "composer.status.starting",
             "composer.mic",
+            "composer.swap",
             "composer.banner.micDenied",
             "composer.banner.micDeniedAction",
             "composer.banner.noMic",
