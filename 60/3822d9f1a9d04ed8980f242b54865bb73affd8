@@ -1,0 +1,35 @@
+src/LiveLingo.Desktop/Platform/Windows/Win32WindowTracker.cs
+  s_6d6e9175f38e45::t_ca69c26cdb9f9b 43-44
+src/LiveLingo.Desktop/Composer/ComposerTypes.cs
+  s_6d6e9175f38e45::t_ef8d754f863961 1-57
+tests/LiveLingo.Desktop.Tests/Composer/ComposerViewModelTests.cs
+  s_6d6e9175f38e45::t_290eaa52be5e37 15-16,24,124,156,182,199
+  s_6d6e9175f38e45::t_81bf64120b61bd 1-14,17-23,25-123,125-155,157-181,183-198,200-392
+src/LiveLingo.Desktop/Platform/macOS/MacWindowTracker.cs
+  s_6d6e9175f38e45::t_512d214b29ea35 31-56
+src/LiveLingo.Desktop/Platform/macOS/MacNativeMethods.cs
+  s_6d6e9175f38e45::t_bfa7dea2328979 173
+src/LiveLingo.Desktop/Platform/Windows/NativeMethods.cs
+  s_6d6e9175f38e45::t_c6582cec59558f 90-93
+src/LiveLingo.Desktop/Platform/IWindowTracker.cs
+  s_6d6e9175f38e45::t_8b9c1ebea6911b 6-8
+src/LiveLingo.Desktop/Composer/ComposerViewModel.cs
+  s_6d6e9175f38e45::t_8b802e01867cb9 1-75,77-131,137-274,276-318,321-322,324-325
+  s_6d6e9175f38e45::t_619025d4916092 76,132-136,275,319-320,323
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "603822d9f1a9d04ed8980f242b54865bb73affd8",
+  "prompts": {},
+  "sessions": {
+    "s_6d6e9175f38e45": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "f74d37e5-1d96-4ddc-a3f9-5ae24ff39e38",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
