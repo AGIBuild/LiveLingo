@@ -21,12 +21,16 @@ public sealed class Draft
     public bool TargetLost { get; set; }
     public bool Recording { get; set; }
 
+    /// <summary>Increases whenever the source text changes (not when results arrive).</summary>
+    public int SourceRevision { get; private set; }
+
     /// <summary>The frozen result of a successful commit; the draft accepts no further changes once set.</summary>
     public CommitResult? Snapshot { get; private set; }
 
     public void Reset(bool hasTarget)
     {
         _epoch++;
+        SourceRevision++;
         _translationRevision = 0;
         _units.Clear();
         Output = OutputKind.Clean;
