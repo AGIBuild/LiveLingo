@@ -1,0 +1,33 @@
+tests/LiveLingo.Core.Tests/Cloud/CloudRouteTests.cs
+  s_6d6e9175f38e45::t_8b97e69d81ddf0 65-81
+build/BuildTask.cs
+  s_6d6e9175f38e45::t_d2956a43f6a92d 276
+tests/LiveLingo.Core.Tests/Transcription/WavReaderTests.cs
+  s_6d6e9175f38e45::t_00d208e1761473 143-250
+tests/LiveLingo.Core.Tests/Translation/TranslationPromptTests.cs
+  s_6d6e9175f38e45::t_2497ecb5bc198f 59-84
+tests/LiveLingo.Core.Tests/Transcription/FileTranscriberTests.cs
+  s_6d6e9175f38e45::t_4141f46c889bf0 85-95,97-137
+  s_6d6e9175f38e45::t_5f90ed1b867da3 96
+tests/LiveLingo.Core.Tests/stryker-config.json
+  s_6d6e9175f38e45::t_5d637ac3d143ff 10-12
+tests/LiveLingo.Core.Tests/Drafting/TextUnitsTests.cs
+  s_6d6e9175f38e45::t_8a3b3d3e664655 146-167,172
+  s_6d6e9175f38e45::t_b801c32d75fe38 168-171
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "61d2a7f009ff57f15287e65cde424b2740e41e92",
+  "prompts": {},
+  "sessions": {
+    "s_6d6e9175f38e45": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "f74d37e5-1d96-4ddc-a3f9-5ae24ff39e38",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
