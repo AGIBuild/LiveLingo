@@ -1,0 +1,62 @@
+src/LiveLingo.Desktop/Composer/ComposerTypes.cs
+  s_6d6e9175f38e45::t_3440ac8280403c 17-19
+  s_6d6e9175f38e45::t_05440caf2b7f17 6-7,20-22,57-63
+src/LiveLingo.Desktop/Composer/ComposerModelPlan.cs
+  s_6d6e9175f38e45::t_05440caf2b7f17 1-23
+src/LiveLingo.Desktop/App.axaml.cs
+  s_6d6e9175f38e45::t_93b833de6cdf09 8-9,186,204-206,210,214-215,224-225
+  s_6d6e9175f38e45::t_654d39447a415f 220
+tests/LiveLingo.Desktop.Tests/Composer/ComposerHarness.cs
+  s_6d6e9175f38e45::t_121d4e83567305 2,36-96,103-104,106,113,116,121-126,130,135-136,138-139,141-143,150-151
+  s_6d6e9175f38e45::t_e3d59f52cff81c 12-20,117
+src/LiveLingo.Desktop/Composer/ComposerTexts.cs
+  s_6d6e9175f38e45::t_3440ac8280403c 17-18,26-33,48-49,57
+tests/LiveLingo.Desktop.Tests/Services/Localization/LocalizationServiceTests.cs
+  s_6d6e9175f38e45::t_08460b526d2eae 209-216
+src/LiveLingo.Desktop/Composer/ComposerWindow.axaml
+  s_6d6e9175f38e45::t_3440ac8280403c 103-115,142,185-193
+tests/LiveLingo.Desktop.Tests/Composer/ComposerWindowTests.cs
+  s_6d6e9175f38e45::t_08460b526d2eae 6,14,16,20,37,99-143
+src/LiveLingo.Desktop/Composer/ComposerWindow.axaml.cs
+  s_6d6e9175f38e45::t_654d39447a415f 32,38,41-51,77-81,124-146,153-159
+src/LiveLingo.Desktop/Composer/IVoiceInput.cs
+  s_6d6e9175f38e45::t_05440caf2b7f17 1-54
+tests/LiveLingo.Desktop.Tests/Composer/ComposerTextsTests.cs
+  s_6d6e9175f38e45::t_08460b526d2eae 25-26,52-53,82-94
+  s_6d6e9175f38e45::t_70eaeab8611761 95
+src/LiveLingo.Core/Dictation/DictationSession.cs
+  s_6d6e9175f38e45::t_0d9baceb6c0828 114-118
+src/LiveLingo.Core/Drafting/Draft.cs
+  s_6d6e9175f38e45::t_a29079762d2655 200-203
+tests/LiveLingo.Core.Tests/Drafting/DraftTests.cs
+  s_6d6e9175f38e45::t_a29079762d2655 413-443
+src/LiveLingo.Desktop/Composer/ComposerViewModel.cs
+  s_6d6e9175f38e45::t_b210613b428405 11-12,14,16-18,21,25-26,29,31-35,40,44-45,47-48,52,56-57,60,63,77,87-90,97,109,111-113,127,138-236,242-244,278,280-282,289-296,301-302,313,316-318,321,325-326,329-331,335-342,346,351-352,366-367,371,393-395,403-420,429-430,436,445,447-448,457-458,461,465-466,472-473,483,489,491,499,504,509-510,512
+  s_6d6e9175f38e45::t_3440ac8280403c 506-508
+  s_6d6e9175f38e45::t_1a69a44b28a147 122-126,128-132
+  s_6d6e9175f38e45::t_7fc00a413fddb3 133
+src/LiveLingo.Desktop/Resources/i18n/zh-CN.json
+  s_6d6e9175f38e45::t_3440ac8280403c 38,40,44-51
+tests/LiveLingo.Desktop.Tests/Composer/MicrophoneVoiceInputTests.cs
+  s_6d6e9175f38e45::t_096b8bcf1625d9 1-96
+src/LiveLingo.Desktop/Resources/i18n/en-US.json
+  s_6d6e9175f38e45::t_3440ac8280403c 38,40,44-51
+tests/LiveLingo.Desktop.Tests/Composer/ComposerVoiceTests.cs
+  s_6d6e9175f38e45::t_bb8a02b27a3070 1-297
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "547df7a612f03222272ab85fe85fe41e844dc224",
+  "prompts": {},
+  "sessions": {
+    "s_6d6e9175f38e45": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "f74d37e5-1d96-4ddc-a3f9-5ae24ff39e38",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
