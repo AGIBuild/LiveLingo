@@ -17,6 +17,7 @@
       "**/Dictation/**/*.cs",
       "**/Cleanup/**/*.cs",
       "**/Cloud/**/*.cs",
+      "**/Transcription/**/*.cs",
       "**/Inference/**/*.cs",
       "!**/Inference/LlamaProcessLauncher.cs",
       "!**/Inference/LlamaServerAdapters.cs"

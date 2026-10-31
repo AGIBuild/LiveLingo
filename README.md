@@ -1,186 +1,78 @@
-<div align="center">
-
-# 🌐 LiveLingo
-
-**Your words, any language, zero cloud. Instantly.**
-
-A privacy-first, AI-powered desktop translator that lives in your menu bar.  
-Press a hotkey → type → get your translation → send it. All offline. All local. All yours.
-
-![LiveLingo Demo](docs/demo/demo.gif)
-
-[![.NET](https://img.shields.io/badge/.NET_10-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
-[![Avalonia](https://img.shields.io/badge/Avalonia_11-7B2BFC?logo=data:image/svg+xml;base64,&logoColor=white)](https://avaloniaui.net/)
-[![Platform](https://img.shields.io/badge/Windows_%7C_macOS-0078D4?logo=windows&logoColor=white)](/)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](/)
-
-</div>
-
----
-
-> **Rewrite in progress (branch `feat/composer-v3`).** LiveLingo 2.0 replaces the translator overlay with a
-> single *composer* for voice dictation and translation (Chinese ↔ English first), designed for Apple M2 / 16 GB
-> and equivalent Windows hardware. The feature list below describes the released 1.x line (tag `v1.4.2`) and is
-> updated as 2.0 milestones land. Design: [docs/superpowers/specs/2026-10-31-livelingo-composer-design.md](docs/superpowers/specs/2026-10-31-livelingo-composer-design.md);
-> plan: [docs/superpowers/plans/2026-10-31-composer-implementation.md](docs/superpowers/plans/2026-10-31-composer-implementation.md).
-
----
-
-## Why LiveLingo?
-
-You're chatting with a colleague in Tokyo. Mid-conversation, you need to reply in Japanese — but your Japanese is… *creative* at best. You could open a browser, navigate to some translation site, copy-paste, wait for the response, copy-paste again…
-
-**Or you could just press `Ctrl+Alt+T`.**
-
-LiveLingo pops up as a sleek floating overlay — right where you're working. Type your message, get an instant AI translation, and hit **Send**. The translated text lands directly into the app you were using. No tab-switching. No copy-paste gymnastics. No data leaving your machine.
-
-> 💡 Think of it as having a personal interpreter sitting inside your keyboard.
-
----
-
-## ✨ Features
-
-### 🔒 100% Offline & Private
-
-Your text — and your voice — never leaves your computer. LiveLingo runs local AI
-models for both translation and speech recognition: [Gemma 4 26B-A4B
-MoE](https://huggingface.co/google) (Mixture-of-Experts, ~26 B-class quality at
-~4 B-class latency) for translation, and [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx)
-(Cohere Transcribe 14-Lang or SenseVoice CJK-tuned) for speech-to-text.
-No API keys, no cloud services, no "we may use your data to improve our products" surprises.
-
-### ⚡ Ridiculously Fast
-
-Translation in **~300ms**. The overlay appears instantly with a global hotkey. Type, translate, send — all in one fluid motion.
-
-### 🌍 10 Languages
-
-Chinese, English, Japanese, Korean, French, German, Spanish, Russian, Arabic, and Portuguese. Mix and match source and target languages freely.
-
-### 🎯 Smart Text Injection
-
-Two modes to fit your workflow:
-
-- **Paste Only** — drops the translation into your clipboard
-- **Paste & Send** — pastes AND hits Enter for you (perfect for chat apps)
-
-### 🎙️ Voice Input
-
-Talk to LiveLingo instead of typing. Powered by sherpa-onnx with two
-interchangeable engines:
-
-- **Accuracy First** — Cohere Transcribe (14 languages, top of the Open ASR
-  Leaderboard, ~1.6 GB)
-- **Multilingual First** — SenseVoice Small (中 / 粤 / 英 / 日 / 韩, on-model
-  language detection, ~228 MB)
-
-Switch engines anytime from *Settings → Speech* — the active model card shows
-exactly what will run, with a one-click jump to the *Models* tab when a
-download is missing.
-
-### 🪟 Beautiful Floating Overlay
-
-A frosted-glass overlay that floats above everything. Drag it, resize it, adjust its transparency from 10% to fully opaque. The text automatically adapts contrast based on your opacity setting — readable on any desktop background.
-
-### 🖥️ Cross-Platform
-
-Native experience on both **Windows** and **macOS**. Platform-specific hotkey hooks, text injection, and UI polish on each.
-
-### 🔄 Auto-Update
-
-Built-in update system via [Velopack](https://velopack.io/) keeps you on the latest version without lifting a finger.
-
----
-
-## 📸 Screenshots
-
-<table>
-<tr>
-<td width="50%">
-
-**Translation Overlay**  
-*Floating, resizable, with adaptive transparency*
-
-<img src="docs/demo/transalate-window.jpg" width="100%"/>
-
-</td>
-<td width="50%">
-
-**Long Text Translation**  
-*Handles paragraphs with ease*
-
-<img src="docs/demo/translate-long-text.jpg" width="100%"/>
-
-</td>
-</tr>
-<tr>
-<td width="50%">
-
-**Settings — General**  
-*Custom hotkeys, opacity, injection mode*
-
-<img src="docs/demo/settings-general.jpg" width="100%"/>
-
-</td>
-<td width="50%">
-
-**Settings — AI Models**  
-*One-click download and management*
-
-<img src="docs/demo/settings-AI-models-download.jpg" width="100%"/>
-
-</td>
-</tr>
-</table>
-
----
-
-## 🚀 Getting Started
-
-### Install
-
-Download the latest release for your platform:
-
-| Platform | Format | Download |
-|----------|--------|----------|
-| Windows  | `.exe` (auto-update) | [Releases](../../releases) |
-| Windows  | `.msi` (traditional) | [Releases](../../releases) |
-| macOS    | `.pkg`               | [Releases](../../releases) |
-
-### First Launch
-
-1. **Download the AI models** — LiveLingo will prompt you on first run.
-   Translation needs Gemma 4 26B-A4B MoE (~17 GB; falls back to Gemma 4 E4B
-   ~5.4 GB on low-RAM devices). Voice input is optional — pull either
-   Cohere Transcribe (~1.6 GB) or SenseVoice Small (~228 MB) from
-   *Settings → Models* when you're ready.
-2. **Set your hotkey** — Default is `Ctrl+Alt+T` (Windows) or `Option+Cmd+T`
-   (macOS). Customize it anytime.
-3. **Start translating** — Press the hotkey anywhere, type or speak your
-   text, and go.
-
-> **macOS users:** Grant Accessibility and Input Monitoring permissions when
-> prompted. LiveLingo needs these to register global hotkeys and inject text.
-
----
-
-## Design and validation
-
-- [Validated voice dictation architecture and migration design](docs/superpowers/specs/2026-10-29-voice-dictation-design.md)
-- [Text translation and live speech translation POC plan](docs/superpowers/plans/2026-10-29-translation-poc.md)
-- [Independent local translation POC and measured findings](poc/text-translation/REPORT.md)
-
-These documents distinguish verified POC findings from proposed changes. They do not mean the product has already adopted the new pipelines.
-
-## 🤝 Contributing
-
-Contributions are welcome! Whether it's a bug fix, new language support, or a feature idea — check the [Contributing Guide](CONTRIBUTING.md) to get started.
-
----
-
-<div align="center">
-
-**Stop copy-pasting between translator tabs.**  
-**Start LiveLingo-ing.** 🚀
-
-</div>
+# LiveLingo
+
+Voice dictation and translation that stay on your computer. Press a hotkey in any app, speak or type, and the finished
+text is written back into the input box you were using.
+
+LiveLingo 2.0 is a rewrite around one small window, the *composer*. The 1.x translator overlay is gone; its last
+release is tag `v1.4.2`.
+
+![Composer prototype](docs/superpowers/prototypes/livelingo-ux-v3/overview.png)
+
+## How it works
+
+1. **Summon** with a global hotkey (default `Ctrl+Alt+T`). The composer opens above the input box you were in.
+2. **Say it or type it.** Tap the microphone to talk hands-free, or hold it to talk while pressed. You can also
+   paste text or import a WAV recording.
+3. **Pick what is written**, with one control: *Clean up* (fillers, repetitions and homophone errors removed, meaning
+   untouched), *Translate to English / Chinese*, or *Original*. Your original words stay visible and can be restored for
+   any sentence.
+4. **Press Enter.** The result goes into the app you came from. If that window is gone, nothing is typed anywhere
+   else; copy still works.
+
+Cleanup is checked by a fidelity gate: a rewrite that adds facts, drops negations or numbers, or drifts from what you
+said is rejected and that sentence keeps your words.
+
+Imported recordings become a read-only timeline that goes through the same cleanup and translation, and can be
+exported as SRT.
+
+## Privacy
+
+- Speech recognition, cleanup and translation run locally. Audio never leaves the machine.
+- Cloud models are **off by default**. In *Settings → Cloud model* you can switch translation and cleanup to your own
+  OpenAI-compatible endpoint (for example Microsoft Foundry) separately. Only the text of that step is sent; the
+  endpoint must be `https`; the API key is kept in the system secret store, not in a file. A cloud failure is shown,
+  never silently retried on the local model.
+- Models are downloaded only after you agree, from their original hosts, and verified against pinned SHA256 hashes.
+- Recent drafts are kept in memory only and are gone when the app exits.
+
+## Models
+
+| Role | Model | Size |
+|---|---|---|
+| Live recognition | X-ASR 480 ms streaming (zh-en) | ~130 MB |
+| Settled recognition and recording import | Qwen3-ASR 0.6B | ~880 MB |
+| Speech boundaries | Silero VAD | <1 MB |
+| Cleanup | Qwen3.5 4B Q4_K_M | ~2.7 GB |
+| Translation (balanced) / (quality) | Hy-MT2 1.8B / 7B Q4_K_M | ~1.1 GB / ~4.6 GB |
+| Runtime | llama.cpp b11980 | ~16–24 MB |
+
+Licenses are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+## Requirements and status
+
+- Target hardware: Apple M2 or newer with 16 GB, or an equivalent Windows 11 PC. macOS 12+ and Windows 10/11.
+- macOS needs Accessibility (to type into other apps) and Microphone permission.
+- Developed and measured on an M3 Pro (36 GB). **Not yet verified:** an M2/16 GB machine (memory with all models
+  resident, latency), anything running on Windows beyond a successful build and bundled native libraries, and a real
+  Foundry/OpenAI endpoint.
+- Recording import reads uncompressed WAV only. m4a/mp3 need a platform decoder that is not built yet.
+- The project license is not chosen yet; there is no `LICENSE` file.
+
+## Build and test
+
+```bash
+dotnet tool restore
+dotnet run --project src/LiveLingo.Desktop       # run
+./build.sh Test                                  # unit tests with coverage gates
+./build.sh ProbeVoice --ProbeCorpus poc/voice-dictation/corpus   # end-to-end voice probe (downloads models)
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the project layout, build targets and rules.
+
+## Design
+
+- [Composer design](docs/superpowers/specs/2026-10-31-livelingo-composer-design.md)
+- [Implementation plan and progress](docs/superpowers/plans/2026-10-31-composer-implementation.md)
+- [UI prototype v3](docs/superpowers/prototypes/livelingo-ux-v3/README.md) (open `index.html` in a browser)
+- Evidence behind the choices: [voice dictation design](docs/superpowers/specs/2026-10-29-voice-dictation-design.md),
+  [translation POC report](poc/text-translation/REPORT.md)
