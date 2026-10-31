@@ -9,7 +9,7 @@ public enum TargetLanguage
 
 public sealed record GlossaryTerm(string Source, string Target);
 
-/// <param name="Source">Text to translate, already protected (see <see cref="ProtectedText"/>).</param>
+/// <param name="Source">Text to translate as the user wrote it; the translator protects literals itself.</param>
 /// <param name="Context">Read-only background that must not be translated; empty when unused.</param>
 public sealed record TranslationRequest(
     string Source,

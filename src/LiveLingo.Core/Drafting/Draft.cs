@@ -44,6 +44,7 @@ public sealed class Draft
     public JobTicket Append(string raw)
     {
         EnsureEditable();
+        SourceRevision++;
         var unit = NewUnit(new SourceUnit(raw));
         _units.Add(unit);
         return TicketFor(unit);
@@ -58,6 +59,7 @@ public sealed class Draft
     public IReadOnlyList<JobTicket> SyncSource(IReadOnlyList<SourceUnit> source, DraftRoute route)
     {
         EnsureEditable();
+        SourceRevision++;
         var pool = new Dictionary<string, Queue<DraftUnit>>();
         foreach (var unit in _units)
         {
@@ -110,6 +112,18 @@ public sealed class Draft
         result.Text = null;
         result.Error = reason;
         return true;
+    }
+
+    /// <summary>True while a result for this ticket would still be accepted.</summary>
+    public bool IsCurrent(JobTicket ticket, UnitKind kind) => TryResolve(ticket, kind, out _);
+
+    /// <summary>Clears a failed or finished model result so it is produced again; user-edited text is kept.</summary>
+    public void Retry(int index, UnitKind kind)
+    {
+        EnsureEditable();
+        var result = _units[index].Result(kind);
+        if (!result.IsOwned)
+            result.Clear();
     }
 
     public void Edit(int index, UnitKind kind, string text)
