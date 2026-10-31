@@ -289,4 +289,56 @@ public class DraftTests
         Assert.Equal("", draft.Units[0].Clean.Error);
         Assert.Equal(UnitState.Ready, draft.StateOf(draft.Units[0], OutputKind.Clean));
     }
+
+    [Fact]
+    public void SourceRevision_ChangesWithTheSource_NotWithResults()
+    {
+        var draft = new Draft(hasTarget: true);
+        var start = draft.SourceRevision;
+        var ticket = draft.Append("好的。");
+        var afterAppend = draft.SourceRevision;
+        draft.Complete(ticket, UnitKind.Clean, "好。");
+        draft.Edit(0, UnitKind.Clean, "好。");
+        Assert.Equal(afterAppend, draft.SourceRevision);
+
+        draft.SyncSource([new SourceUnit("好的。")], DraftRoute.Units);
+        var afterSync = draft.SourceRevision;
+        draft.Reset(hasTarget: true);
+
+        Assert.True(start < afterAppend);
+        Assert.True(afterAppend < afterSync);
+        Assert.True(afterSync < draft.SourceRevision);
+    }
+
+    [Fact]
+    public void IsCurrent_FollowsStaleness()
+    {
+        var (draft, ticket) = Ready();
+        Assert.True(draft.IsCurrent(ticket, UnitKind.Translation));
+
+        draft.InvalidateTranslations();
+        Assert.False(draft.IsCurrent(ticket, UnitKind.Translation));
+        Assert.True(draft.IsCurrent(ticket, UnitKind.Clean));
+
+        draft.Edit(0, UnitKind.Clean, "手动");
+        Assert.False(draft.IsCurrent(ticket, UnitKind.Clean));
+    }
+
+    [Fact]
+    public void Retry_ClearsAFailedResult_ButNeverUserEditedText()
+    {
+        var draft = new Draft(hasTarget: true);
+        var ticket = draft.Append("好的。");
+        draft.Fail(ticket, UnitKind.Translation, "boom");
+
+        draft.Retry(0, UnitKind.Translation);
+
+        Assert.Null(draft.Units[0].Translation.Text);
+        Assert.Equal("", draft.Units[0].Translation.Error);
+        Assert.Equal(UnitState.Pending, draft.StateOf(draft.Units[0], OutputKind.Translation));
+
+        draft.Edit(0, UnitKind.Clean, "好。");
+        draft.Retry(0, UnitKind.Clean);
+        Assert.Equal("好。", draft.Units[0].Clean.Text);
+    }
 }
