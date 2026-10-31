@@ -1,0 +1,21 @@
+src/LiveLingo.Core/Models/ModelCatalog.cs
+  s_6d6e9175f38e45::t_bc87ecd67e60f4 1-87
+tests/LiveLingo.Core.Tests/Models/ModelCatalogTests.cs
+  s_6d6e9175f38e45::t_0ff9e4a630cef9 1-67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "5b65c5fc81c6b5ce3c6f0f86d3f4154409cb956c",
+  "prompts": {},
+  "sessions": {
+    "s_6d6e9175f38e45": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "f74d37e5-1d96-4ddc-a3f9-5ae24ff39e38",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
