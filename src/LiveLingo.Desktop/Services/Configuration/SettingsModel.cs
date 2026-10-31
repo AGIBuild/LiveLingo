@@ -9,6 +9,7 @@ public partial class SettingsModel : ObservableObject
     [ObservableProperty] private int _schemaVersion = CurrentSchemaVersion;
     [ObservableProperty] private HotkeySettings _hotkeys = new();
     [ObservableProperty] private AppearanceSettings _appearance = new();
+    [ObservableProperty] private ComposerSettings _composer = new();
     [ObservableProperty] private UpdateSettings _update = new();
     [ObservableProperty] private AdvancedSettings _advanced = new();
 
@@ -19,6 +20,7 @@ public partial class SettingsModel : ObservableObject
         SchemaVersion = SchemaVersion,
         Hotkeys = Hotkeys.DeepClone(),
         Appearance = Appearance.DeepClone(),
+        Composer = Composer.DeepClone(),
         Update = Update.DeepClone(),
         Advanced = Advanced.DeepClone()
     };
@@ -29,6 +31,17 @@ public partial class HotkeySettings : ObservableObject
     [ObservableProperty] private string _summon = "Ctrl+Alt+T";
 
     public HotkeySettings DeepClone() => new() { Summon = Summon };
+}
+
+public partial class ComposerSettings : ObservableObject
+{
+    /// <summary>Name of a <see cref="LiveLingo.Core.Models.TranslatorTier"/>; the fast tier suits 16 GB machines.</summary>
+    [ObservableProperty] private string _translatorTier = nameof(LiveLingo.Core.Models.TranslatorTier.Fast);
+
+    /// <summary>The user's terms, one per line (see <see cref="LiveLingo.Core.Translation.Glossary"/>).</summary>
+    [ObservableProperty] private string _glossary = "";
+
+    public ComposerSettings DeepClone() => new() { TranslatorTier = TranslatorTier, Glossary = Glossary };
 }
 
 public partial class AppearanceSettings : ObservableObject

@@ -14,6 +14,7 @@ public sealed class TranslationScheduler : IAsyncDisposable
     private readonly DraftSession _session;
     private readonly ITranslator _translator;
     private readonly TimeProvider _time;
+    private readonly Glossary _glossary;
     private readonly TimeSpan _tailDelay;
     private readonly object _gate = new();
     private readonly CancellationTokenSource _stop = new();
@@ -32,8 +33,10 @@ public sealed class TranslationScheduler : IAsyncDisposable
         ITranslator translator,
         TargetLanguage target,
         TimeSpan tailDelay,
-        TimeProvider? time = null)
+        TimeProvider? time = null,
+        Glossary? glossary = null)
     {
+        _glossary = glossary ?? Glossary.Empty;
         _session = session;
         _translator = translator;
         _target = target;
@@ -133,7 +136,7 @@ public sealed class TranslationScheduler : IAsyncDisposable
             try
             {
                 var translated = await _translator
-                    .TranslateAsync(new TranslationRequest(source, target, []), cancel.Token)
+                    .TranslateAsync(new TranslationRequest(source, target, _glossary.TermsFor(target)), cancel.Token)
                     .ConfigureAwait(false);
                 _session.Mutate(draft => draft.Complete(ticket, UnitKind.Translation, translated.Text));
             }

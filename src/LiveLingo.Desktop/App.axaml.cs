@@ -12,6 +12,7 @@ using LiveLingo.Core.Inference;
 using LiveLingo.Core.Models;
 using LiveLingo.Core.Translation;
 using LiveLingo.Desktop.Composer;
+using LiveLingo.Desktop.Settings;
 using LiveLingo.Desktop.Platform;
 using LiveLingo.Desktop.Platform.macOS;
 using LiveLingo.Desktop.Platform.Windows;
@@ -34,6 +35,7 @@ public partial class App : Application
     private IUpdateService? _updateService;
     private string? _registeredGesture;
     private ComposerWindow? _composer;
+    private SettingsWindow? _settingsWindow;
 
     public override void Initialize()
     {
@@ -120,6 +122,9 @@ public partial class App : Application
 
     private static void ApplyCoreOptions(SettingsModel settings, CoreOptions options)
     {
+        options.TranslatorTier = Enum.TryParse<TranslatorTier>(settings.Composer.TranslatorTier, out var tier)
+            ? tier
+            : TranslatorTier.Fast;
         if (!string.IsNullOrWhiteSpace(settings.Advanced.ModelStoragePath))
             options.ModelStoragePath = settings.Advanced.ModelStoragePath;
         options.InferenceThreads = settings.Advanced.InferenceThreads;
@@ -154,6 +159,9 @@ public partial class App : Application
                 Summon(platform);
         });
 
+        var settingsItem = new NativeMenuItem(loc.T("tray.settings"));
+        settingsItem.Click += (_, _) => Dispatcher.UIThread.Post(ShowSettings);
+
         var checkUpdateItem = new NativeMenuItem(loc.T("tray.checkUpdates"));
         checkUpdateItem.Click += (_, _) => Dispatcher.UIThread.Post(async () => await CheckForUpdatesFromMenuAsync());
 
@@ -162,6 +170,7 @@ public partial class App : Application
 
         var menu = new NativeMenu();
         menu.Items.Add(openItem);
+        menu.Items.Add(settingsItem);
         menu.Items.Add(checkUpdateItem);
         menu.Items.Add(new NativeMenuItemSeparator());
         menu.Items.Add(quitItem);
@@ -198,11 +207,13 @@ public partial class App : Application
 
         var services = _serviceProvider!;
         var context = SynchronizationContext.Current;
+        var glossary = Glossary.Parse(services.GetRequiredService<ISettingsService>().Current.Composer.Glossary);
         var session = new DraftSession(hasTarget: target is not null, notifyOn: context);
         var scheduler = new TranslationScheduler(
-            session, services.GetRequiredService<ITranslator>(), TargetLanguage.English, TailIdleDelay);
+            session, services.GetRequiredService<ITranslator>(), TargetLanguage.English, TailIdleDelay,
+            glossary: glossary);
         var cleanup = new CleanupScheduler(
-            session, services.GetRequiredService<ITextCleaner>(), glossary: [], CleanupHoldback, contextUnits: 2);
+            session, services.GetRequiredService<ITextCleaner>(), glossary.Terms, CleanupHoldback, contextUnits: 2);
         var voice = new MicrophoneVoiceInput(services.GetRequiredService<IDictationSessionFactory>(), platform.Microphone);
         var vm = new ComposerViewModel(
             session,
@@ -212,7 +223,7 @@ public partial class App : Application
             services.GetRequiredService<IModelDownloadCoordinator>(),
             platform,
             voice,
-            glossary: [],
+            glossary.Terms,
             target,
             context);
 
@@ -227,6 +238,21 @@ public partial class App : Application
         };
         _composer = window;
         window.Show();
+    }
+
+    private void ShowSettings()
+    {
+        if (_settingsWindow is { IsVisible: true } open)
+        {
+            open.Activate();
+            return;
+        }
+
+        var services = _serviceProvider!;
+        var vm = new SettingsViewModel(services.GetRequiredService<ISettingsService>());
+        _settingsWindow = new SettingsWindow(vm, services.GetRequiredService<ILocalizationService>());
+        _settingsWindow.Closed += (_, _) => _settingsWindow = null;
+        _settingsWindow.Show();
     }
 
     private void RegisterHotkey(IPlatformServices platform, string gesture)
@@ -246,6 +272,7 @@ public partial class App : Application
 
     private void ApplySettings(IPlatformServices platform, SettingsModel settings)
     {
+        ApplyCoreOptions(settings, _serviceProvider!.GetRequiredService<CoreOptions>());
         var loc = _serviceProvider!.GetRequiredService<ILocalizationService>();
         if (!string.Equals(loc.CurrentCulture.Name, settings.Appearance.Language, StringComparison.OrdinalIgnoreCase))
             loc.SetCulture(settings.Appearance.Language);

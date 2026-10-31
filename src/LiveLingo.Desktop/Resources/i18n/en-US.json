@@ -50,5 +50,16 @@
   "composer.banner.micDeniedAction": "Open Settings",
   "composer.banner.noMic": "Cannot use the microphone: {0}",
   "composer.banner.noSound": "No sound is coming in. Check the microphone, the input volume, or the input device in System Settings.",
-  "composer.status.keptOriginal": "Press Enter to write · {0} sentence(s) kept as spoken (cleanup failed the fidelity check)"
+  "composer.status.keptOriginal": "Press Enter to write · {0} sentence(s) kept as spoken (cleanup failed the fidelity check)",
+  "tray.settings": "Settings",
+  "settings.title": "Settings",
+  "settings.hotkey": "Summon hotkey",
+  "settings.hotkey.hint": "Click, then press the new combination",
+  "settings.hotkey.invalid": "Invalid hotkey. Include one key, for example Ctrl+Alt+T.",
+  "settings.language": "Interface language",
+  "settings.quality": "Use the quality translation model (7B, about 4.6 GB, needs more memory; the default 1.8B is about 1.1 GB)",
+  "settings.glossary": "Glossary",
+  "settings.glossary.hint": "One per line. A plain word is kept exactly as written (speech recognition, cleanup and the fidelity check use it); “中文=English” also fixes the translation. Lines starting with # are comments.",
+  "settings.save": "Save",
+  "settings.cancel": "Cancel"
 }
