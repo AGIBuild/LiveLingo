@@ -37,24 +37,13 @@ public sealed class HuggingFaceMirrorPolicyTests
     }
 
     [Fact]
-    public void ApplyMirror_NoMirrorAndFallbackInactive_ReturnsOriginal()
+    public void ApplyMirror_WithoutUserMirror_ReturnsOriginal()
     {
         var policy = MakePolicy();
 
         var url = policy.ApplyMirror("https://huggingface.co/owner/repo/resolve/main/file.gguf");
 
         Assert.Equal("https://huggingface.co/owner/repo/resolve/main/file.gguf", url);
-    }
-
-    [Fact]
-    public void ApplyMirror_AfterEngagingFallback_RewritesToHfMirror()
-    {
-        var policy = MakePolicy();
-
-        policy.EngageFallbackMirror();
-        var url = policy.ApplyMirror("https://huggingface.co/owner/repo/resolve/main/file.gguf");
-
-        Assert.Equal("https://hf-mirror.com/owner/repo/resolve/main/file.gguf", url);
     }
 
     // ── GetEffectiveHubBase ────────────────────────────────────────────────
@@ -65,15 +54,6 @@ public sealed class HuggingFaceMirrorPolicyTests
         var policy = MakePolicy(userMirror: "https://user.example/");
 
         Assert.Equal("https://user.example", policy.GetEffectiveHubBase("https://huggingface.co/owner/repo"));
-    }
-
-    [Fact]
-    public void GetEffectiveHubBase_HfUrl_FallsBackToFallbackHubWhenLatched()
-    {
-        var policy = MakePolicy();
-        policy.EngageFallbackMirror();
-
-        Assert.Equal("https://hf-mirror.com", policy.GetEffectiveHubBase("https://huggingface.co/owner/repo"));
     }
 
     [Fact]
@@ -92,87 +72,6 @@ public sealed class HuggingFaceMirrorPolicyTests
         Assert.Equal("https://other.example", policy.GetEffectiveHubBase("https://other.example/path/to/file.bin"));
     }
 
-    // ── ShouldFallbackToMirror ─────────────────────────────────────────────
-
-    [Fact]
-    public void ShouldFallbackToMirror_TrueOnSocketExceptionToHfWithoutUserMirror()
-    {
-        var policy = MakePolicy();
-        var ex = new HttpRequestException("boom", new SocketException());
-
-        Assert.True(policy.ShouldFallbackToMirror("https://huggingface.co/x", ex));
-    }
-
-    [Fact]
-    public void ShouldFallbackToMirror_FalseWhenAlreadyEngaged()
-    {
-        var policy = MakePolicy();
-        policy.EngageFallbackMirror();
-        var ex = new HttpRequestException("boom", new SocketException());
-
-        Assert.False(policy.ShouldFallbackToMirror("https://huggingface.co/x", ex));
-    }
-
-    [Fact]
-    public void ShouldFallbackToMirror_FalseWhenUserMirrorConfigured()
-    {
-        var policy = MakePolicy(userMirror: "https://user.example");
-        var ex = new HttpRequestException("boom", new SocketException());
-
-        Assert.False(policy.ShouldFallbackToMirror("https://huggingface.co/x", ex));
-    }
-
-    [Fact]
-    public void ShouldFallbackToMirror_FalseForNonHfUrl()
-    {
-        var policy = MakePolicy();
-        var ex = new HttpRequestException("boom", new SocketException());
-
-        Assert.False(policy.ShouldFallbackToMirror("https://other.example/x", ex));
-    }
-
-    [Fact]
-    public void ShouldFallbackToMirror_FalseForNonSocketCause()
-    {
-        var policy = MakePolicy();
-        var ex = new HttpRequestException("boom", new InvalidOperationException());
-
-        Assert.False(policy.ShouldFallbackToMirror("https://huggingface.co/x", ex));
-    }
-
-    // ── EngageFallbackMirror / Reset / UsingFallbackMirror ─────────────────
-
-    [Fact]
-    public void EngageFallbackMirror_FlipsLatch()
-    {
-        var policy = MakePolicy();
-
-        Assert.False(policy.UsingFallbackMirror);
-        policy.EngageFallbackMirror();
-        Assert.True(policy.UsingFallbackMirror);
-    }
-
-    [Fact]
-    public void Reset_ClearsLatch()
-    {
-        var policy = MakePolicy();
-        policy.EngageFallbackMirror();
-
-        policy.Reset();
-
-        Assert.False(policy.UsingFallbackMirror);
-    }
-
-    [Fact]
-    public void RewriteToFallbackMirror_PrefixSwap()
-    {
-        var policy = MakePolicy();
-
-        var rewritten = policy.RewriteToFallbackMirror("https://huggingface.co/path");
-
-        Assert.Equal("https://hf-mirror.com/path", rewritten);
-    }
-
     // ── ShouldAttachBearer ─────────────────────────────────────────────────
 
     [Fact]
@@ -184,16 +83,7 @@ public sealed class HuggingFaceMirrorPolicyTests
     }
 
     [Fact]
-    public void ShouldAttachBearer_TrueForHfMirrorWhenFallbackEngaged()
-    {
-        var policy = MakePolicy();
-        policy.EngageFallbackMirror();
-
-        Assert.True(policy.ShouldAttachBearer("https://hf-mirror.com/anything"));
-    }
-
-    [Fact]
-    public void ShouldAttachBearer_FalseForHfMirrorWithoutFallbackEngaged()
+    public void ShouldAttachBearer_FalseForUnconfiguredThirdPartyMirror()
     {
         var policy = MakePolicy();
 

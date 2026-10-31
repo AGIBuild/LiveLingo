@@ -14,6 +14,31 @@
 | M3 完整性 | P2 | 转录导入 / 时间线 / SRT、术语、草稿恢复、云端（Foundry / OpenAI 兼容）、宽屏、托盘、无障碍、Windows 对齐 | 逐项验收见任务卡 |
 | M4 发布 | P3 | M2/16 GB 与 Windows 16 GB 验证、安装包与签名、设置迁移、旧模型清理、文档 | 开放问题 S1–S7 全部关闭或有明确结论 |
 
+## 进度与偏差（随实施更新）
+
+| 任务 | 状态 | 说明 |
+|---|---|---|
+| M0（0.1–0.3） | 完成 | 基线提交；旧实现已删除；覆盖与变异配置已指向新模块 |
+| 1.1 Draft 域 | 完成 | 23 → 28 个测试；`Restore`（草稿恢复）推迟到 M3 |
+| 1.2 文本单元 | 完成 | 唯一的 `TextUnits`（拆分、整段判定、拼接） |
+| 1.3 保护与提示 | 完成 | `ProtectedText`、`TranslationPrompt` |
+| 1.4 ChatClient | 完成 | `OpenAiChatClient`、`IChatCompletionClient`（本地与云端共用） |
+| 1.5 调度 | 完成 | `TranslationScheduler` + `DraftSession` |
+| 1.6 目录与校验 | 完成 | 每个资产必带 SHA256；新增 tar.gz / zip；`ModelCatalog` 固定版本 |
+| 1.7 LlamaServerHost | 完成 | 按角色实例、回环端口、闲置卸载；真实模型端到端探针通过（macOS arm64，1.8B：首字约 200 ms，整句约 400 ms） |
+| 1.8 ComposerViewModel | 完成 | 19 个测试；无 Avalonia 依赖 |
+| 1.9 视图与接线 | 完成 | `ComposerWindow`、`IWindowTracker.IsAlive`、热键 → 浮窗；Windows 的 `IsAlive` 未在实机验证 |
+| 1.10 验收 | 部分 | `ProbeTranslation` 已跑通；**macOS 手工验收与 Windows 验证未做** |
+
+**相对原计划的偏差（均有意为之）**
+
+1. **文本拼接**：听写追加的句子之间不再强制 `\n`（原型 `draft.js` 如此），而是沿用 POC 的同行拼接规则（只在两侧都是 ASCII 时加空格）。原因：向聊天框写入 `\n` 可能直接发送消息。
+2. **前文上下文**：评测未测出收益，`TranslationRequest.Context` 保留但调度器不使用；复测有收益再接入。
+3. **术语表**：M1 不接入；`TranslationRequest.Terms` 与提示词已支持，设置界面与失效逻辑在 M3。
+4. **Windows 运行时**：登记 CPU 版（`win-cpu-x64`）。Vulkan 版待 Windows 实机评估（S3）。
+5. **镜像回退**：删除了旧代码里“Hugging Face 不可达时自动改走 hf-mirror.com”的隐式回退；只用用户显式配置的镜像。
+6. **已知风险**：应用崩溃（非正常退出）会留下孤儿 llama-server 进程；需要在 M1 验收中确认并加启动时清理或父进程监控。
+
 ## M0 地基
 
 ### Task 0.1 分支与基线提交

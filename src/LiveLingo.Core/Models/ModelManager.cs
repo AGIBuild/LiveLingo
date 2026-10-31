@@ -62,8 +62,6 @@ public sealed class ModelManager : IModelManager
     public Task MigrateStoragePathAsync(string newPath, CancellationToken ct = default) =>
         _pathMigrator.MigrateAsync(newPath, ct);
 
-    public void ResetHuggingfaceTransportFallback() => _mirrorPolicy.Reset();
-
     public Task<long> CleanObsoleteModelsAsync(
         IEnumerable<string> obsoleteModelIds,
         CancellationToken ct = default) =>

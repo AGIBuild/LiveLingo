@@ -33,11 +33,6 @@ public interface IModelManager
     Task MigrateStoragePathAsync(string newPath, CancellationToken ct = default);
 
     /// <summary>
-    /// Clears automatic hf-mirror fallback so the next Hugging Face download tries the primary hub again.
-    /// </summary>
-    void ResetHuggingfaceTransportFallback();
-
-    /// <summary>
     /// Removes residue of model ids no longer in the model catalog
     /// (supplied by the caller). Returns the total
     /// bytes reclaimed; safe to call on every startup — missing directories are no-ops.
