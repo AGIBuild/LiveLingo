@@ -5,6 +5,10 @@ using Avalonia.Markup.Xaml;
 using Avalonia.Platform;
 using Avalonia.Threading;
 using LiveLingo.Core;
+using LiveLingo.Core.Drafting;
+using LiveLingo.Core.Models;
+using LiveLingo.Core.Translation;
+using LiveLingo.Desktop.Composer;
 using LiveLingo.Desktop.Platform;
 using LiveLingo.Desktop.Platform.macOS;
 using LiveLingo.Desktop.Platform.Windows;
@@ -26,6 +30,7 @@ public partial class App : Application
     private Timer? _updateCheckTimer;
     private IUpdateService? _updateService;
     private string? _registeredGesture;
+    private ComposerWindow? _composer;
 
     public override void Initialize()
     {
@@ -173,10 +178,53 @@ public partial class App : Application
         return new WindowIcon(AssetLoader.Open(new Uri(iconPath)));
     }
 
-    private static void Summon(IPlatformServices platform)
+    private static readonly TimeSpan TailIdleDelay = TimeSpan.FromSeconds(1.5);
+
+    private void Summon(IPlatformServices platform)
     {
+        if (_composer is { IsVisible: true } open)
+        {
+            open.Close();
+            return;
+        }
+
         var target = platform.WindowTracker.GetForegroundWindowInfo();
         Log.Information("Summon requested: target={Process}", target?.ProcessName ?? "none");
+
+        var services = _serviceProvider!;
+        var context = SynchronizationContext.Current;
+        var session = new DraftSession(hasTarget: target is not null, notifyOn: context);
+        var scheduler = new TranslationScheduler(
+            session, services.GetRequiredService<ITranslator>(), TargetLanguage.English, TailIdleDelay);
+        var tier = services.GetRequiredService<CoreOptions>().TranslatorTier;
+        var vm = new ComposerViewModel(
+            session,
+            scheduler,
+            [ModelCatalog.LlamaRuntime, ModelCatalog.Translator(tier)],
+            services.GetRequiredService<IModelManager>(),
+            services.GetRequiredService<IModelDownloadCoordinator>(),
+            platform,
+            target,
+            context);
+
+        var loc = services.GetRequiredService<ILocalizationService>();
+        var window = new ComposerWindow(
+            vm,
+            new ComposerTexts(loc),
+            target,
+            copyLabel: loc.T("composer.copy"),
+            writeLabel: loc.T("composer.write"),
+            originalLabel: loc.T("composer.output.original"),
+            placeholder: loc.T("composer.placeholder"),
+            retryLabel: loc.T("composer.retry"));
+        window.Closed += async (_, _) =>
+        {
+            _composer = null;
+            vm.Dispose();
+            await scheduler.DisposeAsync();
+        };
+        _composer = window;
+        window.Show();
     }
 
     private void RegisterHotkey(IPlatformServices platform, string gesture)
