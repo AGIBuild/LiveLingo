@@ -38,6 +38,9 @@ class BuildTask : NukeBuild
     [Parameter("Minimum mutation score percentage")]
     readonly int MutationThreshold = 80;
 
+    [Parameter("Model storage directory used by end-to-end probes (defaults to the app's model directory)")]
+    readonly string ProbeModelPath = string.Empty;
+
     AbsolutePath SourceDir => RootDirectory / "src";
     AbsolutePath TestsDir => RootDirectory / "tests";
     AbsolutePath PublishDir => RootDirectory / "publish";
@@ -197,6 +200,27 @@ class BuildTask : NukeBuild
                 .SetConfiguration(Configuration.Debug)
                 .EnableNoBuild()
                 .SetProcessLogger(RunProcessLogger));
+        });
+
+    // End-to-end probe: real download (SHA256-verified), real llama-server, real translation. Not part of the unit-test gate.
+    Target ProbeTranslation => _ => _
+        .DependsOn(Build)
+        .Executes(() =>
+        {
+            var env = new Dictionary<string, string>
+            {
+                ["LIVELINGO_ENABLE_TRANSLATION_PROBE"] = "1",
+                ["LIVELINGO_PROBE_MODEL_PATH"] = ProbeModelPath
+            }.AsReadOnly();
+
+            DotNet(
+                $"test \"{TestsDir / "LiveLingo.Core.Tests" / "LiveLingo.Core.Tests.csproj"}\" " +
+                $"--configuration {Configuration} " +
+                $"--no-build " +
+                $"--filter \"FullyQualifiedName~TranslationProbeTests\" " +
+                $"--logger \"console;verbosity=detailed\" " +
+                $"--nologo",
+                environmentVariables: env);
         });
 
     Target Publish => _ => _
