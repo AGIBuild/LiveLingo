@@ -6,6 +6,7 @@ using Avalonia.Platform;
 using Avalonia.Threading;
 using LiveLingo.Core;
 using LiveLingo.Core.Drafting;
+using LiveLingo.Core.Inference;
 using LiveLingo.Core.Models;
 using LiveLingo.Core.Translation;
 using LiveLingo.Desktop.Composer;
@@ -79,6 +80,7 @@ public partial class App : Application
         }
 
         _serviceProvider = services.BuildServiceProvider();
+        _serviceProvider.GetRequiredService<ServerPidRegistry>().ReapOrphans();
 
         if (!string.IsNullOrEmpty(settings.Update.UpdateUrl))
         {

@@ -4,13 +4,21 @@ using Microsoft.Extensions.Logging;
 namespace LiveLingo.Core.Inference;
 
 /// <summary>Starts llama-server as a child process and kills its whole tree on dispose.</summary>
-public sealed class LlamaProcessLauncher(ILogger<LlamaProcessLauncher> logger) : ILlamaProcessLauncher
+public sealed class LlamaProcessLauncher(ServerPidRegistry registry, ILogger<LlamaProcessLauncher> logger) : ILlamaProcessLauncher
 {
     private sealed class ChildProcess : ILlamaProcess
     {
         private readonly Process _process;
 
-        public ChildProcess(Process process) => _process = process;
+        private readonly ServerPidRegistry _registry;
+        private readonly int _pid;
+
+        public ChildProcess(Process process, ServerPidRegistry registry)
+        {
+            _process = process;
+            _registry = registry;
+            _pid = process.Id;
+        }
 
         public bool HasExited => _process.HasExited;
 
@@ -22,6 +30,7 @@ public sealed class LlamaProcessLauncher(ILogger<LlamaProcessLauncher> logger) :
                 _process.Kill(entireProcessTree: true);
             _process.WaitForExit();
             _process.Dispose();
+            _registry.Remove(_pid);
             return ValueTask.CompletedTask;
         }
     }
@@ -40,11 +49,12 @@ public sealed class LlamaProcessLauncher(ILogger<LlamaProcessLauncher> logger) :
 
         var process = Process.Start(info)
             ?? throw new LlamaServerStartException($"Could not start '{launch.ExecutablePath}'.");
+        registry.Record(process.Id);
         process.OutputDataReceived += (_, e) => Log(e.Data);
         process.ErrorDataReceived += (_, e) => Log(e.Data);
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();
-        return new ChildProcess(process);
+        return new ChildProcess(process, registry);
     }
 
     private void Log(string? line)
