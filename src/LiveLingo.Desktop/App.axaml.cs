@@ -340,7 +340,7 @@ public partial class App : Application
             WindowStartupLocation = WindowStartupLocation.CenterScreen
         };
 
-        var text = new TextBlock
+        var text = new SelectableTextBlock
         {
             Text = message,
             TextWrapping = Avalonia.Media.TextWrapping.Wrap,

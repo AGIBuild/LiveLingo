@@ -30,6 +30,10 @@
                     <SolidColorBrush x:Key="ComposerWarnText" Color="#FF8A5A00"/>
                     <SolidColorBrush x:Key="ComposerDanger" Color="#FFB3382C"/>
                     <SolidColorBrush x:Key="ComposerSkeleton" Color="#1A0F141E"/>
+                    <SolidColorBrush x:Key="ButtonBackground" Color="Transparent"/>
+                    <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#0F0F141E"/>
+                    <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#1A0F141E"/>
+                    <SolidColorBrush x:Key="ButtonBackgroundDisabled" Color="Transparent"/>
                 </ResourceDictionary>
                 <ResourceDictionary x:Key="Dark">
                     <SolidColorBrush x:Key="ComposerPanel" Color="#F21E2026"/>
@@ -44,21 +48,30 @@
                     <SolidColorBrush x:Key="ComposerWarnText" Color="#FFF2C66B"/>
                     <SolidColorBrush x:Key="ComposerDanger" Color="#FFFF8A7E"/>
                     <SolidColorBrush x:Key="ComposerSkeleton" Color="#26FFFFFF"/>
+                    <SolidColorBrush x:Key="ButtonBackground" Color="Transparent"/>
+                    <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="#14FFFFFF"/>
+                    <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="#26FFFFFF"/>
+                    <SolidColorBrush x:Key="ButtonBackgroundDisabled" Color="Transparent"/>
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
         </ResourceDictionary>
     </Window.Resources>
 
     <Window.Styles>
-        <Style Selector="TextBlock">
+        <!-- A CJK-first stack keeps line metrics identical for pure-CJK and mixed labels, so rows align. -->
+        <Style Selector=":is(TemplatedControl)">
+            <Setter Property="FontFamily" Value="PingFang SC, Microsoft YaHei UI, Inter"/>
+        </Style>
+        <Style Selector=":is(TextBlock)">
+            <Setter Property="FontFamily" Value="PingFang SC, Microsoft YaHei UI, Inter"/>
             <Setter Property="Foreground" Value="{DynamicResource ComposerText}"/>
             <Setter Property="FontSize" Value="14"/>
         </Style>
-        <Style Selector="TextBlock.muted">
+        <Style Selector=":is(TextBlock).muted">
             <Setter Property="Foreground" Value="{DynamicResource ComposerMuted}"/>
             <Setter Property="FontSize" Value="13"/>
         </Style>
-        <Style Selector="TextBlock.failed">
+        <Style Selector=":is(TextBlock).failed">
             <Setter Property="Foreground" Value="{DynamicResource ComposerDanger}"/>
         </Style>
         <Style Selector="TextBox">
@@ -114,7 +127,11 @@
             <Setter Property="Foreground" Value="{DynamicResource ComposerAccentText}"/>
         </Style>
         <Style Selector="Button.segment">
-            <Setter Property="Padding" Value="10,5"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="Height" Value="30"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
         </Style>
         <Style Selector="Button.segment.active">
             <Setter Property="Background" Value="{DynamicResource ComposerWell}"/>
@@ -149,7 +166,7 @@
 
             <Border x:Name="BannerBox" IsVisible="False" CornerRadius="10" Padding="10,8" Background="{DynamicResource ComposerWarnBg}">
                 <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
-                    <TextBlock x:Name="BannerText" Foreground="{DynamicResource ComposerWarnText}" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                    <SelectableTextBlock x:Name="BannerText" Foreground="{DynamicResource ComposerWarnText}" TextWrapping="Wrap" VerticalAlignment="Center"/>
                     <Button x:Name="BannerAction" Grid.Column="1" Classes="primary" Click="OnBannerActionClick"/>
                     <ProgressBar x:Name="BannerProgress" Grid.Row="1" Grid.ColumnSpan="2" Margin="0,8,0,0" Minimum="0" Maximum="100" IsVisible="False"/>
                 </Grid>
@@ -169,23 +186,27 @@
             </Border>
 
             <Border x:Name="ResultBox" IsVisible="False" CornerRadius="12" Background="{DynamicResource ComposerWell}" BorderBrush="{DynamicResource ComposerLine}" BorderThickness="1" Padding="12,10">
+                <StackPanel>
+                <SelectableTextBlock x:Name="ResultTextBlock" IsVisible="False" TextWrapping="Wrap" FontSize="15"/>
                 <ItemsControl x:Name="ResultList">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="local:ComposerLineView">
                             <Grid ColumnDefinitions="*,Auto" Margin="0,2">
-                                <TextBlock Text="{Binding Text}" IsVisible="{Binding !IsPending}" Classes.failed="{Binding IsFailed}" TextWrapping="Wrap" FontSize="15"/>
+                                <SelectableTextBlock Text="{Binding Text}" IsVisible="{Binding !IsPending}" Classes.failed="{Binding IsFailed}" TextWrapping="Wrap" FontSize="15"/>
                                 <Border IsVisible="{Binding IsPending}" Height="14" Width="260" CornerRadius="7" HorizontalAlignment="Left" Background="{DynamicResource ComposerSkeleton}"/>
                                 <Button Grid.Column="1" Content="{Binding RetryLabel}" IsVisible="{Binding IsFailed}" Tag="{Binding Index}" Click="OnRetryClick" Padding="8,2"/>
                             </Grid>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
+                </StackPanel>
             </Border>
 
             <Grid ColumnDefinitions="Auto,*,Auto,Auto">
                 <Button x:Name="MicButton" Classes="mic" Margin="0,0,10,0" Width="40" Height="40" Padding="0" CornerRadius="20">
                     <Path Data="M12,3 A3,3 0 0 0 9,6 L9,11 A3,3 0 0 0 15,11 L15,6 A3,3 0 0 0 12,3 Z M6,11 A6,6 0 0 0 18,11 M12,17 L12,21"
                           Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.8" StrokeLineCap="Round"
+                          Stretch="Uniform" Width="18" Height="20"
                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Button>
                 <TextBlock x:Name="StatusText" Grid.Column="1" Classes="muted" VerticalAlignment="Center"/>

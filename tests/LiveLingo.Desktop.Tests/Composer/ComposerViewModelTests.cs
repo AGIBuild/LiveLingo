@@ -323,4 +323,32 @@ public class ComposerViewModelTests
 
         Assert.Same(lines, h.Vm.Lines);
     }
+
+    [Fact]
+    public async Task ResultText_IsTheWholeResultOnceReady_AndEmptyWhileSentencesAreStillPending()
+    {
+        await using var h = new Harness();
+        var gate = new TaskCompletionSource<TranslatedText>();
+        h.Translator.Handler = (request, ct) => request.Source.StartsWith("先") ? Task.FromResult(new TranslatedText("One.", 1, 2)) : gate.Task;
+
+        h.Vm.SourceText = "先检查缓存。再更新索引。";
+        await Wait.Until(() => h.Vm.Lines.Count == 2 && h.Vm.Lines[0].State == LineState.Ready);
+        Assert.Equal("", h.Vm.ResultText);
+
+        gate.SetResult(new TranslatedText("Two.", 1, 2));
+        await Wait.Until(() => h.Vm.Status == ComposerStatus.Ready);
+
+        Assert.Equal("One. Two.", h.Vm.ResultText);
+    }
+
+    [Fact]
+    public async Task ResultText_IsEmptyWhileModelsAreMissing()
+    {
+        await using var h = new Harness(modelsInstalled: false);
+
+        h.Vm.SourceText = "先检查缓存。";
+        await Task.Delay(50);
+
+        Assert.Equal("", h.Vm.ResultText);
+    }
 }

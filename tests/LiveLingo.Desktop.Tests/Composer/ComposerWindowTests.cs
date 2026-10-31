@@ -141,4 +141,33 @@ public class ComposerWindowTests
         h.Permission.Received(1).OpenSettings();
         window.Close();
     }
+
+    [AvaloniaFact]
+    public async Task EveryTextDisplay_IsSelectable_SoItCanBeCopied()
+    {
+        var (window, h) = Open(modelsInstalled: false);
+        await using var _ = h;
+        Find<TextBox>(window, "SourceBox").Text = "先检查缓存。";
+        await Task.Delay(30);
+
+        Assert.IsType<SelectableTextBlock>(Find<SelectableTextBlock>(window, "BannerText"));
+        Assert.IsType<SelectableTextBlock>(Find<SelectableTextBlock>(window, "ResultTextBlock"));
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public async Task AFinishedResult_IsOneSelectableBlockWithTheWholeText()
+    {
+        var (window, h) = Open();
+        await using var _ = h;
+
+        Find<TextBox>(window, "SourceBox").Text = "先检查缓存。再更新索引。";
+        await Wait.Until(() => h.Vm.Status == ComposerStatus.Ready);
+
+        var block = Find<SelectableTextBlock>(window, "ResultTextBlock");
+        Assert.True(block.IsVisible);
+        Assert.Equal("T:先检查缓存。T:再更新索引。", block.Text);
+        Assert.False(window.FindControl<ItemsControl>("ResultList")!.IsVisible);
+        window.Close();
+    }
 }
