@@ -41,28 +41,23 @@ dotnet run --project src/LiveLingo.Desktop
 ```
 LiveLingo/
 ├── src/
-│   ├── LiveLingo.Core/              # Pure C# — translation pipeline, AI engines, models
-│   │   ├── Engines/                 # LLamaSharp (Gemma 4) + MarianMT ONNX engines
-│   │   ├── Models/                  # Model registry + download / install / cleanup
-│   │   │                            #   collaborators (incl. ObsoleteModelCleaner)
-│   │   ├── Processing/              # Post-processing (summarize, optimize, colloquialize)
-│   │   ├── Settings/                # User settings model + JSON persistence
-│   │   ├── Speech/                  # sherpa-onnx STT engines (Cohere / SenseVoice),
-│   │   │                            #   SpeechModelRouting, Silero VAD
-│   │   └── Translation/             # Translation pipeline orchestration
+│   ├── LiveLingo.Core/              # Pure C# — composer domain, inference, models
+│   │   └── Models/                  # Model download / install / cleanup collaborators
+│   │                                #   (Drafting, Dictation, Cleanup, Translation, Inference
+│   │                                #   and Speech/Native are added by the composer plan)
 │   │
-│   └── LiveLingo.Desktop/           # Avalonia 11 UI application
+│   └── LiveLingo.Desktop/           # Avalonia UI application
 │       ├── Platform/
 │       │   ├── Windows/             # Win32 hotkeys, SendInput text injection
 │       │   └── macOS/               # CGEventTap hotkeys, Cocoa text injection
-│       ├── Views/                   # AXAML windows + code-behind
-│       ├── ViewModels/              # CommunityToolkit.Mvvm — pure C#, no Avalonia refs
-│       ├── Services/                # Localization, update service
+│       ├── Services/                # Settings, localization, update service
 │       └── Styles/                  # AppTheme, adaptive color system
 │
+├── docs/superpowers/                # Design specs, plans, UX prototypes (see below)
+├── poc/                             # Validated POCs (sources only; corpora are not committed)
 ├── tests/
 │   ├── LiveLingo.Core.Tests/        # Unit tests for Core
-│   └── LiveLingo.Desktop.Tests/     # Unit tests for ViewModels
+│   └── LiveLingo.Desktop.Tests/     # Unit tests for Desktop services and view models
 │
 ├── build/                           # Nuke build automation
 │   ├── BuildTask.cs                 # All build targets
@@ -118,13 +113,6 @@ LiveLingo uses [Nuke](https://nuke.build/) for build automation. All targets are
 ./build.sh Run                                       # Launch in Debug mode
 ./build.sh Mutate                                    # Run mutation testing only
 
-# End-to-end probes (real model download + inference; not part of the unit-test gate)
-./build.sh ProbeTranslation                          # Real Gemma 4 translation probe
-./build.sh ProbeStt                                  # Real sherpa-onnx STT probe (uses bundled wav)
-./build.sh ProbeStt --ProbeWavPath ~/sample.wav \
-                    --ProbeSttLang en \
-                    --ProbeSttExpected "hello"       # Custom wav + language + assertion
-
 # Packaging
 ./build.sh Publish --Runtime osx-arm64               # Publish for macOS
 ./build.ps1 Publish --Runtime win-x64                # Publish for Windows
@@ -135,38 +123,19 @@ LiveLingo uses [Nuke](https://nuke.build/) for build automation. All targets are
 
 Use `--Configuration Release` for release builds. On CI, configuration defaults to Release automatically.
 
-### `ProbeStt` operational notes
-
-`ProbeStt` exercises the full sherpa-onnx pipeline on the host machine:
-download → tar.bz2 extract → `OfflineRecognizer` init → real wav decode →
-substring assertion. It is intentionally kept off the unit-test gate because
-it requires network and disk for the model archive (~1.6 GB for Cohere
-Transcribe).
-
-| Parameter | Default | Purpose |
-|-----------|---------|---------|
-| `--ProbeWavPath` | `<model>/test_wavs/en.wav` (bundled with the archive) | 16 kHz mono PCM16 wav file to transcribe |
-| `--ProbeSttLang` | `""` (no hint) | Optional ISO-639-1 language hint |
-| `--ProbeSttExpected` | `""` (no assertion) | Substring that must appear in the transcript |
-| `--ProbeModelPath` | `%LocalAppData%/LiveLingo/models` | Where to cache the downloaded bundle |
-
-The probe reuses the model cache between runs — the first invocation downloads
-~1.6 GB, subsequent invocations reuse the extracted archive.
-
 ### Obsolete model cleanup
 
-`ObsoleteModelRegistry` (see `LiveLingo.Core/Models/`) lists model IDs that
-are no longer shipped. On startup, `App.axaml.cs` fires
-`IModelManager.CleanObsoleteModelsAsync` to delete the corresponding
-directories and log the disk reclaimed. When retiring a model, add its ID to
-`ObsoleteModelRegistry.Ids`; existing installs will sweep it on next launch.
+`IModelManager.CleanObsoleteModelsAsync` deletes the directories of model ids the
+caller passes in and reports the bytes reclaimed. The 1.x model directories
+(Gemma, Marian, Qwen processors) are retired by the composer rewrite; the app
+must ask the user before removing them (design spec, S7).
 
 ---
 
 ## Model downloads
 
-Model downloads are a **process-global concern**: the Setup Wizard, the
-Settings → Models cards, the Overlay STT status line and any background
+Model downloads are a **process-global concern**: the first-run banner, the
+settings model cards, the composer status line and any background
 "ensure model before use" call must all observe the same lifecycle so that
 
 - a download started from one surface is visible on every other surface, and
@@ -187,8 +156,7 @@ is the single owner of that lifecycle.
    ```
 
    This applies to every ViewModel, Service or background coordinator that
-   wants to *report* a download to the user — including the Overlay's STT
-   status line, the Setup Wizard, and any future Settings affordances.
+   wants to *report* a download to the user.
 
 2. **`IModelManager.EnsureModelAsync` is a low-level primitive.** It is
    marked `[EditorBrowsable(Advanced)]` and the XML doc points new callers
@@ -201,7 +169,6 @@ is the single owner of that lifecycle.
    `IModelDownloadCoordinator.StateChanged` must implement `IDisposable` (or
    already does) and unsubscribe in `Dispose` — otherwise the coordinator
    keeps the subscriber alive for the lifetime of the process.
-   `SetupWizardViewModel` and `OverlayViewModel` are the canonical examples.
 
 4. **Tests use `InProcessModelDownloadCoordinator` over a mocked
    `IModelManager`** for integration-style tests, and mock the coordinator
@@ -229,9 +196,8 @@ The `Test` target enforces three quality gates. **All must pass for CI to succee
 - Platform implementations (`Platform.Windows.*`, `Platform.macOS.*`)
 - View layer (`Views.*`, `Controls.*`)
 - Infrastructure (`Program`, `App`, `VelopackUpdateService`)
-- AI model hosts that require GPU (`LlamaModelHost`, `MarianOnnxEngine`)
-- sherpa-onnx engines (`SherpaCohereTranscribeEngine`, `SherpaSenseVoiceTranscribeEngine`)
-  — covered by the dedicated `ProbeStt` Nuke target instead of unit-test mocks
+- AI model hosts and native adapters (`Inference.LlamaServerHost*`, `Speech.Native.*`)
+  — covered by end-to-end Nuke probe targets instead of unit-test mocks
 
 ### 2. Mutation Testing
 
@@ -239,7 +205,9 @@ The `Test` target enforces three quality gates. **All must pass for CI to succee
 |--------|-----------|------|
 | Mutation score | ≥ **80%** | [Stryker.NET](https://stryker-mutator.io/) |
 
-Stryker only targets `LiveLingo.Core` (source generators in Avalonia projects are incompatible).
+Stryker only targets the pure-logic modules of `LiveLingo.Core`
+(`Drafting`, `Translation`, `Dictation`, `Cleanup`; see `tests/LiveLingo.Core.Tests/stryker-config.json`).
+Source generators in Avalonia projects are incompatible with it.
 
 ### 3. Test Conventions
 
@@ -285,12 +253,10 @@ Only final installer artifacts (`.exe`, `.msi`, `.pkg`) are published — no sou
 
 ## Adding a New Language
 
-1. Add the language code to the supported list in `LiveLingo.Core`
-2. Ensure the AI model supports it. Gemma 4 26B-A4B MoE covers all major
-   languages; for voice input, check that the chosen STT bundle (Cohere
-   Transcribe 14-Lang, or SenseVoice CJK+EN) handles the source language.
-3. Add UI translations in `Resources/i18n/` if adding a new UI locale
-4. Add tests for the new language pair
+Only Chinese ↔ English is validated (see `poc/text-translation/REPORT.md` and the
+voice design spec). Adding a language requires a new evaluation run on a
+representative corpus before it is exposed in the UI; UI locales live in
+`Resources/i18n/`.
 
 ---
 

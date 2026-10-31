@@ -18,6 +18,14 @@ Press a hotkey → type → get your translation → send it. All offline. All l
 
 ---
 
+> **Rewrite in progress (branch `feat/composer-v3`).** LiveLingo 2.0 replaces the translator overlay with a
+> single *composer* for voice dictation and translation (Chinese ↔ English first), designed for Apple M2 / 16 GB
+> and equivalent Windows hardware. The feature list below describes the released 1.x line (tag `v1.4.2`) and is
+> updated as 2.0 milestones land. Design: [docs/superpowers/specs/2026-10-31-livelingo-composer-design.md](docs/superpowers/specs/2026-10-31-livelingo-composer-design.md);
+> plan: [docs/superpowers/plans/2026-10-31-composer-implementation.md](docs/superpowers/plans/2026-10-31-composer-implementation.md).
+
+---
+
 ## Why LiveLingo?
 
 You're chatting with a colleague in Tokyo. Mid-conversation, you need to reply in Japanese — but your Japanese is… *creative* at best. You could open a browser, navigate to some translation site, copy-paste, wait for the response, copy-paste again…

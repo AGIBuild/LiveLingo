@@ -38,33 +38,6 @@ class BuildTask : NukeBuild
     [Parameter("Minimum mutation score percentage")]
     readonly int MutationThreshold = 80;
 
-    [Parameter("Enable translation regression probe target")]
-    readonly bool EnableTranslationProbe = true;
-
-    [Parameter("Model path used by translation probe")]
-    readonly string ProbeModelPath = string.Empty;
-
-    [Parameter("Source text used by translation probe")]
-    readonly string ProbeSourceText = "你好";
-
-    [Parameter("Expected substring in translation result")]
-    readonly string ProbeExpectedContains = "hello";
-
-    [Parameter("Batch probe cases: source=>expected;source=>expected")]
-    readonly string ProbeCases = "你好=>hello;谢谢=>thank;早上好=>morning";
-
-    [Parameter("Enable sherpa-onnx STT regression probe target")]
-    readonly bool EnableSttProbe = true;
-
-    [Parameter("Path to a 16 kHz mono wav file used by the STT probe")]
-    readonly string ProbeWavPath = string.Empty;
-
-    [Parameter("Optional language hint (ISO-639-1) for the STT probe, e.g. en / zh / ja")]
-    readonly string ProbeSttLang = string.Empty;
-
-    [Parameter("Expected substring in the STT probe transcription result")]
-    readonly string ProbeSttExpected = string.Empty;
-
     AbsolutePath SourceDir => RootDirectory / "src";
     AbsolutePath TestsDir => RootDirectory / "tests";
     AbsolutePath PublishDir => RootDirectory / "publish";
@@ -226,104 +199,6 @@ class BuildTask : NukeBuild
                 .SetProcessLogger(RunProcessLogger));
         });
 
-    Target ProbeTranslation => _ => _
-        .DependsOn(Build)
-        .OnlyWhenDynamic(() => EnableTranslationProbe)
-        .Executes(() =>
-        {
-            var probeProject = TestsDir / "LiveLingo.Core.Tests" / "LiveLingo.Core.Tests.csproj";
-            var modelPath = string.IsNullOrWhiteSpace(ProbeModelPath)
-                ? Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "LiveLingo",
-                    "models")
-                : ProbeModelPath;
-            var env = new Dictionary<string, string>
-            {
-                ["LIVELINGO_ENABLE_TRANSLATION_PROBE"] = "1",
-                ["LIVELINGO_PROBE_SOURCE_TEXT"] = ProbeSourceText,
-                ["LIVELINGO_PROBE_EXPECTED_CONTAINS"] = ProbeExpectedContains,
-                ["LIVELINGO_PROBE_MODEL_PATH"] = modelPath
-            }.AsReadOnly();
-
-            Log.Information("Running translation probe with source text: {Text}", ProbeSourceText);
-            Log.Information("Probe model path: {ModelPath}", modelPath);
-
-            DotNet(
-                $"test \"{probeProject}\" " +
-                $"--configuration {Configuration} " +
-                $"--no-build " +
-                $"--filter \"FullyQualifiedName~MarianTranslationProbeTests\" " +
-                $"--nologo",
-                environmentVariables: env);
-        });
-
-    Target ProbeTranslationAll => _ => _
-        .DependsOn(Build)
-        .OnlyWhenDynamic(() => EnableTranslationProbe)
-        .Executes(() =>
-        {
-            var probeProject = TestsDir / "LiveLingo.Core.Tests" / "LiveLingo.Core.Tests.csproj";
-            var modelPath = string.IsNullOrWhiteSpace(ProbeModelPath)
-                ? Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "LiveLingo",
-                    "models")
-                : ProbeModelPath;
-            var env = new Dictionary<string, string>
-            {
-                ["LIVELINGO_ENABLE_TRANSLATION_PROBE"] = "1",
-                ["LIVELINGO_PROBE_CASES"] = ProbeCases,
-                ["LIVELINGO_PROBE_MODEL_PATH"] = modelPath
-            }.AsReadOnly();
-
-            Log.Information("Running translation batch probe with cases: {Cases}", ProbeCases);
-            Log.Information("Probe model path: {ModelPath}", modelPath);
-
-            DotNet(
-                $"test \"{probeProject}\" " +
-                $"--configuration {Configuration} " +
-                $"--no-build " +
-                $"--filter \"FullyQualifiedName~Translate_ZhToEn_BatchCases_ProducesExpectedText\" " +
-                $"--nologo",
-                environmentVariables: env);
-        });
-
-    Target ProbeStt => _ => _
-        .DependsOn(Build)
-        .OnlyWhenDynamic(() => EnableSttProbe)
-        .Executes(() =>
-        {
-            var probeProject = TestsDir / "LiveLingo.Core.Tests" / "LiveLingo.Core.Tests.csproj";
-            var modelPath = string.IsNullOrWhiteSpace(ProbeModelPath)
-                ? Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "LiveLingo",
-                    "models")
-                : ProbeModelPath;
-
-            var env = new Dictionary<string, string>
-            {
-                ["LIVELINGO_ENABLE_STT_PROBE"] = "1",
-                ["LIVELINGO_PROBE_WAV_PATH"] = ProbeWavPath,
-                ["LIVELINGO_PROBE_LANG"] = ProbeSttLang,
-                ["LIVELINGO_PROBE_EXPECTED_CONTAINS"] = ProbeSttExpected,
-                ["LIVELINGO_PROBE_MODEL_PATH"] = modelPath
-            }.AsReadOnly();
-
-            Log.Information("Running STT probe with wav: {Wav}", ProbeWavPath);
-            Log.Information("Probe model path: {ModelPath}", modelPath);
-
-            DotNet(
-                $"test \"{probeProject}\" " +
-                $"--configuration {Configuration} " +
-                $"--no-build " +
-                $"--filter \"FullyQualifiedName~SherpaSttProbeTests\" " +
-                $"--logger \"console;verbosity=detailed\" " +
-                $"--nologo",
-                environmentVariables: env);
-        });
-
     Target Publish => _ => _
         .DependsOn(Test)
         .Executes(() =>
@@ -349,13 +224,9 @@ class BuildTask : NukeBuild
             $"--project LiveLingo.Core.csproj " +
             $"--break-at {MutationThreshold} " +
             $"--reporter progress --reporter json " +
-            $"--mutate \"!**/Engines/MarianOnnxEngine*\" " +
-            $"--mutate \"!**/Processing/QwenModelHost.cs\" " +
-            $"--mutate \"!**/Processing/QwenTextProcessor.cs\" " +
-            $"--mutate \"!**/Processing/SummarizeProcessor.cs\" " +
-            $"--mutate \"!**/Processing/OptimizeProcessor.cs\" " +
-            $"--mutate \"!**/Processing/ColloquializeProcessor.cs\" " +
-            $"--mutate \"!**/ServiceCollectionExtensions.cs\"",
+            $"--mutate \"!**/ServiceCollectionExtensions.cs\" " +
+            $"--mutate \"!**/Inference/LlamaServerHost*\" " +
+            $"--mutate \"!**/Speech/Native/**\"",
             workingDirectory: coreTestDir);
 
         var reportFile = coreTestDir.GlobFiles("**/StrykerOutput/**/mutation-report.json")

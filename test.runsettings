@@ -5,7 +5,7 @@
       <DataCollector friendlyName="XPlat code coverage">
         <Configuration>
           <Format>cobertura</Format>
-          <Exclude>[*]LiveLingo.Desktop.Platform.Windows.*,[*]LiveLingo.Desktop.Platform.macOS.*,[*]LiveLingo.Desktop.Views.*,[*]LiveLingo.Desktop.Controls.*,[*]LiveLingo.Desktop.Program,[*]LiveLingo.Desktop.App,[*]LiveLingo.Desktop.Services.Update.VelopackUpdateService,[*]LiveLingo.Core.Engines.MarianOnnxEngine*,[*]LiveLingo.Core.Processing.QwenModelHost,[*]LiveLingo.Core.Processing.QwenTextProcessor,[*]LiveLingo.Core.Processing.SummarizeProcessor,[*]LiveLingo.Core.Processing.OptimizeProcessor,[*]LiveLingo.Core.Processing.ColloquializeProcessor</Exclude>
+          <Exclude>[*]LiveLingo.Desktop.Platform.Windows.*,[*]LiveLingo.Desktop.Platform.macOS.*,[*]LiveLingo.Desktop.Views.*,[*]LiveLingo.Desktop.Controls.*,[*]LiveLingo.Desktop.Program,[*]LiveLingo.Desktop.App,[*]LiveLingo.Desktop.Services.Update.VelopackUpdateService,[*]LiveLingo.Core.Inference.LlamaServerHost*,[*]LiveLingo.Core.Speech.Native.*</Exclude>
           <ExcludeByAttribute>Obsolete,GeneratedCodeAttribute,CompilerGeneratedAttribute</ExcludeByAttribute>
         </Configuration>
       </DataCollector>
