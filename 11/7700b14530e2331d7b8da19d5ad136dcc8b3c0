@@ -1,0 +1,36 @@
+tests/LiveLingo.Core.Tests/Drafting/DraftSessionTests.cs
+  s_6d6e9175f38e45::t_4d0859bd5ca972 50
+  s_6d6e9175f38e45::t_21bbc98488a5d1 1-49,51-73
+src/LiveLingo.Core/Drafting/DraftSession.cs
+  s_6d6e9175f38e45::t_4d0859bd5ca972 5,11,13-17
+  s_6d6e9175f38e45::t_628141e8eac531 1-4,6-10,12,18-50
+tests/LiveLingo.Core.Tests/Drafting/DraftTests.cs
+  s_6d6e9175f38e45::t_649829088d6218 292-343
+src/LiveLingo.Core/Drafting/Draft.cs
+  s_6d6e9175f38e45::t_628141e8eac531 117-128
+  s_6d6e9175f38e45::t_ccd1e304eecfc1 47,62
+src/LiveLingo.Core/Translation/ITranslator.cs
+  s_6d6e9175f38e45::t_a6c823af5e8737 1-10
+src/LiveLingo.Core/Translation/LlmTranslator.cs
+  s_6d6e9175f38e45::t_f861831c14a89c 1-29
+src/LiveLingo.Core/Translation/TranslationRequest.cs
+  s_6d6e9175f38e45::t_d62c9ebfcc42a3 12
+tests/LiveLingo.Core.Tests/Translation/LlmTranslatorTests.cs
+  s_6d6e9175f38e45::t_2e4db91094b247 1-69
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "117700b14530e2331d7b8da19d5ad136dcc8b3c0",
+  "prompts": {},
+  "sessions": {
+    "s_6d6e9175f38e45": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "f74d37e5-1d96-4ddc-a3f9-5ae24ff39e38",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
