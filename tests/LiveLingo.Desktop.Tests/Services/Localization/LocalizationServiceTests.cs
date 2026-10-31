@@ -213,7 +213,9 @@ public class LocalizationServiceTests
             "composer.mic",
             "composer.banner.micDenied",
             "composer.banner.micDeniedAction",
-            "composer.banner.noMic"
+            "composer.banner.noMic",
+            "composer.banner.noSound",
+            "composer.status.keptOriginal"
         ];
         foreach (var key in criticalKeys)
         {

@@ -7,6 +7,12 @@ namespace LiveLingo.Desktop.Composer;
 /// <summary>Speech input into a draft: opens the microphone and runs a dictation session until stopped.</summary>
 public interface IVoiceInput : IAsyncDisposable
 {
+    /// <summary>
+    /// True when the open microphone has delivered only silence for a while, false when sound returns.
+    /// Raised on the audio thread.
+    /// </summary>
+    event Action<bool>? NoSignalChanged;
+
     /// <exception cref="LiveLingo.Core.Models.ModelNotReadyException">A speech model is not installed.</exception>
     /// <exception cref="InvalidOperationException">There is no input device or it could not be opened.</exception>
     Task StartAsync(DraftSession draft, IReadOnlyList<string> glossary, CancellationToken ct);
@@ -17,7 +23,12 @@ public interface IVoiceInput : IAsyncDisposable
 
 public sealed class MicrophoneVoiceInput(IDictationSessionFactory factory, IMicrophone microphone) : IVoiceInput
 {
+    private static readonly TimeSpan SilenceTimeout = TimeSpan.FromSeconds(4);
+
     private DictationSession? _session;
+    private SignalMonitor? _monitor;
+
+    public event Action<bool>? NoSignalChanged;
 
     public async Task StartAsync(DraftSession draft, IReadOnlyList<string> glossary, CancellationToken ct)
     {
@@ -26,9 +37,16 @@ public sealed class MicrophoneVoiceInput(IDictationSessionFactory factory, IMicr
 
         var session = await factory.CreateAsync(draft, glossary, ct).ConfigureAwait(false);
         session.Start();
+        var monitor = new SignalMonitor(SilenceTimeout);
+        _monitor = monitor;
         try
         {
-            microphone.Start(session.Push);
+            microphone.Start(frame =>
+            {
+                if (monitor.Observe(frame) is { } silent)
+                    NoSignalChanged?.Invoke(silent);
+                session.Push(frame);
+            });
         }
         catch
         {

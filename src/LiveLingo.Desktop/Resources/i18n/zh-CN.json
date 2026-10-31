@@ -48,5 +48,7 @@
   "composer.mic": "点按开始或结束，按住说话",
   "composer.banner.micDenied": "没有麦克风权限。请在系统设置里允许 LiveLingo 使用麦克风。",
   "composer.banner.micDeniedAction": "打开系统设置",
-  "composer.banner.noMic": "无法使用麦克风：{0}"
+  "composer.banner.noMic": "无法使用麦克风：{0}",
+  "composer.banner.noSound": "没有听到声音。请检查麦克风、输入音量，或在系统设置里选对输入设备。",
+  "composer.status.keptOriginal": "回车写入 · {0} 句保留原话（整理未通过保真检查）"
 }

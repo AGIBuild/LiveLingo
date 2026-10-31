@@ -294,4 +294,56 @@ public class ComposerVoiceTests
 
         Assert.True(h.Voice.Stops >= 1);
     }
+
+    [Fact]
+    public async Task ADeadMicrophone_ShowsTheNoSoundBanner_AndSoundReturningClearsIt()
+    {
+        await using var h = Create();
+        await h.Vm.StartListeningAsync();
+
+        h.Voice.RaiseNoSignal(true);
+        Assert.Equal(BannerKind.NoSound, h.Vm.Banner.Kind);
+
+        h.Voice.RaiseNoSignal(false);
+        Assert.Equal(BannerKind.None, h.Vm.Banner.Kind);
+    }
+
+    [Fact]
+    public async Task NoSound_IsIgnoredWhenNotListening_AndDoesNotReplaceAnotherBanner()
+    {
+        await using var h = Create();
+
+        h.Voice.RaiseNoSignal(true);
+        Assert.Equal(BannerKind.None, h.Vm.Banner.Kind);
+
+        h.Permission.Status.Returns(MicrophoneAccess.Denied);
+        await h.Vm.StartListeningAsync();
+        h.Voice.RaiseNoSignal(true);
+        Assert.Equal(BannerKind.MicrophoneDenied, h.Vm.Banner.Kind);
+    }
+
+    [Fact]
+    public async Task StoppingListening_ClearsTheNoSoundBanner()
+    {
+        await using var h = Create();
+        await h.Vm.StartListeningAsync();
+        h.Voice.RaiseNoSignal(true);
+
+        await h.Vm.StopListeningAsync();
+
+        Assert.Equal(BannerKind.None, h.Vm.Banner.Kind);
+    }
+
+    [Fact]
+    public async Task SentencesThatKeptTheirWording_AreCounted_WhenCleanIsSelected()
+    {
+        await using var h = Create(output: ComposerOutput.Clean);
+        h.Cleaner.Handler = (request, _) => Task.FromResult(request.Target.Contains("8080") ? "端口改一下。" : request.Target);
+
+        h.Vm.SourceText = "端口改成 8080。再补测试。";
+        await Wait.Until(() => h.Vm.Status == ComposerStatus.Ready);
+
+        Assert.Equal(1, h.Vm.KeptOriginalCount);
+        Assert.Equal("端口改成 8080。再补测试。", h.Vm.ResultText);
+    }
 }
