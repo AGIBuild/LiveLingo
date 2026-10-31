@@ -1,0 +1,29 @@
+src/LiveLingo.Core/Models/Downloads/HuggingFaceMirrorPolicy.cs
+  s_6d6e9175f38e45::t_18d64700e564de 7-9,26-27,33-35,42,45-46,49-51,54,61,63,66
+src/LiveLingo.Core/Models/Downloads/HttpRangeDownloader.cs
+  s_6d6e9175f38e45::t_18d64700e564de 225-226
+tests/LiveLingo.Core.Tests/Models/Downloads/HuggingFaceMirrorPolicyTests.cs
+  s_6d6e9175f38e45::t_7eaad51a7fcce0 40,86
+tests/LiveLingo.Core.Tests/Models/ModelManagerTests.cs
+  s_6d6e9175f38e45::t_dff017f2fe6420 593,599-600,605,608,610-611
+src/LiveLingo.Core/Models/Downloads/HfResolveAssetDownloader.cs
+  s_6d6e9175f38e45::t_18d64700e564de 52-54
+docs/superpowers/plans/2026-10-31-composer-implementation.md
+  s_6d6e9175f38e45::t_697f00301b14f6 17-41
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "98f9ef2b0f2ab8a1f6f2747793ce2aaad204ab35",
+  "prompts": {},
+  "sessions": {
+    "s_6d6e9175f38e45": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "f74d37e5-1d96-4ddc-a3f9-5ae24ff39e38",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
