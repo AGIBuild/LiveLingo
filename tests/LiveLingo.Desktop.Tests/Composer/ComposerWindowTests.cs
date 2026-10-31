@@ -173,6 +173,24 @@ public class ComposerWindowTests
     }
 
     [AvaloniaFact]
+    public async Task InteractiveControlsWithoutVisibleText_HaveAccessibleNames_AndStatusIsALiveRegion()
+    {
+        var (window, h) = Open();
+        await using var _ = h;
+
+        Assert.Equal("composer.mic", Avalonia.Automation.AutomationProperties.GetName(Find<Button>(window, "MicButton")));
+        Assert.Equal("composer.swap", Avalonia.Automation.AutomationProperties.GetName(Find<Button>(window, "SwapButton")));
+        Assert.Equal("composer.placeholder", Avalonia.Automation.AutomationProperties.GetName(Find<TextBox>(window, "SourceBox")));
+        Assert.Equal(
+            Avalonia.Automation.AutomationLiveSetting.Polite,
+            Avalonia.Automation.AutomationProperties.GetLiveSetting(Find<TextBlock>(window, "StatusText")));
+        Assert.Equal(
+            Avalonia.Automation.AutomationLiveSetting.Assertive,
+            Avalonia.Automation.AutomationProperties.GetLiveSetting(Find<SelectableTextBlock>(window, "BannerText")));
+        window.Close();
+    }
+
+    [AvaloniaFact]
     public async Task TheRecentButton_ShowsOnlyWhenThereAreEarlierDrafts()
     {
         var (empty, h1) = Open();

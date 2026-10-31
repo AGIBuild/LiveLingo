@@ -60,6 +60,12 @@ public partial class ComposerWindow : Window
         SourceBox.Watermark = texts.Placeholder;
         Avalonia.Controls.ToolTip.SetTip(MicButton, texts.MicLabel);
         Avalonia.Automation.AutomationProperties.SetName(MicButton, texts.MicLabel);
+        Avalonia.Controls.ToolTip.SetTip(SwapButton, texts.SwapLabel);
+        Avalonia.Automation.AutomationProperties.SetName(SwapButton, texts.SwapLabel);
+        Avalonia.Automation.AutomationProperties.SetName(SourceBox, texts.Placeholder);
+        // Screen readers announce state changes without moving focus.
+        Avalonia.Automation.AutomationProperties.SetLiveSetting(StatusText, Avalonia.Automation.AutomationLiveSetting.Polite);
+        Avalonia.Automation.AutomationProperties.SetLiveSetting(BannerText, Avalonia.Automation.AutomationLiveSetting.Assertive);
 
         MicButton.AddHandler(PointerPressedEvent, OnMicPressed, RoutingStrategies.Tunnel);
         MicButton.AddHandler(PointerReleasedEvent, OnMicReleased, RoutingStrategies.Tunnel);

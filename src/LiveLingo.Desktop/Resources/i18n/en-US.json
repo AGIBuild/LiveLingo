@@ -46,6 +46,7 @@
   "composer.status.listening": "Listening…",
   "composer.status.starting": "Loading speech models…",
   "composer.mic": "Tap to start or stop, hold to talk",
+  "composer.swap": "Swap translation direction",
   "composer.banner.micDenied": "Microphone access is off. Allow LiveLingo to use the microphone in System Settings.",
   "composer.banner.micDeniedAction": "Open Settings",
   "composer.banner.noMic": "Cannot use the microphone: {0}",

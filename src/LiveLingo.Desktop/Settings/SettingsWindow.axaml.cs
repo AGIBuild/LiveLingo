@@ -33,6 +33,10 @@ public partial class SettingsWindow : Window
         CloudKeyStored.Text = loc.T("settings.cloud.keyStored");
         CloudForgetButton.Content = loc.T("settings.cloud.forget");
         CloudError.Text = loc.T("settings.cloud.invalid");
+        Avalonia.Automation.AutomationProperties.SetName(GlossaryBox, loc.T("settings.glossary"));
+        Avalonia.Automation.AutomationProperties.SetName(CloudBaseUrlBox, loc.T("settings.cloud.baseUrl"));
+        Avalonia.Automation.AutomationProperties.SetName(CloudModelBox, loc.T("settings.cloud.model"));
+        Avalonia.Automation.AutomationProperties.SetName(CloudApiKeyBox, loc.T("settings.cloud.apiKey"));
         LegacyRemoveButton.Content = loc.T("settings.legacy.remove");
         vm.PropertyChanged += (_, e) =>
         {

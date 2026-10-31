@@ -24,5 +24,7 @@
     <true/>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>LiveLingo listens to your voice only while you dictate. Audio is recognized on this Mac and is never sent anywhere.</string>
 </dict>
 </plist>

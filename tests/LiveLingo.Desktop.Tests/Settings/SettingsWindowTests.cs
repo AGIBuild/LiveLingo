@@ -49,6 +49,7 @@ public class SettingsWindowTests
         window.Show();
 
         Assert.Equal('•', window.FindControl<TextBox>("CloudApiKeyBox")!.PasswordChar);
+        Assert.Equal("settings.cloud.apiKey", Avalonia.Automation.AutomationProperties.GetName(window.FindControl<TextBox>("CloudApiKeyBox")!));
         await Wait.Until(() => window.FindControl<Button>("CloudForgetButton")!.IsEffectivelyVisible);
     }
 }
