@@ -8,6 +8,11 @@ public class CoreOptions
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "LiveLingo", "models");
 
+    /// <summary>Where short-lived runtime state (pid records of started servers) is kept.</summary>
+    public string RuntimeStatePath { get; set; } = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "LiveLingo", "run");
+
     public int InferenceThreads { get; set; }
 
     /// <summary>Which translation model to run; the fast tier is the default for 16 GB machines.</summary>

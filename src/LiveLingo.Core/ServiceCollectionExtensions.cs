@@ -44,6 +44,11 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IModelManager>(sp => sp.GetRequiredService<ModelManager>());
         services.AddSingleton<IModelDownloadCoordinator, InProcessModelDownloadCoordinator>();
 
+        services.AddSingleton<IProcessInspector, SystemProcessInspector>();
+        services.AddSingleton(sp => new ServerPidRegistry(
+            sp.GetRequiredService<CoreOptions>().RuntimeStatePath,
+            sp.GetRequiredService<IProcessInspector>(),
+            sp.GetRequiredService<ILogger<ServerPidRegistry>>()));
         services.AddSingleton<ILlamaProcessLauncher, LlamaProcessLauncher>();
         services.AddSingleton<IServerHealthProbe, HttpHealthProbe>();
         services.AddSingleton<IPortAllocator, LoopbackPortAllocator>();
