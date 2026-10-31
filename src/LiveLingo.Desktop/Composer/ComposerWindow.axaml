@@ -100,6 +100,19 @@
         <Style Selector="Button.primary:disabled /template/ ContentPresenter">
             <Setter Property="Opacity" Value="0.4"/>
         </Style>
+        <Style Selector="Button.mic">
+            <Setter Property="Background" Value="{DynamicResource ComposerHover}"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Button.mic.listening">
+            <Setter Property="Background" Value="{DynamicResource ComposerAccent}"/>
+            <Setter Property="Foreground" Value="{DynamicResource ComposerAccentText}"/>
+        </Style>
+        <Style Selector="Button.mic.listening /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ComposerAccent}"/>
+            <Setter Property="Foreground" Value="{DynamicResource ComposerAccentText}"/>
+        </Style>
         <Style Selector="Button.segment">
             <Setter Property="Padding" Value="10,5"/>
         </Style>
@@ -126,6 +139,7 @@
                 <TextBlock x:Name="TargetText" Classes="muted" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
                 <Border Grid.Column="1" CornerRadius="10" Background="{DynamicResource ComposerHover}" Padding="2">
                     <StackPanel Orientation="Horizontal" Spacing="2">
+                        <Button x:Name="CleanButton" Classes="segment" Click="OnCleanClick"/>
                         <Button x:Name="TranslateButton" Classes="segment" Click="OnTranslateClick"/>
                         <Button x:Name="SwapButton" Classes="segment" Content="⇄" Click="OnSwapClick"/>
                         <Button x:Name="OriginalButton" Classes="segment" Click="OnOriginalClick"/>
@@ -168,10 +182,15 @@
                 </ItemsControl>
             </Border>
 
-            <Grid ColumnDefinitions="*,Auto,Auto">
-                <TextBlock x:Name="StatusText" Classes="muted" VerticalAlignment="Center"/>
-                <Button x:Name="CopyButton" Grid.Column="1" Margin="0,0,6,0" Command="{Binding CopyCommand}"/>
-                <Button x:Name="WriteButton" Grid.Column="2" Classes="primary" Command="{Binding WriteCommand}"/>
+            <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                <Button x:Name="MicButton" Classes="mic" Margin="0,0,10,0" Width="40" Height="40" Padding="0" CornerRadius="20">
+                    <Path Data="M12,3 A3,3 0 0 0 9,6 L9,11 A3,3 0 0 0 15,11 L15,6 A3,3 0 0 0 12,3 Z M6,11 A6,6 0 0 0 18,11 M12,17 L12,21"
+                          Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.8" StrokeLineCap="Round"
+                          HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Button>
+                <TextBlock x:Name="StatusText" Grid.Column="1" Classes="muted" VerticalAlignment="Center"/>
+                <Button x:Name="CopyButton" Grid.Column="2" Margin="0,0,6,0" Command="{Binding CopyCommand}"/>
+                <Button x:Name="WriteButton" Grid.Column="3" Classes="primary" Command="{Binding WriteCommand}"/>
             </Grid>
         </StackPanel>
     </Border>

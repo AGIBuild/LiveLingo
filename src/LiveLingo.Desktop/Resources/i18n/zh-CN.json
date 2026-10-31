@@ -35,11 +35,18 @@
   "composer.write": "写入",
   "composer.retry": "重试",
   "composer.result.empty": "（空）",
-  "composer.banner.modelMissing": "翻译需要先下载本地模型（约 {0}）。只有你同意后才会下载。",
+  "composer.banner.modelMissing": "需要先下载本地模型（约 {0}）。只有你同意后才会下载。",
   "composer.banner.download": "下载",
-  "composer.banner.downloading": "正在下载翻译模型 {0}%",
+  "composer.banner.downloading": "正在下载模型 {0}%",
   "composer.banner.downloadFailed": "下载失败：{0}",
   "composer.banner.downloadRetry": "重试",
   "composer.banner.targetLost": "原来的输入窗口已关闭，仍可复制结果。",
-  "composer.banner.writeFailed": "写入失败：{0}。结果已保留，可以复制。"
+  "composer.banner.writeFailed": "写入失败：{0}。结果已保留，可以复制。",
+  "composer.output.clean": "整理",
+  "composer.status.listening": "正在听…",
+  "composer.status.starting": "正在加载语音模型…",
+  "composer.mic": "点按开始或结束，按住说话",
+  "composer.banner.micDenied": "没有麦克风权限。请在系统设置里允许 LiveLingo 使用麦克风。",
+  "composer.banner.micDeniedAction": "打开系统设置",
+  "composer.banner.noMic": "无法使用麦克风：{0}"
 }

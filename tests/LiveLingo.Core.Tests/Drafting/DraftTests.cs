@@ -410,4 +410,35 @@ public class DraftTests
 
         Assert.Equal("", draft.Units[0].Translation.Error);
     }
+
+    [Fact]
+    public void SourceText_IsTheOriginalUnitsFollowedByTheLiveHypothesis()
+    {
+        var draft = new Draft(hasTarget: true);
+        draft.Append("先改接口。");
+        draft.Append("再补测试。");
+        draft.SetPending("然后更");
+
+        Assert.Equal("先改接口。再补测试。然后更", draft.SourceText());
+    }
+
+    [Fact]
+    public void SourceText_IgnoresCleanAndTranslationResults_AndSpacesEnglishSeams()
+    {
+        var draft = new Draft(hasTarget: true);
+        var ticket = draft.Append("Use Redis.");
+        draft.Complete(ticket, UnitKind.Clean, "Use redis.");
+        draft.SetPending("then retry");
+
+        Assert.Equal("Use Redis. then retry", draft.SourceText());
+    }
+
+    [Fact]
+    public void SourceText_KeepsTheLayoutOfUnitsThatCameFromTypedText()
+    {
+        var draft = new Draft(hasTarget: true);
+        draft.SyncSource(TextUnits.Split("第一行\n  第二行"), DraftRoute.Units);
+
+        Assert.Equal("第一行\n  第二行", draft.SourceText());
+    }
 }

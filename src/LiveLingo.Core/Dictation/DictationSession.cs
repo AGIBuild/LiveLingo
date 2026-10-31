@@ -111,8 +111,11 @@ public sealed class DictationSession : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         await StopAsync().ConfigureAwait(false);
-        _ = Task.WhenAll(_recognitionTask, _secondPassTask).ContinueWith(
-            _ => ReleaseRecognizers(), TaskScheduler.Default);
+        var workers = Task.WhenAll(_recognitionTask, _secondPassTask);
+        if (workers.IsCompleted)
+            ReleaseRecognizers();
+        else
+            _ = workers.ContinueWith(_ => ReleaseRecognizers(), TaskScheduler.Default);
     }
 
     private void ReleaseRecognizers()

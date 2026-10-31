@@ -5,6 +5,8 @@ using Avalonia.Markup.Xaml;
 using Avalonia.Platform;
 using Avalonia.Threading;
 using LiveLingo.Core;
+using LiveLingo.Core.Cleanup;
+using LiveLingo.Core.Dictation;
 using LiveLingo.Core.Drafting;
 using LiveLingo.Core.Inference;
 using LiveLingo.Core.Models;
@@ -181,6 +183,7 @@ public partial class App : Application
     }
 
     private static readonly TimeSpan TailIdleDelay = TimeSpan.FromSeconds(1.5);
+    private static readonly TimeSpan CleanupHoldback = TimeSpan.FromSeconds(2);
 
     private void Summon(IPlatformServices platform)
     {
@@ -198,31 +201,28 @@ public partial class App : Application
         var session = new DraftSession(hasTarget: target is not null, notifyOn: context);
         var scheduler = new TranslationScheduler(
             session, services.GetRequiredService<ITranslator>(), TargetLanguage.English, TailIdleDelay);
-        var tier = services.GetRequiredService<CoreOptions>().TranslatorTier;
+        var cleanup = new CleanupScheduler(
+            session, services.GetRequiredService<ITextCleaner>(), glossary: [], CleanupHoldback, contextUnits: 2);
+        var voice = new MicrophoneVoiceInput(services.GetRequiredService<IDictationSessionFactory>(), platform.Microphone);
         var vm = new ComposerViewModel(
             session,
             scheduler,
-            [ModelCatalog.LlamaRuntime, ModelCatalog.Translator(tier)],
+            ComposerModelPlan.Create(services.GetRequiredService<CoreOptions>().TranslatorTier),
             services.GetRequiredService<IModelManager>(),
             services.GetRequiredService<IModelDownloadCoordinator>(),
             platform,
+            voice,
+            glossary: [],
             target,
             context);
 
         var loc = services.GetRequiredService<ILocalizationService>();
-        var window = new ComposerWindow(
-            vm,
-            new ComposerTexts(loc),
-            target,
-            copyLabel: loc.T("composer.copy"),
-            writeLabel: loc.T("composer.write"),
-            originalLabel: loc.T("composer.output.original"),
-            placeholder: loc.T("composer.placeholder"),
-            retryLabel: loc.T("composer.retry"));
+        var window = new ComposerWindow(vm, new ComposerTexts(loc), target);
         window.Closed += async (_, _) =>
         {
             _composer = null;
-            vm.Dispose();
+            await vm.DisposeAsync();
+            await cleanup.DisposeAsync();
             await scheduler.DisposeAsync();
         };
         _composer = window;
