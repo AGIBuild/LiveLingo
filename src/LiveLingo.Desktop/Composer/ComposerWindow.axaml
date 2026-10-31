@@ -1,0 +1,178 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:LiveLingo.Desktop.Composer"
+        x:Class="LiveLingo.Desktop.Composer.ComposerWindow"
+        x:DataType="local:ComposerViewModel"
+        Width="680"
+        SizeToContent="Height"
+        CanResize="False"
+        ShowInTaskbar="False"
+        Topmost="True"
+        WindowDecorations="None"
+        Background="Transparent"
+        TransparencyLevelHint="Transparent"
+        WindowStartupLocation="Manual"
+        Title="LiveLingo">
+
+    <Window.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="ComposerPanel" Color="#F7FBFBFD"/>
+                    <SolidColorBrush x:Key="ComposerWell" Color="#FFFFFFFF"/>
+                    <SolidColorBrush x:Key="ComposerLine" Color="#1A0F141E"/>
+                    <SolidColorBrush x:Key="ComposerText" Color="#FF15181E"/>
+                    <SolidColorBrush x:Key="ComposerMuted" Color="#FF555D6B"/>
+                    <SolidColorBrush x:Key="ComposerAccent" Color="#FF4358D8"/>
+                    <SolidColorBrush x:Key="ComposerAccentText" Color="#FFFFFFFF"/>
+                    <SolidColorBrush x:Key="ComposerHover" Color="#0F0F141E"/>
+                    <SolidColorBrush x:Key="ComposerWarnBg" Color="#FFFFF4D9"/>
+                    <SolidColorBrush x:Key="ComposerWarnText" Color="#FF8A5A00"/>
+                    <SolidColorBrush x:Key="ComposerDanger" Color="#FFB3382C"/>
+                    <SolidColorBrush x:Key="ComposerSkeleton" Color="#1A0F141E"/>
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Dark">
+                    <SolidColorBrush x:Key="ComposerPanel" Color="#F21E2026"/>
+                    <SolidColorBrush x:Key="ComposerWell" Color="#FF272A32"/>
+                    <SolidColorBrush x:Key="ComposerLine" Color="#26FFFFFF"/>
+                    <SolidColorBrush x:Key="ComposerText" Color="#FFECEEF3"/>
+                    <SolidColorBrush x:Key="ComposerMuted" Color="#FFA9AFBC"/>
+                    <SolidColorBrush x:Key="ComposerAccent" Color="#FF8C9CFF"/>
+                    <SolidColorBrush x:Key="ComposerAccentText" Color="#FF10131F"/>
+                    <SolidColorBrush x:Key="ComposerHover" Color="#14FFFFFF"/>
+                    <SolidColorBrush x:Key="ComposerWarnBg" Color="#FF3A3015"/>
+                    <SolidColorBrush x:Key="ComposerWarnText" Color="#FFF2C66B"/>
+                    <SolidColorBrush x:Key="ComposerDanger" Color="#FFFF8A7E"/>
+                    <SolidColorBrush x:Key="ComposerSkeleton" Color="#26FFFFFF"/>
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+        </ResourceDictionary>
+    </Window.Resources>
+
+    <Window.Styles>
+        <Style Selector="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource ComposerText}"/>
+            <Setter Property="FontSize" Value="14"/>
+        </Style>
+        <Style Selector="TextBlock.muted">
+            <Setter Property="Foreground" Value="{DynamicResource ComposerMuted}"/>
+            <Setter Property="FontSize" Value="13"/>
+        </Style>
+        <Style Selector="TextBlock.failed">
+            <Setter Property="Foreground" Value="{DynamicResource ComposerDanger}"/>
+        </Style>
+        <Style Selector="TextBox">
+            <Setter Property="Foreground" Value="{DynamicResource ComposerText}"/>
+        </Style>
+        <Style Selector="TextBox /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+        <Style Selector="TextBox:pointerover /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+        <Style Selector="TextBox:focus /template/ Border#PART_BorderElement">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+        <Style Selector="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource ComposerText}"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="12,6"/>
+            <Setter Property="FontSize" Value="13"/>
+        </Style>
+        <Style Selector="Button:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ComposerHover}"/>
+            <Setter Property="Foreground" Value="{DynamicResource ComposerText}"/>
+        </Style>
+        <Style Selector="Button.primary">
+            <Setter Property="Background" Value="{DynamicResource ComposerAccent}"/>
+            <Setter Property="Foreground" Value="{DynamicResource ComposerAccentText}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+        <Style Selector="Button.primary:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ComposerAccent}"/>
+            <Setter Property="Foreground" Value="{DynamicResource ComposerAccentText}"/>
+            <Setter Property="Opacity" Value="0.9"/>
+        </Style>
+        <Style Selector="Button.primary:disabled /template/ ContentPresenter">
+            <Setter Property="Opacity" Value="0.4"/>
+        </Style>
+        <Style Selector="Button.segment">
+            <Setter Property="Padding" Value="10,5"/>
+        </Style>
+        <Style Selector="Button.segment.active">
+            <Setter Property="Background" Value="{DynamicResource ComposerWell}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+        <Style Selector="Button.segment.active:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource ComposerWell}"/>
+        </Style>
+    </Window.Styles>
+
+    <Border x:Name="Panel"
+            Margin="18"
+            Padding="14"
+            CornerRadius="18"
+            Background="{DynamicResource ComposerPanel}"
+            BorderBrush="{DynamicResource ComposerLine}"
+            BorderThickness="1"
+            BoxShadow="0 14 44 0 #40000000">
+        <StackPanel Spacing="10">
+
+            <Grid ColumnDefinitions="*,Auto">
+                <TextBlock x:Name="TargetText" Classes="muted" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                <Border Grid.Column="1" CornerRadius="10" Background="{DynamicResource ComposerHover}" Padding="2">
+                    <StackPanel Orientation="Horizontal" Spacing="2">
+                        <Button x:Name="TranslateButton" Classes="segment" Click="OnTranslateClick"/>
+                        <Button x:Name="SwapButton" Classes="segment" Content="⇄" Click="OnSwapClick"/>
+                        <Button x:Name="OriginalButton" Classes="segment" Click="OnOriginalClick"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <Border x:Name="BannerBox" IsVisible="False" CornerRadius="10" Padding="10,8" Background="{DynamicResource ComposerWarnBg}">
+                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+                    <TextBlock x:Name="BannerText" Foreground="{DynamicResource ComposerWarnText}" TextWrapping="Wrap" VerticalAlignment="Center"/>
+                    <Button x:Name="BannerAction" Grid.Column="1" Classes="primary" Click="OnBannerActionClick"/>
+                    <ProgressBar x:Name="BannerProgress" Grid.Row="1" Grid.ColumnSpan="2" Margin="0,8,0,0" Minimum="0" Maximum="100" IsVisible="False"/>
+                </Grid>
+            </Border>
+
+            <Border CornerRadius="12" Background="{DynamicResource ComposerWell}" BorderBrush="{DynamicResource ComposerLine}" BorderThickness="1" Padding="10,8">
+                <TextBox x:Name="SourceBox"
+                         AcceptsReturn="True"
+                         TextWrapping="Wrap"
+                         MinHeight="56"
+                         MaxHeight="160"
+                         BorderThickness="0"
+                         Background="Transparent"
+                         FontSize="15"
+                         Text="{Binding SourceText, Mode=TwoWay}"
+                         IsReadOnly="{Binding !IsEditable}"/>
+            </Border>
+
+            <Border x:Name="ResultBox" IsVisible="False" CornerRadius="12" Background="{DynamicResource ComposerWell}" BorderBrush="{DynamicResource ComposerLine}" BorderThickness="1" Padding="12,10">
+                <ItemsControl x:Name="ResultList">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="local:ComposerLineView">
+                            <Grid ColumnDefinitions="*,Auto" Margin="0,2">
+                                <TextBlock Text="{Binding Text}" IsVisible="{Binding !IsPending}" Classes.failed="{Binding IsFailed}" TextWrapping="Wrap" FontSize="15"/>
+                                <Border IsVisible="{Binding IsPending}" Height="14" Width="260" CornerRadius="7" HorizontalAlignment="Left" Background="{DynamicResource ComposerSkeleton}"/>
+                                <Button Grid.Column="1" Content="{Binding RetryLabel}" IsVisible="{Binding IsFailed}" Tag="{Binding Index}" Click="OnRetryClick" Padding="8,2"/>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Border>
+
+            <Grid ColumnDefinitions="*,Auto,Auto">
+                <TextBlock x:Name="StatusText" Classes="muted" VerticalAlignment="Center"/>
+                <Button x:Name="CopyButton" Grid.Column="1" Margin="0,0,6,0" Command="{Binding CopyCommand}"/>
+                <Button x:Name="WriteButton" Grid.Column="2" Classes="primary" Command="{Binding WriteCommand}"/>
+            </Grid>
+        </StackPanel>
+    </Border>
+</Window>
