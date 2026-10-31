@@ -304,6 +304,20 @@ public class LlamaServerHostTests
             () => h.Host.AcquireAsync(InferenceRole.Translator, Fast, CancellationToken.None));
     }
 
+    [Fact]
+    public async Task DisposeWhileStarting_StopsTheServerThatFinishesStarting()
+    {
+        var h = new Harness();
+        h.Probe.ReadyAfterPolls = 20;
+        var acquire = h.Host.AcquireAsync(InferenceRole.Translator, Fast, CancellationToken.None);
+        await WaitUntil(() => h.Launcher.Started.Count == 1);
+
+        await h.DisposeAsync();
+
+        using var lease = await acquire;
+        Assert.True(h.Launcher.Started[0].Process.Disposed);
+    }
+
     private static async Task WaitUntil(Func<bool> condition)
     {
         var deadline = DateTime.UtcNow.AddSeconds(5);

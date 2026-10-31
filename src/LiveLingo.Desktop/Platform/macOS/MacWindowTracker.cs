@@ -7,6 +7,7 @@ namespace LiveLingo.Desktop.Platform.macOS;
 [SupportedOSPlatform("macos")]
 internal sealed class MacWindowTracker : IWindowTracker
 {
+    /// <summary>The frontmost app's top window, or null when it has none: a target always has a real window number.</summary>
     public TargetWindowInfo? GetForegroundWindowInfo()
     {
         var (pid, processName) = GetFrontmostApp();
@@ -16,7 +17,7 @@ internal sealed class MacWindowTracker : IWindowTracker
             kCGWindowListOptionOnScreenOnly | kCGWindowListExcludeDesktopElements, 0);
 
         if (windowList == IntPtr.Zero)
-            return new TargetWindowInfo((nint)pid, IntPtr.Zero, processName, "", 0, 0, 800, 600);
+            return null;
 
         try
         {
@@ -74,7 +75,7 @@ internal sealed class MacWindowTracker : IWindowTracker
         return (pid, name);
     }
 
-    private static TargetWindowInfo FindWindowForPid(IntPtr windowList, int pid, string processName)
+    private static TargetWindowInfo? FindWindowForPid(IntPtr windowList, int pid, string processName)
     {
         var count = CFArrayGetCount(windowList);
         var kOwnerPID = CreateCFString("kCGWindowOwnerPID");
@@ -109,8 +110,8 @@ internal sealed class MacWindowTracker : IWindowTracker
 
                 var windowNumRef = CFDictionaryGetValue(dict, kWindowNumber);
                 int windowNumber = 0;
-                if (windowNumRef != IntPtr.Zero)
-                    CFNumberGetValue(windowNumRef, kCFNumberSInt32Type, out windowNumber);
+                if (windowNumRef == IntPtr.Zero || !CFNumberGetValue(windowNumRef, kCFNumberSInt32Type, out windowNumber))
+                    continue;
 
                 return new TargetWindowInfo(
                     (nint)windowNumber, IntPtr.Zero, processName, title,
@@ -125,6 +126,6 @@ internal sealed class MacWindowTracker : IWindowTracker
             CFRelease(kWindowNumber);
         }
 
-        return new TargetWindowInfo((nint)pid, IntPtr.Zero, processName, "", 0, 0, 800, 600);
+        return null;
     }
 }

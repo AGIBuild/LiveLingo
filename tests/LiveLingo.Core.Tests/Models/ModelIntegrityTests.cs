@@ -64,4 +64,38 @@ public class ModelIntegrityTests : IDisposable
         Assert.False(File.Exists(Path.Combine(_dir, "integrity", "weights.bin")));
         Assert.False(File.Exists(Path.Combine(_dir, "integrity", "manifest.json")));
     }
+
+    [Fact]
+    public async Task ACorruptFileLeftByAnInterruptedInstall_IsReplaced_NotTrusted()
+    {
+        var dir = Path.Combine(_dir, "integrity");
+        Directory.CreateDirectory(dir);
+        await File.WriteAllBytesAsync(Path.Combine(dir, "weights.bin"), [1, 2, 3]);
+
+        await Manager().EnsureModelAsync(Descriptor(TestModel.FakeContentSha256));
+
+        Assert.Equal(TestModel.Content(100), await File.ReadAllBytesAsync(Path.Combine(dir, "weights.bin")));
+    }
+
+    [Fact]
+    public async Task AVerifiedFileLeftByAnInterruptedInstall_IsKeptWithoutDownloading()
+    {
+        var dir = Path.Combine(_dir, "integrity");
+        Directory.CreateDirectory(dir);
+        await File.WriteAllBytesAsync(Path.Combine(dir, "weights.bin"), TestModel.Content(100));
+        var manager = new ModelManager(
+            Options.Create(new CoreOptions { ModelStoragePath = _dir }),
+            new HttpClient(new ThrowingHandler()),
+            NullLogger<ModelManager>.Instance);
+
+        await manager.EnsureModelAsync(Descriptor(TestModel.FakeContentSha256));
+
+        Assert.True(File.Exists(Path.Combine(dir, "manifest.json")));
+    }
+
+    private sealed class ThrowingHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) =>
+            throw new InvalidOperationException("No download expected.");
+    }
 }

@@ -252,12 +252,42 @@ public class TranslationSchedulerTests
         h.Source(new SourceUnit("先检查缓存。"), new SourceUnit("再更新索引。"));
         h.Output(OutputKind.Translation);
 
-        (await h.NextCall(1)).Result.SetException(new HttpRequestException("连接被拒绝"));
+        (await h.NextCall(1)).Result.SetException(new InvalidDataException("连接被拒绝"));
         var second = await h.NextCall(2);
 
         Assert.Equal("再更新索引。", second.Request.Source);
         Assert.Equal("连接被拒绝", h.ErrorOf(0));
         Assert.Null(h.TranslationOf(0));
+    }
+
+    [Fact]
+    public async Task AServiceFailure_FailsEveryPendingUnit_WithoutTryingEachOne()
+    {
+        await using var h = new Harness();
+        h.Source(new SourceUnit("先检查缓存。"), new SourceUnit("再更新索引。"), new SourceUnit("最后重启。"));
+        h.Output(OutputKind.Translation);
+
+        (await h.NextCall(1)).Result.SetException(new HttpRequestException("连接被拒绝"));
+
+        await WaitUntil(() => h.ErrorOf(2).Length > 0);
+        await Task.Delay(50);
+        Assert.Single(h.Translator.Calls);
+        Assert.Equal("连接被拒绝", h.ErrorOf(0));
+        Assert.Equal("连接被拒绝", h.ErrorOf(1));
+    }
+
+    [Fact]
+    public async Task AUnitSpecificFailure_DoesNotFailTheOthers()
+    {
+        await using var h = new Harness();
+        h.Source(new SourceUnit("先检查缓存。"), new SourceUnit("再更新索引。"));
+        h.Output(OutputKind.Translation);
+
+        (await h.NextCall(1)).Result.SetException(new InvalidDataException("literal lost"));
+        var second = await h.NextCall(2);
+
+        Assert.Equal("", h.ErrorOf(1));
+        second.Result.SetResult(Done("Then update the index."));
     }
 
     [Fact]
