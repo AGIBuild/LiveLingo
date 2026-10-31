@@ -4,6 +4,7 @@ using LiveLingo.Core.Dictation;
 using LiveLingo.Core.Inference;
 using LiveLingo.Core.Models;
 using LiveLingo.Core.Speech.Native;
+using LiveLingo.Core.Transcription;
 using LiveLingo.Core.Translation;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http.Resilience;
@@ -68,6 +69,7 @@ public static class ServiceCollectionExtensions
             TimeProvider.System,
             sp.GetRequiredService<ILogger<LlamaServerHost>>()));
         services.AddSingleton<IDictationSessionFactory, SherpaDictationSessionFactory>();
+        services.AddSingleton<IAudioFileTranscriber, SherpaAudioFileTranscriber>();
 
         // Everything stays on the machine unless the host registers routes (after this call) that send a role to the cloud.
         services.AddSingleton<ICloudRoutes, LocalOnlyRoutes>();

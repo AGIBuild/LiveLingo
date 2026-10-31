@@ -2,11 +2,12 @@ using LiveLingo.Core.Models;
 
 namespace LiveLingo.Desktop.Composer;
 
-/// <summary>Which models each output needs, and which ones listening needs on top.</summary>
+/// <summary>Which models each output needs, and which ones listening and importing a recording need on top.</summary>
 public sealed record ComposerModelPlan(
     IReadOnlyList<ModelDescriptor> Clean,
     IReadOnlyList<ModelDescriptor> Translate,
-    IReadOnlyList<ModelDescriptor> Voice)
+    IReadOnlyList<ModelDescriptor> Voice,
+    IReadOnlyList<ModelDescriptor> Transcription)
 {
     public IReadOnlyList<ModelDescriptor> For(ComposerOutput output) => output switch
     {
@@ -21,5 +22,6 @@ public sealed record ComposerModelPlan(
     public static ComposerModelPlan Create(TranslatorTier tier, bool cleanInCloud, bool translateInCloud) => new(
         cleanInCloud ? [] : [ModelCatalog.LlamaRuntime, ModelCatalog.Cleaner],
         translateInCloud ? [] : [ModelCatalog.LlamaRuntime, ModelCatalog.Translator(tier)],
-        ModelCatalog.Speech);
+        ModelCatalog.Speech,
+        ModelCatalog.Transcription);
 }

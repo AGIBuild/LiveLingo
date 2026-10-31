@@ -20,6 +20,9 @@ public enum ComposerStatus
     /// <summary>The microphone is open and speech is being recognized.</summary>
     Listening,
 
+    /// <summary>The recording is being transcribed; the progress is on the view model.</summary>
+    Transcribing,
+
     /// <summary>The selected output is still being produced.</summary>
     Working,
 
@@ -39,7 +42,8 @@ public enum LineState
 }
 
 /// <summary>One line of the "will be written" pane.</summary>
-public sealed record ResultLine(int Index, string Text, LineState State, string Error);
+/// <param name="Time">Where the line starts in an imported recording ("1:05"); empty for typed or spoken text.</param>
+public sealed record ResultLine(int Index, string Text, LineState State, string Error, string Time = "");
 
 public enum BannerKind
 {
@@ -63,7 +67,13 @@ public enum BannerKind
     NoMicrophone,
 
     /// <summary>The microphone is open but only silence arrives.</summary>
-    NoSound
+    NoSound,
+
+    /// <summary>A recording could not be read, or subtitles could not be saved (unsupported format, unreadable or unwritable file).</summary>
+    FileFailed,
+
+    /// <summary>The recording was read but contains no recognizable speech.</summary>
+    NoSpeechFound
 }
 
 /// <param name="Detail">Size, error text or other detail for the view to show next to the localized message.</param>

@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
+using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using LiveLingo.Desktop.Platform;
 using System.ComponentModel;
@@ -14,15 +15,23 @@ internal sealed record ComposerLineView(
     string Text,
     bool IsPending,
     bool IsFailed,
-    string RetryLabel);
+    string RetryLabel,
+    string Time)
+{
+    public bool HasTime => Time.Length > 0;
+}
 
 /// <summary>Binding glue for <see cref="ComposerViewModel"/>: maps view-model state to controls and keys to commands.</summary>
 public partial class ComposerWindow : Window
 {
+    private const double NarrowWidth = 680;
+    private const double WideWidth = 980;
+
     private readonly ComposerViewModel _vm;
     private readonly ComposerTexts _texts;
     private readonly TargetWindowInfo? _target;
     private readonly string _retryLabel;
+    private bool _wide;
 
     public ComposerWindow()
     {
@@ -42,6 +51,8 @@ public partial class ComposerWindow : Window
         WriteButton.Content = texts.WriteLabel;
         CleanButton.Content = texts.CleanLabel;
         OriginalButton.Content = texts.OriginalLabel;
+        ImportButton.Content = texts.ImportLabel;
+        ExportButton.Content = texts.ExportLabel;
         SourceBox.Watermark = texts.Placeholder;
         Avalonia.Controls.ToolTip.SetTip(MicButton, texts.MicLabel);
         Avalonia.Automation.AutomationProperties.SetName(MicButton, texts.MicLabel);
@@ -80,7 +91,7 @@ public partial class ComposerWindow : Window
         SwapButton.IsVisible = _vm.Output == ComposerOutput.Translate;
         MicButton.Classes.Set("listening", _vm.IsListening || _vm.IsStartingListening);
 
-        StatusText.Text = _texts.Status(_vm.Status, _vm.IsWriteQueued, _vm.KeptOriginalCount);
+        StatusText.Text = _texts.Status(_vm.Status, _vm.IsWriteQueued, _vm.KeptOriginalCount, (int)_vm.TranscribeProgress);
         CopyButton.IsEnabled = _vm.CanCopy;
         WriteButton.IsEnabled = _vm.CanWrite || _vm.IsWriteQueued;
 
@@ -95,10 +106,30 @@ public partial class ComposerWindow : Window
 
         ResultBox.IsVisible = _vm.Lines.Count > 0;
         // A finished result is one selectable block, so any part (or all) of what will be written can be copied.
+        // A timeline keeps its per-line times instead.
+        var asBlock = _vm.ResultText.Length > 0 && !_vm.HasTimeline;
         ResultTextBlock.Text = _vm.ResultText;
-        ResultTextBlock.IsVisible = _vm.ResultText.Length > 0;
-        ResultList.IsVisible = _vm.ResultText.Length == 0;
+        ResultTextBlock.IsVisible = asBlock;
+        ResultList.IsVisible = !asBlock;
         ResultList.ItemsSource = _vm.Lines.Select(ToView).ToList();
+        ApplyLayout(_vm.IsWide);
+    }
+
+    /// <summary>A whole document or transcript puts the source and the result side by side; otherwise they stack.</summary>
+    private void ApplyLayout(bool wide)
+    {
+        if (wide == _wide)
+            return;
+
+        _wide = wide;
+        BodyGrid.ColumnDefinitions = ColumnDefinitions.Parse(wide ? "*,*" : "*");
+        Grid.SetColumn(ResultBox, wide ? 1 : 0);
+        Grid.SetRow(ResultBox, wide ? 0 : 1);
+        ResultBox.Margin = wide ? new Thickness(10, 0, 0, 0) : new Thickness(0, 10, 0, 0);
+        SourceBox.MaxHeight = wide ? 320 : 160;
+        Width = wide ? WideWidth : NarrowWidth;
+        if (IsVisible)
+            Place();
     }
 
     private ComposerLineView ToView(ResultLine line)
@@ -108,7 +139,33 @@ public partial class ComposerWindow : Window
             _texts.Line(line),
             line.State == LineState.Pending,
             line.State == LineState.Failed,
-            _retryLabel);
+            _retryLabel,
+            line.Time);
+    }
+
+    private async void OnImportClick(object? sender, RoutedEventArgs e)
+    {
+        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = _texts.ImportTitle,
+            AllowMultiple = false,
+            FileTypeFilter = [new FilePickerFileType(_texts.ImportFileType) { Patterns = ["*.wav"] }]
+        });
+        if (files.Count > 0)
+            await _vm.ImportAsync(files[0].Path.LocalPath);
+    }
+
+    private async void OnExportClick(object? sender, RoutedEventArgs e)
+    {
+        var file = await StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = _texts.ExportTitle,
+            SuggestedFileName = "transcript.srt",
+            DefaultExtension = "srt",
+            FileTypeChoices = [new FilePickerFileType("SubRip") { Patterns = ["*.srt"] }]
+        });
+        if (file is not null)
+            await _vm.ExportSrtAsync(file.Path.LocalPath);
     }
 
     private void OnKeyDown(object? sender, KeyEventArgs e)

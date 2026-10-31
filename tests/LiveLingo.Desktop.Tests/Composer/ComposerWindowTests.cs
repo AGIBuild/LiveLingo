@@ -170,4 +170,30 @@ public class ComposerWindowTests
         Assert.False(window.FindControl<ItemsControl>("ResultList")!.IsVisible);
         window.Close();
     }
+
+    [AvaloniaFact]
+    public async Task AnImportedRecording_WidensTheWindow_PutsTheResultBesideTheSource_AndShowsTimes()
+    {
+        var (window, h) = Open(output: ComposerOutput.Original);
+        await using var _ = h;
+        h.Transcriber.Handler = (_, _, _) => Task.FromResult<IReadOnlyList<LiveLingo.Core.Transcription.TimedSegment>>(
+            [new(TimeSpan.FromSeconds(65), TimeSpan.FromSeconds(70), "先看缓存。")]);
+        Assert.Equal(680, window.Width);
+        Assert.True(Find<Button>(window, "ImportButton").IsVisible);
+        Assert.False(Find<Button>(window, "ExportButton").IsVisible);
+
+        await h.Vm.ImportAsync("a.wav");
+        await Wait.Until(() => h.Vm.CanExport);
+
+        Assert.Equal(980, window.Width);
+        var result = Find<Border>(window, "ResultBox");
+        Assert.Equal(1, Grid.GetColumn(result));
+        Assert.Equal(0, Grid.GetRow(result));
+        Assert.False(Find<SelectableTextBlock>(window, "ResultTextBlock").IsVisible);
+        Assert.True(Find<ItemsControl>(window, "ResultList").IsVisible);
+        Assert.False(Find<Button>(window, "ImportButton").IsVisible);
+        Assert.True(Find<Button>(window, "ExportButton").IsEnabled);
+        Assert.True(Find<TextBox>(window, "SourceBox").IsReadOnly);
+        window.Close();
+    }
 }

@@ -172,7 +172,8 @@
                 </Grid>
             </Border>
 
-            <Border CornerRadius="12" Background="{DynamicResource ComposerWell}" BorderBrush="{DynamicResource ComposerLine}" BorderThickness="1" Padding="10,8">
+            <Grid x:Name="BodyGrid" ColumnDefinitions="*" RowDefinitions="Auto,Auto">
+            <Border x:Name="SourceBorder" CornerRadius="12" Background="{DynamicResource ComposerWell}" BorderBrush="{DynamicResource ComposerLine}" BorderThickness="1" Padding="10,8">
                 <TextBox x:Name="SourceBox"
                          AcceptsReturn="True"
                          TextWrapping="Wrap"
@@ -185,33 +186,39 @@
                          IsReadOnly="{Binding !IsEditable}"/>
             </Border>
 
-            <Border x:Name="ResultBox" IsVisible="False" CornerRadius="12" Background="{DynamicResource ComposerWell}" BorderBrush="{DynamicResource ComposerLine}" BorderThickness="1" Padding="12,10">
+            <Border x:Name="ResultBox" Grid.Row="1" Margin="0,10,0,0" IsVisible="False" CornerRadius="12" Background="{DynamicResource ComposerWell}" BorderBrush="{DynamicResource ComposerLine}" BorderThickness="1" Padding="12,10">
+                <ScrollViewer x:Name="ResultScroll" MaxHeight="320" VerticalScrollBarVisibility="Auto">
                 <StackPanel>
                 <SelectableTextBlock x:Name="ResultTextBlock" IsVisible="False" TextWrapping="Wrap" FontSize="15"/>
                 <ItemsControl x:Name="ResultList">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="local:ComposerLineView">
-                            <Grid ColumnDefinitions="*,Auto" Margin="0,2">
-                                <SelectableTextBlock Text="{Binding Text}" IsVisible="{Binding !IsPending}" Classes.failed="{Binding IsFailed}" TextWrapping="Wrap" FontSize="15"/>
-                                <Border IsVisible="{Binding IsPending}" Height="14" Width="260" CornerRadius="7" HorizontalAlignment="Left" Background="{DynamicResource ComposerSkeleton}"/>
-                                <Button Grid.Column="1" Content="{Binding RetryLabel}" IsVisible="{Binding IsFailed}" Tag="{Binding Index}" Click="OnRetryClick" Padding="8,2"/>
+                            <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,2">
+                                <TextBlock Text="{Binding Time}" IsVisible="{Binding HasTime}" Classes="muted" MinWidth="40" VerticalAlignment="Top" Margin="0,2,8,0"/>
+                                <SelectableTextBlock Grid.Column="1" Text="{Binding Text}" IsVisible="{Binding !IsPending}" Classes.failed="{Binding IsFailed}" TextWrapping="Wrap" FontSize="15"/>
+                                <Border Grid.Column="1" IsVisible="{Binding IsPending}" Height="14" Width="260" CornerRadius="7" HorizontalAlignment="Left" Background="{DynamicResource ComposerSkeleton}"/>
+                                <Button Grid.Column="2" Content="{Binding RetryLabel}" IsVisible="{Binding IsFailed}" Tag="{Binding Index}" Click="OnRetryClick" Padding="8,2"/>
                             </Grid>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
                 </StackPanel>
+                </ScrollViewer>
             </Border>
+            </Grid>
 
-            <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+            <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto,Auto">
                 <Button x:Name="MicButton" Classes="mic" Margin="0,0,10,0" Width="40" Height="40" Padding="0" CornerRadius="20">
                     <Path Data="M12,3 A3,3 0 0 0 9,6 L9,11 A3,3 0 0 0 15,11 L15,6 A3,3 0 0 0 12,3 Z M6,11 A6,6 0 0 0 18,11 M12,17 L12,21"
                           Stroke="{Binding $parent[Button].Foreground}" StrokeThickness="1.8" StrokeLineCap="Round"
                           Stretch="Uniform" Width="18" Height="20"
                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Button>
-                <TextBlock x:Name="StatusText" Grid.Column="1" Classes="muted" VerticalAlignment="Center"/>
-                <Button x:Name="CopyButton" Grid.Column="2" Margin="0,0,6,0" Command="{Binding CopyCommand}"/>
-                <Button x:Name="WriteButton" Grid.Column="3" Classes="primary" Command="{Binding WriteCommand}"/>
+                <Button x:Name="ImportButton" Grid.Column="1" Margin="0,0,10,0" Click="OnImportClick" IsVisible="{Binding CanImport}"/>
+                <TextBlock x:Name="StatusText" Grid.Column="2" Classes="muted" VerticalAlignment="Center"/>
+                <Button x:Name="ExportButton" Grid.Column="3" Margin="0,0,6,0" Click="OnExportClick" IsVisible="{Binding HasTimeline}" IsEnabled="{Binding CanExport}"/>
+                <Button x:Name="CopyButton" Grid.Column="4" Margin="0,0,6,0" Command="{Binding CopyCommand}"/>
+                <Button x:Name="WriteButton" Grid.Column="5" Classes="primary" Command="{Binding WriteCommand}"/>
             </Grid>
         </StackPanel>
     </Border>
