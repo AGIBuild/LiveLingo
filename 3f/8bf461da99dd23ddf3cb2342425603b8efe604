@@ -1,0 +1,494 @@
+docs/superpowers/prototypes/livelingo-ux/prototype.test.cjs
+  s_6d6e9175f38e45::t_b272f3072a0283 1-117,127-162
+  s_6d6e9175f38e45::t_7202eb6c363a83 118-126
+poc/voice-dictation/src/Dictation.TestApp/App.axaml
+  s_6d6e9175f38e45::t_8a180406217427 1-8
+docs/superpowers/prototypes/livelingo-ux-v3/README.md
+  s_6d6e9175f38e45::t_f8806b8edbdc46 1-68
+README.md
+  s_6d6e9175f38e45::t_5f46e983520b76 163
+  s_6d6e9175f38e45::t_2071682498301e 159-162,164-166
+poc/text-translation/README.md
+  s_6d6e9175f38e45::t_b8545f5247b3ce 71-82,96
+  s_6d6e9175f38e45::t_20a3c81c34eceb 1-21,23-56,58-70,83-95,97-100
+  s_6d6e9175f38e45::t_0ef11f8ab8080b 22,57
+poc/voice-dictation/src/Dictation.Core/Draft.cs
+  s_6d6e9175f38e45::t_c8b63c17485f5c 46-48
+  s_6d6e9175f38e45::t_27cf868ebcde38 30-32
+  s_6d6e9175f38e45::t_be54dfc6be4de4 40-41,43-45
+  s_6d6e9175f38e45::t_f6aa2d30021bd5 1-29,33-39,42,49-100
+poc/voice-dictation/src/Dictation.Cleanup.Llama/LlamaCleaner.cs
+  s_6d6e9175f38e45::t_077206bce3b000 82
+  s_6d6e9175f38e45::t_5c2284951db425 1-17,19-24,26-30,32-34,37-39,42-63,65-81,83-100
+  s_6d6e9175f38e45::t_86c38a40c5eb0e 31,35-36,40-41
+  s_6d6e9175f38e45::t_c6c9072611fa25 18,25,64
+poc/text-translation/Units.cs
+  s_6d6e9175f38e45::t_530b8c66b199ae 15-16,19-23
+  s_6d6e9175f38e45::t_fd8c00f3927072 7-14,17-18,24-33,45-53,55-56,60,86
+  s_6d6e9175f38e45::t_28e3ce57dee1b5 1-2,4-6,87
+  s_6d6e9175f38e45::t_1028259b15616c 54,57-59,63-65,69-70,74,78-79,81-83
+  s_6d6e9175f38e45::t_e925a1f229f678 3,39
+  s_6d6e9175f38e45::t_37ef2671a8262c 34-38,40-44,61-62,66-68,71-73,75-77,80,84-85
+poc/text-translation/ProtectedText.cs
+  s_6d6e9175f38e45::t_68d23e32489c26 3-4,6,38
+  s_6d6e9175f38e45::t_530b8c66b199ae 7-9
+  s_6d6e9175f38e45::t_446479e87d6a9c 1-2,5,10-37
+docs/superpowers/plans/2026-10-31-composer-implementation.md
+  s_6d6e9175f38e45::t_59d1db5958715e 1-114
+poc/voice-dictation/src/Dictation.Asr.Sherpa/SherpaOfflineRecognizer.cs
+  s_6d6e9175f38e45::t_a25636a5127ed4 1-99
+poc/text-translation/scripts/fetch-models.sh
+  s_6d6e9175f38e45::t_28e3ce57dee1b5 1-36
+poc/voice-dictation/src/Dictation.Audio/MicrophoneRecorder.cs
+  s_6d6e9175f38e45::t_c6f266b3adb878 1-66
+poc/voice-dictation/src/Dictation.TestApp/TestBench.cs
+  s_6d6e9175f38e45::t_29b3bb0597bb49 13-14,18,45-50,53,55-64,95
+  s_6d6e9175f38e45::t_882bc9750d8485 1-12,15-17,19-44,51-52,54,65-94,96-139
+poc/voice-dictation/src/Dictation.Harness/Program.cs
+  s_6d6e9175f38e45::t_30a58b66fb134b 31,37,39-44,46-65
+  s_6d6e9175f38e45::t_42e646cbbcdd58 101
+  s_6d6e9175f38e45::t_05cae7918efe9f 70
+  s_6d6e9175f38e45::t_b47950b74fad15 12-13,34-35,137-141,143,145-191
+  s_6d6e9175f38e45::t_863d8d4fc660fd 1-2,4,6-11,14-30,32-33,36,38,66-69,72-99,103-116,118-123,125-136,192-215,217-224,250-267
+  s_6d6e9175f38e45::t_249afa9361f199 102,124,216
+  s_6d6e9175f38e45::t_c4c1c91e68c33e 3,5,45,71
+  s_6d6e9175f38e45::t_9c79d08c67d367 117,225-249
+  s_6d6e9175f38e45::t_cb269aa536cb51 142
+  s_6d6e9175f38e45::t_befa14f469067b 100,144
+poc/text-translation/TranslationBenchSupport.cs
+  s_6d6e9175f38e45::t_603feb6ed54b38 228
+  s_6d6e9175f38e45::t_27a7827dfbbf91 172,181
+  s_6d6e9175f38e45::t_f1085c0b6ed7c3 1-171,173-180,182-227,229-266
+poc/text-translation/scripts/build-corpus.py
+  s_6d6e9175f38e45::t_a25f9b3e94537c 1-157,160-194,196-200,210-211,215-218
+  s_6d6e9175f38e45::t_0da589505a9275 201-209,212-214
+  s_6d6e9175f38e45::t_0148c2e046ddf5 195
+  s_6d6e9175f38e45::t_d41b209cbe57fc 158-159
+poc/voice-dictation/src/Dictation.Models/Dictation.Models.csproj
+  s_6d6e9175f38e45::t_e1c9f4236a5f70 1-15
+poc/text-translation/scripts/run-llm.sh
+  s_6d6e9175f38e45::t_76030321d20b5d 1-2,4-5,7-24,26
+  s_6d6e9175f38e45::t_f47bd473d12488 3,6,25
+docs/superpowers/prototypes/livelingo-ux-v3/style.css
+  s_6d6e9175f38e45::t_7810a1d2c76b43 130-133,143,203
+  s_6d6e9175f38e45::t_0362aeb81d08b8 51,100,231
+  s_6d6e9175f38e45::t_1de54c21875956 219
+  s_6d6e9175f38e45::t_f60ec76d335665 234
+  s_6d6e9175f38e45::t_e856ee11fde285 1-50,52-99,101-129,134-142,144-202,204-218,220-230,232-233,235-238
+docs/superpowers/prototypes/livelingo-ux-v3/app.js
+  s_6d6e9175f38e45::t_d84f1ebd36561d 39,116,200,213,264,272,276,281,290,292,405,422-424,428,457,530,614
+  s_6d6e9175f38e45::t_7c836272ccd7e3 91,144,270,345,421,565,600
+  s_6d6e9175f38e45::t_f60ec76d335665 190,375-376
+  s_6d6e9175f38e45::t_0ab990c39ef2e2 1-38,40-90,92-115,117-143,145-189,191-199,201-212,214-263,265-269,271,273-275,277-280,282-289,291,293-344,346-374,377-404,406-420,425-427,429-456,458-529,531-564,566-599,601-613,615-650
+poc/voice-dictation/src/Dictation.Models/ModelCatalog.cs
+  s_6d6e9175f38e45::t_92adbb672b9794 33
+  s_6d6e9175f38e45::t_29b3bb0597bb49 29-31
+  s_6d6e9175f38e45::t_c4c1c91e68c33e 1-22,28,34-63
+  s_6d6e9175f38e45::t_5cb97ca94b890a 32
+  s_6d6e9175f38e45::t_befa14f469067b 23,25-27
+  s_6d6e9175f38e45::t_e2f13a62ba1b1a 24
+poc/voice-dictation/src/Dictation.TestApp/TranslationBench.cs
+  s_6d6e9175f38e45::t_a1bd8b870d5363 45
+  s_6d6e9175f38e45::t_1beaa9c14abf0f 1-21,23-44,46-58,65-67,77-79,81-96,98-119,121-143,145,147-149,151,153,155,157-169
+  s_6d6e9175f38e45::t_fb683cae8c2d2a 59-64
+  s_6d6e9175f38e45::t_f3defcc7d1e0d2 68-76
+  s_6d6e9175f38e45::t_4e79b28975722a 80,120,144,156
+  s_6d6e9175f38e45::t_f16378bbe001a9 146,150,152,154
+  s_6d6e9175f38e45::t_c321e42cedfb8a 22,97
+docs/superpowers/prototypes/livelingo-ux/browser.test.cjs
+  s_6d6e9175f38e45::t_7202eb6c363a83 27,33,37-38,42,46-48,51,59,61,76-77,79,90,97,99,101,109-156,159-160,162-163,165-166,172,174-175,179,184,186,195,215,239,243
+  s_6d6e9175f38e45::t_7b17b4b6f2cd72 24-26
+  s_6d6e9175f38e45::t_1fea984c42a2a6 28-32
+  s_6d6e9175f38e45::t_cebb3da62ee95d 34-36
+  s_6d6e9175f38e45::t_6436c0590a91bc 39-41
+  s_6d6e9175f38e45::t_47429236c48a85 43-45
+  s_6d6e9175f38e45::t_2dca75502f598b 49-50
+  s_6d6e9175f38e45::t_c492250c5e6436 52-54,56-58
+  s_6d6e9175f38e45::t_926e042d3c7389 60
+  s_6d6e9175f38e45::t_59acca68d557d5 62-64,73-75
+  s_6d6e9175f38e45::t_21e2d458da5914 78
+  s_6d6e9175f38e45::t_043c1035ade300 80-82,87-89
+  s_6d6e9175f38e45::t_dec43584e559b8 91-96
+  s_6d6e9175f38e45::t_baa86543d64a0c 98
+  s_6d6e9175f38e45::t_5f375f367ed057 100
+  s_6d6e9175f38e45::t_22983d6ca0a8a5 102-104,106-108
+  s_6d6e9175f38e45::t_00170bebb35874 157-158
+  s_6d6e9175f38e45::t_cbadc9e18ecd72 161
+  s_6d6e9175f38e45::t_bbef09307fce87 164
+  s_6d6e9175f38e45::t_ef635fbbb37dd6 167-171
+  s_6d6e9175f38e45::t_aa0a2fa286ade0 173
+  s_6d6e9175f38e45::t_d0d832d9b432d4 176-178
+  s_6d6e9175f38e45::t_6cd491a48b05ce 180-183
+  s_6d6e9175f38e45::t_89b248f6ac0c03 185
+  s_6d6e9175f38e45::t_6ac8725a9cb026 187-189,192-194
+  s_6d6e9175f38e45::t_31f10b2d012c95 196-198,212-214
+  s_6d6e9175f38e45::t_71cef96f05d2f0 216-218,236-238
+  s_6d6e9175f38e45::t_60b7a1a8f88197 240-242
+  s_6d6e9175f38e45::t_4740665105e222 244-246
+  s_6d6e9175f38e45::t_f07608f1de96e9 1-23,55,65-72,83-86,105,190-191,199-211,219-235,247-248
+poc/voice-dictation/src/Dictation.Audio/Dictation.Audio.csproj
+  s_6d6e9175f38e45::t_4f2f29ddd4fb14 1-17
+poc/voice-dictation/tests/Dictation.Core.Tests/AudioStoreTests.cs
+  s_6d6e9175f38e45::t_aa9f7076751685 1-62,64-69
+  s_6d6e9175f38e45::t_29b3bb0597bb49 63
+poc/voice-dictation/src/Dictation.Audio/WavFile.cs
+  s_6d6e9175f38e45::t_470d54a42acd72 1-104
+poc/voice-dictation/src/Dictation.Core/FidelityGate.cs
+  s_6d6e9175f38e45::t_d11f428bf71b16 1-36,45-98,104-199
+  s_6d6e9175f38e45::t_8ea2aa46060de5 37-40
+  s_6d6e9175f38e45::t_6a500c8c25ed19 41-44,99-103
+docs/superpowers/prototypes/livelingo-ux-v3/draft.test.cjs
+  s_6d6e9175f38e45::t_edceb59c834db8 1-193
+poc/voice-dictation/scripts/build-dialect-corpus.sh
+  s_6d6e9175f38e45::t_0dc59e196cef0f 1-18
+docs/superpowers/specs/2026-10-31-livelingo-composer-design.md
+  s_6d6e9175f38e45::t_7c9ad3b209b144 1-204
+poc/text-translation/tests/HttpTests.cs
+  s_6d6e9175f38e45::t_abe149dc702f42 48-59
+  s_6d6e9175f38e45::t_fd8c00f3927072 1-46,97-99,101,106-108,110-111
+  s_6d6e9175f38e45::t_20a3c81c34eceb 77,79-80,82-90,92,94-96
+  s_6d6e9175f38e45::t_407e056521320d 78,81,91,93
+  s_6d6e9175f38e45::t_30fe4c2c89f26b 68-76
+  s_6d6e9175f38e45::t_c2e8f49071264e 47,60-67,100,102-105,109
+poc/voice-dictation/src/Dictation.TestApp/Program.cs
+  s_6d6e9175f38e45::t_b9db02d49a34a5 1-10
+poc/voice-dictation/src/Dictation.Asr.Sherpa/SherpaLiveRecognizer.cs
+  s_6d6e9175f38e45::t_ed1c7082522d9a 1-70
+poc/voice-dictation/src/Dictation.Harness/Scoring.cs
+  s_6d6e9175f38e45::t_10899a8758beca 1-51
+poc/voice-dictation/src/Dictation.Harness/Runner.cs
+  s_6d6e9175f38e45::t_68b8d53b831461 1,3,5-15,22-23,25-26,31-33,35-57,61-78,81-82,84,93-105,107-108,110-129,131-134,143-148,150-166,174-182,184-190,197-201,203-212,214-222
+  s_6d6e9175f38e45::t_9c79d08c67d367 34,149
+  s_6d6e9175f38e45::t_237750ef472ddf 191-196
+  s_6d6e9175f38e45::t_d052f4ea3613e7 58,106,109,135-142,167
+  s_6d6e9175f38e45::t_c4c1c91e68c33e 2,4,79,183
+  s_6d6e9175f38e45::t_671d64014a9116 20,91
+  s_6d6e9175f38e45::t_db5598c5285e0c 213
+  s_6d6e9175f38e45::t_befa14f469067b 16,83
+  s_6d6e9175f38e45::t_93727ae231c5b1 24,27-30,59-60,130,168-173
+  s_6d6e9175f38e45::t_a9940d63f856a6 202
+  s_6d6e9175f38e45::t_183775f250f4c4 17-19,21,80,85-90,92
+poc/text-translation/Prompt.cs
+  s_6d6e9175f38e45::t_28e3ce57dee1b5 1-4,29
+  s_6d6e9175f38e45::t_a0cdc0557f2ae5 5-7,26
+  s_6d6e9175f38e45::t_fd8c00f3927072 8-24,27-28
+  s_6d6e9175f38e45::t_446479e87d6a9c 25
+poc/voice-dictation/tests/Dictation.Core.Tests/TextTests.cs
+  s_6d6e9175f38e45::t_51c67a345b2180 76-84,86,90,155-179
+  s_6d6e9175f38e45::t_46ac267431001f 91-94,124-146
+  s_6d6e9175f38e45::t_6a500c8c25ed19 106-122
+  s_6d6e9175f38e45::t_d1145c71adc351 180-193,213-218
+  s_6d6e9175f38e45::t_8ea2aa46060de5 95-105,123
+  s_6d6e9175f38e45::t_a997559e175fe0 85,87-89,147-154
+  s_6d6e9175f38e45::t_b7cf8630bb9577 194-212
+  s_6d6e9175f38e45::t_a3a5e583461e22 229-234
+  s_6d6e9175f38e45::t_3a133e49122fe0 221-228,235-236
+  s_6d6e9175f38e45::t_2ec52523853af2 1-75,219-220,237-257
+poc/text-translation/TranslationPoc.csproj
+  s_6d6e9175f38e45::t_28e3ce57dee1b5 1-11
+poc/text-translation/Contracts.cs
+  s_6d6e9175f38e45::t_28e3ce57dee1b5 1-10
+poc/voice-dictation/src/Dictation.Asr.Sherpa/Dictation.Asr.Sherpa.csproj
+  s_6d6e9175f38e45::t_dc0a6cb853d5ec 1-17
+docs/superpowers/prototypes/livelingo-ux/index.html
+  s_6d6e9175f38e45::t_6ce36120ecce86 31-41
+  s_6d6e9175f38e45::t_95337d37ba90e3 1-30,42-197
+docs/superpowers/prototypes/livelingo-ux-v3/index.html
+  s_6d6e9175f38e45::t_1de54c21875956 189-196
+  s_6d6e9175f38e45::t_6771c35e61283f 1-188,197-242
+poc/voice-dictation/src/Dictation.TestApp/App.axaml.cs
+  s_6d6e9175f38e45::t_2faff143896c44 4,15
+  s_6d6e9175f38e45::t_1393e97dbfa2b8 1-3,5-14,16-18
+poc/voice-dictation/.gitignore
+  s_6d6e9175f38e45::t_9fa64c9f85af52 1-5
+  s_6d6e9175f38e45::t_6e08461206fabf 6
+poc/voice-dictation/tests/Dictation.Core.Tests/Fakes.cs
+  s_6d6e9175f38e45::t_e86a9dfbabd102 65,75
+  s_6d6e9175f38e45::t_41806c12950a9b 103-119
+  s_6d6e9175f38e45::t_afcf695a9fb72f 1-8,13-16,18-20,24-28,37-41,51-64,76-102,120-159
+  s_6d6e9175f38e45::t_004e9cca3d11a4 66-74
+  s_6d6e9175f38e45::t_857ac15886e0eb 9-12,17,21-23,29-36,42-50
+poc/text-translation/CorpusRunner.cs
+  s_6d6e9175f38e45::t_f629ea59fdb107 1-68,70-102
+  s_6d6e9175f38e45::t_5fb56be9d4f833 69
+poc/voice-dictation/VoicePoc.slnx
+  s_6d6e9175f38e45::t_2faff143896c44 14
+  s_6d6e9175f38e45::t_dc0a6cb853d5ec 1-3,5-7,11-13,16-17
+  s_6d6e9175f38e45::t_616a346239d1e2 10,15
+  s_6d6e9175f38e45::t_a2a10281079795 4,8-9
+poc/voice-dictation/src/Dictation.Asr.Sherpa/SherpaVad.cs
+  s_6d6e9175f38e45::t_92b323c85ea85d 28-29
+  s_6d6e9175f38e45::t_64ca75a2c3bb66 1-10,12-14,16-27,30-46
+  s_6d6e9175f38e45::t_befa14f469067b 11,15
+poc/voice-dictation/src/Dictation.Core/SentenceSplitter.cs
+  s_6d6e9175f38e45::t_84dc79fc63b170 1-59
+poc/text-translation/scripts/nmt-benchmark.py
+  s_6d6e9175f38e45::t_e6d545a8c3e737 1-56
+poc/text-translation/.gitignore
+  s_6d6e9175f38e45::t_28e3ce57dee1b5 1-7
+docs/superpowers/prototypes/livelingo-ux/app.js
+  s_6d6e9175f38e45::t_17caa4d89303fa 149,494
+  s_6d6e9175f38e45::t_80ef8d14ceae5d 64,71-81,293,405-408,418
+  s_6d6e9175f38e45::t_622e36f42ac75b 170,211-216,224,572
+  s_6d6e9175f38e45::t_6ce36120ecce86 198,314-316,465-474
+  s_6d6e9175f38e45::t_ba92ba77348694 26,29
+  s_6d6e9175f38e45::t_462e603d6221bf 260,568,570-571,573-574
+  s_6d6e9175f38e45::t_185e26a407229e 1-25,27-28,30-63,65-70,82-148,150-169,171-197,199-210,217-223,225-259,261-292,294-313,317-404,409-417,419-464,475-493,495,502-567,569,575-582
+  s_6d6e9175f38e45::t_40a3f86281ef80 496-501
+poc/voice-dictation/scripts/fetch-models.sh
+  s_6d6e9175f38e45::t_fb62aa23172408 1-47
+poc/voice-dictation/tests/Dictation.Core.Tests/DictationSessionTests.cs
+  s_6d6e9175f38e45::t_6012075a05b380 238-246,248,250-252
+  s_6d6e9175f38e45::t_e1e8209da2e78a 16,25-28,31-32,35-37,39-40,46-47,68-70,72-74,77,79-82,86,88-95,97,99,101
+  s_6d6e9175f38e45::t_e059803b6fcfed 102
+  s_6d6e9175f38e45::t_7b84598561db09 17-20,24,29-30,38,41-45,48,52,54-67,71,75-76,78,83-85,87,96,98,100
+  s_6d6e9175f38e45::t_41806c12950a9b 207-224
+  s_6d6e9175f38e45::t_3c1ab872169a52 120,140,302
+  s_6d6e9175f38e45::t_3c14b0a2dc1c88 49-51,53
+  s_6d6e9175f38e45::t_774c772cb28b42 225-237
+  s_6d6e9175f38e45::t_97d4d0bb9abcb7 1-15,21-23,33-34,103-119,121-139,141-206,266-301,303-313
+  s_6d6e9175f38e45::t_88d1ab93f60904 253-265
+  s_6d6e9175f38e45::t_bed49fe9b39b0a 247,249
+poc/voice-dictation/src/Dictation.Harness/Corpus.cs
+  s_6d6e9175f38e45::t_715faa2889b4c8 1-31
+docs/superpowers/prototypes/livelingo-ux/style.css
+  s_6d6e9175f38e45::t_6ce36120ecce86 17,56-63,141,223,237-239
+  s_6d6e9175f38e45::t_95337d37ba90e3 1-16,18-52,55,64-77,80-94,96-140,142-222,224-233,235-236,240-243
+  s_6d6e9175f38e45::t_2332ccbc9f9f4b 53-54,78-79,95,234
+poc/voice-dictation/src/Dictation.Core/Dictation.Core.csproj
+  s_6d6e9175f38e45::t_dc0a6cb853d5ec 1-9
+poc/voice-dictation/src/Dictation.Cleanup.Llama/Dictation.Cleanup.Llama.csproj
+  s_6d6e9175f38e45::t_dc0a6cb853d5ec 1-18
+poc/voice-dictation/tests/Dictation.TestApp.Tests/MainWindowTests.cs
+  s_6d6e9175f38e45::t_cb269aa536cb51 41,44
+  s_6d6e9175f38e45::t_b57d1fdb1ec551 36-39,42-43,45-53
+  s_6d6e9175f38e45::t_1b20060ff477c2 55-82
+  s_6d6e9175f38e45::t_02477c138b2b09 85,88
+  s_6d6e9175f38e45::t_5cb97ca94b890a 40
+  s_6d6e9175f38e45::t_d7435a873aeb9b 87
+  s_6d6e9175f38e45::t_15644b673834f4 1-35,54,83-84,86,89-96
+poc/text-translation/cases.json
+  s_6d6e9175f38e45::t_a421cd86ff37d2 1-33
+docs/superpowers/plans/2026-10-29-translation-poc.md
+  s_6d6e9175f38e45::t_ef84c38119d887 11,19,21,23,25-27,29,40,113-114,118,195,197,202
+  s_6d6e9175f38e45::t_2071682498301e 1-2,5-6,8-10,12,14-16,20,22,24,28,30-38,41-42,44-61,63-112,115-117,119-147,150-160,162,164-165,167-189,191-194,196,198-201,204-210,212-239
+  s_6d6e9175f38e45::t_b1994fba434bf8 7,17-18,39,43,62,148-149,161,163,166,203,211
+  s_6d6e9175f38e45::t_6609cf12efa9cb 3-4
+  s_6d6e9175f38e45::t_5f46e983520b76 13,190
+poc/text-translation/scripts/score-corpus.py
+  s_6d6e9175f38e45::t_7340fe31f4c1a3 118-127,133,136,139-141,245
+  s_6d6e9175f38e45::t_c7d056e546346a 56
+  s_6d6e9175f38e45::t_1c24b154dc2410 170
+  s_6d6e9175f38e45::t_e7e031e1e5b132 1-17,19-55,57-90,93-117,142-169,171-242,246-271
+  s_6d6e9175f38e45::t_f68330aa08b243 18,128-132,134-135,137-138
+  s_6d6e9175f38e45::t_39c3ed7d91400e 91-92,243-244
+poc/text-translation/scripts/nmt-corpus.py
+  s_6d6e9175f38e45::t_947259b29399de 1-79
+.gitignore
+  s_6d6e9175f38e45::t_d1b3a22fc9e530 431-437
+poc/voice-dictation/src/Dictation.TestApp/Dictation.TestApp.csproj
+  s_6d6e9175f38e45::t_0ed6870c00a9c7 7
+  s_6d6e9175f38e45::t_02477c138b2b09 22
+  s_6d6e9175f38e45::t_0407501ac57d39 1-6,8-21,23-25
+poc/voice-dictation/src/Dictation.Core/TextTidy.cs
+  s_6d6e9175f38e45::t_5e50bb7c21747f 1-5,8-10,13-14,19-23,27-33
+  s_6d6e9175f38e45::t_a3a5e583461e22 6-7,11-12,15-18,24-26
+poc/voice-dictation/scripts/build-corpus.sh
+  s_6d6e9175f38e45::t_e5655cb76168be 6-13,19-22,25,34-52,59-60,70,99-104,109
+  s_6d6e9175f38e45::t_c536dcab7fbc65 53
+  s_6d6e9175f38e45::t_47b73e623d3237 1-5,14-18,23-24,26-33,54-58,61-69,71-98,105-108
+poc/voice-dictation/tests/Dictation.Core.Tests/Dictation.Core.Tests.csproj
+  s_6d6e9175f38e45::t_dc0a6cb853d5ec 1-22,24-26
+  s_6d6e9175f38e45::t_120c370abcc2d9 23
+poc/voice-dictation/README.md
+  s_6d6e9175f38e45::t_a3b88036d708ec 162-184
+  s_6d6e9175f38e45::t_2071682498301e 5-11
+  s_6d6e9175f38e45::t_2b672e26937626 3,36-37,39,49
+  s_6d6e9175f38e45::t_3c9b55edefaa53 120-127
+  s_6d6e9175f38e45::t_5b3c174149ca49 1-2,4,12-23,45-48,50-83,185-201
+  s_6d6e9175f38e45::t_82ca249b96da15 24-25,30-35,38,40-44
+  s_6d6e9175f38e45::t_5814039c7c7c6e 84-119,128-130
+  s_6d6e9175f38e45::t_ced98d28bd8015 26-29
+  s_6d6e9175f38e45::t_2952c23942b109 131-161
+poc/voice-dictation/src/Dictation.TestApp/MainWindow.axaml
+  s_6d6e9175f38e45::t_a4c74e1951fcc7 4-62,74,76,85-119
+  s_6d6e9175f38e45::t_50ddb24ea971e1 63-69,72-73,75,77-84
+  s_6d6e9175f38e45::t_c2e295bac484c8 70-71
+  s_6d6e9175f38e45::t_018a095f0eb31c 1-3,120
+poc/voice-dictation/src/Dictation.Core/AudioBuffer.cs
+  s_6d6e9175f38e45::t_25ac803c0c443d 1-53
+poc/voice-dictation/src/Dictation.TestApp/MainWindow.axaml.cs
+  s_6d6e9175f38e45::t_44a1e044e7b300 178
+  s_6d6e9175f38e45::t_0af5f618fbffee 184,188,191-197,207
+  s_6d6e9175f38e45::t_b57d1fdb1ec551 6,8,47-56,339,350-385,423,464
+  s_6d6e9175f38e45::t_b2faf1bcf4afe9 125,285-305
+  s_6d6e9175f38e45::t_1316d13c3db67d 126,179,245,249-266
+  s_6d6e9175f38e45::t_cbcda78f039705 9,15-28,30,32,36,39-40,42,45,62,64-66,70-75,92-114,116-124,127-177,180-183,185-187,189-190,198-206,208-244,246-248,267-277,279-284,306-331,421,448
+  s_6d6e9175f38e45::t_a736e71656d491 1-3,5,7,10-14,31,33-35,37-38,41,43,46,57-61,63,67-69,76-91,278,332-338,340-349,386-420,422,424-447,449-463,465-482
+  s_6d6e9175f38e45::t_8e89aeef289df1 115
+  s_6d6e9175f38e45::t_f220c8ef14d3b4 4
+  s_6d6e9175f38e45::t_2faff143896c44 29,44
+poc/voice-dictation/scripts/fetch-real-corpus.py
+  s_6d6e9175f38e45::t_ec1895a3304798 1-9,14-23,25-61,67-93,95-162,164,198-203,205-207,210-217,220-226
+  s_6d6e9175f38e45::t_63aa892cb4be8d 10-13,165-197,204,208-209,218-219
+  s_6d6e9175f38e45::t_9da30095115c68 24,62-66,94,163
+poc/text-translation/HttpTranslator.cs
+  s_6d6e9175f38e45::t_8b20963b6dc914 13,16-22,24-28,60,66
+  s_6d6e9175f38e45::t_2b8c5e39818139 12
+  s_6d6e9175f38e45::t_fd8c00f3927072 5-6,8,68
+  s_6d6e9175f38e45::t_8f3b800ddfc830 7,15,59
+  s_6d6e9175f38e45::t_a0f4678c7819b5 65
+  s_6d6e9175f38e45::t_789b3924ba5a25 1-4,9-11,14,29,31-58,61-64,67
+  s_6d6e9175f38e45::t_8b38fb2fa1d9f7 23
+  s_6d6e9175f38e45::t_18891a5a5c1a32 30
+poc/text-translation/tests/TranslationPoc.Tests.csproj
+  s_6d6e9175f38e45::t_28e3ce57dee1b5 1-15
+poc/text-translation/TranslationSession.cs
+  s_6d6e9175f38e45::t_6e3a0946e25652 85
+  s_6d6e9175f38e45::t_9facd9b876c473 152-158
+  s_6d6e9175f38e45::t_becbf54a9b5d74 180,182,197-198,200-201,219,222
+  s_6d6e9175f38e45::t_d5bfb9e084607c 14,26,107-109,111-112,135
+  s_6d6e9175f38e45::t_42dd70f63d2dee 136-137
+  s_6d6e9175f38e45::t_2f9408db002e09 27,110,113
+  s_6d6e9175f38e45::t_4783f90000837f 15-16,20
+  s_6d6e9175f38e45::t_fd8c00f3927072 3-4,17,19,234
+  s_6d6e9175f38e45::t_789b3924ba5a25 1-2,21-25,30-35,39-43,45-46,48,51,78-83,87-88,90,115,117-121,143-151,159-162,164-175,178-179,181,187-188,190-193,196,202-207,209-215,217-218,220,223-233
+  s_6d6e9175f38e45::t_711b96119f8452 5-13,28-29,36-38,47,49-50,52-53,64-77,86,89,91-106,114,116,122-134,138-142,176-177,183-185,189,194-195,199,208,216
+  s_6d6e9175f38e45::t_0f665c5db50e8d 18,186
+  s_6d6e9175f38e45::t_b66aa9e05c60b8 44,84,163,221
+  s_6d6e9175f38e45::t_ac6a4bfe42258e 54-63
+poc/text-translation/scripts/requirements-eval.txt
+  s_6d6e9175f38e45::t_a421cd86ff37d2 1
+poc/text-translation/scripts/score.py
+  s_6d6e9175f38e45::t_446479e87d6a9c 19,21
+  s_6d6e9175f38e45::t_5199b4c1f8a1a4 1-18,20,22-39
+poc/text-translation/tests/TextTests.cs
+  s_6d6e9175f38e45::t_6153b656bc5806 21
+  s_6d6e9175f38e45::t_046eb21bfaf6d1 88,90-91
+  s_6d6e9175f38e45::t_7334926c79c03a 76-85
+  s_6d6e9175f38e45::t_84088786cd6cca 39-47,50,63-65
+  s_6d6e9175f38e45::t_28e3ce57dee1b5 1-20,22-31,36-38,66-75,134
+  s_6d6e9175f38e45::t_b511e5542ce56b 48-49
+  s_6d6e9175f38e45::t_c037affad2668e 89
+  s_6d6e9175f38e45::t_bc9b013d247f0c 93-133
+  s_6d6e9175f38e45::t_35ee9137265953 32-35
+  s_6d6e9175f38e45::t_96fea5e4b61887 51-62
+  s_6d6e9175f38e45::t_f9c5eda3951d3a 86-87,92
+poc/text-translation/tests/ReplayTests.cs
+  s_6d6e9175f38e45::t_c940be1b885fb0 1-28
+poc/text-translation/REPORT.md
+  s_6d6e9175f38e45::t_52c4a763709cbf 1,3,5-74,76-92,94-95,97-118,120-125
+  s_6d6e9175f38e45::t_b66aa9e05c60b8 241
+  s_6d6e9175f38e45::t_5f46e983520b76 2,4,126-240,242-262
+  s_6d6e9175f38e45::t_c4f1aae6d6059b 75,119
+  s_6d6e9175f38e45::t_b8c2449f19e6c0 93,96
+docs/superpowers/specs/2026-10-29-voice-dictation-design.md
+  s_6d6e9175f38e45::t_2071682498301e 1-9,11-119,121-207,209,211,213-217
+  s_6d6e9175f38e45::t_b1994fba434bf8 10,120,208,210,212,218
+poc/voice-dictation/tests/Dictation.TestApp.Tests/Dictation.TestApp.Tests.csproj
+  s_6d6e9175f38e45::t_1089022f1cfdde 1-26
+poc/text-translation/Program.cs
+  s_6d6e9175f38e45::t_e11fd89c3f0e10 6,50-57
+  s_6d6e9175f38e45::t_14609daf69c6eb 24-26,38-39,43-45,47-48
+  s_6d6e9175f38e45::t_8b20963b6dc914 27-28
+  s_6d6e9175f38e45::t_a421cd86ff37d2 1-5,7-23,30-37,40-42,46,49,58-61
+  s_6d6e9175f38e45::t_7da5bf4c9d269a 29
+poc/text-translation/tests/SessionTests.cs
+  s_6d6e9175f38e45::t_9facd9b876c473 64
+  s_6d6e9175f38e45::t_19f77c06b1b35a 115-160
+  s_6d6e9175f38e45::t_fd8c00f3927072 1-63,65-90,161-172
+  s_6d6e9175f38e45::t_a9c1c2559da9a4 91-114
+poc/voice-dictation/src/Dictation.Core/Contracts.cs
+  s_6d6e9175f38e45::t_0c1722ec61ce2f 53-56,60
+  s_6d6e9175f38e45::t_8e97c0ab6cf056 1-19,26-52,57-59,61-66
+  s_6d6e9175f38e45::t_494f12bd2d28b1 20-25
+poc/text-translation/tests/ProtectionTests.cs
+  s_6d6e9175f38e45::t_68d23e32489c26 1-31
+poc/voice-dictation/src/Dictation.Audio/RecordingStore.cs
+  s_6d6e9175f38e45::t_8b7eb03197f0a6 1-12,14-69
+  s_6d6e9175f38e45::t_29b3bb0597bb49 13
+poc/voice-dictation/src/Dictation.Harness/Dictation.Harness.csproj
+  s_6d6e9175f38e45::t_c4c1c91e68c33e 7-8
+  s_6d6e9175f38e45::t_dc0a6cb853d5ec 1-6,9-18
+poc/text-translation/scripts/sample-resources.py
+  s_6d6e9175f38e45::t_fa733fe90a6571 1-29
+poc/text-translation/scripts/run-final.sh
+  s_6d6e9175f38e45::t_68379d4ff21c13 1-21
+poc/text-translation/scripts/requirements-nmt.txt
+  s_6d6e9175f38e45::t_e6d545a8c3e737 1-5
+poc/text-translation/Evaluation.cs
+  s_6d6e9175f38e45::t_40329f5f6025da 47
+  s_6d6e9175f38e45::t_cdc210164c2308 64-65,79,81,84
+  s_6d6e9175f38e45::t_d645625d66d01c 104
+  s_6d6e9175f38e45::t_a421cd86ff37d2 1-46,48-49,51-60,63,66-78,80,82-83,85-94,96-103,105-115
+  s_6d6e9175f38e45::t_c940be1b885fb0 61-62
+  s_6d6e9175f38e45::t_ff7942d040d489 95
+  s_6d6e9175f38e45::t_446479e87d6a9c 50
+poc/text-translation/scripts/report.py
+  s_6d6e9175f38e45::t_a5ed1f3b4180b3 1-24,33-74,82-87,93-155,157-159,161-165,168-211,213-226,229-232,234-246,248-254,256-261,263,265-269,272,274-324,330,332-346
+  s_6d6e9175f38e45::t_519aeba262d8dc 156,160
+  s_6d6e9175f38e45::t_671686760fb05b 247
+  s_6d6e9175f38e45::t_703ccf0758ea64 325-329,331
+  s_6d6e9175f38e45::t_7cd0fc19ee1c41 233
+  s_6d6e9175f38e45::t_388d496466e01d 228
+  s_6d6e9175f38e45::t_71822ca5d2bd4a 89-92,212
+  s_6d6e9175f38e45::t_dc3b4c83ea544f 227,255,262,264,270-271,273
+  s_6d6e9175f38e45::t_270a9116226902 25-32
+  s_6d6e9175f38e45::t_e4af1c13c33def 75-81,88
+  s_6d6e9175f38e45::t_50f8669376e9a9 166
+  s_6d6e9175f38e45::t_ab9d2816b3a769 167
+docs/superpowers/prototypes/livelingo-ux-v3/draft.js
+  s_6d6e9175f38e45::t_c535d2a3ca9d5e 6
+  s_6d6e9175f38e45::t_5fba88545b6da5 1-5,7-147
+docs/superpowers/prototypes/livelingo-ux/README.md
+  s_6d6e9175f38e45::t_428ef85c5962a8 68-70
+  s_6d6e9175f38e45::t_a459c81debcd54 65-67
+  s_6d6e9175f38e45::t_47176bdd0e9a49 71-73
+  s_6d6e9175f38e45::t_b48e00c388eeb0 1-64,74-77
+docs/superpowers/prototypes/livelingo-ux-v3/browser.test.cjs
+  s_6d6e9175f38e45::t_6f79d9e024b826 249
+  s_6d6e9175f38e45::t_2e6c8e8f9c29a9 1-38,49-67,69,71-79,81-109,111-123,125-136,138-171,173-176,178-189,191-201,203-226,228-235,281-286,288-293,295-330,332-333,340-379,381-387,389-407,410,419-431
+  s_6d6e9175f38e45::t_b51e9b94d35fee 331
+  s_6d6e9175f38e45::t_331065827a9f9d 110,124,137,202,287,294
+  s_6d6e9175f38e45::t_9acf4cfa3262fd 68,411-418
+  s_6d6e9175f38e45::t_0ab3366f2f2f0a 177,190
+  s_6d6e9175f38e45::t_f60ec76d335665 44,46,334-339,408
+  s_6d6e9175f38e45::t_edb3ef3f823415 236-248,250-264,266-280
+  s_6d6e9175f38e45::t_83e41c7ecd3dd7 265
+  s_6d6e9175f38e45::t_28e457c406adb3 227
+  s_6d6e9175f38e45::t_0362aeb81d08b8 39-43,45,47-48,70,80,172,380,388,409
+poc/voice-dictation/src/Dictation.Core/DictationSession.cs
+  s_6d6e9175f38e45::t_135ec8e80b5eab 11,14,16,21-22,384,387
+  s_6d6e9175f38e45::t_f1ea56a54d77d0 186,269,327
+  s_6d6e9175f38e45::t_bed49fe9b39b0a 251,306
+  s_6d6e9175f38e45::t_5fed9ccdf35709 366
+  s_6d6e9175f38e45::t_4f82755b5a3f99 441
+  s_6d6e9175f38e45::t_281d9b1da2abb3 217
+  s_6d6e9175f38e45::t_2c5e3376e5ce29 468
+  s_6d6e9175f38e45::t_6dd29e2c24c218 1-10,23-26,35-37,44-79,84-174,176,179,191-192,220-231,237-238,240-243,250,270-276,280-288,291-292,294-305,308-326,330-365,367-383,385-386,388-430,432-440,442-467,469-487,489-515,517-552,557-595
+  s_6d6e9175f38e45::t_be54dfc6be4de4 265-266,277-278,307
+  s_6d6e9175f38e45::t_88d1ab93f60904 38-43,328-329
+  s_6d6e9175f38e45::t_2ac544c29b12fe 175,177-178,180-185,189-190,193,198-202,553-556
+  s_6d6e9175f38e45::t_e57636ed6572d7 488
+  s_6d6e9175f38e45::t_a04d3104605fc4 12-13,15,17-20,83,187-188,194,203-216,218,268,279
+  s_6d6e9175f38e45::t_ecceb6fc537b6c 431
+  s_6d6e9175f38e45::t_8106633ff1f5e4 516
+  s_6d6e9175f38e45::t_ccd05c644d6a3d 27-31,80-81,195-197,219,232-236,244-249,252,259-260,267,289,293
+  s_6d6e9175f38e45::t_774c772cb28b42 32-34,82,239,253-258,261-264,290
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3f8bf461da99dd23ddf3cb2342425603b8efe604",
+  "prompts": {},
+  "sessions": {
+    "s_6d6e9175f38e45": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "f74d37e5-1d96-4ddc-a3f9-5ae24ff39e38",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
