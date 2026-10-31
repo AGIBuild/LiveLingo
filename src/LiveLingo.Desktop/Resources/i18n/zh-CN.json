@@ -50,5 +50,16 @@
   "composer.banner.micDeniedAction": "打开系统设置",
   "composer.banner.noMic": "无法使用麦克风：{0}",
   "composer.banner.noSound": "没有听到声音。请检查麦克风、输入音量，或在系统设置里选对输入设备。",
-  "composer.status.keptOriginal": "回车写入 · {0} 句保留原话（整理未通过保真检查）"
+  "composer.status.keptOriginal": "回车写入 · {0} 句保留原话（整理未通过保真检查）",
+  "tray.settings": "设置",
+  "settings.title": "设置",
+  "settings.hotkey": "唤起快捷键",
+  "settings.hotkey.hint": "点击后按下新的组合键",
+  "settings.hotkey.invalid": "快捷键无效，请包含一个按键，例如 Ctrl+Alt+T。",
+  "settings.language": "界面语言",
+  "settings.quality": "使用质量档翻译模型（7B，约 4.6 GB，需要更多内存；默认的 1.8B 约 1.1 GB）",
+  "settings.glossary": "术语表",
+  "settings.glossary.hint": "每行一个。只写词，表示原样保留（语音识别、整理和保真检查都会用）；写“中文=English”还会固定译法。以 # 开头的行是注释。",
+  "settings.save": "保存",
+  "settings.cancel": "取消"
 }

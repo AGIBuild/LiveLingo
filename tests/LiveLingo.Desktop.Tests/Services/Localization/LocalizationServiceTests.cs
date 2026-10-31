@@ -215,7 +215,18 @@ public class LocalizationServiceTests
             "composer.banner.micDeniedAction",
             "composer.banner.noMic",
             "composer.banner.noSound",
-            "composer.status.keptOriginal"
+            "composer.status.keptOriginal",
+            "tray.settings",
+            "settings.title",
+            "settings.hotkey",
+            "settings.hotkey.hint",
+            "settings.hotkey.invalid",
+            "settings.language",
+            "settings.quality",
+            "settings.glossary",
+            "settings.glossary.hint",
+            "settings.save",
+            "settings.cancel"
         ];
         foreach (var key in criticalKeys)
         {

@@ -46,8 +46,8 @@ public class TranslationSchedulerTests
         public ManualTimeProvider Time { get; } = new();
         public TranslationScheduler Scheduler { get; }
 
-        public Harness(TargetLanguage target = TargetLanguage.English) =>
-            Scheduler = new TranslationScheduler(Session, Translator, target, TimeSpan.FromSeconds(1.5), Time);
+        public Harness(TargetLanguage target = TargetLanguage.English, Glossary? glossary = null) =>
+            Scheduler = new TranslationScheduler(Session, Translator, target, TimeSpan.FromSeconds(1.5), Time, glossary);
 
         public void Source(params SourceUnit[] units) =>
             Session.Mutate(draft => draft.SyncSource(units, DraftRoute.Units));
@@ -101,6 +101,23 @@ public class TranslationSchedulerTests
         await WaitUntil(() => h.TranslationOf(1) is not null);
         Assert.Equal("Check the cache first.", h.TranslationOf(0));
         Assert.Equal("Then update the index.", h.TranslationOf(1));
+    }
+
+    [Fact]
+    public async Task TheGlossary_IsGivenToEveryRequest_OrientedTowardTheTargetLanguage()
+    {
+        await using var h = new Harness(glossary: Glossary.Parse("缓存穿透=cache penetration"));
+        h.Source(new SourceUnit("防止缓存穿透。"));
+        h.Output(OutputKind.Translation);
+        var english = await h.NextCall(1);
+        Assert.Equal([new GlossaryTerm("缓存穿透", "cache penetration")], english.Request.Terms);
+        english.Result.SetResult(Done("Prevent cache penetration."));
+        await WaitUntil(() => h.TranslationOf(0) is not null);
+
+        h.Scheduler.SetTarget(TargetLanguage.Chinese);
+
+        var chinese = await h.NextCall(2);
+        Assert.Equal([new GlossaryTerm("cache penetration", "缓存穿透")], chinese.Request.Terms);
     }
 
     [Fact]

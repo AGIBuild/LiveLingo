@@ -1,0 +1,39 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:LiveLingo.Desktop.Settings"
+        xmlns:controls="clr-namespace:LiveLingo.Desktop.Controls"
+        x:Class="LiveLingo.Desktop.Settings.SettingsWindow"
+        x:DataType="local:SettingsViewModel"
+        Width="560"
+        SizeToContent="Height"
+        CanResize="False"
+        WindowStartupLocation="CenterScreen"
+        RequestedThemeVariant="Dark">
+    <StackPanel Margin="24" Spacing="16">
+        <StackPanel Spacing="6">
+            <SelectableTextBlock x:Name="HotkeyLabel" FontWeight="SemiBold"/>
+            <controls:HotkeyRecorder Hotkey="{Binding SummonHotkey, Mode=TwoWay}" HorizontalAlignment="Left" MinWidth="220"/>
+            <SelectableTextBlock x:Name="HotkeyHint" FontSize="12" Opacity="0.7"/>
+            <SelectableTextBlock x:Name="HotkeyError" FontSize="12" Foreground="#FF8A7E" IsVisible="{Binding HotkeyInvalid}"/>
+        </StackPanel>
+
+        <StackPanel Spacing="6">
+            <SelectableTextBlock x:Name="LanguageLabel" FontWeight="SemiBold"/>
+            <ComboBox ItemsSource="{x:Static local:SettingsViewModel.Languages}" SelectedItem="{Binding Language, Mode=TwoWay}" MinWidth="160"/>
+        </StackPanel>
+
+        <CheckBox x:Name="QualityBox" IsChecked="{Binding Quality, Mode=TwoWay}"/>
+
+        <StackPanel Spacing="6">
+            <SelectableTextBlock x:Name="GlossaryLabel" FontWeight="SemiBold"/>
+            <TextBox x:Name="GlossaryBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="120" MaxHeight="220"
+                     Text="{Binding Glossary, Mode=TwoWay}"/>
+            <SelectableTextBlock x:Name="GlossaryHint" FontSize="12" Opacity="0.7" TextWrapping="Wrap"/>
+        </StackPanel>
+
+        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+            <Button x:Name="CancelButton" Command="{Binding CancelCommand}" MinWidth="88" HorizontalContentAlignment="Center"/>
+            <Button x:Name="SaveButton" Command="{Binding SaveCommand}" Classes="accent" MinWidth="88" HorizontalContentAlignment="Center"/>
+        </StackPanel>
+    </StackPanel>
+</Window>
