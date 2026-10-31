@@ -225,7 +225,8 @@ class BuildTask : NukeBuild
             $"--break-at {MutationThreshold} " +
             $"--reporter progress --reporter json " +
             $"--mutate \"!**/ServiceCollectionExtensions.cs\" " +
-            $"--mutate \"!**/Inference/LlamaServerHost*\" " +
+            $"--mutate \"!**/Inference/LlamaProcessLauncher.cs\" " +
+            $"--mutate \"!**/Inference/LlamaServerAdapters.cs\" " +
             $"--mutate \"!**/Speech/Native/**\"",
             workingDirectory: coreTestDir);
 

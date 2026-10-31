@@ -1,6 +1,9 @@
+using LiveLingo.Core.Inference;
 using LiveLingo.Core.Models;
+using LiveLingo.Core.Translation;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http.Resilience;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Polly;
 using Polly.Timeout;
@@ -40,6 +43,25 @@ public static class ServiceCollectionExtensions
             });
         services.AddSingleton<IModelManager>(sp => sp.GetRequiredService<ModelManager>());
         services.AddSingleton<IModelDownloadCoordinator, InProcessModelDownloadCoordinator>();
+
+        services.AddSingleton<ILlamaProcessLauncher, LlamaProcessLauncher>();
+        services.AddSingleton<IServerHealthProbe, HttpHealthProbe>();
+        services.AddSingleton<IPortAllocator, LoopbackPortAllocator>();
+        services.AddSingleton(LlamaServerHostOptions.Default);
+        services.AddSingleton(sp => new LlamaServerHost(
+            sp.GetRequiredService<IModelManager>(),
+            ModelCatalog.LlamaRuntime,
+            sp.GetRequiredService<ILlamaProcessLauncher>(),
+            sp.GetRequiredService<IServerHealthProbe>(),
+            sp.GetRequiredService<IPortAllocator>(),
+            sp.GetRequiredService<CoreOptions>(),
+            sp.GetRequiredService<LlamaServerHostOptions>(),
+            TimeProvider.System,
+            sp.GetRequiredService<ILogger<LlamaServerHost>>()));
+        services.AddSingleton<ITranslator>(sp => new LlmTranslator(new LocalChatClient(
+            sp.GetRequiredService<LlamaServerHost>(),
+            InferenceRole.Translator,
+            () => ModelCatalog.Translator(sp.GetRequiredService<CoreOptions>().TranslatorTier))));
 
         return services;
     }

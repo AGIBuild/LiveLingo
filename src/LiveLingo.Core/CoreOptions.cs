@@ -1,3 +1,5 @@
+using LiveLingo.Core.Models;
+
 namespace LiveLingo.Core;
 
 public class CoreOptions
@@ -7,6 +9,9 @@ public class CoreOptions
         "LiveLingo", "models");
 
     public int InferenceThreads { get; set; }
+
+    /// <summary>Which translation model to run; the fast tier is the default for 16 GB machines.</summary>
+    public TranslatorTier TranslatorTier { get; set; } = TranslatorTier.Fast;
 
     /// <summary>
     /// Mirror base URL for huggingface.co downloads (e.g. "https://hf-mirror.com").
