@@ -80,7 +80,7 @@ public partial class ComposerWindow : Window
         SwapButton.IsVisible = _vm.Output == ComposerOutput.Translate;
         MicButton.Classes.Set("listening", _vm.IsListening || _vm.IsStartingListening);
 
-        StatusText.Text = _texts.Status(_vm.Status, _vm.IsWriteQueued);
+        StatusText.Text = _texts.Status(_vm.Status, _vm.IsWriteQueued, _vm.KeptOriginalCount);
         CopyButton.IsEnabled = _vm.CanCopy;
         WriteButton.IsEnabled = _vm.CanWrite || _vm.IsWriteQueued;
 

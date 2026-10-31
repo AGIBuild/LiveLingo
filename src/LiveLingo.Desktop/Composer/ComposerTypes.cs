@@ -60,7 +60,10 @@ public enum BannerKind
     MicrophoneDenied,
 
     /// <summary>There is no input device or it could not be opened.</summary>
-    NoMicrophone
+    NoMicrophone,
+
+    /// <summary>The microphone is open but only silence arrives.</summary>
+    NoSound
 }
 
 /// <param name="Detail">Size, error text or other detail for the view to show next to the localized message.</param>

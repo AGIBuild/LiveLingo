@@ -48,5 +48,7 @@
   "composer.mic": "Tap to start or stop, hold to talk",
   "composer.banner.micDenied": "Microphone access is off. Allow LiveLingo to use the microphone in System Settings.",
   "composer.banner.micDeniedAction": "Open Settings",
-  "composer.banner.noMic": "Cannot use the microphone: {0}"
+  "composer.banner.noMic": "Cannot use the microphone: {0}",
+  "composer.banner.noSound": "No sound is coming in. Check the microphone, the input volume, or the input device in System Settings.",
+  "composer.status.keptOriginal": "Press Enter to write · {0} sentence(s) kept as spoken (cleanup failed the fidelity check)"
 }

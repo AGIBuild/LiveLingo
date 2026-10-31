@@ -6,10 +6,12 @@ namespace LiveLingo.Desktop.Composer;
 /// <summary>Turns view-model states into localized text, so the window only binds strings.</summary>
 public sealed class ComposerTexts(ILocalizationService loc)
 {
-    public string Status(ComposerStatus status, bool writeQueued)
+    public string Status(ComposerStatus status, bool writeQueued, int keptOriginal = 0)
     {
         if (writeQueued)
             return loc.T("composer.status.queued");
+        if (status == ComposerStatus.Ready && keptOriginal > 0)
+            return loc.T("composer.status.keptOriginal", keptOriginal);
 
         return loc.T(status switch
         {
@@ -47,6 +49,7 @@ public sealed class ComposerTexts(ILocalizationService loc)
         BannerKind.WriteFailed => loc.T("composer.banner.writeFailed", banner.Detail),
         BannerKind.MicrophoneDenied => loc.T("composer.banner.micDenied"),
         BannerKind.NoMicrophone => loc.T("composer.banner.noMic", banner.Detail),
+        BannerKind.NoSound => loc.T("composer.banner.noSound"),
         _ => throw new ArgumentOutOfRangeException(nameof(banner))
     };
 

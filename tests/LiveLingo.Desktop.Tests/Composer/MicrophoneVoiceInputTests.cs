@@ -93,4 +93,22 @@ public class MicrophoneVoiceInputTests
         await Assert.ThrowsAsync<InvalidOperationException>(() => input.StartAsync(draft, [], CancellationToken.None));
         await input.DisposeAsync();
     }
+
+    [Fact]
+    public async Task SilentFrames_RaiseNoSignal_AndSoundClearsIt()
+    {
+        var (input, mic, draft, _) = Create();
+        Action<float[]>? onFrame = null;
+        mic.Start(Arg.Do<Action<float[]>>(handler => onFrame = handler)).Returns("mic");
+        var changes = new List<bool>();
+        input.NoSignalChanged += changes.Add;
+        await input.StartAsync(draft, [], CancellationToken.None);
+
+        for (var i = 0; i < 150; i++)
+            onFrame!(new float[640]);
+        onFrame!(Enumerable.Repeat(0.3f, 640).ToArray());
+
+        Assert.Equal([true, false], changes);
+        await input.StopAsync();
+    }
 }

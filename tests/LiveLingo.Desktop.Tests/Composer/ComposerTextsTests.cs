@@ -51,6 +51,7 @@ public class ComposerTextsTests
     [InlineData(BannerKind.WriteFailed, "no focus", 0, "[composer.banner.writeFailed:no focus]", "")]
     [InlineData(BannerKind.MicrophoneDenied, "", 0, "[composer.banner.micDenied]", "[composer.banner.micDeniedAction]")]
     [InlineData(BannerKind.NoMicrophone, "no device", 0, "[composer.banner.noMic:no device]", "")]
+    [InlineData(BannerKind.NoSound, "", 0, "[composer.banner.noSound]", "")]
     public void Banner_ProvidesMessageAndAction(BannerKind kind, string detail, double progress, string message, string action)
     {
         var texts = Create();
@@ -92,5 +93,15 @@ public class ComposerTextsTests
         Assert.Equal("[composer.retry]", texts.RetryLabel);
         Assert.Equal("[composer.placeholder]", texts.Placeholder);
         Assert.Equal("[composer.mic]", texts.MicLabel);
+    }
+
+    [Fact]
+    public void ReadyStatus_MentionsSentencesThatKeptTheirOriginalWording()
+    {
+        var texts = Create();
+
+        Assert.Equal("[composer.status.keptOriginal:2]", texts.Status(ComposerStatus.Ready, false, 2));
+        Assert.Equal("[composer.status.ready]", texts.Status(ComposerStatus.Ready, false, 0));
+        Assert.Equal("[composer.status.working]", texts.Status(ComposerStatus.Working, false, 2));
     }
 }

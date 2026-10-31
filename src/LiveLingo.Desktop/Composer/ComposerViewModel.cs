@@ -64,6 +64,7 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
         ApplyDraftOutput();
         _session.Changed += OnDraftChanged;
         _downloads.StateChanged += OnDownloadStateChanged;
+        _voice.NoSignalChanged += OnNoSignalChanged;
         Refresh();
     }
 
@@ -86,6 +87,9 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
     [ObservableProperty] private bool _modelsReady;
     /// <summary>The text that will be written once everything is ready; empty while sentences are still pending or failed.</summary>
     [ObservableProperty] private string _resultText = "";
+
+    /// <summary>How many sentences kept their original wording because the cleanup failed the fidelity check.</summary>
+    [ObservableProperty] private int _keptOriginalCount;
 
     [ObservableProperty] private bool _isListening;
 
@@ -227,6 +231,8 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
             return;
 
         IsListening = false;
+        if (Banner.Kind is BannerKind.NoSound)
+            Banner = BannerState.None;
         await _voice.StopAsync().ConfigureAwait(true);
         ShowDraftSource();
         Refresh();
@@ -325,6 +331,7 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
     {
         _session.Changed -= OnDraftChanged;
         _downloads.StateChanged -= OnDownloadStateChanged;
+        _voice.NoSignalChanged -= OnNoSignalChanged;
         IsListening = false;
         await _voice.DisposeAsync().ConfigureAwait(false);
     }
@@ -427,6 +434,22 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
         await WriteAsync().ConfigureAwait(true);
     }
 
+    private void OnNoSignalChanged(bool silent)
+    {
+        void Apply()
+        {
+            if (silent && IsListening && Banner.Kind is BannerKind.None)
+                Banner = new BannerState(BannerKind.NoSound);
+            else if (!silent && Banner.Kind is BannerKind.NoSound)
+                Banner = BannerState.None;
+        }
+
+        if (_notifyOn is null)
+            Apply();
+        else
+            _notifyOn.Post(_ => Apply(), null);
+    }
+
     private void OnDownloadStateChanged(ModelDownloadState state)
     {
         var wanted = _plan.For(Output).Concat(_wantsVoice ? _plan.Voice : []).DistinctBy(model => model.Id).ToList();
@@ -459,11 +482,13 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
             Content: draft.ContentReadiness(),
             Count: draft.Units.Count,
             HasPending: draft.Pending.Length > 0,
-            Text: draft.ContentReadiness().IsReady ? draft.Text() : ""));
+            Text: draft.ContentReadiness().IsReady ? draft.Text() : "",
+            Kept: Output == ComposerOutput.Clean ? draft.Units.Count(unit => unit.Clean.Warning.Length > 0) : 0));
 
         Lines = snapshot.Lines;
         Status = StatusOf(snapshot.Count + (snapshot.HasPending ? 1 : 0), snapshot.Content);
         ResultText = Status == ComposerStatus.Ready ? snapshot.Text : "";
+        KeptOriginalCount = snapshot.Kept;
         CanCopy = _committed is not null || Status == ComposerStatus.Ready;
         CanWrite = CanCopy && _committed is null;
 

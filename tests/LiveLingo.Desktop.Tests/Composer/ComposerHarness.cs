@@ -53,6 +53,10 @@ internal sealed class FakeVoiceInput : IVoiceInput
 {
     private DraftSession? _draft;
 
+    public event Action<bool>? NoSignalChanged;
+
+    public void RaiseNoSignal(bool silent) => NoSignalChanged?.Invoke(silent);
+
     public int Starts { get; private set; }
     public int Stops { get; private set; }
     public Exception? StartFailure { get; set; }
