@@ -273,11 +273,7 @@ class BuildTask : NukeBuild
             $"stryker " +
             $"--project LiveLingo.Core.csproj " +
             $"--break-at {MutationThreshold} " +
-            $"--reporter progress --reporter json " +
-            $"--mutate \"!**/ServiceCollectionExtensions.cs\" " +
-            $"--mutate \"!**/Inference/LlamaProcessLauncher.cs\" " +
-            $"--mutate \"!**/Inference/LlamaServerAdapters.cs\" " +
-            $"--mutate \"!**/Speech/Native/**\"",
+            $"--reporter progress --reporter json",
             workingDirectory: coreTestDir);
 
         var reportFile = coreTestDir.GlobFiles("**/StrykerOutput/**/mutation-report.json")

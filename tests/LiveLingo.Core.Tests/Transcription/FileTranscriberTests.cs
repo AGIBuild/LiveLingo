@@ -83,6 +83,59 @@ public class FileTranscriberTests
     }
 
     [Fact]
+    public void ACancellationDuringTheFirstSpan_StopsBeforeTheSecondOneIsRecognized()
+    {
+        using var cts = new CancellationTokenSource();
+        var recognized = 0;
+        var recognizer = new ScriptedSegmentRecognizer(() =>
+        {
+            recognized++;
+            cts.Cancel();
+            return "x";
+        });
+        var vad = new ScriptedVad([new ScriptedSegment(0, 200, "a"), new ScriptedSegment(250, 500, "b")]);
+
+        Assert.Throws<OperationCanceledException>(() => FileTranscriber.Transcribe(Audio(1), vad, recognizer, null, cts.Token));
+
+        Assert.Equal(1, recognized);
+    }
+
+    [Fact]
+    public void ASpanOfExactlyTheLimit_IsNotCut()
+    {
+        var samples = Audio(14);
+        var vad = new ScriptedVad([new ScriptedSegment(0, 12_000, "x")]);
+
+        var result = FileTranscriber.Transcribe(samples, vad, new ScriptedSegmentRecognizer(() => "x"), null, CancellationToken.None);
+
+        Assert.Single(result);
+    }
+
+    [Fact]
+    public void AudioThatIsNotAWholeNumberOfSeconds_IsFedWithoutOverrunning()
+    {
+        var samples = new float[(int)(2.5 * AudioFormat.SampleRate)];
+
+        var result = FileTranscriber.Transcribe(
+            samples, new ScriptedVad([]), new ScriptedSegmentRecognizer(() => "x"), null, CancellationToken.None);
+
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public void TheQuietestFrame_MayBeTheLastOneBeforeTheLimit()
+    {
+        var samples = Audio(30);
+        Array.Fill(samples, 0.5f);
+        Array.Clear(samples, FileTranscriber.MaxSpanSamples - 320, 320);
+        var vad = new ScriptedVad([new ScriptedSegment(0, 20_000, "x")]);
+
+        var result = FileTranscriber.Transcribe(samples, vad, new ScriptedSegmentRecognizer(() => "x"), null, CancellationToken.None);
+
+        Assert.Equal(FileTranscriber.MaxSpanSamples - 160, Math.Round(result[0].End.TotalSeconds * AudioFormat.SampleRate), 0);
+    }
+
+    [Fact]
     public void ACancelledToken_StopsTheWork()
     {
         using var cts = new CancellationTokenSource();

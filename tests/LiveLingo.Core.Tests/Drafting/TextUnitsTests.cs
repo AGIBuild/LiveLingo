@@ -143,4 +143,31 @@ public class TextUnitsTests
 
         Assert.Equal(["`x`", "https://a.io/b", "{name}", "${KEY}"], spans);
     }
+
+    [Fact]
+    public void AnUnclosedBacktick_KeepsTheRestAsOneUnit_BecauseTheCodeNeverEnds()
+    {
+        var units = TextUnits.Split("先看 `未闭合。后面还有。");
+
+        Assert.Equal("先看 `未闭合。后面还有。", Assert.Single(units).Body);
+    }
+
+    [Fact]
+    public void ABacktickRunAtTheVeryEnd_IsReadWithoutRunningPastTheText()
+    {
+        var units = TextUnits.Split("说明。``");
+
+        Assert.Equal(["说明。", "``"], units.Select(u => u.Body).ToArray());
+    }
+
+    [Fact]
+    public void AFenceOfThreeBackticks_IsOneRunOfTicks_AndTextAfterTheFenceSplitsAgain()
+    {
+        var units = TextUnits.Split("```\n不拆。\n```\n然后说明。再来一句。");
+
+        Assert.Equal(3, units.Count);
+        Assert.Equal("```\n不拆。\n```", units[0].Body);
+        Assert.Equal("然后说明。", units[1].Body);
+        Assert.Equal("再来一句。", units[2].Body);
+    }
 }
