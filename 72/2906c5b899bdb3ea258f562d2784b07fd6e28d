@@ -1,0 +1,19 @@
+docs/superpowers/specs/2026-10-31-livelingo-composer-design.md
+  s_6d6e9175f38e45::t_1d0d228e4b9d5b 126
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "722906c5b899bdb3ea258f562d2784b07fd6e28d",
+  "prompts": {},
+  "sessions": {
+    "s_6d6e9175f38e45": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "f74d37e5-1d96-4ddc-a3f9-5ae24ff39e38",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
