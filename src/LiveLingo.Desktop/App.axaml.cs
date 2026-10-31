@@ -37,6 +37,7 @@ public partial class App : Application
     private IUpdateService? _updateService;
     private string? _registeredGesture;
     private ComposerWindow? _composer;
+    private readonly UnsentDraft _unsentDraft = new();
     private SettingsWindow? _settingsWindow;
 
     public override void Initialize()
@@ -238,9 +239,15 @@ public partial class App : Application
 
         var loc = services.GetRequiredService<ILocalizationService>();
         var window = new ComposerWindow(vm, new ComposerTexts(loc), target);
+        var written = false;
+        vm.Completed += () => written = true;
+        var restored = _unsentDraft.Take();
+        if (restored.Length > 0)
+            vm.SourceText = restored;
         window.Closed += async (_, _) =>
         {
             _composer = null;
+            _unsentDraft.Close(vm.SourceText, written);
             await vm.DisposeAsync();
             await cleanup.DisposeAsync();
             await scheduler.DisposeAsync();
