@@ -14,7 +14,10 @@ public sealed record LlamaServerHostOptions(
         new(TimeSpan.FromMinutes(10), TimeSpan.FromSeconds(90), TimeSpan.FromMilliseconds(150));
 }
 
-/// <summary>A running server that is guaranteed not to be unloaded until the lease is disposed.</summary>
+/// <summary>
+/// A running server that is not unloaded for idleness while a lease is held. Replacing the model of a role or
+/// disposing the host stops the server immediately; requests in flight then fail with an explicit error.
+/// </summary>
 public sealed class ServerLease : IDisposable
 {
     private readonly Action _release;
@@ -134,15 +137,32 @@ public sealed class LlamaServerHost : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        List<(InferenceRole Role, Instance Instance)> running;
+        List<InferenceRole> roles;
         lock (_gate)
         {
+            if (_disposed)
+                return;
             _disposed = true;
-            running = _instances.Select(pair => (pair.Key, pair.Value)).ToList();
+            roles = _locks.Keys.ToList();
         }
 
-        foreach (var (role, instance) in running)
-            await StopAsync(role, instance).ConfigureAwait(false);
+        foreach (var role in roles)
+        {
+            var roleLock = LockFor(role);
+            await roleLock.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                Instance? instance;
+                lock (_gate)
+                    _instances.TryGetValue(role, out instance);
+                if (instance is not null)
+                    await StopAsync(role, instance).ConfigureAwait(false);
+            }
+            finally
+            {
+                roleLock.Release();
+            }
+        }
     }
 
     private SemaphoreSlim LockFor(InferenceRole role)

@@ -44,14 +44,19 @@ internal sealed class ModelAssetDownloader
 
         if (File.Exists(finalPath))
         {
-            var existingFileSize = new FileInfo(finalPath).Length;
-            _logger.LogDebug(
-                "Model asset already exists: model={ModelId}, asset={AssetPath}, bytes={Bytes}",
-                modelId,
-                relativePath,
-                existingFileSize);
-            progress?.Report(new ModelDownloadProgress(modelId, downloadedBeforeAsset + existingFileSize, totalBytes));
-            return existingFileSize;
+            // A file left by an interrupted install is trusted only after its hash matches the catalog.
+            if (await HashMatchesAsync(finalPath, asset.Sha256, ct).ConfigureAwait(false))
+            {
+                var existingFileSize = new FileInfo(finalPath).Length;
+                _logger.LogDebug(
+                    "Model asset already exists and verified: model={ModelId}, asset={AssetPath}, bytes={Bytes}",
+                    modelId, relativePath, existingFileSize);
+                progress?.Report(new ModelDownloadProgress(modelId, downloadedBeforeAsset + existingFileSize, totalBytes));
+                return existingFileSize;
+            }
+
+            _logger.LogWarning("Existing asset failed verification and is removed: model={ModelId}, asset={AssetPath}", modelId, relativePath);
+            File.Delete(finalPath);
         }
 
         var downloadedBytes = HuggingFaceResolveUrl.TryParse(asset.DownloadUrl, out _, out _, out _)
@@ -69,8 +74,16 @@ internal sealed class ModelAssetDownloader
     private async Task VerifyAsync(string modelId, string relativePath, string path, string expected, CancellationToken ct)
     {
         string actual;
-        await using (var file = File.OpenRead(path))
-            actual = Convert.ToHexStringLower(await SHA256.HashDataAsync(file, ct).ConfigureAwait(false));
+        try
+        {
+            actual = await ComputeHashAsync(path, ct).ConfigureAwait(false);
+        }
+        catch
+        {
+            // Never leave a file that has not been verified (cancelled or failed hashing) at its final path.
+            File.Delete(path);
+            throw;
+        }
 
         if (string.Equals(actual, expected, StringComparison.OrdinalIgnoreCase))
             return;
@@ -80,5 +93,14 @@ internal sealed class ModelAssetDownloader
             "Integrity check failed: model={ModelId}, asset={AssetPath}, expected={Expected}, actual={Actual}",
             modelId, relativePath, expected, actual);
         throw new ModelIntegrityException(modelId, relativePath, expected, actual);
+    }
+
+    private static async Task<bool> HashMatchesAsync(string path, string expected, CancellationToken ct) =>
+        string.Equals(await ComputeHashAsync(path, ct).ConfigureAwait(false), expected, StringComparison.OrdinalIgnoreCase);
+
+    private static async Task<string> ComputeHashAsync(string path, CancellationToken ct)
+    {
+        await using var file = File.OpenRead(path);
+        return Convert.ToHexStringLower(await SHA256.HashDataAsync(file, ct).ConfigureAwait(false));
     }
 }
