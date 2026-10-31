@@ -70,6 +70,23 @@ public class OpenAiChatClientTests
     }
 
     [Fact]
+    public async Task CompleteAsync_SendsTheSystemMessageFirst_WhenGiven()
+    {
+        var handler = new StubHandler(_ => Sse(Delta("ok"), Stop, "data: [DONE]"));
+
+        await ClientFor(handler).CompleteAsync(
+            new ChatRequest("用户输入", 32, 0, NoExtra, System: "你是整理器"), CancellationToken.None);
+
+        using var body = System.Text.Json.JsonDocument.Parse(handler.RequestBody!);
+        var messages = body.RootElement.GetProperty("messages");
+        Assert.Equal(2, messages.GetArrayLength());
+        Assert.Equal("system", messages[0].GetProperty("role").GetString());
+        Assert.Equal("你是整理器", messages[0].GetProperty("content").GetString());
+        Assert.Equal("user", messages[1].GetProperty("role").GetString());
+        Assert.Equal("用户输入", messages[1].GetProperty("content").GetString());
+    }
+
+    [Fact]
     public async Task CompleteAsync_RejectsAStreamThatDidNotStopNormally()
     {
         var truncated = new StubHandler(_ => Sse(Delta("Do not"), "data: [DONE]"));

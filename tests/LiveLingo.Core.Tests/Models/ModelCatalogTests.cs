@@ -64,4 +64,24 @@ public class ModelCatalogTests
         Assert.Equal(ModelType.Translation, ModelCatalog.TranslatorQuality.Type);
         Assert.True(ModelCatalog.TranslatorQuality.SizeBytes > ModelCatalog.TranslatorFast.SizeBytes);
     }
+
+    [Fact]
+    public void SpeechModels_AreArchivesWithTheFilesTheAdaptersLoad()
+    {
+        Assert.Equal(ModelType.SpeechToText, ModelCatalog.SpeechLive.Type);
+        Assert.Equal(ModelArchiveType.TarBz2, ModelCatalog.SpeechLive.ArchiveType);
+        Assert.Equal(
+            ["encoder.int8.onnx", "decoder.onnx", "joiner.int8.onnx", "tokens.txt"],
+            ModelCatalog.SpeechLive.ExtractedFiles);
+        Assert.Contains("tokenizer/vocab.json", ModelCatalog.SpeechSecondPass.ExtractedFiles);
+        Assert.Equal(ModelArchiveType.None, ModelCatalog.SpeechVad.ArchiveType);
+        Assert.Equal(3, ModelCatalog.Speech.Count);
+    }
+
+    [Fact]
+    public void Cleaner_IsAPostProcessingModelWithAPinnedRevision()
+    {
+        Assert.Equal(ModelType.PostProcessing, ModelCatalog.Cleaner.Type);
+        Assert.Matches("/resolve/[0-9a-f]{40}/", ModelCatalog.Cleaner.Assets[0].DownloadUrl);
+    }
 }

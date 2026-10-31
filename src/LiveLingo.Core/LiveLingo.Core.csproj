@@ -16,6 +16,7 @@
     <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.3.0" />
     <PackageReference Include="Microsoft.Extensions.Options" Version="11.0.0-preview.1.26104.118" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="11.0.0-preview.1.26104.118" />
+    <PackageReference Include="org.k2fsa.sherpa.onnx" Version="2.0.1" />
     <PackageReference Include="SharpCompress" Version="1.0.0" />
   </ItemGroup>
 </Project>
