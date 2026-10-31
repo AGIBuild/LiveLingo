@@ -132,10 +132,15 @@ Use `--Configuration Release` for release builds. On CI, configuration defaults 
 
 ### Obsolete model cleanup
 
-`IModelManager.CleanObsoleteModelsAsync` deletes the directories of model ids the
-caller passes in and reports the bytes reclaimed. The 1.x model directories
-(Gemma, Marian, Qwen processors) are retired by the composer rewrite; the app
-must ask the user before removing them (design spec, S7).
+Settings lists model directories that are not in `ModelCatalog` (for example the 1.x Gemma, Marian and Qwen
+processors) with their total size, and removes them through `IModelManager.CleanObsoleteModelsAsync` only when the user
+presses *Remove old models*. Nothing is deleted silently (design spec, S7).
+
+### Settings migration
+
+`SettingsMigration` reads a schema 2 file (1.x) and keeps the hotkey, interface language, update settings and the
+advanced paths and levels. Any other schema version starts from defaults. A new schema version must add its own
+migration instead of resetting the file.
 
 ---
 

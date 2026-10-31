@@ -46,4 +46,8 @@
   <ItemGroup>
     <EmbeddedResource Include="Resources\i18n\*.json" />
   </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\..\THIRD_PARTY_NOTICES.md" Link="THIRD_PARTY_NOTICES.md" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

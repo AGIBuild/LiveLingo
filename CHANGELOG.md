@@ -5,6 +5,35 @@ All notable changes to LiveLingo are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - Unreleased
+
+Rewrite around a single composer window (branch `feat/composer-v3`). The 1.x translator overlay, its cloud and Ollama
+providers, wizard and model catalog were removed; see the design and plan under `docs/superpowers/`.
+
+### Added
+
+- Composer: summon with a global hotkey, type, paste or speak, choose *Clean up*, *Translate* or *Original*, press
+  Enter to write into the app you came from. Banners replace dialogs for missing models, permissions and silence.
+- Voice dictation with live text (X-ASR), settled text (Qwen3-ASR) and a fidelity-checked cleanup (Qwen3.5 4B).
+- Translation with Hy-MT2 on a pinned `llama-server`; glossary of keep-as-written terms and fixed translations.
+- Import a WAV recording as a timeline; export SRT in the chosen output.
+- Optional cloud translation and cleanup through an OpenAI-compatible endpoint, per feature, text only, off by default;
+  API key in the system secret store.
+- Recent drafts (memory only), side-by-side layout for transcripts and whole documents, accessible names and live
+  regions.
+- Settings: hotkey, language, translator tier, glossary, cloud model, removal of models from earlier versions.
+- Settings migration from schema 2; `THIRD_PARTY_NOTICES.md`.
+
+### Changed
+
+- Model catalog pins revisions and SHA256 hashes and shows each model's license.
+- macOS bundle declares `NSMicrophoneUsageDescription` and the audio-input entitlement.
+
+### Known limits
+
+- Validated on an M3 Pro only; M2/16 GB and Windows runtime behaviour are unverified.
+- Recording import reads uncompressed WAV only.
+
 ## [1.4.0] - 2026-04-25
 
 ### Changed

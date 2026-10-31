@@ -62,6 +62,24 @@
 | 转录导入 / SRT | 完成（仅 WAV） | `WavReader`（PCM 8/16/24/32、float、扩展格式，任意声道与采样率→16 kHz 单声道）→ Silero VAD 按停顿切分（0.5 s）→ Qwen3-ASR 二遍识别；单段超过 12 s 时在其后 4 s 内最安静处切开（真实探针发现：Qwen3-ASR 对 36–43 s 的片段会截断并输出乱码）。结果进 `Draft` 的逐句单元，与语音共用整理、翻译、保真；时间线只读；导出 SRT 用当前输出（整理 / 译文 / 原话）。M3 Pro 上 81 s 录音 7.3–10.5 s 转完（约 8–11 倍实时）。**不支持 m4a / mp3 等压缩格式**（需要各平台解码器，见开放问题） |
 | 宽屏 | 完成 | 转录与整段文本自动切为左右对照（980 px），其余堆叠（680 px）；结果区最高 320 px 内部滚动 |
 | 历史（云端同步等） | 不做 | 原型只有内存中的最近 5 份草稿，已由上面的“最近草稿”覆盖 |
+| 设置迁移（schema 2 → 3） | 完成 | `SettingsMigration`：只保留热键、界面语言、更新设置、高级路径与级别；其余按新设计丢弃，云端保持关闭；其它版本从默认开始。顺带修复：`schemaVersion` 不是数字时会抛 `InvalidOperationException` 使启动崩溃 |
+| 旧模型清理（S7） | 完成 | 设置里列出不在目录中的模型目录（数量与大小），用户点“删除旧模型”才删除，不静默删除 |
+| 无障碍 | 完成（基础） | 无可见文字的控件有可访问名称（麦克风、互换方向、原话输入框、设置里的输入框）；状态行为礼貌播报、横幅为立即播报；全部文字可选可复制；键盘：Enter 写入、Esc 逐级退出、麦克风 Space/Enter。**未用读屏软件实测** |
+| Windows 对齐 | 构建级 | `dotnet publish -r win-x64 --self-contained` 成功，产物含 `portaudio.dll`、`onnxruntime.dll`、`sherpa-onnx-c-api.dll`；Windows 平台服务实现了全部接口（含 `IsAlive`、麦克风与权限）；llama.cpp 已登记 `win-x64` CPU 包（`llama-server.exe`）。**没有在 Windows 上运行过任何东西** |
+| macOS 打包 | 修复 | `Info.plist` 缺 `NSMicrophoneUsageDescription`、entitlements 的 audio-input 为 false，打包后的应用无法打开麦克风；已补上。未重新打包签名验证 |
+| 许可审计（S5） | 完成 | 逐项核对上游许可文件与模型卡：Hy-MT2、Qwen3.5、X-ASR、Qwen3-ASR、sherpa-onnx 均 Apache-2.0；llama.cpp、Silero VAD 为 MIT。模型只在用户同意后从原站下载，不随应用分发。写入 `THIRD_PARTY_NOTICES.md` 并随产物复制。**仓库没有 `LICENSE` 文件（1.x README 的 MIT 徽章无依据），需要负责人决定**；安装包尚未附带 Apache-2.0 许可全文 |
+
+## M4 进度（随实施更新）
+
+| 项目 | 状态 | 说明 |
+|---|---|---|
+| S1 内存（开发机数据） | 有数据，**目标机未测** | `ResidentMemoryProbeTests`（`LIVELINGO_ENABLE_VOICE_PROBE=1`，仅 macOS）：识别（实时 + 二遍 + VAD）、整理 4B、翻译全部常驻并各跑过一次请求后，合计常驻内存（M3 Pro 36 GB）：**均衡档 6.6 GB**（应用进程含语音模型 1.8 GB、整理 llama-server 3.1 GB、翻译 1.8B 1.7 GB）；**质量档 10.5 GB**（翻译 7B 的 llama-server 5.8 GB）。结论：均衡档在 16 GB 机器上有余量，可继续作默认；质量档加上系统与其他应用已很紧，不应自动选用。M2/16 GB 上的换页、首字与整句延迟仍需实机 |
+| S3 Windows 实机 | 未做 | 需要 Windows 16 GB 机器：PortAudio 采集、热键、注入、CPU / Vulkan 速度 |
+| S5 许可 | 完成 | 见上 |
+| S7 旧模型 | 完成 | 见上 |
+| 安装包与签名 | 未做 | 需要证书与公证账号；`Pack` 目标沿用，未验证 |
+| 文档 | 完成 | README 改写为 2.0；CHANGELOG 增加 2.0.0 草案；CONTRIBUTING 更新旧模型清理与设置迁移 |
+| 真实语料对照 POC | 部分 | 语音：6 个场景回放通过（M2）；录音导入在 81 s 合成长录音上跑通，识别有同音错字（合成语音所致），未做 CER 对照；没有真实人声语料 |
 
 ## M0 地基
 
