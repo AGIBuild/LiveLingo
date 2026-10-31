@@ -1,0 +1,40 @@
+src/LiveLingo.Desktop/Composer/ComposerTexts.cs
+  s_6d6e9175f38e45::t_9620ddc2c9d722 37
+tests/LiveLingo.Desktop.Tests/Composer/ComposerWindowTests.cs
+  s_6d6e9175f38e45::t_57c5da9565e177 185,188
+  s_6d6e9175f38e45::t_6b9d9e0623ea1c 176-184,186-187,189-192
+  s_6d6e9175f38e45::t_3a853d5ff95b4f 175
+build/macos/Info.plist
+  s_6d6e9175f38e45::t_6fad624cc082a0 27-28
+tests/LiveLingo.Desktop.Tests/Settings/SettingsWindowTests.cs
+  s_6d6e9175f38e45::t_925ea36e74c79c 52
+src/LiveLingo.Desktop/Settings/SettingsWindow.axaml.cs
+  s_6d6e9175f38e45::t_93976c7533f580 36-39
+src/LiveLingo.Desktop/Resources/i18n/zh-CN.json
+  s_6d6e9175f38e45::t_21e01553740b5b 49
+build/macos/entitlements.plist
+  s_6d6e9175f38e45::t_3a2f0dd17ac0be 8
+tests/LiveLingo.Desktop.Tests/Services/Localization/LocalizationServiceTests.cs
+  s_6d6e9175f38e45::t_59e0402ffb2ed7 214
+src/LiveLingo.Desktop/Resources/i18n/en-US.json
+  s_6d6e9175f38e45::t_9620ddc2c9d722 49
+src/LiveLingo.Desktop/Composer/ComposerWindow.axaml.cs
+  s_6d6e9175f38e45::t_57c5da9565e177 67-68
+  s_6d6e9175f38e45::t_df665c85eff137 63-66
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d563bba354074cc8b6413c750e58733c9f0aa315",
+  "prompts": {},
+  "sessions": {
+    "s_6d6e9175f38e45": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "f74d37e5-1d96-4ddc-a3f9-5ae24ff39e38",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
