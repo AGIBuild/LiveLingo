@@ -70,12 +70,7 @@ public sealed class CleanupScheduler : IAsyncDisposable
                 return;
 
             var now = _time.GetUtcNow();
-            var revision = _session.Read(draft => draft.EditRevision);
-            if (revision != _seenEditRevision)
-            {
-                _seenEditRevision = revision;
-                _editedAt = now;
-            }
+            ObserveEdits(now);
 
             foreach (var id in _session.Read(draft => draft.Units.Select(unit => unit.Id).ToList()))
                 _firstSeen.TryAdd(id, now);
@@ -85,6 +80,20 @@ public sealed class CleanupScheduler : IAsyncDisposable
 
             StartWorkerIfNeeded();
         }
+    }
+
+    /// <summary>
+    /// Notes when the user last edited the text. Also called before every scan, because a scan can see an edit before
+    /// its change notification arrives; without it that edit would count as made long ago and skip the typing pause.
+    /// </summary>
+    private void ObserveEdits(DateTimeOffset now)
+    {
+        var revision = _session.Read(draft => draft.EditRevision);
+        if (revision == _seenEditRevision)
+            return;
+
+        _seenEditRevision = revision;
+        _editedAt = now;
     }
 
     private void StartWorkerIfNeeded()
@@ -105,6 +114,8 @@ public sealed class CleanupScheduler : IAsyncDisposable
             CancellationTokenSource cancel;
             lock (_gate)
             {
+                if (!_disposed)
+                    ObserveEdits(_time.GetUtcNow());
                 var (next, wait) = _disposed ? (null, null) : _session.Read(draft => Find(draft, _time.GetUtcNow()));
                 if (next is null)
                 {

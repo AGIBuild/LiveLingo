@@ -25,6 +25,16 @@ public sealed class SettingsWebSessionTests
 
         public JsonElement Last => JsonDocument.Parse(Host.Posted[^1]).RootElement;
 
+        /// <summary>
+        /// Waits until the page was told about the devices. The view model sets the list before it announces the change,
+        /// so the clock is advanced until the snapshot shows it rather than trusting the property alone.
+        /// </summary>
+        public Task DevicesRead() => Wait.Until(() =>
+        {
+            Time.Advance(WebBridge.Frame);
+            return Last.GetProperty("data").GetProperty("voice").GetProperty("microphones").GetArrayLength() == 3;
+        });
+
         public string? Section => Last.GetProperty("data").GetProperty("section").GetString();
 
         public void Dispose() => Session.Dispose();
@@ -46,7 +56,7 @@ public sealed class SettingsWebSessionTests
     public async Task WhatTheSystemProvides_ReachesThePageOnceItIsRead()
     {
         using var rig = new Rig();
-        await Wait.Until(() => rig.F.Vm.MicrophoneNames.Count == 3);
+        await rig.DevicesRead();
 
         rig.Time.Advance(WebBridge.Frame);
 
@@ -58,7 +68,7 @@ public sealed class SettingsWebSessionTests
     public async Task ThePageActs_AndTheNextSnapshotShowsTheResult()
     {
         using var rig = new Rig();
-        await Wait.Until(() => rig.F.Vm.MicrophoneNames.Count == 3);
+        await rig.DevicesRead();
         rig.Host.Posted.Clear();
 
         rig.Host.FromPage("""{"v":1,"name":"setting","key":"theme","value":"Dark"}""");
@@ -73,7 +83,7 @@ public sealed class SettingsWebSessionTests
     public async Task ChangesInAFrame_ReachThePageAsOneSnapshot()
     {
         using var rig = new Rig();
-        await Wait.Until(() => rig.F.Vm.MicrophoneNames.Count == 3);
+        await rig.DevicesRead();
         rig.Host.Posted.Clear();
 
         rig.Host.FromPage("""{"v":1,"name":"setting","key":"hotkey","value":"Ctrl+Alt+K"}""");
