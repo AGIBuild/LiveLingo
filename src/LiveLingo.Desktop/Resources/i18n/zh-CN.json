@@ -126,7 +126,7 @@
   "composer.banner.writeFailed": "写入失败：{0}。结果已保留，可以复制。",
   "composer.banner.micDenied": "麦克风权限未开启 · 仍可直接打字。",
   "composer.banner.noMic": "无法使用麦克风：{0}",
-  "composer.banner.noSound": "没有检测到声音，已停止录音，已有内容保留。",
+  "composer.banner.noSound": "5 分钟没有检测到声音，已关闭麦克风，已有内容保留。如果一直没有声音，请检查输入设备。",
   "composer.banner.fileFailed": "文件无法使用：{0}",
   "composer.banner.noSpeech": "这段录音里没有识别到语音。",
   "composer.banner.slow": "处理比平时慢。你可以继续等待，或改用原话。",

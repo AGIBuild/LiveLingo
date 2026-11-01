@@ -95,7 +95,7 @@ public class MicrophoneVoiceInputTests
     }
 
     [Fact]
-    public async Task SilentFrames_RaiseNoSignal_AndSoundClearsIt()
+    public async Task SilentFrames_RaiseNoSignalOnlyAfterTheIdleTimeout_AndSoundClearsIt()
     {
         var (input, mic, draft, _) = Create();
         Action<float[]>? onFrame = null;
@@ -104,10 +104,16 @@ public class MicrophoneVoiceInputTests
         input.NoSignalChanged += changes.Add;
         await input.StartAsync(draft, [], CancellationToken.None);
 
-        for (var i = 0; i < 150; i++)
+        const int framesPerMinute = 16_000 * 60 / 640;
+        for (var i = 0; i < 4 * framesPerMinute; i++)
+            onFrame!(new float[640]);
+        Assert.Empty(changes);
+
+        for (var i = 0; i < framesPerMinute + 1; i++)
             onFrame!(new float[640]);
         onFrame!(Enumerable.Repeat(0.3f, 640).ToArray());
 
+        Assert.Equal(TimeSpan.FromMinutes(5), MicrophoneVoiceInput.IdleTimeout);
         Assert.Equal([true, false], changes);
         await input.StopAsync();
     }

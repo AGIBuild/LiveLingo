@@ -488,7 +488,7 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
             if (!silent || !IsListening)
                 return;
 
-            // Listening stops by itself so a dead microphone is not mistaken for a long pause; what was heard is kept.
+            // Listening stops by itself after a long silence, so a forgotten or dead microphone does not stay open; what was heard is kept.
             await StopListeningAsync().ConfigureAwait(true);
             Banner = new BannerState(BannerKind.NoSound);
         }
