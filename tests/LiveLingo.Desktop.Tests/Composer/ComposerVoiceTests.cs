@@ -264,7 +264,7 @@ public class ComposerVoiceTests
         Assert.Equal(ComposerOutput.Clean, new ComposerViewModel(
             h.Session, h.Scheduler,
             new ComposerModelPlan([], [], [], []),
-            h.Models, h.Downloads, h.Platform, h.Voice, h.Transcriber, [], null).Output);
+            h.Models, h.Downloads, h.Platform, h.Voice, h.Transcriber, [], ComposerOptions.Default, null).Output);
     }
 
     [Fact]
@@ -296,16 +296,18 @@ public class ComposerVoiceTests
     }
 
     [Fact]
-    public async Task ADeadMicrophone_ShowsTheNoSoundBanner_AndSoundReturningClearsIt()
+    public async Task ADeadMicrophone_StopsListening_ShowsTheNoSoundBanner_AndListeningAgainClearsIt()
     {
         await using var h = Create();
         await h.Vm.StartListeningAsync();
 
         h.Voice.RaiseNoSignal(true);
-        Assert.Equal(BannerKind.NoSound, h.Vm.Banner.Kind);
+        await Wait.Until(() => h.Vm.Banner.Kind == BannerKind.NoSound);
+        Assert.False(h.Vm.IsListening);
 
-        h.Voice.RaiseNoSignal(false);
+        await h.Vm.StartListeningAsync();
         Assert.Equal(BannerKind.None, h.Vm.Banner.Kind);
+        Assert.True(h.Vm.IsListening);
     }
 
     [Fact]
@@ -323,19 +325,23 @@ public class ComposerVoiceTests
     }
 
     [Fact]
-    public async Task StoppingListening_ClearsTheNoSoundBanner()
+    public async Task NoSound_KeepsWhatWasHeard_AndDismissingTheBannerClearsIt()
     {
         await using var h = Create();
         await h.Vm.StartListeningAsync();
+        h.Voice.Say("先检查缓存。");
         h.Voice.RaiseNoSignal(true);
+        await Wait.Until(() => h.Vm.Banner.Kind == BannerKind.NoSound);
 
-        await h.Vm.StopListeningAsync();
+        Assert.Contains("先检查缓存。", h.Vm.SourceText);
+
+        await h.Vm.RunBannerActionCommand.ExecuteAsync(BannerAction.Dismiss);
 
         Assert.Equal(BannerKind.None, h.Vm.Banner.Kind);
     }
 
     [Fact]
-    public async Task SentencesThatKeptTheirWording_AreCounted_WhenCleanIsSelected()
+    public async Task SentencesThatKeptTheirWording_CarryTheReason_WhenCleanIsSelected()
     {
         await using var h = Create(output: ComposerOutput.Clean);
         h.Cleaner.Handler = (request, _) => Task.FromResult(request.Target.Contains("8080") ? "端口改一下。" : request.Target);
@@ -343,7 +349,8 @@ public class ComposerVoiceTests
         h.Vm.SourceText = "端口改成 8080。再补测试。";
         await Wait.Until(() => h.Vm.Status == ComposerStatus.Ready);
 
-        Assert.Equal(1, h.Vm.KeptOriginalCount);
-        Assert.Equal("端口改成 8080。再补测试。", h.Vm.ResultText);
+        Assert.NotEqual("", h.Vm.Lines[0].Warning);
+        Assert.Equal("", h.Vm.Lines[1].Warning);
+        Assert.Equal("端口改成 8080。再补测试。", h.Vm.BuildExport(ExportFormat.Txt));
     }
 }

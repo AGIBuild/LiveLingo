@@ -259,7 +259,7 @@ Only final installer artifacts (`.exe`, `.msi`, `.pkg`) are published — no sou
 - Tests for new logic (ViewModels, Core services)
 - No Avalonia references leaked into ViewModels
 - Coverage and mutation thresholds maintained
-- Follows existing code style (Inter font, dark theme conventions)
+- Follows the v3 prototype (`docs/superpowers/prototypes/livelingo-ux-v3/`): design tokens in `Styles/AppTheme.axaml`, system font, light and dark themes
 
 ---
 

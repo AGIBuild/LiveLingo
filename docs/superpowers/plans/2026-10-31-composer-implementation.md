@@ -78,7 +78,9 @@
 | S5 许可 | 完成 | 见上 |
 | S7 旧模型 | 完成 | 见上 |
 | 安装包与签名 | 部分 | `./build.sh PackMac --Runtime osx-arm64` 成功：`.pkg` 内的 `Info.plist` 含麦克风说明，`libportaudio` / `libonnxruntime` / `libsherpa-onnx-c-api` 与 `THIRD_PARTY_NOTICES.md` 都在包内。**未签名、未公证、未安装运行**（需要证书与公证账号）；Windows 的 `Pack` / `PackMsi` 未在本机验证 |
-| CI 门禁 | 通过 | `./build.sh Test`：Core 421、Desktop 296、HfGguf 9 全绿；行覆盖 91.1%、分支覆盖 86.3%。`./build.sh Mutate`：变异得分 81.79%（门槛 80%）。修复了变异目标从未能运行的问题（Nuke 传 `--break-at 80` 而配置 `low: 60`；命令行 `--mutate` 还覆盖了配置里的范围），现在范围与阈值只由 `stryker-config.json` 决定 |
+| CI 门禁 | 通过 | `./build.sh Test`：Core 445、Desktop 359、HfGguf 9 全绿；行覆盖 86.2%、分支覆盖 81.6%（升级 coverlet 10 后分母变大，仍高于门槛 80 / 65）。`./build.sh Mutate`：变异得分 81.99%（门槛 80%，升级包之前测得，界面重写后只改了 Desktop，不在变异范围内）。修复了变异目标从未能运行的问题（Nuke 传 `--break-at 80` 而配置 `low: 60`；命令行 `--mutate` 还覆盖了配置里的范围），现在范围与阈值只由 `stryker-config.json` 决定 |
+| 包升级 | 完成 | Avalonia 12.1.4、Microsoft.Extensions 10.0.14（`Http.Resilience` 10.11.0）、CommunityToolkit.Mvvm 8.4.2、Serilog 4.4.0 / Sinks.File 7.0.0、Velopack 1.2.161、测试包与工具（vpk、stryker 5、wix 7）全部最新稳定版。`xunit.v3` 留在 3.2.2：4.x 只支持 Microsoft Testing Platform，.NET 10 SDK 的 `dotnet test` 无法运行。移除未使用的 `Avalonia.Diagnostics` 与 `Avalonia.Fonts.Inter`（界面改用系统字体，与原型一致）。`./build.sh Build`、`Test`、`Run` 均 0 警告 |
+| 原型一致性重做 | 完成（实机待验） | 按 `livelingo-ux-v3` 逐项重做：设计令牌（浅 / 深色、跟随系统）、浮窗头部（去向、隐私、输出药丸、更多、关闭）、横幅与行内操作、句子悬停工具与行内编辑、麦克风点按 / 按住、保留 Esc 逐级退出、三个菜单、最近草稿与导出对话框、设置即改即存。用无头 Skia 渲染截图（浅色 / 深色 / 听写 / 横幅 / 宽屏 / 设置四页）与原型截图逐张对照，图标、开关、按钮已修正 |
 | 文档 | 完成 | README 改写为 2.0；CHANGELOG 增加 2.0.0 草案；CONTRIBUTING 更新旧模型清理与设置迁移 |
 | 真实语料对照 POC | 部分 | 语音：6 个场景回放通过（M2）；录音导入在 81 s 合成长录音上跑通，识别有同音错字（合成语音所致），未做 CER 对照；没有真实人声语料 |
 

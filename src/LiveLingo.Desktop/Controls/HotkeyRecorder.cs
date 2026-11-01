@@ -34,22 +34,22 @@ public class HotkeyRecorder : Border
 
     public HotkeyRecorder()
     {
-        Background = Brush.Parse("#0D0D0F");
-        BorderBrush = Brush.Parse("#2A2A2C");
         BorderThickness = new Thickness(1);
-        CornerRadius = new CornerRadius(6);
-        Padding = new Thickness(10, 6);
+        CornerRadius = new CornerRadius(10);
+        Padding = new Thickness(10, 7);
         Cursor = new Cursor(StandardCursorType.Hand);
-        MinHeight = 32;
+        MinHeight = 34;
 
         _display = new TextBlock
         {
-            Foreground = Brush.Parse("#E5E5E7"),
             FontSize = 14,
             VerticalAlignment = VerticalAlignment.Center,
         };
         Child = _display;
     }
+
+    /// <summary>What the box says while it waits for the key combination.</summary>
+    public string PromptText { get; set; } = "Press key combination…";
 
     protected override void OnAttachedToVisualTree(VisualTreeAttachmentEventArgs e)
     {
@@ -63,21 +63,14 @@ public class HotkeyRecorder : Border
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed) return;
 
         _recording = true;
-        _display.Text = "Press key combination…";
-        _display.Foreground = Brush.Parse("#8E8E93");
-        BorderBrush = Brush.Parse("#0A84FF");
+        _display.Text = PromptText;
+        _display.Classes.Set("prompt", true);
+        Classes.Set("recording", true);
         Focus();
         e.Handled = true;
     }
 
-    protected override void OnGotFocus(GotFocusEventArgs e)
-    {
-        base.OnGotFocus(e);
-        if (!_recording)
-            BorderBrush = Brush.Parse("#0A84FF");
-    }
-
-    protected override void OnLostFocus(RoutedEventArgs e)
+    protected override void OnLostFocus(FocusChangedEventArgs e)
     {
         base.OnLostFocus(e);
         ExitRecording();
@@ -121,8 +114,8 @@ public class HotkeyRecorder : Border
     {
         _recording = false;
         _display.Text = FormatDisplay(Hotkey);
-        _display.Foreground = Brush.Parse("#E5E5E7");
-        BorderBrush = Brush.Parse(IsFocused ? "#0A84FF" : "#2A2A2C");
+        _display.Classes.Set("prompt", false);
+        Classes.Set("recording", false);
     }
 
     private static string FormatDisplay(string hotkey)

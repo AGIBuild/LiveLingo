@@ -4,62 +4,272 @@
         xmlns:controls="clr-namespace:LiveLingo.Desktop.Controls"
         x:Class="LiveLingo.Desktop.Settings.SettingsWindow"
         x:DataType="local:SettingsViewModel"
-        Width="560"
-        SizeToContent="Height"
-        MaxHeight="760"
+        Width="920"
+        Height="660"
         CanResize="False"
         WindowStartupLocation="CenterScreen"
-        RequestedThemeVariant="Dark">
-    <ScrollViewer VerticalScrollBarVisibility="Auto">
-    <StackPanel Margin="24" Spacing="16">
-        <StackPanel Spacing="6">
-            <SelectableTextBlock x:Name="HotkeyLabel" FontWeight="SemiBold"/>
-            <controls:HotkeyRecorder Hotkey="{Binding SummonHotkey, Mode=TwoWay}" HorizontalAlignment="Left" MinWidth="220"/>
-            <SelectableTextBlock x:Name="HotkeyHint" FontSize="12" Opacity="0.7"/>
-            <SelectableTextBlock x:Name="HotkeyError" FontSize="12" Foreground="#FF8A7E" IsVisible="{Binding HotkeyInvalid}"/>
-        </StackPanel>
+        Background="{DynamicResource Panel}">
 
-        <StackPanel Spacing="6">
-            <SelectableTextBlock x:Name="LanguageLabel" FontWeight="SemiBold"/>
-            <ComboBox ItemsSource="{x:Static local:SettingsViewModel.Languages}" SelectedItem="{Binding Language, Mode=TwoWay}" MinWidth="160"/>
-        </StackPanel>
+    <Window.Styles>
+        <Style Selector="Button.nav">
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="Padding" Value="12,8"/>
+            <Setter Property="CornerRadius" Value="9"/>
+            <Setter Property="Foreground" Value="{DynamicResource Muted}"/>
+        </Style>
+        <Style Selector="Button.nav:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Hover}"/>
+        </Style>
+        <Style Selector="Button.nav.active">
+            <Setter Property="Foreground" Value="{DynamicResource Text}"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+        <Style Selector="Button.nav.active /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource Panel}"/>
+            <Setter Property="BoxShadow" Value="0 1 2 0 #14000000"/>
+        </Style>
+        <Style Selector="Border.row">
+            <Setter Property="Padding" Value="0,16"/>
+            <Setter Property="BorderThickness" Value="0,1,0,0"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Line}"/>
+        </Style>
+        <Style Selector="StackPanel > Border.row:nth-child(1)">
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+        <Style Selector="Border.row ComboBox, Border.row TextBox, Border.row controls|HotkeyRecorder">
+            <Setter Property="MinWidth" Value="200"/>
+            <Setter Property="MaxWidth" Value="260"/>
+        </Style>
+        <Style Selector="TextBlock.title">
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="14"/>
+        </Style>
+        <Style Selector="ToggleSwitch">
+            <Setter Property="OnContent" Value=""/>
+            <Setter Property="OffContent" Value=""/>
+            <Setter Property="MinWidth" Value="0"/>
+        </Style>
+    </Window.Styles>
 
-        <CheckBox x:Name="QualityBox" IsChecked="{Binding Quality, Mode=TwoWay}"/>
-
-        <StackPanel Spacing="6">
-            <SelectableTextBlock x:Name="GlossaryLabel" FontWeight="SemiBold"/>
-            <TextBox x:Name="GlossaryBox" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="120" MaxHeight="220"
-                     Text="{Binding Glossary, Mode=TwoWay}"/>
-            <SelectableTextBlock x:Name="GlossaryHint" FontSize="12" Opacity="0.7" TextWrapping="Wrap"/>
-        </StackPanel>
-
-        <StackPanel Spacing="8">
-            <SelectableTextBlock x:Name="CloudLabel" FontWeight="SemiBold"/>
-            <SelectableTextBlock x:Name="CloudHint" FontSize="12" Opacity="0.7" TextWrapping="Wrap"/>
-            <CheckBox x:Name="CloudTranslateBox" IsChecked="{Binding CloudTranslate, Mode=TwoWay}"/>
-            <CheckBox x:Name="CloudCleanBox" IsChecked="{Binding CloudClean, Mode=TwoWay}"/>
-            <SelectableTextBlock x:Name="CloudBaseUrlLabel" FontSize="12"/>
-            <TextBox x:Name="CloudBaseUrlBox" Text="{Binding CloudBaseUrl, Mode=TwoWay}"/>
-            <SelectableTextBlock x:Name="CloudModelLabel" FontSize="12"/>
-            <TextBox x:Name="CloudModelBox" Text="{Binding CloudModel, Mode=TwoWay}"/>
-            <SelectableTextBlock x:Name="CloudApiKeyLabel" FontSize="12"/>
-            <TextBox x:Name="CloudApiKeyBox" PasswordChar="•" Text="{Binding CloudApiKey, Mode=TwoWay}"/>
-            <StackPanel Orientation="Horizontal" Spacing="12" IsVisible="{Binding HasStoredKey}">
-                <SelectableTextBlock x:Name="CloudKeyStored" FontSize="12" Opacity="0.7" VerticalAlignment="Center"/>
-                <Button x:Name="CloudForgetButton" Command="{Binding ForgetCloudKeyCommand}" HorizontalContentAlignment="Center"/>
+    <Grid ColumnDefinitions="200,*">
+        <Border Background="{DynamicResource Hover}" Padding="10,14">
+            <StackPanel x:Name="Nav" Spacing="2">
+                <Button x:Name="NavGeneral" Classes="nav" Tag="general"/>
+                <Button x:Name="NavVoice" Classes="nav" Tag="voice"/>
+                <Button x:Name="NavPrivacy" Classes="nav" Tag="privacy"/>
+                <Button x:Name="NavModels" Classes="nav" Tag="models"/>
             </StackPanel>
-            <SelectableTextBlock x:Name="CloudError" FontSize="12" Foreground="#FF8A7E" TextWrapping="Wrap" IsVisible="{Binding CloudInvalid}"/>
-        </StackPanel>
+        </Border>
 
-        <StackPanel x:Name="LegacyPanel" Spacing="8" IsVisible="{Binding HasLegacyModels}">
-            <SelectableTextBlock x:Name="LegacyText" TextWrapping="Wrap"/>
-            <Button x:Name="LegacyRemoveButton" Command="{Binding RemoveLegacyModelsCommand}" HorizontalAlignment="Left"/>
-        </StackPanel>
+        <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
+            <Grid Margin="28,8,28,24">
 
-        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-            <Button x:Name="CancelButton" Command="{Binding CancelCommand}" MinWidth="88" HorizontalContentAlignment="Center"/>
-            <Button x:Name="SaveButton" Command="{Binding SaveCommand}" Classes="accent" MinWidth="88" HorizontalContentAlignment="Center"/>
-        </StackPanel>
-    </StackPanel>
-    </ScrollViewer>
+                <!-- general -->
+                <StackPanel x:Name="PanelGeneral">
+                    <Border Classes="row">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20">
+                            <StackPanel Spacing="2">
+                                <TextBlock x:Name="HotkeyTitle" Classes="title"/>
+                                <TextBlock x:Name="HotkeyDesc" Classes="muted"/>
+                                <TextBlock x:Name="HotkeyError" Classes="muted" Foreground="{DynamicResource Danger}" IsVisible="{Binding HotkeyInvalid}" TextWrapping="Wrap"/>
+                            </StackPanel>
+                            <controls:HotkeyRecorder x:Name="HotkeyBox" Grid.Column="1" Hotkey="{Binding SummonHotkey, Mode=TwoWay}" VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+                    <Border Classes="row">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20">
+                            <StackPanel Spacing="2">
+                                <TextBlock x:Name="CommitTitle" Classes="title"/>
+                                <TextBlock x:Name="CommitDesc" Classes="muted"/>
+                            </StackPanel>
+                            <ComboBox x:Name="CommitBox" Grid.Column="1" SelectedIndex="{Binding CommitKeyIndex, Mode=TwoWay}" VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+                    <Border Classes="row">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20">
+                            <StackPanel Spacing="2">
+                                <TextBlock x:Name="LanguageTitle" Classes="title"/>
+                                <TextBlock x:Name="LanguageDesc" Classes="muted"/>
+                            </StackPanel>
+                            <ComboBox x:Name="LanguageBox" Grid.Column="1" SelectedIndex="{Binding LanguageIndex, Mode=TwoWay}" VerticalAlignment="Center">
+                                <ComboBoxItem>中文</ComboBoxItem>
+                                <ComboBoxItem>English</ComboBoxItem>
+                            </ComboBox>
+                        </Grid>
+                    </Border>
+                    <Border Classes="row">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20">
+                            <StackPanel Spacing="2">
+                                <TextBlock x:Name="ThemeTitle" Classes="title"/>
+                                <TextBlock x:Name="ThemeDesc" Classes="muted"/>
+                            </StackPanel>
+                            <ComboBox x:Name="ThemeBox" Grid.Column="1" SelectedIndex="{Binding ThemeIndex, Mode=TwoWay}" VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+                    <Border Classes="row">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20">
+                            <StackPanel Spacing="2">
+                                <TextBlock x:Name="MotionTitle" Classes="title"/>
+                                <TextBlock x:Name="MotionDesc" Classes="muted"/>
+                            </StackPanel>
+                            <ToggleSwitch x:Name="MotionSwitch" Grid.Column="1" IsChecked="{Binding ReduceMotion, Mode=TwoWay}" VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+                </StackPanel>
+
+                <!-- speech and translation -->
+                <StackPanel x:Name="PanelVoice" IsVisible="False">
+                    <Border Classes="row">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20">
+                            <StackPanel Spacing="2">
+                                <TextBlock x:Name="MicTitle" Classes="title"/>
+                                <TextBlock x:Name="MicDesc" Classes="muted"/>
+                            </StackPanel>
+                            <ComboBox x:Name="MicBox" Grid.Column="1" SelectedIndex="{Binding MicrophoneIndex, Mode=TwoWay}" VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+                    <Border Classes="row">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20">
+                            <StackPanel Spacing="2">
+                                <TextBlock x:Name="DirectionTitle" Classes="title"/>
+                                <TextBlock x:Name="DirectionDesc" Classes="muted"/>
+                            </StackPanel>
+                            <ComboBox x:Name="DirectionBox" Grid.Column="1" SelectedIndex="{Binding TargetIndex, Mode=TwoWay}" VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+                    <Border Classes="row" Padding="0,12,0,0">
+                        <StackPanel Spacing="10">
+                            <TextBlock x:Name="TermsTitle" Classes="heading"/>
+                            <Grid ColumnDefinitions="*,*,Auto" ColumnSpacing="10" VerticalAlignment="Bottom">
+                                <StackPanel Spacing="4">
+                                    <TextBlock x:Name="TermSourceLabel" Classes="muted"/>
+                                    <TextBox x:Name="TermSourceBox" Text="{Binding NewTermSource, Mode=TwoWay}" MaxWidth="1000"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Spacing="4">
+                                    <TextBlock x:Name="TermTargetLabel" Classes="muted"/>
+                                    <TextBox x:Name="TermTargetBox" Text="{Binding NewTermTarget, Mode=TwoWay}" MaxWidth="1000"/>
+                                </StackPanel>
+                                <Button x:Name="TermAddButton" Grid.Column="2" Classes="btn" Command="{Binding AddTermCommand}" VerticalAlignment="Bottom"/>
+                            </Grid>
+                            <TextBlock x:Name="TermsHint" Classes="faint" TextWrapping="Wrap"/>
+                            <ItemsControl x:Name="TermsList" ItemsSource="{Binding Terms}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="local:TermEntry">
+                                        <Border BorderBrush="{DynamicResource Line}" BorderThickness="0,1,0,0" Padding="0,9">
+                                            <Grid ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="10">
+                                                <SelectableTextBlock Text="{Binding Source}" VerticalAlignment="Center"/>
+                                                <TextBlock Grid.Column="1" Text="→" Classes="muted" VerticalAlignment="Center"/>
+                                                <SelectableTextBlock Grid.Column="2" Text="{Binding Target}" VerticalAlignment="Center"/>
+                                                <Button Grid.Column="3" Classes="plain danger" Tag="{Binding}" Click="OnRemoveTermClick"
+                                                        Content="{Binding $parent[local:SettingsWindow].RemoveLabel}"/>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- privacy and cloud -->
+                <StackPanel x:Name="PanelPrivacy" IsVisible="False">
+                    <Border Classes="row">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20">
+                            <StackPanel Spacing="2">
+                                <TextBlock x:Name="CloudTranslateTitle" Classes="title"/>
+                                <TextBlock x:Name="CloudTranslateDesc" Classes="muted"/>
+                            </StackPanel>
+                            <ToggleSwitch x:Name="CloudTranslateSwitch" Grid.Column="1" VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+                    <Border Classes="row">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20">
+                            <StackPanel Spacing="2">
+                                <TextBlock x:Name="CloudCleanTitle" Classes="title"/>
+                                <TextBlock x:Name="CloudCleanDesc" Classes="muted"/>
+                            </StackPanel>
+                            <ToggleSwitch x:Name="CloudCleanSwitch" Grid.Column="1" VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+                    <Border Classes="row">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20">
+                            <StackPanel Spacing="2">
+                                <TextBlock x:Name="CloudUrlTitle" Classes="title"/>
+                                <TextBlock x:Name="CloudUrlDesc" Classes="muted"/>
+                            </StackPanel>
+                            <TextBox x:Name="CloudUrlBox" Grid.Column="1" Text="{Binding CloudBaseUrl, Mode=TwoWay}" PlaceholderText="https://…/v1" VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+                    <Border Classes="row">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20">
+                            <StackPanel Spacing="2">
+                                <TextBlock x:Name="CloudModelTitle" Classes="title"/>
+                                <TextBlock x:Name="CloudModelDesc" Classes="muted"/>
+                            </StackPanel>
+                            <TextBox x:Name="CloudModelBox" Grid.Column="1" Text="{Binding CloudModel, Mode=TwoWay}" VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+                    <Border Classes="row">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20">
+                            <StackPanel Spacing="2">
+                                <TextBlock x:Name="CloudKeyTitle" Classes="title"/>
+                                <TextBlock x:Name="CloudKeyDesc" Classes="muted"/>
+                                <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding HasStoredKey}">
+                                    <TextBlock x:Name="CloudKeyStored" Classes="faint" VerticalAlignment="Center"/>
+                                    <Button x:Name="CloudForgetButton" Classes="plain danger" Command="{Binding ForgetCloudKeyCommand}"/>
+                                </StackPanel>
+                                <TextBlock x:Name="CloudError" Classes="muted" Foreground="{DynamicResource Danger}" IsVisible="{Binding CloudInvalid}" TextWrapping="Wrap"/>
+                            </StackPanel>
+                            <TextBox x:Name="CloudKeyBox" Grid.Column="1" PasswordChar="•" Text="{Binding CloudApiKey, Mode=TwoWay}" VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+                    <Border Classes="row">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20">
+                            <StackPanel Spacing="2">
+                                <TextBlock x:Name="RecentTitle" Classes="title"/>
+                                <TextBlock x:Name="RecentDesc" Classes="muted"/>
+                            </StackPanel>
+                            <Button x:Name="RecentClearButton" Grid.Column="1" Classes="btn" Command="{Binding ClearRecentCommand}" VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+                </StackPanel>
+
+                <!-- models and about -->
+                <StackPanel x:Name="PanelModels" IsVisible="False">
+                    <Border Classes="row" BorderThickness="0">
+                        <WrapPanel x:Name="ModelChips" Orientation="Horizontal"/>
+                    </Border>
+                    <Border Classes="row">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20">
+                            <StackPanel Spacing="2">
+                                <TextBlock x:Name="ModelTitle" Classes="title"/>
+                                <TextBlock x:Name="ModelDesc" Classes="muted"/>
+                            </StackPanel>
+                            <ComboBox x:Name="ModelBox" Grid.Column="1" SelectedIndex="{Binding TierIndex, Mode=TwoWay}" VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+                    <Border Classes="row" IsVisible="{Binding HasLegacyModels}">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20">
+                            <StackPanel Spacing="2">
+                                <TextBlock x:Name="LegacyTitle" Classes="title"/>
+                                <TextBlock x:Name="LegacyDesc" Classes="muted" TextWrapping="Wrap"/>
+                            </StackPanel>
+                            <Button x:Name="LegacyRemoveButton" Grid.Column="1" Classes="btn" Command="{Binding RemoveLegacyModelsCommand}" VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+                    <Border Classes="row">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20">
+                            <StackPanel Spacing="2">
+                                <TextBlock x:Name="VersionTitle" Classes="title"/>
+                                <TextBlock x:Name="VersionDesc" Classes="muted"/>
+                            </StackPanel>
+                            <Border Grid.Column="1" Classes="chip" VerticalAlignment="Center">
+                                <TextBlock x:Name="VersionText" Classes="faint" VerticalAlignment="Center"/>
+                            </Border>
+                        </Grid>
+                    </Border>
+                </StackPanel>
+            </Grid>
+        </ScrollViewer>
+    </Grid>
 </Window>

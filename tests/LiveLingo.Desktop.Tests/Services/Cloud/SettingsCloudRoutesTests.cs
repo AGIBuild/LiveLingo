@@ -28,7 +28,7 @@ public class SettingsCloudRoutesTests
 
         Assert.Null(await routes.GetAsync(InferenceRole.Translator, CancellationToken.None));
         Assert.Null(await routes.GetAsync(InferenceRole.Cleaner, CancellationToken.None));
-        await secrets.DidNotReceiveWithAnyArgs().GetSecretAsync(default!, default);
+        await secrets.DidNotReceiveWithAnyArgs().GetSecretAsync(default!, TestContext.Current.CancellationToken);
     }
 
     [Fact]

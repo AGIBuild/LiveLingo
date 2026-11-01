@@ -1,7 +1,9 @@
+using System.Runtime.Versioning;
 using LiveLingo.Desktop.Platform;
 
 namespace LiveLingo.Desktop.Platform.Windows;
 
+[SupportedOSPlatform("windows")]
 internal sealed class WindowsPlatformServices : IPlatformServices
 {
     public IHotkeyService Hotkey { get; }

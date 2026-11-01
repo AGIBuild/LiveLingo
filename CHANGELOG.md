@@ -21,11 +21,18 @@ providers, wizard and model catalog were removed; see the design and plan under 
   API key in the system secret store.
 - Recent drafts (memory only), side-by-side layout for transcripts and whole documents, accessible names and live
   regions.
-- Settings: hotkey, language, translator tier, glossary, cloud model, removal of models from earlier versions.
+- Settings: hotkey, commit key (Enter or Ctrl+Enter), interface language, theme (light, dark, follow system), reduce
+  motion, microphone, translation direction, glossary list, cloud model, translator tier, removal of models from
+  earlier versions. Changes apply at once; there is no save button.
 - Settings migration from schema 2; `THIRD_PARTY_NOTICES.md`.
 
 ### Changed
 
+- The interface follows the v3 prototype (`docs/superpowers/prototypes/livelingo-ux-v3/`): destination, privacy and
+  output chips, per-sentence edit and "use original", tap-to-listen or hold-to-talk microphone, light and dark themes,
+  system font.
+- All packages are on their latest stable versions; `xunit.v3` stays on 3.2.2 because 4.x only supports Microsoft
+  Testing Platform.
 - Model catalog pins revisions and SHA256 hashes and shows each model's license.
 - macOS bundle declares `NSMicrophoneUsageDescription` and the audio-input entitlement.
 
@@ -33,6 +40,7 @@ providers, wizard and model catalog were removed; see the design and plan under 
 
 - Validated on an M3 Pro only; M2/16 GB and Windows runtime behaviour are unverified.
 - Recording import reads uncompressed WAV only.
+- The composer window is not blurred (alpha glass only); the prototype's backdrop blur is not reproduced.
 
 ## [1.4.0] - 2026-04-25
 

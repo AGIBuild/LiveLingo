@@ -41,9 +41,16 @@ public enum LineState
     Empty
 }
 
-/// <summary>One line of the "will be written" pane.</summary>
+/// <summary>One sentence of the "will be written" pane.</summary>
 /// <param name="Time">Where the line starts in an imported recording ("1:05"); empty for typed or spoken text.</param>
-public sealed record ResultLine(int Index, string Text, LineState State, string Error, string Time = "");
+/// <param name="Warning">Why a cleanup was rejected and the original wording was kept; empty otherwise.</param>
+/// <param name="IsOwned">The user edited this sentence; model results never replace it.</param>
+public sealed record ResultLine(
+    int Index, string Text, LineState State, string Error, string Time = "", string Warning = "", bool IsOwned = false);
+
+/// <summary>One line of the source pane while listening or showing a transcript.</summary>
+/// <param name="IsTail">The sentence still being spoken (not settled yet).</param>
+public sealed record SourceLine(string Time, string Text, bool IsTail);
 
 public enum BannerKind
 {
@@ -66,14 +73,37 @@ public enum BannerKind
     /// <summary>There is no input device or it could not be opened.</summary>
     NoMicrophone,
 
-    /// <summary>The microphone is open but only silence arrives.</summary>
+    /// <summary>The microphone was open but only silence arrived; listening was stopped.</summary>
     NoSound,
 
     /// <summary>A recording could not be read, or subtitles could not be saved (unsupported format, unreadable or unwritable file).</summary>
     FileFailed,
 
     /// <summary>The recording was read but contains no recognizable speech.</summary>
-    NoSpeechFound
+    NoSpeechFound,
+
+    /// <summary>The selected output takes much longer than usual; the user may fall back to the original words.</summary>
+    SlowProcessing
+}
+
+public enum BannerTone
+{
+    Info,
+    Warn,
+    Bad
+}
+
+/// <summary>What a banner button does.</summary>
+public enum BannerAction
+{
+    Dismiss,
+    Download,
+    OpenMicrophoneSettings,
+    OpenInputSettings,
+    UseOriginal,
+    KeepWaiting,
+    Retarget,
+    Copy
 }
 
 /// <param name="Detail">Size, error text or other detail for the view to show next to the localized message.</param>
@@ -81,4 +111,70 @@ public enum BannerKind
 public sealed record BannerState(BannerKind Kind, string Detail = "", double Progress = 0)
 {
     public static BannerState None { get; } = new(BannerKind.None);
+
+    public BannerTone Tone => Kind switch
+    {
+        BannerKind.ModelMissing or BannerKind.Downloading or BannerKind.SlowProcessing => BannerTone.Info,
+        BannerKind.MicrophoneDenied or BannerKind.NoMicrophone or BannerKind.NoSound or BannerKind.NoSpeechFound => BannerTone.Warn,
+        _ => BannerTone.Bad
+    };
+
+    public IReadOnlyList<BannerAction> Actions => Kind switch
+    {
+        BannerKind.ModelMissing or BannerKind.DownloadFailed => [BannerAction.Download],
+        BannerKind.Downloading or BannerKind.FileFailed or BannerKind.NoSpeechFound => [BannerAction.Dismiss],
+        BannerKind.TargetLost => [BannerAction.Retarget, BannerAction.Copy],
+        BannerKind.MicrophoneDenied => [BannerAction.OpenMicrophoneSettings, BannerAction.Dismiss],
+        BannerKind.NoMicrophone or BannerKind.NoSound => [BannerAction.OpenInputSettings, BannerAction.Dismiss],
+        BannerKind.SlowProcessing => [BannerAction.UseOriginal, BannerAction.KeepWaiting],
+        _ => []
+    };
+}
+
+/// <summary>The key that writes the result; Shift+Enter always inserts a line break.</summary>
+public enum CommitKey
+{
+    Enter,
+    CtrlEnter
+}
+
+/// <summary>A file format of the export dialog.</summary>
+public enum ExportFormat
+{
+    Txt,
+    Markdown,
+    Srt
+}
+
+/// <summary>Short messages shown below the composer; they replace dialogs for blocked actions.</summary>
+public enum ToastKind
+{
+    Copied,
+    Cancelled,
+    Empty,
+    Unavailable,
+    Processing,
+    Exported,
+    ExportUnfinished
+}
+
+/// <summary>Everything the footer status line is built from.</summary>
+public sealed record StatusInfo(
+    ComposerStatus Status,
+    bool Written,
+    bool HandsFree,
+    int RecordingSeconds,
+    bool Armed,
+    int Units,
+    ComposerOutput Output,
+    bool UsesCloud,
+    int TranscribePercent);
+
+/// <summary>Settings the composer reads once when it opens.</summary>
+/// <param name="CloudTranslate">Translation runs on the user's cloud endpoint (shown in the privacy chip).</param>
+/// <param name="CloudClean">Cleanup runs on the user's cloud endpoint (shown in the privacy chip).</param>
+/// <param name="Animations">False when the user asked to reduce motion.</param>
+public sealed record ComposerOptions(bool CloudTranslate, bool CloudClean, CommitKey CommitKey, bool Animations)
+{
+    public static ComposerOptions Default { get; } = new(false, false, CommitKey.Enter, true);
 }

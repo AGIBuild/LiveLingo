@@ -26,6 +26,7 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
     private readonly IVoiceInput _voice;
     private readonly IAudioFileTranscriber _transcriber;
     private readonly IReadOnlyList<string> _glossary;
+    private readonly ComposerOptions _options;
     private readonly TargetWindowInfo? _target;
     private readonly SynchronizationContext? _notifyOn;
     private readonly TimeProvider _time;
@@ -46,6 +47,7 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
         IVoiceInput voice,
         IAudioFileTranscriber transcriber,
         IReadOnlyList<string> glossary,
+        ComposerOptions options,
         TargetWindowInfo? target,
         SynchronizationContext? notifyOn = null,
         TimeProvider? time = null)
@@ -59,6 +61,7 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
         _voice = voice;
         _transcriber = transcriber;
         _glossary = glossary;
+        _options = options;
         _target = target;
         _notifyOn = notifyOn;
         _time = time ?? TimeProvider.System;
@@ -89,27 +92,26 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
     [ObservableProperty] private bool _canCopy;
     [ObservableProperty] private bool _isEditable = true;
     [ObservableProperty] private bool _modelsReady;
-    /// <summary>The text that will be written once everything is ready; empty while sentences are still pending or failed.</summary>
-    [ObservableProperty] private string _resultText = "";
-
-    /// <summary>How many sentences kept their original wording because the cleanup failed the fidelity check.</summary>
-    [ObservableProperty] private int _keptOriginalCount;
 
     [ObservableProperty] private bool _isListening;
 
     /// <summary>True while the speech models are loading after the microphone was pressed (takes a few seconds).</summary>
     [ObservableProperty] private bool _isStartingListening;
 
-    public bool HasTarget => _target is not null;
+    public bool HasTarget => _target is not null && !CopyOnly;
     public string TargetName => _target?.ProcessName ?? "";
 
-    partial void OnSourceTextChanged(string value)
+    partial void OnSourceTextChanged(string value) => ResyncSource();
+
+    /// <summary>Hands the source text to the draft as sentences, or as one document (long or structured text, or when forced).</summary>
+    private void ResyncSource()
     {
-        if (_applyingDraftText || _committed is not null)
+        if (_applyingDraftText || _committed is not null || HasTimeline || IsListening || IsStartingListening)
             return;
 
         CancelQueuedWrite();
-        var route = TextUnits.RouteFor(value);
+        var value = SourceText;
+        var route = ForceWhole && !string.IsNullOrWhiteSpace(value) ? DraftRoute.Whole : TextUnits.RouteFor(value);
         var units = route == DraftRoute.Whole ? TextUnits.Whole(value) : TextUnits.Split(value);
         _session.Mutate(draft => draft.SyncSource(units, route));
     }
@@ -133,6 +135,8 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
     partial void OnIsListeningChanged(bool value)
     {
         UpdateEditable();
+        OnPropertyChanged(nameof(CanEditRows));
+        UpdateRecordingClock(value);
         Refresh();
     }
 
@@ -161,7 +165,7 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
         }
 
         _tapStopsListening = false;
-        await StartListeningAsync().ConfigureAwait(true);
+        await StartListeningAsync(handsFree: false).ConfigureAwait(true);
     }
 
     /// <summary>The microphone was released: a long press that started listening is push-to-talk and ends it.</summary>
@@ -174,7 +178,10 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
         }
 
         if (_time.GetUtcNow() - _micPressedAt < HoldThreshold)
+        {
+            IsHandsFree = true;
             return;
+        }
 
         if (IsStartingListening)
             _stopAfterStart = true;
@@ -182,11 +189,16 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
             await StopListeningAsync().ConfigureAwait(true);
     }
 
-    public async Task StartListeningAsync()
+    /// <param name="handsFree">True when listening continues until the microphone is tapped again; false while it is held.</param>
+    public async Task StartListeningAsync(bool handsFree = true)
     {
         if (IsListening || IsStartingListening || IsTranscribing || HasTimeline || _committed is not null)
             return;
 
+        if (EditingIndex >= 0)
+            SaveEdit();
+
+        IsHandsFree = handsFree;
         if (_platform.MicrophonePermission.Status == MicrophoneAccess.Denied)
         {
             Banner = new BannerState(BannerKind.MicrophoneDenied);
@@ -206,7 +218,7 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
         {
             await _voice.StartAsync(_session, _glossary, CancellationToken.None).ConfigureAwait(true);
             IsListening = true;
-            if (Banner.Kind is BannerKind.MicrophoneDenied or BannerKind.NoMicrophone)
+            if (Banner.Kind is BannerKind.MicrophoneDenied or BannerKind.NoMicrophone or BannerKind.NoSound)
                 Banner = BannerState.None;
         }
         catch (ModelNotReadyException)
@@ -248,10 +260,36 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
     // ---- writing -------------------------------------------------------------
 
     [RelayCommand]
-    private async Task WriteAsync()
+    private Task WriteAsync() => CommitAsync(fromKey: false);
+
+    /// <summary>Raised to show a short message below the composer.</summary>
+    public event Action<ToastKind>? ToastRaised;
+
+    public bool IsWritten => _committed is not null;
+
+    public StatusInfo StatusInfo => new(
+        Status, IsWritten, IsHandsFree, RecordingSeconds, IsWriteQueued, Lines.Count, Output,
+        CloudTranslate || CloudClean, (int)TranscribeProgress);
+
+    /// <summary>Writes the result, or queues the write while it is still being produced.</summary>
+    /// <param name="fromKey">The commit key was pressed; the button instead cancels an already queued write.</param>
+    public async Task CommitAsync(bool fromKey)
     {
-        if (IsWriteQueued || _committed is not null)
+        if (_committed is not null)
             return;
+
+        if (IsWriteQueued)
+        {
+            if (!fromKey)
+            {
+                CancelQueuedWrite();
+                ToastRaised?.Invoke(ToastKind.Cancelled);
+            }
+            return;
+        }
+
+        if (EditingIndex >= 0)
+            SaveEdit();
 
         await StopListeningAsync().ConfigureAwait(true);
         if (Output != ComposerOutput.Original && !ModelsReady)
@@ -274,6 +312,12 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
             case BlockReason.TargetLost:
                 Banner = new BannerState(BannerKind.TargetLost);
                 break;
+            case BlockReason.Empty:
+                ToastRaised?.Invoke(ToastKind.Empty);
+                break;
+            case BlockReason.Unavailable:
+                ToastRaised?.Invoke(ToastKind.Unavailable);
+                break;
         }
     }
 
@@ -285,12 +329,28 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
 
         var text = _committed?.Text ?? _session.Read(draft => draft.Text());
         await _platform.Clipboard.SetTextAsync(text).ConfigureAwait(true);
+        ToastRaised?.Invoke(ToastKind.Copied);
     }
+
+    /// <summary>Hides the composer and keeps the draft (the close button).</summary>
+    [RelayCommand]
+    private void Hide() => CloseRequested?.Invoke();
+
+    /// <summary>The window lost focus: a held microphone must not stay open without its button being held.</summary>
+    public async Task WindowDeactivatedAsync()
+    {
+        if (IsListening && !IsHandsFree)
+            await StopListeningAsync().ConfigureAwait(true);
+    }
+
+    public void OpenSettings(string section = "general") => SettingsRequested?.Invoke(section);
 
     [RelayCommand]
     private async Task CancelAsync()
     {
-        if (IsListening)
+        if (EditingIndex >= 0)
+            CancelEdit();
+        else if (IsListening)
             await StopListeningAsync().ConfigureAwait(true);
         else if (IsTranscribing)
             _transcribing?.Cancel();
@@ -339,6 +399,7 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
         _session.Changed -= OnDraftChanged;
         _downloads.StateChanged -= OnDownloadStateChanged;
         _voice.NoSignalChanged -= OnNoSignalChanged;
+        DisposeTimers();
         IsListening = false;
         await _voice.DisposeAsync().ConfigureAwait(false);
     }
@@ -444,12 +505,14 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
 
     private void OnNoSignalChanged(bool silent)
     {
-        void Apply()
+        async void Apply()
         {
-            if (silent && IsListening && Banner.Kind is BannerKind.None)
-                Banner = new BannerState(BannerKind.NoSound);
-            else if (!silent && Banner.Kind is BannerKind.NoSound)
-                Banner = BannerState.None;
+            if (!silent || !IsListening)
+                return;
+
+            // Listening stops by itself so a dead microphone is not mistaken for a long pause; what was heard is kept.
+            await StopListeningAsync().ConfigureAwait(true);
+            Banner = new BannerState(BannerKind.NoSound);
         }
 
         if (_notifyOn is null)
@@ -485,24 +548,27 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
 
     private void Refresh()
     {
+        var times = Enumerable.Range(0, _segments.Count).Select(TimeLabel).ToList();
         var snapshot = _session.Read(draft => (
             Lines: BuildLines(draft),
+            SourceLines: IsListening || IsStartingListening || HasTimeline ? BuildSourceLines(draft, times) : [],
             Content: draft.ContentReadiness(),
             Count: draft.Units.Count,
             Whole: draft.Route == DraftRoute.Whole,
             HasPending: draft.Pending.Length > 0,
-            Text: draft.ContentReadiness().IsReady ? draft.Text() : "",
-            Kept: Output == ComposerOutput.Clean ? draft.Units.Count(unit => unit.Clean.Warning.Length > 0) : 0));
+            TargetLost: draft.TargetLost));
 
         Lines = snapshot.Lines;
-        IsWide = HasTimeline || snapshot.Whole;
+        SourceLines = snapshot.SourceLines;
+        IsWholeRoute = snapshot.Whole;
+        IsTargetLost = snapshot.TargetLost;
+        IsWide = ForceWide || HasTimeline || snapshot.Whole;
         Status = StatusOf(snapshot.Count + (snapshot.HasPending ? 1 : 0), snapshot.Content);
-        ResultText = Status == ComposerStatus.Ready ? snapshot.Text : "";
-        KeptOriginalCount = snapshot.Kept;
         CanCopy = _committed is not null || Status == ComposerStatus.Ready;
         CanWrite = CanCopy && _committed is null;
         OnPropertyChanged(nameof(CanReplaceDraft));
-        OnPropertyChanged(nameof(CanExport));
+        OnPropertyChanged(nameof(CanEditRows));
+        UpdateSlowTimer();
 
         var needsModels = !ModelsReady && Output != ComposerOutput.Original;
         if (needsModels && Banner.Kind is BannerKind.None)
@@ -544,7 +610,9 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
                     _ => LineState.Pending
                 }
                 : LineState.Pending;
-            lines.Add(new ResultLine(i, result.Text ?? "", state, result.Error, TimeLabel(i)));
+            lines.Add(new ResultLine(
+                i, result.Text ?? "", state, result.Error, TimeLabel(i),
+                Output == ComposerOutput.Clean ? result.Warning : "", result.IsOwned));
         }
         return lines;
     }

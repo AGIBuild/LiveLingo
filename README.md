@@ -28,7 +28,7 @@ exported as SRT.
 ## Privacy
 
 - Speech recognition, cleanup and translation run locally. Audio never leaves the machine.
-- Cloud models are **off by default**. In *Settings → Cloud model* you can switch translation and cleanup to your own
+- Cloud models are **off by default**. In *Settings → Privacy and cloud* you can switch translation and cleanup to your own
   OpenAI-compatible endpoint (for example Microsoft Foundry) separately. Only the text of that step is sent; the
   endpoint must be `https`; the API key is kept in the system secret store, not in a file. A cloud failure is shown,
   never silently retried on the local model.

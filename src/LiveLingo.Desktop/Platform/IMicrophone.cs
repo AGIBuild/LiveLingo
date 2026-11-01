@@ -1,9 +1,15 @@
 namespace LiveLingo.Desktop.Platform;
 
-/// <summary>Captures the default input device as 16 kHz mono float frames.</summary>
+/// <summary>Captures an input device as 16 kHz mono float frames.</summary>
 public interface IMicrophone : IDisposable
 {
     bool IsRecording { get; }
+
+    /// <summary>Name of the input device to capture from; empty means the system default.</summary>
+    string PreferredDevice { get; set; }
+
+    /// <summary>The names of the devices that can record (queried from the system each time).</summary>
+    IReadOnlyList<string> InputDevices();
 
     /// <summary>
     /// Starts capturing and returns the device name. <paramref name="onFrame"/> runs on the audio thread: it must

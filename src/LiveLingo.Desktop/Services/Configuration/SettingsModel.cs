@@ -60,7 +60,23 @@ public partial class ComposerSettings : ObservableObject
     /// <summary>The user's terms, one per line (see <see cref="LiveLingo.Core.Translation.Glossary"/>).</summary>
     [ObservableProperty] private string _glossary = "";
 
-    public ComposerSettings DeepClone() => new() { TranslatorTier = TranslatorTier, Glossary = Glossary };
+    /// <summary>"Enter" or "CtrlEnter": the key that writes the result; Shift+Enter always inserts a line break.</summary>
+    [ObservableProperty] private string _commitKey = "Enter";
+
+    /// <summary>Name of a <see cref="LiveLingo.Core.Translation.TargetLanguage"/>: what "Translate" writes.</summary>
+    [ObservableProperty] private string _targetLanguage = "English";
+
+    /// <summary>Name of the input device used for dictation; empty means the system default.</summary>
+    [ObservableProperty] private string _microphone = "";
+
+    public ComposerSettings DeepClone() => new()
+    {
+        TranslatorTier = TranslatorTier,
+        Glossary = Glossary,
+        CommitKey = CommitKey,
+        TargetLanguage = TargetLanguage,
+        Microphone = Microphone
+    };
 }
 
 public partial class AppearanceSettings : ObservableObject
@@ -68,7 +84,10 @@ public partial class AppearanceSettings : ObservableObject
     [ObservableProperty] private string _language = "en-US";
     [ObservableProperty] private bool _animations = true;
 
-    public AppearanceSettings DeepClone() => new() { Language = Language, Animations = Animations };
+    /// <summary>"Auto" follows the system; "Light" or "Dark" forces a theme.</summary>
+    [ObservableProperty] private string _theme = "Auto";
+
+    public AppearanceSettings DeepClone() => new() { Language = Language, Animations = Animations, Theme = Theme };
 }
 
 public partial class UpdateSettings : ObservableObject

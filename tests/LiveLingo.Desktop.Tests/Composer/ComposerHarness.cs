@@ -26,13 +26,65 @@ internal sealed class ScriptedTranscriber : IAudioFileTranscriber
     }
 }
 
+/// <summary>A clock a test moves by hand; timers created from it fire only when the test advances time.</summary>
 internal sealed class FakeClock : TimeProvider
 {
+    private sealed class FakeTimer(FakeClock clock, TimerCallback callback, object? state, TimeSpan due, TimeSpan period) : ITimer
+    {
+        public DateTimeOffset Next { get; private set; } = due == Timeout.InfiniteTimeSpan ? DateTimeOffset.MaxValue : clock._now + due;
+        public bool Disposed { get; private set; }
+
+        public bool Change(TimeSpan dueTime, TimeSpan newPeriod)
+        {
+            due = dueTime;
+            period = newPeriod;
+            Next = dueTime == Timeout.InfiniteTimeSpan ? DateTimeOffset.MaxValue : clock._now + dueTime;
+            return true;
+        }
+
+        public void Fire()
+        {
+            Next = period == Timeout.InfiniteTimeSpan ? DateTimeOffset.MaxValue : Next + period;
+            callback(state);
+        }
+
+        public void Dispose() => Disposed = true;
+
+        public ValueTask DisposeAsync()
+        {
+            Disposed = true;
+            return ValueTask.CompletedTask;
+        }
+    }
+
     private DateTimeOffset _now = new(2026, 10, 31, 12, 0, 0, TimeSpan.Zero);
+    private readonly List<FakeTimer> _timers = [];
 
     public override DateTimeOffset GetUtcNow() => _now;
 
-    public void Advance(TimeSpan by) => _now += by;
+    public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
+    {
+        var timer = new FakeTimer(this, callback, state, dueTime, period);
+        _timers.Add(timer);
+        return timer;
+    }
+
+    public void Advance(TimeSpan by)
+    {
+        var target = _now + by;
+        while (true)
+        {
+            _timers.RemoveAll(t => t.Disposed);
+            var next = _timers.OrderBy(t => t.Next).FirstOrDefault();
+            if (next is null || next.Next > target)
+                break;
+
+            _now = next.Next;
+            next.Fire();
+        }
+
+        _now = target;
+    }
 }
 
 internal sealed class ScriptedTranslator : ITranslator
@@ -145,7 +197,8 @@ internal sealed class Harness : IAsyncDisposable
         bool modelsInstalled = true,
         bool hasTarget = true,
         SynchronizationContext? notifyOn = null,
-        ComposerOutput output = ComposerOutput.Translate)
+        ComposerOutput output = ComposerOutput.Translate,
+        ComposerOptions? options = null)
     {
         Session = new DraftSession(hasTarget, notifyOn);
         Scheduler = new TranslationScheduler(Session, Translator, TargetLanguage.English, TimeSpan.FromHours(1));
@@ -160,8 +213,8 @@ internal sealed class Harness : IAsyncDisposable
         var plan = new ComposerModelPlan(
             [Runtime, CleanerModel], [Runtime, TranslatorModel], ModelCatalog.Speech, ModelCatalog.Transcription);
         Vm = new ComposerViewModel(
-            Session, Scheduler, plan, Models, Downloads, Platform, Voice, Transcriber, [], hasTarget ? Target : null,
-            notifyOn, Time);
+            Session, Scheduler, plan, Models, Downloads, Platform, Voice, Transcriber, [],
+            options ?? ComposerOptions.Default, hasTarget ? Target : null, notifyOn, Time);
         Vm.Output = output;
         Vm.Completed += () => Events.Add("completed");
         Vm.CloseRequested += () => Events.Add("close");

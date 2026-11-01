@@ -14,13 +14,35 @@ public sealed class PortAudioMicrophone : IMicrophone
 
     public bool IsRecording => _stream is not null;
 
+    public string PreferredDevice { get; set; } = "";
+
+    public IReadOnlyList<string> InputDevices()
+    {
+        PortAudio.Initialize();
+        try
+        {
+            var names = new List<string>();
+            for (var i = 0; i < PortAudio.DeviceCount; i++)
+            {
+                var info = PortAudio.GetDeviceInfo(i);
+                if (info.maxInputChannels > 0)
+                    names.Add(info.name);
+            }
+            return names;
+        }
+        finally
+        {
+            PortAudio.Terminate();
+        }
+    }
+
     public string Start(Action<float[]> onFrame)
     {
         if (_stream is not null)
             throw new InvalidOperationException("Already recording.");
 
         PortAudio.Initialize();
-        var device = PortAudio.DefaultInputDevice;
+        var device = FindPreferredDevice() ?? PortAudio.DefaultInputDevice;
         if (device == PortAudio.NoDevice)
         {
             PortAudio.Terminate();
@@ -54,12 +76,29 @@ public sealed class PortAudioMicrophone : IMicrophone
     {
         if (_stream is null)
             return;
-
         _stream.Stop();
         _stream.Dispose();
         _stream = null;
         _callback = null;
         PortAudio.Terminate();
+    }
+
+    /// <summary>The device the user chose, or null for the system default.</summary>
+    /// <exception cref="InvalidOperationException">The chosen device is not connected.</exception>
+    private int? FindPreferredDevice()
+    {
+        if (PreferredDevice.Length == 0)
+            return null;
+
+        for (var i = 0; i < PortAudio.DeviceCount; i++)
+        {
+            var info = PortAudio.GetDeviceInfo(i);
+            if (info.maxInputChannels > 0 && info.name == PreferredDevice)
+                return i;
+        }
+
+        PortAudio.Terminate();
+        throw new InvalidOperationException($"The input device '{PreferredDevice}' is not available.");
     }
 
     public void Dispose() => Stop();

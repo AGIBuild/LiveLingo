@@ -29,8 +29,6 @@ public sealed partial class ComposerViewModel
         _committed is null && !IsListening && !IsStartingListening && !IsTranscribing && !HasTimeline
         && string.IsNullOrWhiteSpace(SourceText);
 
-    public bool CanExport => HasTimeline && Status == ComposerStatus.Ready;
-
     partial void OnIsTranscribingChanged(bool value)
     {
         UpdateEditable();
@@ -51,6 +49,7 @@ public sealed partial class ComposerViewModel
 
         CancelQueuedWrite();
         _pendingImport = path;
+        TranscriptName = Path.GetFileName(path);
         if (!IsInstalled(_plan.Transcription))
         {
             Banner = new BannerState(BannerKind.ModelMissing, MissingSizeLabel());
@@ -123,15 +122,30 @@ public sealed partial class ComposerViewModel
     public string BuildSrt() =>
         SrtWriter.Write(_segments.Select((segment, i) => segment with { Text = i < Lines.Count ? Lines[i].Text : "" }));
 
-    /// <summary>Saves <see cref="BuildSrt"/>; a file that cannot be written is reported in a banner.</summary>
-    public async Task ExportSrtAsync(string path)
+    /// <summary>Everything can be exported once it is finished; subtitles also need the timing of an imported recording.</summary>
+    public bool CanExportAs(ExportFormat format) => Status == ComposerStatus.Ready && (format != ExportFormat.Srt || HasTimeline);
+
+    /// <summary>The finished output as plain text, Markdown or subtitles.</summary>
+    public string BuildExport(ExportFormat format) => format switch
     {
-        if (!CanExport)
+        ExportFormat.Srt => BuildSrt(),
+        ExportFormat.Markdown => "# LiveLingo\n\n" + _session.Read(draft => draft.Text()),
+        _ => _session.Read(draft => draft.Text())
+    };
+
+    /// <summary>Saves the export; unfinished content is refused and a file that cannot be written is reported in a banner.</summary>
+    public async Task ExportAsync(string path, ExportFormat format)
+    {
+        if (!CanExportAs(format))
+        {
+            ToastRaised?.Invoke(ToastKind.ExportUnfinished);
             return;
+        }
 
         try
         {
-            await File.WriteAllTextAsync(path, BuildSrt(), new System.Text.UTF8Encoding(false)).ConfigureAwait(true);
+            await File.WriteAllTextAsync(path, BuildExport(format), new System.Text.UTF8Encoding(false)).ConfigureAwait(true);
+            ToastRaised?.Invoke(ToastKind.Exported);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {

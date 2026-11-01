@@ -6,42 +6,70 @@ namespace LiveLingo.Desktop.Composer;
 /// <summary>Turns view-model states into localized text, so the window only binds strings.</summary>
 public sealed class ComposerTexts(ILocalizationService loc)
 {
-    public string Status(ComposerStatus status, bool writeQueued, int keptOriginal = 0, int percent = 0)
-    {
-        if (writeQueued)
-            return loc.T("composer.status.queued");
-        if (status == ComposerStatus.Ready && keptOriginal > 0)
-            return loc.T("composer.status.keptOriginal", keptOriginal);
-        if (status == ComposerStatus.Transcribing)
-            return loc.T("composer.status.transcribing", percent);
+    // ---- header ----------------------------------------------------------------
 
-        return loc.T(status switch
-        {
-            ComposerStatus.Empty => "composer.status.empty",
-            ComposerStatus.Starting => "composer.status.starting",
-            ComposerStatus.Listening => "composer.status.listening",
-            ComposerStatus.Working => "composer.status.working",
-            ComposerStatus.Ready => "composer.status.ready",
-            ComposerStatus.Failed => "composer.status.failed",
-            _ => throw new ArgumentOutOfRangeException(nameof(status))
-        });
+    public string DestAria => loc.T("composer.dest.aria");
+    public string OutputAria => loc.T("composer.out.aria");
+    public string MoreAria => loc.T("composer.more");
+    public string CloseAria => loc.T("composer.close");
+
+    /// <summary>The destination chip: the app that receives the text, a lost window, or copy only.</summary>
+    public string Dest(bool hasTarget, bool targetLost, string targetName) =>
+        targetLost ? loc.T("composer.dest.lost") : hasTarget ? targetName : loc.T("composer.dest.copyOnly");
+
+    public string TargetMenuSome(string targetName) => loc.T("composer.menu.target.some", targetName);
+    public string TargetMenuNone => loc.T("composer.menu.target.none");
+
+    public string Privacy(bool cloudTranslate, bool cloudClean)
+    {
+        if (!cloudTranslate && !cloudClean)
+            return loc.T("composer.privacy.local");
+        return loc.T("composer.privacy.cloud", CloudSteps(cloudTranslate, cloudClean));
     }
 
-    public string CleanLabel => loc.T("composer.output.clean");
-    public string OriginalLabel => loc.T("composer.output.original");
-    public string CopyLabel => loc.T("composer.copy");
-    public string WriteLabel => loc.T("composer.write");
-    public string RetryLabel => loc.T("composer.retry");
-    public string Placeholder => loc.T("composer.placeholder");
-    public string MicLabel => loc.T("composer.mic");
-    public string SwapLabel => loc.T("composer.swap");
-    public string ImportLabel => loc.T("composer.import");
-    public string ImportTitle => loc.T("composer.import.title");
-    public string ImportFileType => loc.T("composer.import.fileType");
-    public string ExportLabel => loc.T("composer.export");
-    public string ExportTitle => loc.T("composer.export.title");
-    public string RecentLabel => loc.T("composer.recent");
-    public string RecentClearLabel => loc.T("composer.recent.clear");
+    public string PrivacyAria(bool cloudTranslate, bool cloudClean) =>
+        !cloudTranslate && !cloudClean
+            ? loc.T("composer.privacy.aria.local")
+            : loc.T("composer.privacy.aria.cloud", CloudSteps(cloudTranslate, cloudClean));
+
+    private string CloudSteps(bool translate, bool clean) => string.Join(
+        loc.T("composer.privacy.sep"),
+        new[] { translate ? loc.T("composer.privacy.translate") : null, clean ? loc.T("composer.privacy.clean") : null }
+            .Where(step => step is not null));
+
+    /// <summary>English stays "English" and Chinese stays "中文" in every interface language, as in the prototype.</summary>
+    public string LanguageName(TargetLanguage language) => loc.T("composer.language." + language);
+
+    public static TargetLanguage SourceLanguage(TargetLanguage target) =>
+        target == TargetLanguage.English ? TargetLanguage.Chinese : TargetLanguage.English;
+
+    public string OutputPill(ComposerOutput output, TargetLanguage target) => output switch
+    {
+        ComposerOutput.Clean => loc.T("composer.out.clean", LanguageName(SourceLanguage(target))),
+        ComposerOutput.Translate => loc.T("composer.out.translate", LanguageName(target)),
+        _ => loc.T("composer.out.raw")
+    };
+
+    public string OutputMenu(ComposerOutput output, TargetLanguage target) => output switch
+    {
+        ComposerOutput.Clean => loc.T("composer.out.menu.clean", LanguageName(SourceLanguage(target))),
+        ComposerOutput.Translate => loc.T("composer.out.menu.translate", LanguageName(target)),
+        _ => loc.T("composer.out.menu.raw")
+    };
+
+    public string SwapMenu(TargetLanguage target) =>
+        loc.T("composer.out.swap", LanguageName(SourceLanguage(target)), LanguageName(target));
+
+    public string MoreNew => loc.T("composer.menu.new");
+    public string MoreRecent => loc.T("composer.menu.recent");
+    public string MoreImport => loc.T("composer.menu.import");
+    public string MoreExport => loc.T("composer.menu.export");
+    public string MoreWide => loc.T("composer.menu.wide");
+    public string MoreWhole => loc.T("composer.menu.whole");
+    public string MoreSettings => loc.T("composer.menu.settings");
+    public string RecentClear => loc.T("composer.recent.clear");
+    public string RecentEmpty => loc.T("composer.recent.empty");
+    public string RecentRestore => loc.T("composer.recent.restore");
 
     /// <summary>"12:03 · first words of the draft" for the recent-drafts menu.</summary>
     public static string RecentItem(RecentDraft draft)
@@ -51,11 +79,94 @@ public sealed class ComposerTexts(ILocalizationService loc)
         return $"{draft.At.ToLocalTime():HH:mm} · {preview}";
     }
 
-    public string TranslateLabel(TargetLanguage target) =>
-        loc.T("composer.output.translate", loc.T("composer.language." + target));
+    // ---- source pane -------------------------------------------------------------
 
-    public string Target(string targetName, bool hasTarget) =>
-        hasTarget ? loc.T("composer.target.some", targetName) : loc.T("composer.target.none");
+    public string Placeholder => loc.T("composer.placeholder");
+    public string RouteChip => loc.T("composer.route.whole");
+    public string ResultAria => loc.T("composer.res.aria");
+
+    public string SourceLabel(bool listening, bool timeline, string fileName) =>
+        timeline ? loc.T("composer.src.transcript", fileName) : listening ? loc.T("composer.src.listening") : loc.T("composer.src.label");
+
+    public string ResultLabel(ComposerOutput output, TargetLanguage target) =>
+        output == ComposerOutput.Translate ? loc.T("composer.res.labelTo", LanguageName(target)) : loc.T("composer.res.label");
+
+    public string HintMic => loc.T("composer.hint.mic");
+    public string HintWrite => loc.T("composer.hint.write");
+    public string HintNewline => loc.T("composer.hint.newline");
+    public string HintHide => loc.T("composer.hint.hide");
+
+    /// <summary>The key cap of the commit key: "↵", or "⌃↵" on macOS and "Ctrl+↵" elsewhere for Ctrl+Enter.</summary>
+    public static string CommitKeyLabel(CommitKey key) => key == CommitKey.Enter ? "↵" : OperatingSystem.IsMacOS() ? "⌃↵" : "Ctrl+↵";
+
+    public static string NewlineKeyLabel => OperatingSystem.IsMacOS() ? "⇧↵" : "Shift+↵";
+
+    // ---- result rows -------------------------------------------------------------
+
+    public string RowRetry => loc.T("composer.row.retry");
+    public string RowManual => loc.T("composer.row.manual");
+    public string RowSave => loc.T("composer.row.save");
+    public string RowCancel => loc.T("composer.row.cancel");
+    public string RowProcessing => loc.T("composer.row.processing");
+    public string RowUseOriginal => loc.T("composer.row.useOriginal");
+    public string RowEdit => loc.T("composer.row.edit");
+    public string RowUseOriginalAria(int index) => loc.T("composer.row.useOriginal.aria", index + 1);
+    public string RowEditAria(int index) => loc.T("composer.row.edit.aria", index + 1);
+
+    public string Line(ResultLine line) => line.State switch
+    {
+        LineState.Failed => line.Error,
+        LineState.Empty => loc.T("composer.row.empty"),
+        LineState.Pending => "",
+        _ => line.Text
+    };
+
+    /// <summary>The note under a sentence: why the cleanup was not used, or that the user edited it.</summary>
+    public string RowNote(ResultLine line) =>
+        line.Warning.Length > 0 ? loc.T("composer.row.kept", line.Warning) : line.IsOwned ? loc.T("composer.row.edited") : "";
+
+    // ---- footer ------------------------------------------------------------------
+
+    public string MicStart => loc.T("composer.mic.start");
+    public string MicStop => loc.T("composer.mic.stop");
+    public string CopyAria => loc.T("composer.copy.aria");
+
+    public string Status(StatusInfo info)
+    {
+        if (info.Written)
+            return loc.T("composer.status.written");
+        if (info.Status == ComposerStatus.Starting)
+            return loc.T("composer.status.starting");
+        if (info.Status == ComposerStatus.Listening)
+            return loc.T(info.HandsFree ? "composer.status.listening.free" : "composer.status.listening.hold", Clock(info.RecordingSeconds));
+        if (info.Status == ComposerStatus.Transcribing)
+            return loc.T("composer.status.transcribing", info.TranscribePercent);
+        if (info.Armed)
+            return loc.T("composer.status.armed");
+
+        return info.Status switch
+        {
+            ComposerStatus.Empty => "",
+            ComposerStatus.Working => loc.T(info.Output == ComposerOutput.Translate ? "composer.status.working.translate" : "composer.status.working.clean"),
+            ComposerStatus.Failed => loc.T("composer.status.unavailable"),
+            ComposerStatus.Ready => loc.T(info.UsesCloud ? "composer.status.ready.cloud" : "composer.status.ready.local", info.Units),
+            _ => throw new ArgumentOutOfRangeException(nameof(info))
+        };
+    }
+
+    public static string Clock(int seconds) => $"{seconds / 60}:{seconds % 60:00}";
+
+    /// <summary>The primary button: "写入 Agent", "复制" without an input box, "完成后写入" while armed, "已写入" afterwards.</summary>
+    public string CommitLabel(bool written, bool armed, bool hasTarget, string targetName) =>
+        armed ? loc.T("composer.commit.armed")
+        : written ? loc.T("composer.commit.written")
+        : hasTarget ? loc.T("composer.commit.write", targetName)
+        : loc.T("composer.commit.copy");
+
+    public string CommitAria(bool armed, bool hasTarget) =>
+        armed ? loc.T("composer.commit.armed.aria") : hasTarget ? loc.T("composer.commit.write.aria") : loc.T("composer.commit.copy.aria");
+
+    // ---- banners -----------------------------------------------------------------
 
     public string BannerMessage(BannerState banner) => banner.Kind switch
     {
@@ -70,22 +181,41 @@ public sealed class ComposerTexts(ILocalizationService loc)
         BannerKind.NoSound => loc.T("composer.banner.noSound"),
         BannerKind.FileFailed => loc.T("composer.banner.fileFailed", banner.Detail),
         BannerKind.NoSpeechFound => loc.T("composer.banner.noSpeech"),
+        BannerKind.SlowProcessing => loc.T("composer.banner.slow"),
         _ => throw new ArgumentOutOfRangeException(nameof(banner))
     };
 
-    public string BannerAction(BannerState banner) => banner.Kind switch
+    public string BannerActionLabel(BannerState banner, BannerAction action) => action switch
     {
-        BannerKind.ModelMissing => loc.T("composer.banner.download"),
-        BannerKind.DownloadFailed => loc.T("composer.banner.downloadRetry"),
-        BannerKind.MicrophoneDenied => loc.T("composer.banner.micDeniedAction"),
-        _ => ""
+        BannerAction.Dismiss => loc.T(banner.Kind == BannerKind.Downloading ? "composer.banner.background" : "composer.banner.dismiss"),
+        BannerAction.Download => loc.T(banner.Kind == BannerKind.DownloadFailed ? "composer.banner.retry" : "composer.banner.download"),
+        BannerAction.OpenMicrophoneSettings => loc.T("composer.banner.openOs"),
+        BannerAction.OpenInputSettings => loc.T("composer.banner.checkInput"),
+        BannerAction.UseOriginal => loc.T("composer.banner.useOriginal"),
+        BannerAction.KeepWaiting => loc.T("composer.banner.keepWaiting"),
+        BannerAction.Retarget => loc.T("composer.banner.retarget"),
+        BannerAction.Copy => loc.T("composer.banner.copy"),
+        _ => throw new ArgumentOutOfRangeException(nameof(action))
     };
 
-    public string Line(ResultLine line) => line.State switch
+    public string BannerProgressAria => loc.T("composer.banner.progress.aria");
+
+    // ---- notices and dialogs -------------------------------------------------------
+
+    public string Toast(ToastKind kind) => loc.T(kind switch
     {
-        LineState.Failed => line.Error,
-        LineState.Empty => loc.T("composer.result.empty"),
-        LineState.Pending => "",
-        _ => line.Text
-    };
+        ToastKind.Copied => "composer.toast.copied",
+        ToastKind.Cancelled => "composer.toast.cancelled",
+        ToastKind.Empty => "composer.toast.empty",
+        ToastKind.Unavailable => "composer.toast.unavailable",
+        ToastKind.Processing => "composer.toast.processing",
+        ToastKind.Exported => "composer.toast.exported",
+        ToastKind.ExportUnfinished => "composer.toast.exportUnfinished",
+        _ => throw new ArgumentOutOfRangeException(nameof(kind))
+    });
+
+    public string ImportTitle => loc.T("composer.import.title");
+    public string ImportFileType => loc.T("composer.import.fileType");
+    public string ExportTitle => loc.T("composer.export.title");
+    public string ExportHint => loc.T("composer.export.hint");
 }

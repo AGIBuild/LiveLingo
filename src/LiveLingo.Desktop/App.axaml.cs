@@ -112,6 +112,7 @@ public partial class App : Application
             };
 
             var platform = _serviceProvider.GetService<IPlatformServices>();
+            ApplyTheme(settings);
             SetupTrayIcon(desktop, platform);
             if (platform is not null)
             {
@@ -126,6 +127,13 @@ public partial class App : Application
 
         base.OnFrameworkInitializationCompleted();
     }
+
+    private void ApplyTheme(SettingsModel settings) => RequestedThemeVariant = settings.Appearance.Theme switch
+    {
+        "Light" => Avalonia.Styling.ThemeVariant.Light,
+        "Dark" => Avalonia.Styling.ThemeVariant.Dark,
+        _ => Avalonia.Styling.ThemeVariant.Default
+    };
 
     private static void ApplyCoreOptions(SettingsModel settings, CoreOptions options)
     {
@@ -167,7 +175,7 @@ public partial class App : Application
         });
 
         var settingsItem = new NativeMenuItem(loc.T("tray.settings"));
-        settingsItem.Click += (_, _) => Dispatcher.UIThread.Post(ShowSettings);
+        settingsItem.Click += (_, _) => Dispatcher.UIThread.Post(() => ShowSettings());
 
         var checkUpdateItem = new NativeMenuItem(loc.T("tray.checkUpdates"));
         checkUpdateItem.Click += (_, _) => Dispatcher.UIThread.Post(async () => await CheckForUpdatesFromMenuAsync());
@@ -217,12 +225,17 @@ public partial class App : Application
         var settings = services.GetRequiredService<ISettingsService>().Current;
         var glossary = Glossary.Parse(settings.Composer.Glossary);
         var session = new DraftSession(hasTarget: target is not null, notifyOn: context);
+        var targetLanguage = Enum.Parse<TargetLanguage>(settings.Composer.TargetLanguage);
         var scheduler = new TranslationScheduler(
-            session, services.GetRequiredService<ITranslator>(), TargetLanguage.English, TailIdleDelay,
+            session, services.GetRequiredService<ITranslator>(), targetLanguage, TailIdleDelay,
             glossary: glossary);
         var cleanup = new CleanupScheduler(
             session, services.GetRequiredService<ITextCleaner>(), glossary.Terms, CleanupHoldback, contextUnits: 2);
+        platform.Microphone.PreferredDevice = settings.Composer.Microphone;
         var voice = new MicrophoneVoiceInput(services.GetRequiredService<IDictationSessionFactory>(), platform.Microphone);
+        var options = new ComposerOptions(
+            settings.Cloud.Translate, settings.Cloud.Clean,
+            Enum.Parse<CommitKey>(settings.Composer.CommitKey), settings.Appearance.Animations);
         var vm = new ComposerViewModel(
             session,
             scheduler,
@@ -236,8 +249,10 @@ public partial class App : Application
             voice,
             services.GetRequiredService<IAudioFileTranscriber>(),
             glossary.Terms,
+            options,
             target,
             context);
+        vm.SettingsRequested += section => ShowSettings(section);
 
         var loc = services.GetRequiredService<ILocalizationService>();
         var window = new ComposerWindow(vm, new ComposerTexts(loc), target, _recentDrafts);
@@ -258,17 +273,20 @@ public partial class App : Application
         window.Show();
     }
 
-    private void ShowSettings()
+    private void ShowSettings(string section = "general")
     {
         if (_settingsWindow is { IsVisible: true } open)
         {
+            open.ShowSection(section);
             open.Activate();
             return;
         }
 
         var services = _serviceProvider!;
-        var vm = new SettingsViewModel(services.GetRequiredService<ISettingsService>(), services.GetRequiredService<ISecretStore>(), services.GetRequiredService<IModelManager>());
-        _settingsWindow = new SettingsWindow(vm, services.GetRequiredService<ILocalizationService>());
+        var vm = new SettingsViewModel(
+            services.GetRequiredService<ISettingsService>(), services.GetRequiredService<ISecretStore>(),
+            services.GetRequiredService<IModelManager>(), _recentDrafts, services.GetRequiredService<IPlatformServices>().Microphone);
+        _settingsWindow = new SettingsWindow(vm, services.GetRequiredService<ILocalizationService>(), section);
         _settingsWindow.Closed += (_, _) => _settingsWindow = null;
         _settingsWindow.Show();
     }
@@ -291,6 +309,7 @@ public partial class App : Application
     private void ApplySettings(IPlatformServices platform, SettingsModel settings)
     {
         ApplyCoreOptions(settings, _serviceProvider!.GetRequiredService<CoreOptions>());
+        ApplyTheme(settings);
         var loc = _serviceProvider!.GetRequiredService<ILocalizationService>();
         if (!string.Equals(loc.CurrentCulture.Name, settings.Appearance.Language, StringComparison.OrdinalIgnoreCase))
             loc.SetCulture(settings.Appearance.Language);
