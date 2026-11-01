@@ -43,7 +43,7 @@ public class ComposerImportTests
     {
         await using var h = Create(ComposerOutput.Clean);
         await h.Vm.ImportAsync("a.wav");
-        await Wait.Until(() => h.Vm.CanExport);
+        await Wait.Until(() => h.Vm.CanExportAs(ExportFormat.Srt));
 
         var srt = h.Vm.BuildSrt();
 
@@ -64,9 +64,9 @@ public class ComposerImportTests
         var path = Path.Combine(Path.GetTempPath(), $"livelingo-{Guid.NewGuid():N}.srt");
         try
         {
-            await h.Vm.ExportSrtAsync(path);
+            await h.Vm.ExportAsync(path, ExportFormat.Srt);
 
-            var bytes = await File.ReadAllBytesAsync(path);
+            var bytes = await File.ReadAllBytesAsync(path, TestContext.Current.CancellationToken);
             Assert.NotEqual(0xEF, bytes[0]);
             Assert.StartsWith("1\n00:00:01,200 --> 00:00:04,000\n先看缓存。", System.Text.Encoding.UTF8.GetString(bytes));
         }
@@ -75,7 +75,7 @@ public class ComposerImportTests
             File.Delete(path);
         }
 
-        await h.Vm.ExportSrtAsync(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"), "missing", "a.srt"));
+        await h.Vm.ExportAsync(Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"), "missing", "a.srt"), ExportFormat.Srt);
         Assert.Equal(BannerKind.FileFailed, h.Vm.Banner.Kind);
     }
 
@@ -85,7 +85,7 @@ public class ComposerImportTests
         await using var h = Create();
         var path = Path.Combine(Path.GetTempPath(), $"livelingo-{Guid.NewGuid():N}.srt");
 
-        await h.Vm.ExportSrtAsync(path);
+        await h.Vm.ExportAsync(path, ExportFormat.Srt);
 
         Assert.False(File.Exists(path));
     }
@@ -99,9 +99,9 @@ public class ComposerImportTests
 
         await h.Vm.ImportAsync("a.wav");
 
-        Assert.False(h.Vm.CanExport);
+        Assert.False(h.Vm.CanExportAs(ExportFormat.Srt));
         release.SetResult("done");
-        await Wait.Until(() => h.Vm.CanExport);
+        await Wait.Until(() => h.Vm.CanExportAs(ExportFormat.Srt));
     }
 
     [Fact]

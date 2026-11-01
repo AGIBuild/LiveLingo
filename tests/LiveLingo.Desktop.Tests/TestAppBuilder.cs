@@ -18,6 +18,8 @@ public class TestApp : Application
 {
     public override void Initialize()
     {
+        // The XAML loader finds the compiled styles only in assemblies that are already loaded.
+        _ = typeof(LiveLingo.Desktop.App).Assembly;
         Styles.Add(new FluentTheme());
         Styles.Add(new StyleInclude(new Uri("avares://LiveLingo.Desktop.Tests"))
         {

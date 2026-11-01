@@ -33,7 +33,7 @@ public class ComposerViewModelTests
         Assert.Equal(ComposerStatus.Empty, h.Vm.Status);
         Assert.False(h.Vm.CanWrite);
         await h.Vm.WriteCommand.ExecuteAsync(null);
-        await h.Injector.DidNotReceiveWithAnyArgs().InjectAsync(default!, default!, default);
+        await h.Injector.DidNotReceiveWithAnyArgs().InjectAsync(default!, default!, default, TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -60,8 +60,8 @@ public class ComposerViewModelTests
 
         await h.Vm.WriteCommand.ExecuteAsync(null);
         Assert.True(h.Vm.IsWriteQueued);
-        await h.Vm.WriteCommand.ExecuteAsync(null);
-        await h.Injector.DidNotReceiveWithAnyArgs().InjectAsync(default!, default!, default);
+        await h.Vm.CommitAsync(fromKey: true);
+        await h.Injector.DidNotReceiveWithAnyArgs().InjectAsync(default!, default!, default, TestContext.Current.CancellationToken);
 
         gate.SetResult(new TranslatedText("Check the cache.", 1, 2));
 
@@ -122,7 +122,7 @@ public class ComposerViewModelTests
         Assert.False(h.Vm.IsWriteQueued);
         Assert.Equal(LineState.Failed, h.Vm.Lines[0].State);
         Assert.Equal("refused", h.Vm.Lines[0].Error);
-        await h.Injector.DidNotReceiveWithAnyArgs().InjectAsync(default!, default!, default);
+        await h.Injector.DidNotReceiveWithAnyArgs().InjectAsync(default!, default!, default, TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -167,7 +167,7 @@ public class ComposerViewModelTests
         await h.Vm.WriteCommand.ExecuteAsync(null);
 
         Assert.Equal(BannerKind.TargetLost, h.Vm.Banner.Kind);
-        await h.Injector.DidNotReceiveWithAnyArgs().InjectAsync(default!, default!, default);
+        await h.Injector.DidNotReceiveWithAnyArgs().InjectAsync(default!, default!, default, TestContext.Current.CancellationToken);
         Assert.Empty(h.Events);
 
         await h.Vm.CopyCommand.ExecuteAsync(null);
@@ -184,7 +184,7 @@ public class ComposerViewModelTests
         await h.Vm.WriteCommand.ExecuteAsync(null);
 
         await h.Clipboard.Received(1).SetTextAsync("T:先检查缓存。", Arg.Any<CancellationToken>());
-        await h.Injector.DidNotReceiveWithAnyArgs().InjectAsync(default!, default!, default);
+        await h.Injector.DidNotReceiveWithAnyArgs().InjectAsync(default!, default!, default, TestContext.Current.CancellationToken);
         Assert.Equal(["completed"], h.Events);
         Assert.False(h.Vm.HasTarget);
     }
@@ -232,7 +232,7 @@ public class ComposerViewModelTests
     {
         await using var h = new Harness(modelsInstalled: false);
         h.Vm.SourceText = "先检查缓存。";
-        await Task.Delay(50);
+        await Task.Delay(50, TestContext.Current.CancellationToken);
 
         Assert.Equal(BannerKind.ModelMissing, h.Vm.Banner.Kind);
         Assert.False(h.Vm.ModelsReady);
@@ -244,8 +244,8 @@ public class ComposerViewModelTests
 
         await h.Vm.WriteCommand.ExecuteAsync(null);
         await h.Vm.CopyCommand.ExecuteAsync(null);
-        await h.Injector.DidNotReceiveWithAnyArgs().InjectAsync(default!, default!, default);
-        await h.Clipboard.DidNotReceiveWithAnyArgs().SetTextAsync(default!, default);
+        await h.Injector.DidNotReceiveWithAnyArgs().InjectAsync(default!, default!, default, TestContext.Current.CancellationToken);
+        await h.Clipboard.DidNotReceiveWithAnyArgs().SetTextAsync(default!, TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -325,7 +325,7 @@ public class ComposerViewModelTests
     }
 
     [Fact]
-    public async Task ResultText_IsTheWholeResultOnceReady_AndEmptyWhileSentencesAreStillPending()
+    public async Task Export_IsTheWholeResultOnceReady_AndRefusedWhileSentencesAreStillPending()
     {
         await using var h = new Harness();
         var gate = new TaskCompletionSource<TranslatedText>();
@@ -333,22 +333,24 @@ public class ComposerViewModelTests
 
         h.Vm.SourceText = "先检查缓存。再更新索引。";
         await Wait.Until(() => h.Vm.Lines.Count == 2 && h.Vm.Lines[0].State == LineState.Ready);
-        Assert.Equal("", h.Vm.ResultText);
+        Assert.False(h.Vm.CanExportAs(ExportFormat.Txt));
 
         gate.SetResult(new TranslatedText("Two.", 1, 2));
         await Wait.Until(() => h.Vm.Status == ComposerStatus.Ready);
 
-        Assert.Equal("One. Two.", h.Vm.ResultText);
+        Assert.True(h.Vm.CanExportAs(ExportFormat.Txt));
+        Assert.Equal("One. Two.", h.Vm.BuildExport(ExportFormat.Txt));
+        Assert.Equal("# LiveLingo\n\nOne. Two.", h.Vm.BuildExport(ExportFormat.Markdown));
     }
 
     [Fact]
-    public async Task ResultText_IsEmptyWhileModelsAreMissing()
+    public async Task Lines_ArePendingWhileModelsAreMissing_AndNothingIsExportable()
     {
         await using var h = new Harness(modelsInstalled: false);
-
         h.Vm.SourceText = "先检查缓存。";
-        await Task.Delay(50);
+        await Task.Delay(50, TestContext.Current.CancellationToken);
 
-        Assert.Equal("", h.Vm.ResultText);
+        Assert.All(h.Vm.Lines, line => Assert.Equal(LineState.Pending, line.State));
+        Assert.False(h.Vm.CanExportAs(ExportFormat.Txt));
     }
 }

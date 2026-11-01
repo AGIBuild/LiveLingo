@@ -16,71 +16,239 @@ public class ComposerTextsTests
         return new ComposerTexts(loc);
     }
 
-    [Theory]
-    [InlineData(ComposerStatus.Empty, false, "[composer.status.empty]")]
-    [InlineData(ComposerStatus.Working, false, "[composer.status.working]")]
-    [InlineData(ComposerStatus.Ready, false, "[composer.status.ready]")]
-    [InlineData(ComposerStatus.Failed, false, "[composer.status.failed]")]
-    [InlineData(ComposerStatus.Working, true, "[composer.status.queued]")]
-    [InlineData(ComposerStatus.Starting, false, "[composer.status.starting]")]
-    [InlineData(ComposerStatus.Listening, false, "[composer.status.listening]")]
-    public void Status_IsLocalized_AndQueuedWins(ComposerStatus status, bool queued, string expected)
-    {
-        Assert.Equal(expected, Create().Status(status, queued));
-    }
-
-    [Fact]
-    public void TranslateLabel_NamesTheTargetLanguage()
-    {
-        Assert.Equal("[composer.output.translate:[composer.language.English]]", Create().TranslateLabel(TargetLanguage.English));
-        Assert.Equal("[composer.output.translate:[composer.language.Chinese]]", Create().TranslateLabel(TargetLanguage.Chinese));
-    }
-
-    [Fact]
-    public void Target_DistinguishesAnInputFromTheClipboard()
-    {
-        Assert.Equal("[composer.target.some:Slack]", Create().Target("Slack", hasTarget: true));
-        Assert.Equal("[composer.target.none]", Create().Target("", hasTarget: false));
-    }
+    private static StatusInfo Info(
+        ComposerStatus status = ComposerStatus.Empty, bool written = false, bool handsFree = true, int seconds = 0,
+        bool armed = false, int units = 0, ComposerOutput output = ComposerOutput.Translate, bool cloud = false, int percent = 0) =>
+        new(status, written, handsFree, seconds, armed, units, output, cloud, percent);
 
     [Theory]
-    [InlineData(BannerKind.ModelMissing, "x", 0, "[composer.banner.modelMissing:x]", "[composer.banner.download]")]
-    [InlineData(BannerKind.Downloading, "", 42.4, "[composer.banner.downloading:42]", "")]
-    [InlineData(BannerKind.DownloadFailed, "disk full", 0, "[composer.banner.downloadFailed:disk full]", "[composer.banner.downloadRetry]")]
-    [InlineData(BannerKind.TargetLost, "", 0, "[composer.banner.targetLost]", "")]
-    [InlineData(BannerKind.WriteFailed, "no focus", 0, "[composer.banner.writeFailed:no focus]", "")]
-    [InlineData(BannerKind.MicrophoneDenied, "", 0, "[composer.banner.micDenied]", "[composer.banner.micDeniedAction]")]
-    [InlineData(BannerKind.NoMicrophone, "no device", 0, "[composer.banner.noMic:no device]", "")]
-    [InlineData(BannerKind.NoSound, "", 0, "[composer.banner.noSound]", "")]
-    [InlineData(BannerKind.FileFailed, "bad file", 0, "[composer.banner.fileFailed:bad file]", "")]
-    [InlineData(BannerKind.NoSpeechFound, "", 0, "[composer.banner.noSpeech]", "")]
-    public void Banner_ProvidesMessageAndAction(BannerKind kind, string detail, double progress, string message, string action)
+    [InlineData(ComposerStatus.Empty, "")]
+    [InlineData(ComposerStatus.Starting, "[composer.status.starting]")]
+    [InlineData(ComposerStatus.Failed, "[composer.status.unavailable]")]
+    public void Status_IsLocalized(ComposerStatus status, string expected)
     {
-        var texts = Create();
-        var banner = new BannerState(kind, detail, progress);
-
-        Assert.Equal(message, texts.BannerMessage(banner));
-        Assert.Equal(action, texts.BannerAction(banner));
+        Assert.Equal(expected, Create().Status(Info(status)));
     }
 
     [Fact]
-    public void NoBanner_HasNoText()
+    public void Status_Listening_ShowsTheClockAndHowToStop()
     {
         var texts = Create();
 
-        Assert.Equal("", texts.BannerMessage(BannerState.None));
-        Assert.Equal("", texts.BannerAction(BannerState.None));
+        Assert.Equal("[composer.status.listening.free:1:05]", texts.Status(Info(ComposerStatus.Listening, handsFree: true, seconds: 65)));
+        Assert.Equal("[composer.status.listening.hold:0:07]", texts.Status(Info(ComposerStatus.Listening, handsFree: false, seconds: 7)));
     }
 
     [Fact]
-    public void ResultLine_ShowsTheErrorOrAnEmptyMarker()
+    public void Status_Working_NamesTheStep()
+    {
+        var texts = Create();
+
+        Assert.Equal("[composer.status.working.translate]", texts.Status(Info(ComposerStatus.Working, output: ComposerOutput.Translate)));
+        Assert.Equal("[composer.status.working.clean]", texts.Status(Info(ComposerStatus.Working, output: ComposerOutput.Clean)));
+    }
+
+    [Fact]
+    public void Status_Ready_SaysWhereTheTextWasProduced()
+    {
+        var texts = Create();
+
+        Assert.Equal("[composer.status.ready.local:3]", texts.Status(Info(ComposerStatus.Ready, units: 3)));
+        Assert.Equal("[composer.status.ready.cloud:3]", texts.Status(Info(ComposerStatus.Ready, units: 3, cloud: true)));
+    }
+
+    [Fact]
+    public void Status_WrittenAndArmedAndTranscribing_TakePrecedence()
+    {
+        var texts = Create();
+
+        Assert.Equal("[composer.status.written]", texts.Status(Info(ComposerStatus.Ready, written: true, armed: true)));
+        Assert.Equal("[composer.status.armed]", texts.Status(Info(ComposerStatus.Working, armed: true)));
+        Assert.Equal("[composer.status.transcribing:42]", texts.Status(Info(ComposerStatus.Transcribing, percent: 42)));
+    }
+
+    [Fact]
+    public void Status_RejectsAnUnknownStatus()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => Create().Status(Info((ComposerStatus)99)));
+    }
+
+    [Fact]
+    public void Dest_DistinguishesAnInputFromCopyOnlyAndALostWindow()
+    {
+        var texts = Create();
+
+        Assert.Equal("Slack", texts.Dest(hasTarget: true, targetLost: false, "Slack"));
+        Assert.Equal("[composer.dest.copyOnly]", texts.Dest(hasTarget: false, targetLost: false, ""));
+        Assert.Equal("[composer.dest.lost]", texts.Dest(hasTarget: true, targetLost: true, "Slack"));
+    }
+
+    [Fact]
+    public void Privacy_NamesEveryCloudStep()
+    {
+        var texts = Create();
+
+        Assert.Equal("[composer.privacy.local]", texts.Privacy(false, false));
+        Assert.Equal("[composer.privacy.cloud:[composer.privacy.translate]]", texts.Privacy(true, false));
+        Assert.Equal("[composer.privacy.cloud:[composer.privacy.clean]]", texts.Privacy(false, true));
+        Assert.Equal(
+            "[composer.privacy.cloud:[composer.privacy.translate][composer.privacy.sep][composer.privacy.clean]]",
+            texts.Privacy(true, true));
+        Assert.Equal("[composer.privacy.aria.local]", texts.PrivacyAria(false, false));
+        Assert.Equal("[composer.privacy.aria.cloud:[composer.privacy.clean]]", texts.PrivacyAria(false, true));
+    }
+
+    [Fact]
+    public void OutputPillAndMenu_NameTheLanguages()
+    {
+        var texts = Create();
+
+        Assert.Equal("[composer.out.translate:[composer.language.English]]", texts.OutputPill(ComposerOutput.Translate, TargetLanguage.English));
+        Assert.Equal("[composer.out.clean:[composer.language.English]]", texts.OutputPill(ComposerOutput.Clean, TargetLanguage.Chinese));
+        Assert.Equal("[composer.out.raw]", texts.OutputPill(ComposerOutput.Original, TargetLanguage.English));
+        Assert.Equal("[composer.out.menu.translate:[composer.language.Chinese]]", texts.OutputMenu(ComposerOutput.Translate, TargetLanguage.Chinese));
+        Assert.Equal("[composer.out.menu.clean:[composer.language.Chinese]]", texts.OutputMenu(ComposerOutput.Clean, TargetLanguage.English));
+        Assert.Equal("[composer.out.menu.raw]", texts.OutputMenu(ComposerOutput.Original, TargetLanguage.English));
+        Assert.Equal(
+            "[composer.out.swap:[composer.language.Chinese],[composer.language.English]]",
+            texts.SwapMenu(TargetLanguage.English));
+    }
+
+    [Fact]
+    public void SourceLanguage_IsTheOtherSideOfTheTarget()
+    {
+        Assert.Equal(TargetLanguage.Chinese, ComposerTexts.SourceLanguage(TargetLanguage.English));
+        Assert.Equal(TargetLanguage.English, ComposerTexts.SourceLanguage(TargetLanguage.Chinese));
+    }
+
+    [Fact]
+    public void Labels_FollowTheComposerState()
+    {
+        var texts = Create();
+
+        Assert.Equal("[composer.src.transcript:a.wav]", texts.SourceLabel(false, true, "a.wav"));
+        Assert.Equal("[composer.src.listening]", texts.SourceLabel(true, false, ""));
+        Assert.Equal("[composer.src.label]", texts.SourceLabel(false, false, ""));
+        Assert.Equal("[composer.res.labelTo:[composer.language.English]]", texts.ResultLabel(ComposerOutput.Translate, TargetLanguage.English));
+        Assert.Equal("[composer.res.label]", texts.ResultLabel(ComposerOutput.Clean, TargetLanguage.English));
+    }
+
+    [Fact]
+    public void CommitLabel_FollowsTheArmedWrittenAndTargetState()
+    {
+        var texts = Create();
+
+        Assert.Equal("[composer.commit.armed]", texts.CommitLabel(written: false, armed: true, hasTarget: true, "Slack"));
+        Assert.Equal("[composer.commit.written]", texts.CommitLabel(written: true, armed: false, hasTarget: true, "Slack"));
+        Assert.Equal("[composer.commit.write:Slack]", texts.CommitLabel(false, false, true, "Slack"));
+        Assert.Equal("[composer.commit.copy]", texts.CommitLabel(false, false, false, ""));
+        Assert.Equal("[composer.commit.armed.aria]", texts.CommitAria(armed: true, hasTarget: true));
+        Assert.Equal("[composer.commit.write.aria]", texts.CommitAria(false, true));
+        Assert.Equal("[composer.commit.copy.aria]", texts.CommitAria(false, false));
+    }
+
+    [Fact]
+    public void KeyCaps_ShowTheCommitAndNewlineKeys()
+    {
+        Assert.Equal("↵", ComposerTexts.CommitKeyLabel(CommitKey.Enter));
+        Assert.Contains("↵", ComposerTexts.CommitKeyLabel(CommitKey.CtrlEnter));
+        Assert.NotEqual("↵", ComposerTexts.CommitKeyLabel(CommitKey.CtrlEnter));
+        Assert.Contains("↵", ComposerTexts.NewlineKeyLabel);
+    }
+
+    [Fact]
+    public void Clock_PadsTheSeconds()
+    {
+        Assert.Equal("0:00", ComposerTexts.Clock(0));
+        Assert.Equal("1:05", ComposerTexts.Clock(65));
+        Assert.Equal("12:30", ComposerTexts.Clock(750));
+    }
+
+    [Theory]
+    [InlineData(BannerKind.ModelMissing, "x", 0, "[composer.banner.modelMissing:x]")]
+    [InlineData(BannerKind.Downloading, "", 42.4, "[composer.banner.downloading:42]")]
+    [InlineData(BannerKind.DownloadFailed, "disk full", 0, "[composer.banner.downloadFailed:disk full]")]
+    [InlineData(BannerKind.TargetLost, "", 0, "[composer.banner.targetLost]")]
+    [InlineData(BannerKind.WriteFailed, "no focus", 0, "[composer.banner.writeFailed:no focus]")]
+    [InlineData(BannerKind.MicrophoneDenied, "", 0, "[composer.banner.micDenied]")]
+    [InlineData(BannerKind.NoMicrophone, "no device", 0, "[composer.banner.noMic:no device]")]
+    [InlineData(BannerKind.NoSound, "", 0, "[composer.banner.noSound]")]
+    [InlineData(BannerKind.FileFailed, "bad file", 0, "[composer.banner.fileFailed:bad file]")]
+    [InlineData(BannerKind.NoSpeechFound, "", 0, "[composer.banner.noSpeech]")]
+    [InlineData(BannerKind.SlowProcessing, "", 0, "[composer.banner.slow]")]
+    [InlineData(BannerKind.None, "", 0, "")]
+    public void BannerMessage_IsLocalized(BannerKind kind, string detail, double progress, string message)
+    {
+        Assert.Equal(message, Create().BannerMessage(new BannerState(kind, detail, progress)));
+    }
+
+    [Theory]
+    [InlineData(BannerKind.ModelMissing, BannerTone.Info, new[] { BannerAction.Download })]
+    [InlineData(BannerKind.Downloading, BannerTone.Info, new[] { BannerAction.Dismiss })]
+    [InlineData(BannerKind.DownloadFailed, BannerTone.Bad, new[] { BannerAction.Download })]
+    [InlineData(BannerKind.TargetLost, BannerTone.Bad, new[] { BannerAction.Retarget, BannerAction.Copy })]
+    [InlineData(BannerKind.MicrophoneDenied, BannerTone.Warn, new[] { BannerAction.OpenMicrophoneSettings, BannerAction.Dismiss })]
+    [InlineData(BannerKind.NoSound, BannerTone.Warn, new[] { BannerAction.OpenInputSettings, BannerAction.Dismiss })]
+    [InlineData(BannerKind.SlowProcessing, BannerTone.Info, new[] { BannerAction.UseOriginal, BannerAction.KeepWaiting })]
+    [InlineData(BannerKind.WriteFailed, BannerTone.Bad, new BannerAction[0])]
+    public void Banner_HasAToneAndTheActionsOfThePrototype(BannerKind kind, BannerTone tone, BannerAction[] actions)
+    {
+        var banner = new BannerState(kind);
+
+        Assert.Equal(tone, banner.Tone);
+        Assert.Equal(actions, banner.Actions);
+    }
+
+    [Theory]
+    [InlineData(BannerAction.Dismiss, BannerKind.NoSound, "[composer.banner.dismiss]")]
+    [InlineData(BannerAction.Dismiss, BannerKind.Downloading, "[composer.banner.background]")]
+    [InlineData(BannerAction.Download, BannerKind.ModelMissing, "[composer.banner.download]")]
+    [InlineData(BannerAction.Download, BannerKind.DownloadFailed, "[composer.banner.retry]")]
+    [InlineData(BannerAction.OpenMicrophoneSettings, BannerKind.MicrophoneDenied, "[composer.banner.openOs]")]
+    [InlineData(BannerAction.OpenInputSettings, BannerKind.NoSound, "[composer.banner.checkInput]")]
+    [InlineData(BannerAction.UseOriginal, BannerKind.SlowProcessing, "[composer.banner.useOriginal]")]
+    [InlineData(BannerAction.KeepWaiting, BannerKind.SlowProcessing, "[composer.banner.keepWaiting]")]
+    [InlineData(BannerAction.Retarget, BannerKind.TargetLost, "[composer.banner.retarget]")]
+    [InlineData(BannerAction.Copy, BannerKind.TargetLost, "[composer.banner.copy]")]
+    public void BannerActionLabel_IsLocalized(BannerAction action, BannerKind kind, string label)
+    {
+        Assert.Equal(label, Create().BannerActionLabel(new BannerState(kind), action));
+    }
+
+    [Fact]
+    public void Line_ShowsTheErrorOrAnEmptyMarker()
     {
         var texts = Create();
 
         Assert.Equal("hello", texts.Line(new ResultLine(0, "hello", LineState.Ready, "")));
         Assert.Equal("boom", texts.Line(new ResultLine(0, "", LineState.Failed, "boom")));
-        Assert.Equal("[composer.result.empty]", texts.Line(new ResultLine(0, "", LineState.Empty, "")));
+        Assert.Equal("[composer.row.empty]", texts.Line(new ResultLine(0, "", LineState.Empty, "")));
         Assert.Equal("", texts.Line(new ResultLine(0, "", LineState.Pending, "")));
+    }
+
+    [Fact]
+    public void RowNote_ExplainsAKeptOriginalOrAnEdit()
+    {
+        var texts = Create();
+
+        Assert.Equal("[composer.row.kept:added a fact]", texts.RowNote(new ResultLine(0, "a", LineState.Ready, "", Warning: "added a fact")));
+        Assert.Equal("[composer.row.edited]", texts.RowNote(new ResultLine(0, "a", LineState.Ready, "", IsOwned: true)));
+        Assert.Equal("", texts.RowNote(new ResultLine(0, "a", LineState.Ready, "")));
+        Assert.Equal("[composer.row.edit.aria:2]", texts.RowEditAria(1));
+        Assert.Equal("[composer.row.useOriginal.aria:2]", texts.RowUseOriginalAria(1));
+    }
+
+    [Theory]
+    [InlineData(ToastKind.Copied, "[composer.toast.copied]")]
+    [InlineData(ToastKind.Cancelled, "[composer.toast.cancelled]")]
+    [InlineData(ToastKind.Empty, "[composer.toast.empty]")]
+    [InlineData(ToastKind.Unavailable, "[composer.toast.unavailable]")]
+    [InlineData(ToastKind.Processing, "[composer.toast.processing]")]
+    [InlineData(ToastKind.Exported, "[composer.toast.exported]")]
+    [InlineData(ToastKind.ExportUnfinished, "[composer.toast.exportUnfinished]")]
+    public void Toast_IsLocalized(ToastKind kind, string expected)
+    {
+        Assert.Equal(expected, Create().Toast(kind));
     }
 
     [Fact]
@@ -91,30 +259,5 @@ public class ComposerTextsTests
 
         Assert.Equal(local + " · hello", ComposerTexts.RecentItem(new RecentDraft(at, "\n  hello  \nsecond", false)));
         Assert.Equal(local + " · " + new string('a', 28) + "…", ComposerTexts.RecentItem(new RecentDraft(at, new string('a', 40), true)));
-    }
-
-    [Fact]
-    public void Labels_AreLocalized()
-    {
-        var texts = Create();
-
-        Assert.Equal("[composer.output.clean]", texts.CleanLabel);
-        Assert.Equal("[composer.output.original]", texts.OriginalLabel);
-        Assert.Equal("[composer.copy]", texts.CopyLabel);
-        Assert.Equal("[composer.write]", texts.WriteLabel);
-        Assert.Equal("[composer.retry]", texts.RetryLabel);
-        Assert.Equal("[composer.placeholder]", texts.Placeholder);
-        Assert.Equal("[composer.mic]", texts.MicLabel);
-    }
-
-    [Fact]
-    public void ReadyStatus_MentionsSentencesThatKeptTheirOriginalWording()
-    {
-        var texts = Create();
-
-        Assert.Equal("[composer.status.keptOriginal:2]", texts.Status(ComposerStatus.Ready, false, 2));
-        Assert.Equal("[composer.status.ready]", texts.Status(ComposerStatus.Ready, false, 0));
-        Assert.Equal("[composer.status.working]", texts.Status(ComposerStatus.Working, false, 2));
-        Assert.Equal("[composer.status.transcribing:42]", texts.Status(ComposerStatus.Transcribing, false, 0, 42));
     }
 }

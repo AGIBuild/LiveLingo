@@ -1,4 +1,5 @@
 using LiveLingo.Core.Models;
+using LiveLingo.Desktop.Composer;
 using LiveLingo.Desktop.Platform;
 using LiveLingo.Desktop.Services.Configuration;
 using LiveLingo.Desktop.Settings;
@@ -8,17 +9,28 @@ namespace LiveLingo.Desktop.Tests.Settings;
 
 public class SettingsViewModelTests
 {
-    private static (SettingsViewModel Vm, ISecretStore Secrets, List<SettingsModel> Saved) Create(
-        SettingsModel? current = null, string? storedKey = null, IModelManager? models = null)
+    private sealed class Fixture
     {
-        var model = current ?? new SettingsModel();
-        var saved = new List<SettingsModel>();
-        var service = Substitute.For<ISettingsService>();
-        service.CloneCurrent().Returns(_ => model.DeepClone());
-        service.When(s => s.Replace(Arg.Any<SettingsModel>())).Do(call => saved.Add(call.Arg<SettingsModel>()));
-        var secrets = Substitute.For<ISecretStore>();
-        secrets.GetSecretAsync(CloudSettings.ApiKeySecretId, Arg.Any<CancellationToken>()).Returns(storedKey);
-        return (new SettingsViewModel(service, secrets, models ?? Substitute.For<IModelManager>()), secrets, saved);
+        public SettingsModel Current { get; }
+        public List<SettingsModel> Saved { get; } = [];
+        public ISecretStore Secrets { get; } = Substitute.For<ISecretStore>();
+        public IModelManager Models { get; } = Substitute.For<IModelManager>();
+        public IMicrophone Microphone { get; } = Substitute.For<IMicrophone>();
+        public RecentDrafts Recent { get; } = new();
+        public SettingsViewModel Vm { get; }
+
+        public Fixture(SettingsModel? current = null, string? storedKey = null)
+        {
+            Current = current ?? new SettingsModel();
+            var service = Substitute.For<ISettingsService>();
+            service.CloneCurrent().Returns(_ => Saved.Count > 0 ? Saved[^1].DeepClone() : Current.DeepClone());
+            service.When(s => s.Replace(Arg.Any<SettingsModel>())).Do(call => Saved.Add(call.Arg<SettingsModel>()));
+            Secrets.GetSecretAsync(CloudSettings.ApiKeySecretId, Arg.Any<CancellationToken>()).Returns(storedKey);
+            Microphone.InputDevices().Returns(["USB Mic", "Built-in"]);
+            Vm = new SettingsViewModel(service, Secrets, Models, Recent, Microphone);
+        }
+
+        public SettingsModel Last => Saved[^1];
     }
 
     [Fact]
@@ -26,161 +38,192 @@ public class SettingsViewModelTests
     {
         var model = new SettingsModel();
         model.Hotkeys.Summon = "Alt+Space";
-        model.Appearance.Language = "zh-CN";
-        model.Composer.TranslatorTier = "Quality";
-        model.Composer.Glossary = "Redis";
+        model.Appearance.Language = "en-US";
+        model.Appearance.Theme = "Dark";
+        model.Appearance.Animations = false;
+        model.Composer.CommitKey = "CtrlEnter";
+        model.Composer.TargetLanguage = "Chinese";
+        model.Composer.TranslatorTier = "Fast";
+        model.Composer.Glossary = "Redis\n缓存穿透=cache penetration";
         model.Cloud.BaseUrl = "https://api.example.com/v1";
         model.Cloud.Model = "m";
         model.Cloud.Translate = true;
 
-        var (vm, _, _) = Create(model);
+        var vm = new Fixture(model).Vm;
 
         Assert.Equal("Alt+Space", vm.SummonHotkey);
-        Assert.Equal("zh-CN", vm.Language);
-        Assert.True(vm.Quality);
-        Assert.Equal("Redis", vm.Glossary);
+        Assert.Equal(1, vm.LanguageIndex);
+        Assert.Equal(2, vm.ThemeIndex);
+        Assert.True(vm.ReduceMotion);
+        Assert.Equal(1, vm.CommitKeyIndex);
+        Assert.Equal(1, vm.TargetIndex);
+        Assert.Equal(1, vm.TierIndex);
+        Assert.Equal([new TermEntry("Redis", "Redis"), new TermEntry("缓存穿透", "cache penetration")], vm.Terms);
         Assert.Equal("https://api.example.com/v1", vm.CloudBaseUrl);
         Assert.True(vm.CloudTranslate);
         Assert.False(vm.CloudClean);
     }
 
     [Fact]
-    public async Task Save_PersistsEveryEditedValue_AndClosesTheWindow()
+    public void Opening_ApplyingNothing_DoesNotSave()
     {
-        var (vm, _, saved) = Create();
-        var closed = 0;
-        vm.CloseRequested += () => closed++;
+        var f = new Fixture();
 
-        vm.SummonHotkey = " Ctrl+Shift+L ";
-        vm.Language = "zh-CN";
-        vm.Quality = true;
-        vm.Glossary = "Avalonia\n缓存穿透=cache penetration";
-        await vm.SaveCommand.ExecuteAsync(null);
-
-        var model = Assert.Single(saved);
-        Assert.Equal("Ctrl+Shift+L", model.Hotkeys.Summon);
-        Assert.Equal("zh-CN", model.Appearance.Language);
-        Assert.Equal("Quality", model.Composer.TranslatorTier);
-        Assert.Equal("Avalonia\n缓存穿透=cache penetration", model.Composer.Glossary);
-        Assert.Equal(1, closed);
+        Assert.Empty(f.Saved);
     }
 
     [Fact]
-    public async Task Save_WithoutQuality_SelectsTheFastTier()
+    public void EveryChange_IsAppliedAtOnce()
     {
-        var model = new SettingsModel();
-        model.Composer.TranslatorTier = "Quality";
-        var (vm, _, saved) = Create(model);
+        var f = new Fixture();
 
-        vm.Quality = false;
-        await vm.SaveCommand.ExecuteAsync(null);
+        f.Vm.SummonHotkey = " Ctrl+Shift+L ";
+        f.Vm.LanguageIndex = 1;
+        f.Vm.ThemeIndex = 1;
+        f.Vm.CommitKeyIndex = 1;
+        f.Vm.ReduceMotion = true;
+        f.Vm.TargetIndex = 1;
+        f.Vm.TierIndex = 1;
 
-        Assert.Equal("Fast", saved[0].Composer.TranslatorTier);
+        var model = f.Last;
+        Assert.Equal("Ctrl+Shift+L", model.Hotkeys.Summon);
+        Assert.Equal("en-US", model.Appearance.Language);
+        Assert.Equal("Light", model.Appearance.Theme);
+        Assert.Equal("CtrlEnter", model.Composer.CommitKey);
+        Assert.False(model.Appearance.Animations);
+        Assert.Equal("Chinese", model.Composer.TargetLanguage);
+        Assert.Equal("Fast", model.Composer.TranslatorTier);
+    }
+
+    [Fact]
+    public void AComboBoxThatIsBeingRefilled_IsNotAChoice()
+    {
+        var f = new Fixture();
+
+        f.Vm.ThemeIndex = -1;
+
+        Assert.Empty(f.Saved);
     }
 
     [Theory]
     [InlineData("")]
     [InlineData("Ctrl+Alt+")]
     [InlineData("   ")]
-    public async Task Save_WithAnInvalidHotkey_ChangesNothing_AndFlagsIt(string hotkey)
+    public void AnInvalidHotkey_IsFlagged_AndNotStored(string hotkey)
     {
-        var (vm, _, saved) = Create();
-        var closed = 0;
-        vm.CloseRequested += () => closed++;
+        var f = new Fixture();
 
-        vm.SummonHotkey = hotkey;
-        await vm.SaveCommand.ExecuteAsync(null);
+        f.Vm.SummonHotkey = hotkey;
 
-        Assert.Empty(saved);
-        Assert.True(vm.HotkeyInvalid);
-        Assert.Equal(0, closed);
+        Assert.True(f.Vm.HotkeyInvalid);
+        Assert.Equal(new SettingsModel().Hotkeys.Summon, f.Last.Hotkeys.Summon);
 
-        vm.SummonHotkey = "Ctrl+Alt+T";
-        Assert.False(vm.HotkeyInvalid);
+        f.Vm.SummonHotkey = "Ctrl+Alt+T";
+        Assert.False(f.Vm.HotkeyInvalid);
+        Assert.Equal("Ctrl+Alt+T", f.Last.Hotkeys.Summon);
+    }
+
+    // ---- glossary ---------------------------------------------------------------
+
+    [Fact]
+    public void AddingATerm_WithoutATranslation_KeepsItAsWritten()
+    {
+        var f = new Fixture();
+
+        f.Vm.NewTermSource = " Avalonia ";
+        f.Vm.AddTermCommand.Execute(null);
+
+        Assert.Equal([new TermEntry("Avalonia", "Avalonia")], f.Vm.Terms);
+        Assert.Equal("Avalonia", f.Last.Composer.Glossary);
+        Assert.Equal("", f.Vm.NewTermSource);
     }
 
     [Fact]
-    public void Cancel_ClosesWithoutSaving()
+    public void AddingATermWithATranslation_StoresThePair_AndRemovingItDropsIt()
     {
-        var (vm, _, saved) = Create();
-        var closed = 0;
-        vm.CloseRequested += () => closed++;
+        var f = new Fixture();
+        f.Vm.NewTermSource = "缓存穿透";
+        f.Vm.NewTermTarget = "cache penetration";
+        f.Vm.AddTermCommand.Execute(null);
+        Assert.Equal("缓存穿透=cache penetration", f.Last.Composer.Glossary);
 
-        vm.Glossary = "changed";
-        vm.CancelCommand.Execute(null);
+        f.Vm.RemoveTermCommand.Execute(f.Vm.Terms[0]);
 
-        Assert.Empty(saved);
-        Assert.Equal(1, closed);
+        Assert.Empty(f.Vm.Terms);
+        Assert.Equal("", f.Last.Composer.Glossary);
     }
 
     [Fact]
-    public void EditsAreMadeOnACopy_SoTheLiveSettingsAreUntouchedUntilSave()
+    public void AddingAnEmptyTerm_DoesNothing()
     {
-        var model = new SettingsModel();
-        var (vm, _, _) = Create(model);
+        var f = new Fixture();
 
-        vm.Glossary = "edited";
+        f.Vm.NewTermSource = "  ";
+        f.Vm.AddTermCommand.Execute(null);
 
-        Assert.Equal("", model.Composer.Glossary);
+        Assert.Empty(f.Vm.Terms);
+        Assert.Empty(f.Saved);
     }
 
-    // ---- cloud ----------------------------------------------------------------
+    // ---- cloud ------------------------------------------------------------------
 
     [Fact]
-    public async Task Cloud_IsOffByDefault_AndSavingWithoutItNeedsNoEndpointOrKey()
+    public void Cloud_IsOffByDefault()
     {
-        var (vm, secrets, saved) = Create();
+        var vm = new Fixture().Vm;
 
-        await vm.SaveCommand.ExecuteAsync(null);
+        Assert.False(vm.CloudTranslate);
+        Assert.False(vm.CloudClean);
+    }
 
-        var cloud = Assert.Single(saved).Cloud;
-        Assert.False(cloud.Translate);
-        Assert.False(cloud.Clean);
-        await secrets.DidNotReceiveWithAnyArgs().SetSecretAsync(default!, default!, default);
+    [Fact]
+    public void EnablingCloud_WithoutAnEndpointModelAndKey_IsRefused_AndFlagged()
+    {
+        var f = new Fixture();
+
+        Assert.False(f.Vm.TryEnableCloud(translation: true));
+
+        Assert.True(f.Vm.CloudInvalid);
+        Assert.False(f.Vm.CloudTranslate);
+        Assert.Empty(f.Saved);
+
+        f.Vm.CloudModel = "m";
+        Assert.False(f.Vm.CloudInvalid);
     }
 
     [Fact]
     public async Task EnablingCloud_StoresTheKeyInTheSecretStore_NotInTheSettings()
     {
-        var (vm, secrets, saved) = Create();
+        var f = new Fixture();
+        f.Vm.CloudBaseUrl = " https://example.openai.azure.com/openai/v1 ";
+        f.Vm.CloudModel = " gpt-4.1-mini ";
+        f.Vm.CloudApiKey = " sk-secret ";
+        await f.Vm.SaveCloudKeyCommand.ExecuteAsync(null);
 
-        vm.CloudBaseUrl = " https://example.openai.azure.com/openai/v1 ";
-        vm.CloudModel = " gpt-4.1-mini ";
-        vm.CloudApiKey = " sk-secret ";
-        vm.CloudTranslate = true;
-        await vm.SaveCommand.ExecuteAsync(null);
+        Assert.True(f.Vm.TryEnableCloud(translation: true));
+        Assert.True(f.Vm.TryEnableCloud(translation: false));
 
-        await secrets.Received(1).SetSecretAsync(CloudSettings.ApiKeySecretId, "sk-secret", Arg.Any<CancellationToken>());
-        var cloud = Assert.Single(saved).Cloud;
-        Assert.Equal("https://example.openai.azure.com/openai/v1", cloud.BaseUrl);
-        Assert.Equal("gpt-4.1-mini", cloud.Model);
-        Assert.True(cloud.Translate);
-        Assert.DoesNotContain("sk-secret", System.Text.Json.JsonSerializer.Serialize(saved[0]));
-        Assert.Equal("", vm.CloudApiKey);
-        Assert.True(vm.HasStoredKey);
+        await f.Secrets.Received(1).SetSecretAsync(CloudSettings.ApiKeySecretId, "sk-secret", Arg.Any<CancellationToken>());
+        Assert.True(f.Vm.HasStoredKey);
+        Assert.Equal("", f.Vm.CloudApiKey);
+        Assert.Equal("https://example.openai.azure.com/openai/v1", f.Last.Cloud.BaseUrl);
+        Assert.Equal("gpt-4.1-mini", f.Last.Cloud.Model);
+        Assert.True(f.Last.Cloud.Translate);
+        Assert.True(f.Last.Cloud.Clean);
+        Assert.DoesNotContain("sk-secret", System.Text.Json.JsonSerializer.Serialize(f.Last));
     }
 
     [Theory]
-    [InlineData("", "m", "key")]
-    [InlineData("http://api.example.com/v1", "m", "key")]
-    [InlineData("https://api.example.com/v1", "", "key")]
-    [InlineData("https://api.example.com/v1", "m", "")]
-    public async Task EnablingCloud_WithAnIncompleteConfiguration_SavesNothing_AndFlagsIt(string url, string model, string key)
+    [InlineData("http://api.example.com/v1", "m")]
+    [InlineData("https://api.example.com/v1", "")]
+    public void EnablingCloud_WithAnUnusableEndpoint_IsRefused(string url, string model)
     {
-        var (vm, secrets, saved) = Create();
+        var f = new Fixture(storedKey: "sk");
+        f.Vm.CloudBaseUrl = url;
+        f.Vm.CloudModel = model;
 
-        vm.CloudBaseUrl = url;
-        vm.CloudModel = model;
-        vm.CloudApiKey = key;
-        vm.CloudClean = true;
-        await vm.SaveCommand.ExecuteAsync(null);
-
-        Assert.Empty(saved);
-        Assert.True(vm.CloudInvalid);
-        await secrets.DidNotReceiveWithAnyArgs().SetSecretAsync(default!, default!, default);
-
-        vm.CloudModel = "other";
-        Assert.False(vm.CloudInvalid);
+        Assert.False(f.Vm.TryEnableCloud(translation: false));
+        Assert.True(f.Vm.CloudInvalid);
     }
 
     [Fact]
@@ -189,22 +232,67 @@ public class SettingsViewModelTests
         var model = new SettingsModel();
         model.Cloud.BaseUrl = "https://api.example.com/v1";
         model.Cloud.Model = "m";
-        var (vm, secrets, saved) = Create(model, storedKey: "sk-stored");
-        await vm.InitializeAsync();
-        Assert.True(vm.HasStoredKey);
+        var f = new Fixture(model, storedKey: "sk-stored");
+        await f.Vm.InitializeAsync();
 
-        vm.CloudTranslate = true;
-        await vm.SaveCommand.ExecuteAsync(null);
+        Assert.True(f.Vm.HasStoredKey);
+        Assert.True(f.Vm.TryEnableCloud(translation: true));
+        Assert.True(f.Last.Cloud.Translate);
+    }
 
-        Assert.True(Assert.Single(saved).Cloud.Translate);
-        await secrets.DidNotReceiveWithAnyArgs().SetSecretAsync(default!, default!, default);
+    [Fact]
+    public async Task DisablingCloud_SwitchesOnlyThatStepOff()
+    {
+        var model = new SettingsModel();
+        model.Cloud.BaseUrl = "https://api.example.com/v1";
+        model.Cloud.Model = "m";
+        model.Cloud.Translate = true;
+        model.Cloud.Clean = true;
+        var f = new Fixture(model, storedKey: "sk");
+        await f.Vm.InitializeAsync();
+
+        f.Vm.DisableCloud(translation: true);
+
+        Assert.False(f.Last.Cloud.Translate);
+        Assert.True(f.Last.Cloud.Clean);
+    }
+
+    [Fact]
+    public async Task SavingAnEmptyKey_DoesNothing()
+    {
+        var f = new Fixture();
+
+        await f.Vm.SaveCloudKeyCommand.ExecuteAsync(null);
+
+        await f.Secrets.DidNotReceiveWithAnyArgs().SetSecretAsync(default!, default!, TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task ForgettingTheKey_DeletesIt_AndSwitchesTheCloudOff()
+    {
+        var model = new SettingsModel();
+        model.Cloud.BaseUrl = "https://api.example.com/v1";
+        model.Cloud.Model = "m";
+        model.Cloud.Translate = true;
+        model.Cloud.Clean = true;
+        var f = new Fixture(model, storedKey: "sk");
+        await f.Vm.InitializeAsync();
+
+        await f.Vm.ForgetCloudKeyCommand.ExecuteAsync(null);
+
+        await f.Secrets.Received(1).DeleteSecretAsync(CloudSettings.ApiKeySecretId, Arg.Any<CancellationToken>());
+        Assert.False(f.Vm.HasStoredKey);
+        Assert.False(f.Vm.CloudTranslate);
+        Assert.False(f.Vm.CloudClean);
+        Assert.False(f.Last.Cloud.Translate);
+        Assert.False(f.Last.Cloud.Clean);
     }
 
     [Fact]
     public async Task Initialize_ReportsWhetherAKeyIsStored()
     {
-        var (withKey, _, _) = Create(storedKey: "sk");
-        var (withoutKey, _, _) = Create(storedKey: null);
+        var withKey = new Fixture(storedKey: "sk").Vm;
+        var withoutKey = new Fixture(storedKey: null).Vm;
 
         await withKey.InitializeAsync();
         await withoutKey.InitializeAsync();
@@ -213,23 +301,59 @@ public class SettingsViewModelTests
         Assert.False(withoutKey.HasStoredKey);
     }
 
+    // ---- microphone -------------------------------------------------------------
+
     [Fact]
-    public async Task ForgettingTheKey_DeletesIt_AndSwitchesTheCloudOff()
+    public async Task Initialize_ListsTheDevices_AndSelectsTheSavedOne()
     {
-        var (vm, secrets, _) = Create(storedKey: "sk");
-        await vm.InitializeAsync();
-        vm.CloudTranslate = true;
-        vm.CloudClean = true;
+        var model = new SettingsModel();
+        model.Composer.Microphone = "Built-in";
+        var f = new Fixture(model);
 
-        await vm.ForgetCloudKeyCommand.ExecuteAsync(null);
+        await f.Vm.InitializeAsync();
 
-        await secrets.Received(1).DeleteSecretAsync(CloudSettings.ApiKeySecretId, Arg.Any<CancellationToken>());
-        Assert.False(vm.HasStoredKey);
-        Assert.False(vm.CloudTranslate);
-        Assert.False(vm.CloudClean);
+        Assert.Equal(["", "USB Mic", "Built-in"], f.Vm.MicrophoneNames);
+        Assert.Equal(2, f.Vm.MicrophoneIndex);
+        Assert.Empty(f.Saved);
     }
 
-    // ---- models from earlier versions -------------------------------------------
+    [Fact]
+    public async Task ChoosingADevice_StoresItsName_AndSystemDefaultStoresNothing()
+    {
+        var f = new Fixture();
+        await f.Vm.InitializeAsync();
+
+        f.Vm.MicrophoneIndex = 1;
+        Assert.Equal("USB Mic", f.Last.Composer.Microphone);
+
+        f.Vm.MicrophoneIndex = 0;
+        Assert.Equal("", f.Last.Composer.Microphone);
+    }
+
+    [Fact]
+    public void BeforeTheDevicesAreKnown_TheSavedMicrophoneIsKept()
+    {
+        var model = new SettingsModel();
+        model.Composer.Microphone = "USB Mic";
+        var f = new Fixture(model);
+
+        f.Vm.ReduceMotion = true;
+
+        Assert.Equal("USB Mic", f.Last.Composer.Microphone);
+    }
+
+    // ---- recent drafts and models from earlier versions -----------------------------
+
+    [Fact]
+    public void ClearingRecentDrafts_EmptiesTheList()
+    {
+        var f = new Fixture();
+        f.Recent.Close("昨天的想法", written: true);
+
+        f.Vm.ClearRecentCommand.Execute(null);
+
+        Assert.Empty(f.Recent.Items);
+    }
 
     private static InstalledModel Installed(string id, long bytes) =>
         new(id, id, "/models/" + id, bytes, ModelType.Translation, DateTime.UnixEpoch);
@@ -237,49 +361,46 @@ public class SettingsViewModelTests
     [Fact]
     public async Task OnlyModelsOutsideTheCatalog_AreOfferedForRemoval()
     {
-        var models = Substitute.For<IModelManager>();
-        models.ListInstalled().Returns([
+        var f = new Fixture();
+        f.Models.ListInstalled().Returns([
             Installed(ModelCatalog.TranslatorFast.Id, 1_000_000_000),
             Installed("qwen3.5-9b-old", 5_500_000_000),
             Installed("whisper-large-old", 3_000_000_000)]);
-        var (vm, _, _) = Create(models: models);
-        Assert.False(vm.HasLegacyModels);
+        Assert.False(f.Vm.HasLegacyModels);
 
-        await vm.InitializeAsync();
+        await f.Vm.InitializeAsync();
 
-        Assert.True(vm.HasLegacyModels);
-        Assert.Equal(2, vm.LegacyCount);
-        Assert.Equal(8_500_000_000, vm.LegacyBytes);
+        Assert.True(f.Vm.HasLegacyModels);
+        Assert.Equal(2, f.Vm.LegacyCount);
+        Assert.Equal(8_500_000_000, f.Vm.LegacyBytes);
     }
 
     [Fact]
     public async Task NothingIsDeleted_UntilTheUserAsks()
     {
-        var models = Substitute.For<IModelManager>();
-        models.ListInstalled().Returns([Installed("old-a", 10), Installed("old-b", 20)]);
-        var (vm, _, _) = Create(models: models);
+        var f = new Fixture();
+        f.Models.ListInstalled().Returns([Installed("old-a", 10), Installed("old-b", 20)]);
 
-        await vm.InitializeAsync();
-        await models.DidNotReceiveWithAnyArgs().CleanObsoleteModelsAsync(default!, default);
+        await f.Vm.InitializeAsync();
+        await f.Models.DidNotReceiveWithAnyArgs().CleanObsoleteModelsAsync(default!, TestContext.Current.CancellationToken);
 
-        await vm.RemoveLegacyModelsCommand.ExecuteAsync(null);
+        await f.Vm.RemoveLegacyModelsCommand.ExecuteAsync(null);
 
-        await models.Received(1).CleanObsoleteModelsAsync(
+        await f.Models.Received(1).CleanObsoleteModelsAsync(
             Arg.Is<IEnumerable<string>>(ids => ids.OrderBy(id => id).SequenceEqual(new[] { "old-a", "old-b" })),
             Arg.Any<CancellationToken>());
-        Assert.False(vm.HasLegacyModels);
-        Assert.Equal(0, vm.LegacyBytes);
+        Assert.False(f.Vm.HasLegacyModels);
+        Assert.Equal(0, f.Vm.LegacyBytes);
     }
 
     [Fact]
     public async Task WithOnlyCurrentModels_NothingIsOffered()
     {
-        var models = Substitute.For<IModelManager>();
-        models.ListInstalled().Returns([Installed(ModelCatalog.Cleaner.Id, 1)]);
-        var (vm, _, _) = Create(models: models);
+        var f = new Fixture();
+        f.Models.ListInstalled().Returns([Installed(ModelCatalog.Cleaner.Id, 1)]);
 
-        await vm.InitializeAsync();
+        await f.Vm.InitializeAsync();
 
-        Assert.False(vm.HasLegacyModels);
+        Assert.False(f.Vm.HasLegacyModels);
     }
 }

@@ -1,7 +1,9 @@
+using Avalonia.Automation;
 using Avalonia.Controls;
 using Avalonia.Headless;
 using Avalonia.Headless.XUnit;
-using LiveLingo.Core.Translation;
+using Avalonia.Input;
+using Avalonia.Interactivity;
 using LiveLingo.Desktop.Composer;
 using LiveLingo.Desktop.Platform;
 using LiveLingo.Desktop.Services.Localization;
@@ -12,35 +14,39 @@ namespace LiveLingo.Desktop.Tests.Composer;
 public class ComposerWindowTests
 {
     private static (ComposerWindow Window, Harness Harness) Open(
-        bool modelsInstalled = true, ComposerOutput output = ComposerOutput.Translate, RecentDrafts? recent = null)
+        bool modelsInstalled = true, ComposerOutput output = ComposerOutput.Translate, ComposerOptions? options = null)
     {
-        var h = new Harness(modelsInstalled, notifyOn: SynchronizationContext.Current, output: output);
+        var h = new Harness(modelsInstalled, notifyOn: SynchronizationContext.Current, output: output, options: options);
         var loc = Substitute.For<ILocalizationService>();
         loc.T(Arg.Any<string>()).Returns(call => call.Arg<string>());
         loc.T(Arg.Any<string>(), Arg.Any<object[]>()).Returns(call => call.ArgAt<string>(0));
-        var window = new ComposerWindow(h.Vm, new ComposerTexts(loc), Harness.Target, recent ?? new RecentDrafts());
+        var window = new ComposerWindow(h.Vm, new ComposerTexts(loc), Harness.Target, new RecentDrafts());
         window.Show();
+        Avalonia.Threading.Dispatcher.UIThread.RunJobs();
         return (window, h);
     }
 
     private static T Find<T>(ComposerWindow window, string name) where T : Control => window.FindControl<T>(name)!;
 
     [AvaloniaFact]
-    public async Task OpensWithTheTargetAndAnEmptyComposer()
+    public async Task OpensWithTheDestinationAndAnEmptyComposer()
     {
         var (window, h) = Open();
         await using var _ = h;
 
-        Assert.Equal("composer.target.some", Find<TextBlock>(window, "TargetText").Text);
-        Assert.False(Find<Border>(window, "ResultBox").IsVisible);
+        Assert.Equal("Slack", Find<TextBlock>(window, "DestText").Text);
+        Assert.Equal("composer.privacy.local", Find<TextBlock>(window, "PrivacyText").Text);
+        Assert.False(Find<Border>(window, "ResultPane").IsVisible);
         Assert.False(Find<Border>(window, "BannerBox").IsVisible);
-        Assert.False(Find<Button>(window, "WriteButton").IsEnabled);
-        Assert.Equal("composer.placeholder", Find<TextBox>(window, "SourceBox").Watermark);
+        Assert.True(Find<StackPanel>(window, "HintPanel").IsVisible);
+        Assert.False(Find<Button>(window, "CommitButton").IsEnabled);
+        Assert.False(Find<Button>(window, "CopyButton").IsEnabled);
+        Assert.Equal("composer.placeholder", Find<TextBox>(window, "SourceBox").PlaceholderText);
         window.Close();
     }
 
     [AvaloniaFact]
-    public async Task TypingShowsTheResult_AndEnablesWriting()
+    public async Task TypingShowsTheResult_AndEnablesWritingAndCopying()
     {
         var (window, h) = Open();
         await using var _ = h;
@@ -48,84 +54,101 @@ public class ComposerWindowTests
         Find<TextBox>(window, "SourceBox").Text = "先检查缓存。";
         await Wait.Until(() => h.Vm.Status == ComposerStatus.Ready);
 
-        Assert.True(Find<Border>(window, "ResultBox").IsVisible);
-        Assert.True(Find<Button>(window, "WriteButton").IsEnabled);
+        Assert.True(Find<Border>(window, "ResultPane").IsVisible);
+        Assert.False(Find<StackPanel>(window, "HintPanel").IsVisible);
+        Assert.True(Find<Button>(window, "CommitButton").IsEnabled);
         Assert.True(Find<Button>(window, "CopyButton").IsEnabled);
-        Assert.Equal("composer.status.ready", Find<TextBlock>(window, "StatusText").Text);
+        Assert.Equal("composer.status.ready.local", Find<TextBlock>(window, "StatusText").Text);
+        Assert.Equal("composer.commit.write", Find<TextBlock>(window, "CommitText").Text);
         window.Close();
     }
 
     [AvaloniaFact]
-    public async Task MissingModels_ShowTheConsentBanner()
+    public async Task TheOriginalOutput_HidesTheResultPane()
+    {
+        var (window, h) = Open(output: ComposerOutput.Original);
+        await using var _ = h;
+
+        Find<TextBox>(window, "SourceBox").Text = "先检查缓存。";
+        await Wait.Until(() => h.Vm.Status == ComposerStatus.Ready);
+
+        Assert.False(Find<Border>(window, "ResultPane").IsVisible);
+        Assert.Equal("composer.out.raw", Find<TextBlock>(window, "OutputText").Text);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public async Task MissingModels_ShowTheConsentBannerWithOneAction()
     {
         var (window, h) = Open(modelsInstalled: false);
         await using var _ = h;
 
         Assert.Equal(BannerKind.ModelMissing, h.Vm.Banner.Kind);
         Assert.True(Find<Border>(window, "BannerBox").IsVisible);
-        Assert.True(Find<Button>(window, "BannerAction").IsVisible);
+        Assert.Single(Find<StackPanel>(window, "BannerActions").Children);
         Assert.False(Find<ProgressBar>(window, "BannerProgress").IsVisible);
         window.Close();
     }
 
     [AvaloniaFact]
-    public async Task OutputButtons_SwitchTheOutput_AndSwapChangesTheLanguage()
+    public async Task EscapeHidesTheComposer()
     {
         var (window, h) = Open();
         await using var _ = h;
 
-        Find<Button>(window, "OriginalButton").RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
-        Assert.Equal(ComposerOutput.Original, h.Vm.Output);
-        Assert.False(Find<Button>(window, "SwapButton").IsVisible);
+        window.KeyPressQwerty(PhysicalKey.Escape, RawInputModifiers.None);
 
-        Find<Button>(window, "TranslateButton").RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
-        Assert.Equal(ComposerOutput.Translate, h.Vm.Output);
-        Assert.True(Find<Button>(window, "SwapButton").IsVisible);
-
-        Find<Button>(window, "SwapButton").RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
-        Assert.Equal(TargetLanguage.Chinese, h.Vm.TargetLanguage);
-        window.Close();
+        await Wait.Until(() => !window.IsVisible);
     }
 
     [AvaloniaFact]
-    public async Task EscapeClosesTheComposer_AndCompletionClosesIt()
+    public async Task Enter_WritesTheResult()
     {
         var (window, h) = Open();
         await using var _ = h;
+        Find<TextBox>(window, "SourceBox").Text = "先检查缓存。";
+        await Wait.Until(() => h.Vm.Status == ComposerStatus.Ready);
+        Find<TextBox>(window, "SourceBox").Focus();
 
-        window.KeyPressQwerty(Avalonia.Input.PhysicalKey.Escape, Avalonia.Input.RawInputModifiers.None);
+        window.KeyPress(Key.Enter, RawInputModifiers.None, PhysicalKey.Enter, null);
+        await Wait.Until(() => h.Events.Contains("completed"));
 
-        Assert.False(window.IsVisible);
+        await h.Injector.Received(1).InjectAsync(Harness.Target, "T:先检查缓存。", false, Arg.Any<CancellationToken>());
     }
 
     [AvaloniaFact]
-    public async Task TheMicrophoneButton_StartsAndStopsListening_AndShowsItsState()
+    public async Task ShiftEnter_InsertsALineBreak_AndWritesNothing()
+    {
+        var (window, h) = Open();
+        await using var _ = h;
+        Find<TextBox>(window, "SourceBox").Text = "先检查缓存。";
+        Find<TextBox>(window, "SourceBox").Focus();
+
+        window.KeyPress(Key.Enter, RawInputModifiers.Shift, PhysicalKey.Enter, null);
+
+        Assert.Contains("\n", h.Vm.SourceText);
+        await h.Injector.DidNotReceiveWithAnyArgs().InjectAsync(default!, default!, default, TestContext.Current.CancellationToken);
+    }
+
+    [AvaloniaFact]
+    public async Task TheMicrophoneButton_ShowsTheRecordingStateAndTheLiveSource()
     {
         var (window, h) = Open(output: ComposerOutput.Original);
         await using var _ = h;
         var mic = Find<Button>(window, "MicButton");
 
         await h.Vm.StartListeningAsync();
-        Assert.True(mic.Classes.Contains("listening"));
-        Assert.Equal("composer.status.listening", Find<TextBlock>(window, "StatusText").Text);
-        Assert.True(Find<TextBox>(window, "SourceBox").IsReadOnly);
+        Assert.Contains("recording", mic.Classes);
+        Assert.True(Find<Control>(window, "MicBars").IsVisible);
+        Assert.False(Find<Control>(window, "MicIcon").IsVisible);
+        Assert.True(Find<ItemsControl>(window, "SourceLive").IsVisible);
+        Assert.False(Find<TextBox>(window, "SourceBox").IsVisible);
+        Assert.Equal("composer.mic.stop", AutomationProperties.GetName(mic));
 
         await h.Vm.StopListeningAsync();
-        Assert.False(mic.Classes.Contains("listening"));
-        Assert.False(Find<TextBox>(window, "SourceBox").IsReadOnly);
-        window.Close();
-    }
-
-    [AvaloniaFact]
-    public async Task TheCleanButton_SelectsTheCleanOutput()
-    {
-        var (window, h) = Open();
-        await using var _ = h;
-
-        Find<Button>(window, "CleanButton").RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
-
-        Assert.Equal(ComposerOutput.Clean, h.Vm.Output);
-        Assert.True(Find<Button>(window, "CleanButton").Classes.Contains("active"));
+        Assert.DoesNotContain("recording", mic.Classes);
+        Assert.True(Find<TextBox>(window, "SourceBox").IsVisible);
+        Assert.Equal("composer.mic.start", AutomationProperties.GetName(mic));
         window.Close();
     }
 
@@ -137,9 +160,10 @@ public class ComposerWindowTests
         h.Permission.Status.Returns(MicrophoneAccess.Denied);
 
         await h.Vm.StartListeningAsync();
-        Find<Button>(window, "BannerAction").RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+        var open = (Button)Find<StackPanel>(window, "BannerActions").Children[0];
+        open.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
 
-        h.Permission.Received(1).OpenSettings();
+        await Wait.Until(() => h.Permission.ReceivedCalls().Any(call => call.GetMethodInfo().Name == nameof(IMicrophonePermission.OpenSettings)));
         window.Close();
     }
 
@@ -148,27 +172,9 @@ public class ComposerWindowTests
     {
         var (window, h) = Open(modelsInstalled: false);
         await using var _ = h;
-        Find<TextBox>(window, "SourceBox").Text = "先检查缓存。";
-        await Task.Delay(30);
 
         Assert.IsType<SelectableTextBlock>(Find<SelectableTextBlock>(window, "BannerText"));
-        Assert.IsType<SelectableTextBlock>(Find<SelectableTextBlock>(window, "ResultTextBlock"));
-        window.Close();
-    }
-
-    [AvaloniaFact]
-    public async Task AFinishedResult_IsOneSelectableBlockWithTheWholeText()
-    {
-        var (window, h) = Open();
-        await using var _ = h;
-
-        Find<TextBox>(window, "SourceBox").Text = "先检查缓存。再更新索引。";
-        await Wait.Until(() => h.Vm.Status == ComposerStatus.Ready);
-
-        var block = Find<SelectableTextBlock>(window, "ResultTextBlock");
-        Assert.True(block.IsVisible);
-        Assert.Equal("T:先检查缓存。T:再更新索引。", block.Text);
-        Assert.False(window.FindControl<ItemsControl>("ResultList")!.IsVisible);
+        Assert.False(Find<TextBox>(window, "SourceBox").IsReadOnly);
         window.Close();
     }
 
@@ -178,57 +184,54 @@ public class ComposerWindowTests
         var (window, h) = Open();
         await using var _ = h;
 
-        Assert.Equal("composer.mic", Avalonia.Automation.AutomationProperties.GetName(Find<Button>(window, "MicButton")));
-        Assert.Equal("composer.swap", Avalonia.Automation.AutomationProperties.GetName(Find<Button>(window, "SwapButton")));
-        Assert.Equal("composer.placeholder", Avalonia.Automation.AutomationProperties.GetName(Find<TextBox>(window, "SourceBox")));
-        Assert.Equal(
-            Avalonia.Automation.AutomationLiveSetting.Polite,
-            Avalonia.Automation.AutomationProperties.GetLiveSetting(Find<TextBlock>(window, "StatusText")));
-        Assert.Equal(
-            Avalonia.Automation.AutomationLiveSetting.Assertive,
-            Avalonia.Automation.AutomationProperties.GetLiveSetting(Find<SelectableTextBlock>(window, "BannerText")));
+        Assert.Equal("composer.mic.start", AutomationProperties.GetName(Find<Button>(window, "MicButton")));
+        Assert.Equal("composer.more", AutomationProperties.GetName(Find<Button>(window, "MoreButton")));
+        Assert.Equal("composer.close", AutomationProperties.GetName(Find<Button>(window, "CloseButton")));
+        Assert.Equal("composer.copy.aria", AutomationProperties.GetName(Find<Button>(window, "CopyButton")));
+        Assert.Equal(AutomationLiveSetting.Polite, AutomationProperties.GetLiveSetting(Find<TextBlock>(window, "StatusText")));
+        Assert.Equal(AutomationLiveSetting.Assertive, AutomationProperties.GetLiveSetting(Find<SelectableTextBlock>(window, "BannerText")));
         window.Close();
     }
 
     [AvaloniaFact]
-    public async Task TheRecentButton_ShowsOnlyWhenThereAreEarlierDrafts()
+    public async Task AnImportedRecording_WidensThePanel_PutsTheResultBesideTheSource_AndShowsTimes()
     {
-        var (empty, h1) = Open();
-        await using var _1 = h1;
-        Assert.False(Find<Button>(empty, "RecentButton").IsVisible);
-        empty.Close();
-
-        var recent = new RecentDrafts();
-        recent.Close("昨天的想法", written: true);
-        var (window, h2) = Open(recent: recent);
-        await using var _2 = h2;
-        Assert.True(Find<Button>(window, "RecentButton").IsVisible);
-        window.Close();
-    }
-
-    [AvaloniaFact]
-    public async Task AnImportedRecording_WidensTheWindow_PutsTheResultBesideTheSource_AndShowsTimes()
-    {
-        var (window, h) = Open(output: ComposerOutput.Original);
+        var (window, h) = Open(output: ComposerOutput.Clean);
         await using var _ = h;
         h.Transcriber.Handler = (_, _, _) => Task.FromResult<IReadOnlyList<LiveLingo.Core.Transcription.TimedSegment>>(
             [new(TimeSpan.FromSeconds(65), TimeSpan.FromSeconds(70), "先看缓存。")]);
-        Assert.Equal(680, window.Width);
-        Assert.True(Find<Button>(window, "ImportButton").IsVisible);
-        Assert.False(Find<Button>(window, "ExportButton").IsVisible);
+        Assert.Equal(620 + 36, window.Width);
 
         await h.Vm.ImportAsync("a.wav");
-        await Wait.Until(() => h.Vm.CanExport);
+        await Wait.Until(() => h.Vm.Status == ComposerStatus.Ready);
+        await Wait.Until(() => window.Width == 940 + 36);
 
-        Assert.Equal(980, window.Width);
-        var result = Find<Border>(window, "ResultBox");
-        Assert.Equal(1, Grid.GetColumn(result));
-        Assert.Equal(0, Grid.GetRow(result));
-        Assert.False(Find<SelectableTextBlock>(window, "ResultTextBlock").IsVisible);
-        Assert.True(Find<ItemsControl>(window, "ResultList").IsVisible);
-        Assert.False(Find<Button>(window, "ImportButton").IsVisible);
-        Assert.True(Find<Button>(window, "ExportButton").IsEnabled);
-        Assert.True(Find<TextBox>(window, "SourceBox").IsReadOnly);
+        Assert.Equal(940, Find<Border>(window, "Panel").Width);
+        Assert.Equal(1, Grid.GetColumn(Find<Border>(window, "ResultPane")));
+        Assert.Equal(0, Grid.GetRow(Find<Border>(window, "ResultPane")));
+        Assert.True(Find<ItemsControl>(window, "SourceLive").IsVisible);
+        Assert.Equal("composer.src.transcript", Find<TextBlock>(window, "SourceLabel").Text);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public async Task ReducedMotion_StopsTheOpeningAnimation()
+    {
+        var (window, h) = Open(options: ComposerOptions.Default with { Animations = false });
+        await using var _ = h;
+
+        Assert.Contains("still", window.Classes);
+        Assert.Equal(1, Find<Border>(window, "Panel").Opacity);
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public async Task TheCommitKeyCap_FollowsTheSetting()
+    {
+        var (window, h) = Open(options: ComposerOptions.Default with { CommitKey = CommitKey.CtrlEnter });
+        await using var _ = h;
+
+        Assert.Equal(ComposerTexts.CommitKeyLabel(CommitKey.CtrlEnter), Find<TextBlock>(window, "HintCommitKey").Text);
         window.Close();
     }
 }

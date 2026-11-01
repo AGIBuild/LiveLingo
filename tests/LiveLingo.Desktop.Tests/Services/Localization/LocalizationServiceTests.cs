@@ -162,106 +162,27 @@ public class LocalizationServiceTests
     {
         // Guards against shell code adding a T("...") call without entries in en-US.json and zh-CN.json.
         var sut = new LocalizationService();
-        string[] criticalKeys =
-        [
-            "tray.openComposer",
-            "tray.checkUpdates",
-            "tray.quit",
-            "app.name",
-            "app.permission.title",
-            "app.permission.body",
-            "app.permission.openAccessibility",
-            "app.permission.openInputMonitoring",
-            "app.hotkey.registrationFailed.title",
-            "app.hotkey.registrationFailed.body",
-            "dialog.update.title",
-            "dialog.update.notConfigured",
-            "dialog.update.latest",
-            "dialog.update.available.title",
-            "dialog.update.available.body",
-            "dialog.update.available.download",
-            "dialog.update.available.later",
-            "dialog.update.failed",
-            "dialog.ok",
-            "composer.placeholder",
-            "composer.output.translate",
-            "composer.output.original",
-            "composer.language.English",
-            "composer.language.Chinese",
-            "composer.swap",
-            "composer.target.some",
-            "composer.target.none",
-            "composer.status.empty",
-            "composer.status.working",
-            "composer.status.ready",
-            "composer.status.failed",
-            "composer.status.queued",
-            "composer.copy",
-            "composer.write",
-            "composer.retry",
-            "composer.result.empty",
-            "composer.banner.modelMissing",
-            "composer.banner.download",
-            "composer.banner.downloading",
-            "composer.banner.downloadFailed",
-            "composer.banner.downloadRetry",
-            "composer.banner.targetLost",
-            "composer.banner.writeFailed",
-            "composer.output.clean",
-            "composer.status.listening",
-            "composer.status.starting",
-            "composer.mic",
-            "composer.swap",
-            "composer.banner.micDenied",
-            "composer.banner.micDeniedAction",
-            "composer.banner.noMic",
-            "composer.banner.noSound",
-            "composer.status.keptOriginal",
-            "composer.status.transcribing",
-            "composer.import",
-            "composer.import.title",
-            "composer.import.fileType",
-            "composer.export",
-            "composer.export.title",
-            "composer.recent",
-            "composer.recent.clear",
-            "composer.banner.fileFailed",
-            "composer.banner.noSpeech",
-            "tray.settings",
-            "settings.title",
-            "settings.hotkey",
-            "settings.hotkey.hint",
-            "settings.hotkey.invalid",
-            "settings.language",
-            "settings.quality",
-            "settings.glossary",
-            "settings.glossary.hint",
-            "settings.cloud",
-            "settings.cloud.hint",
-            "settings.cloud.translate",
-            "settings.cloud.clean",
-            "settings.cloud.baseUrl",
-            "settings.cloud.model",
-            "settings.cloud.apiKey",
-            "settings.cloud.keyStored",
-            "settings.cloud.forget",
-            "settings.cloud.invalid",
-            "settings.legacy",
-            "settings.legacy.remove",
-            "settings.save",
-            "settings.cancel"
-        ];
-        foreach (var key in criticalKeys)
-        {
-            Assert.True(sut.TryT(key, out var value), $"en-US missing key: {key}");
-            Assert.NotEqual(string.Empty, value);
-        }
+        var enKeys = EmbeddedKeys("en-US");
+        var zhKeys = EmbeddedKeys("zh-CN");
 
-        sut.SetCulture("zh-CN");
-        foreach (var key in criticalKeys)
+        Assert.Equal(enKeys.Order(), zhKeys.Order());
+        Assert.Contains("composer.commit.write", enKeys);
+        Assert.Contains("settings.cloud.apiKey", enKeys);
+        foreach (var culture in new[] { "en-US", "zh-CN" })
         {
-            Assert.True(sut.TryT(key, out var value), $"zh-CN missing key: {key}");
-            Assert.NotEqual(string.Empty, value);
+            sut.SetCulture(culture);
+            foreach (var key in enKeys)
+            {
+                Assert.True(sut.TryT(key, out var value), $"{culture} missing key: {key}");
+                Assert.NotEqual(string.Empty, value);
+            }
         }
+    }
+
+    private static string[] EmbeddedKeys(string culture)
+    {
+        var assembly = typeof(LocalizationService).Assembly;
+        using var stream = assembly.GetManifestResourceStream($"LiveLingo.Desktop.Resources.i18n.{culture}.json")!;
+        return System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(stream)!.Keys.ToArray();
     }
 }
