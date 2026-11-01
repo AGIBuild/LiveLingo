@@ -19,7 +19,7 @@
 | 已完成的实施计划与实测记录（M0–M4 进度表，含数据） | [plans/2026-10-31-composer-implementation.md](./2026-10-31-composer-implementation.md) |
 | 界面规格（视觉、交互、28 个场景、状态模型） | [prototypes/livelingo-ux-v3/](../prototypes/livelingo-ux-v3/)：`style.css`、`index.html`、`app.js`、`draft.js`、`browser.test.cjs`、`*.png` |
 | 语音与翻译的评测、POC | `docs/superpowers/specs/2026-10-29-voice-dictation-design.md`、`plans/2026-10-29-translation-poc.md`、`poc/` |
-| Web 可行性验证程序 | [tools/WebViewSpike](../../../tools/WebViewSpike)（`dotnet run --project tools/WebViewSpike [-- --auto]`） |
+| Web 可行性验证程序 | 已完成并移除（`tools/WebViewSpike`，结论见 `specs/2026-11-01-web-ui-design.md` §3；需要时从 git 历史找回） |
 | 业务核心 | `src/LiveLingo.Core`：`Drafting`、`Translation`、`Dictation`、`Cleanup`、`Transcription`、`Inference`、`Models`、`Cloud` |
 | 桌面外壳 | `src/LiveLingo.Desktop`：`Composer/`、`Settings/`、`Platform/{macOS,Windows}`、`Services/`、`App.axaml.cs` |
 | 构建与门禁 | `build/BuildTask.cs`（Nuke）、`test.runsettings`、`tests/LiveLingo.Core.Tests/stryker-config.json`、`.github/workflows/ci.yml` |
@@ -97,7 +97,7 @@ LIVELINGO_ENABLE_VOICE_PROBE=1 ./build.sh ProbeVoice   # 语音探针（仅 macO
 
 ### W0：可行性关口（先做，半天到一天）
 
-**文件：** `tools/WebViewSpike/`（已有）；结果写回 `specs/2026-11-01-web-ui-design.md` §3 表格。
+**文件：** `tools/WebViewSpike/`（已完成并移除，可从 git 历史找回）；结果写回 `specs/2026-11-01-web-ui-design.md` §3 表格。
 
 - [ ] **步骤 1：** 在用户终端运行 `dotnet run --project tools/WebViewSpike -- --auto`，确认 4 项 PASS（macOS 已通过；在 Windows 上再跑一次）。
 - [ ] **步骤 2（S8a、S8b、S8c，需要肉眼，请用户配合）：** 不带参数运行。检查：窗口四周只有圆角面板与阴影、没有白底或黑角（浅色与深色壁纸各看一次）；窗口出现后 `textarea` 已有焦点可直接输入；用系统拼音输入“缓存穿透”，候选窗位置正确，回车确认候选时 C# 侧收到的 `enter` 消息带 `composing:true`。

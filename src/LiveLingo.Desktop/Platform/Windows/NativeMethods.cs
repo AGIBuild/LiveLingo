@@ -7,7 +7,6 @@ internal static partial class NativeMethods
 {
     public const int WH_KEYBOARD_LL = 13;
     public const int WM_KEYDOWN = 0x0100;
-    public const int WM_SYSKEYDOWN = 0x0104;
 
     public const int VK_RETURN = 0x0D;
     public const int VK_CONTROL = 0x11;
@@ -15,16 +14,12 @@ internal static partial class NativeMethods
     public const int VK_SHIFT = 0x10;
     public const int VK_LWIN = 0x5B;
     public const int VK_RWIN = 0x5C;
-    public const int VK_A = 0x41;
     public const int VK_V = 0x56;
-    public const int VK_L = 0x4C;
-    public const int VK_T = 0x54;
 
     public const uint KEYEVENTF_KEYDOWN = 0x0000;
     public const uint KEYEVENTF_KEYUP = 0x0002;
     public const uint INPUT_KEYBOARD = 1;
 
-    public const int SW_RESTORE = 9;
     public const int SW_SHOW = 5;
 
     public delegate IntPtr LowLevelKeyboardProc(int nCode, IntPtr wParam, IntPtr lParam);
@@ -111,9 +106,6 @@ internal static partial class NativeMethods
     public static partial bool BringWindowToTop(IntPtr hWnd);
 
     [LibraryImport("user32.dll", SetLastError = true)]
-    public static partial IntPtr SetFocus(IntPtr hWnd);
-
-    [LibraryImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static partial bool GetGUIThreadInfo(uint idThread, ref GUITHREADINFO lpgui);
 
@@ -182,9 +174,6 @@ internal static partial class NativeMethods
 
     public const uint ASFW_ANY = unchecked((uint)-1);
 
-    [LibraryImport("user32.dll", StringMarshalling = StringMarshalling.Utf16, SetLastError = true)]
-    public static partial IntPtr FindWindowW(string? lpClassName, string? lpWindowName);
-
     [LibraryImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     public static partial bool PostMessageW(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
@@ -196,7 +185,6 @@ internal static partial class NativeMethods
     [LibraryImport("user32.dll")]
     public static partial IntPtr SendMessageW(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
 
-    public const uint WM_PASTE = 0x0302;
     public const uint WM_KEYUP = 0x0101;
 
     [LibraryImport("user32.dll", StringMarshalling = StringMarshalling.Utf16, SetLastError = true)]
@@ -205,18 +193,4 @@ internal static partial class NativeMethods
 
     [LibraryImport("user32.dll", StringMarshalling = StringMarshalling.Utf16)]
     public static partial int GetClassNameW(IntPtr hWnd, char[] lpClassName, int nMaxCount);
-
-    [StructLayout(LayoutKind.Sequential)]
-    public struct POINT
-    {
-        public int X, Y;
-    }
-
-    [LibraryImport("user32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    public static partial bool GetCursorPos(out POINT lpPoint);
-
-    [LibraryImport("user32.dll", SetLastError = true)]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    public static partial bool ClientToScreen(IntPtr hWnd, ref POINT lpPoint);
 }

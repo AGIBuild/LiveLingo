@@ -429,6 +429,9 @@ stryker-run.log
 .nuke/temp/
 .DS_Store
 
+# Local agent scratch space
+.superpowers/
+
 # POC data (audio corpora, results, models are not committed)
 poc/**/corpus*/
 poc/**/results/

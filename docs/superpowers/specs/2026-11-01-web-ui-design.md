@@ -32,7 +32,7 @@
 
 ## 3. 已验证与未验证
 
-在 macOS（Apple Silicon，Avalonia 12.1.4 + Avalonia.Controls.WebView 12.1.1）上运行 [`tools/WebViewSpike`](../../../tools/WebViewSpike)（`--auto`）：
+在 macOS（Apple Silicon，Avalonia 12.1.4 + Avalonia.Controls.WebView 12.1.1）上运行验证程序 `tools/WebViewSpike`（`--auto`；已完成并移除，可从 git 历史找回）：
 
 | 项 | 结果 |
 |---|---|

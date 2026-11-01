@@ -11,8 +11,6 @@
     el.style.height = el.scrollHeight + 'px';
   }
 
-  LL.autosize = autosize;
-
   class Source extends preact.Component {
     composing = false;
     lastSent = '';

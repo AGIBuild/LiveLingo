@@ -56,12 +56,6 @@ public class ModelManagerTests : IDisposable
     }
 
     [Fact]
-    public void GetTotalDiskUsage_Zero_WhenEmpty()
-    {
-        Assert.Equal(0, _manager.GetTotalDiskUsage());
-    }
-
-    [Fact]
     public async Task EnsureModelAsync_DownloadsModel()
     {
         var desc = TestModel.Create("test-model", "Test", "http://fake/model", 100, ModelType.Translation);
@@ -109,34 +103,6 @@ public class ModelManagerTests : IDisposable
     }
 
     [Fact]
-    public async Task DeleteModelAsync_RemovesModel()
-    {
-        var desc = TestModel.Create("delete-test", "Del", "http://fake/model", 100, ModelType.Translation);
-        await _manager.EnsureModelAsync(desc, null, CancellationToken.None);
-
-        Assert.NotEmpty(_manager.ListInstalled());
-
-        await _manager.DeleteModelAsync("delete-test", CancellationToken.None);
-
-        Assert.Empty(_manager.ListInstalled());
-    }
-
-    [Fact]
-    public async Task DeleteModelAsync_NoOp_WhenNotExists()
-    {
-        await _manager.DeleteModelAsync("nonexistent", CancellationToken.None);
-    }
-
-    [Fact]
-    public async Task GetTotalDiskUsage_ReturnsNonZero_AfterDownload()
-    {
-        var desc = TestModel.Create("size-test", "Size", "http://fake/model", 100, ModelType.Translation);
-        await _manager.EnsureModelAsync(desc, null, CancellationToken.None);
-
-        Assert.True(_manager.GetTotalDiskUsage() > 0);
-    }
-
-    [Fact]
     public void GetModelDirectory_ReturnsCorrectPath()
     {
         var expected = Path.Combine(_tempDir, "test-id");
@@ -171,16 +137,6 @@ public class ModelManagerTests : IDisposable
         var mgr = new ModelManager(options, new HttpClient(new FakeHttpMessageHandler()), Substitute.For<ILogger<ModelManager>>());
 
         Assert.Empty(mgr.ListInstalled());
-    }
-
-    [Fact]
-    public void GetTotalDiskUsage_ReturnsZero_WhenStoragePathMissing()
-    {
-        var nonExistent = Path.Combine(_tempDir, "does_not_exist");
-        var options = Options.Create(new CoreOptions { ModelStoragePath = nonExistent });
-        var mgr = new ModelManager(options, new HttpClient(new FakeHttpMessageHandler()), Substitute.For<ILogger<ModelManager>>());
-
-        Assert.Equal(0, mgr.GetTotalDiskUsage());
     }
 
     [Fact]
@@ -289,23 +245,6 @@ public class ModelManagerTests : IDisposable
     }
 
     [Fact]
-    public async Task DeleteModelAsync_LogsDebug()
-    {
-        var desc = TestModel.Create("del-log", "Del", "http://fake/model", 100, ModelType.Translation);
-        await _manager.EnsureModelAsync(desc, null, CancellationToken.None);
-        _logger.ClearReceivedCalls();
-
-        await _manager.DeleteModelAsync("del-log", CancellationToken.None);
-
-        _logger.Received().Log(
-            LogLevel.Debug,
-            Arg.Any<EventId>(),
-            Arg.Any<object>(),
-            Arg.Any<Exception?>(),
-            Arg.Any<Func<object, Exception?, string>>());
-    }
-
-    [Fact]
     public void ListInstalled_LogsWarning_ForCorruptManifest()
     {
         var dir = Path.Combine(_tempDir, "warn-test");
@@ -379,20 +318,6 @@ public class ModelManagerTests : IDisposable
         Assert.Equal(ModelType.PostProcessing, m.Type);
     }
 
-    [Fact]
-    public void GetTotalDiskUsage_SumsAllFiles()
-    {
-        var dir1 = Path.Combine(_tempDir, "size-a");
-        var dir2 = Path.Combine(_tempDir, "size-b");
-        Directory.CreateDirectory(dir1);
-        Directory.CreateDirectory(dir2);
-        File.WriteAllBytes(Path.Combine(dir1, "data.bin"), new byte[1000]);
-        File.WriteAllBytes(Path.Combine(dir2, "data.bin"), new byte[2000]);
-
-        var usage = _manager.GetTotalDiskUsage();
-        Assert.True(usage >= 3000);
-    }
-
     public void Dispose()
     {
         try { Directory.Delete(_tempDir, true); } catch { }
@@ -403,54 +328,6 @@ public class ModelManagerTests : IDisposable
         private readonly Action<T> _handler;
         public SyncProgress(Action<T> handler) => _handler = handler;
         public void Report(T value) => _handler(value);
-    }
-
-    [Fact]
-    public async Task MigrateStoragePathAsync_MovesModelDirectories()
-    {
-        var modelDir = Path.Combine(_tempDir, "test-model");
-        Directory.CreateDirectory(modelDir);
-        await File.WriteAllTextAsync(Path.Combine(modelDir, "model.bin"), "data");
-        await File.WriteAllTextAsync(Path.Combine(modelDir, "manifest.json"), "{}");
-
-        var newPath = Path.Combine(Path.GetTempPath(), $"LiveLingoMigrate_{Guid.NewGuid():N}");
-        try
-        {
-            await _manager.MigrateStoragePathAsync(newPath);
-
-            Assert.True(Directory.Exists(Path.Combine(newPath, "test-model")));
-            Assert.True(File.Exists(Path.Combine(newPath, "test-model", "model.bin")));
-            Assert.False(Directory.Exists(modelDir));
-        }
-        finally
-        {
-            if (Directory.Exists(newPath)) Directory.Delete(newPath, true);
-        }
-    }
-
-    [Fact]
-    public async Task MigrateStoragePathAsync_NoOp_WhenSamePath()
-    {
-        var modelDir = Path.Combine(_tempDir, "keep-model");
-        Directory.CreateDirectory(modelDir);
-        await File.WriteAllTextAsync(Path.Combine(modelDir, "model.bin"), "data");
-
-        await _manager.MigrateStoragePathAsync(_tempDir);
-
-        Assert.True(Directory.Exists(modelDir));
-    }
-
-    [Fact]
-    public async Task MigrateStoragePathAsync_HandlesEmptySource()
-    {
-        var emptyDir = Path.Combine(Path.GetTempPath(), $"LiveLingoEmpty_{Guid.NewGuid():N}");
-        var newPath = Path.Combine(Path.GetTempPath(), $"LiveLingoNew_{Guid.NewGuid():N}");
-        var options = Options.Create(new CoreOptions { ModelStoragePath = emptyDir });
-        var mgr = new ModelManager(options, new HttpClient(new FakeHttpMessageHandler()), _logger);
-
-        await mgr.MigrateStoragePathAsync(newPath);
-
-        Assert.False(Directory.Exists(emptyDir));
     }
 
     [Fact]
@@ -518,75 +395,6 @@ public class ModelManagerTests : IDisposable
         Assert.True(File.Exists(Path.Combine(modelDir, "onnx", "decoder_model_merged.onnx")));
         Assert.True(File.Exists(Path.Combine(modelDir, "source.spm")));
         Assert.True(File.Exists(Path.Combine(modelDir, "target.spm")));
-    }
-
-    [Fact]
-    public async Task MigrateStoragePathAsync_LogsDebugOnSuccess()
-    {
-        var modelDir = Path.Combine(_tempDir, "log-migrate");
-        Directory.CreateDirectory(modelDir);
-        await File.WriteAllTextAsync(Path.Combine(modelDir, "data.bin"), "x");
-        _logger.ClearReceivedCalls();
-
-        var newPath = Path.Combine(Path.GetTempPath(), $"LiveLingoLogMigrate_{Guid.NewGuid():N}");
-        try
-        {
-            await _manager.MigrateStoragePathAsync(newPath);
-
-            _logger.Received().Log(
-                LogLevel.Debug,
-                Arg.Any<EventId>(),
-                Arg.Any<object>(),
-                Arg.Any<Exception?>(),
-                Arg.Any<Func<object, Exception?, string>>());
-        }
-        finally
-        {
-            if (Directory.Exists(newPath)) Directory.Delete(newPath, true);
-        }
-    }
-
-    [Fact]
-    public async Task MigrateStoragePathAsync_LogsDebugWhenSourceMissing()
-    {
-        var nonExistent = Path.Combine(_tempDir, "does_not_exist_src");
-        var newPath = Path.Combine(Path.GetTempPath(), $"LiveLingoMissing_{Guid.NewGuid():N}");
-        var options = Options.Create(new CoreOptions { ModelStoragePath = nonExistent });
-        var logger = Substitute.For<ILogger<ModelManager>>();
-        var mgr = new ModelManager(options, new HttpClient(new FakeHttpMessageHandler()), logger);
-
-        await mgr.MigrateStoragePathAsync(newPath);
-
-        logger.Received().Log(
-            LogLevel.Debug,
-            Arg.Any<EventId>(),
-            Arg.Any<object>(),
-            Arg.Any<Exception?>(),
-            Arg.Any<Func<object, Exception?, string>>());
-    }
-
-    [Fact]
-    public async Task MigrateStoragePathAsync_PreservesNestedDirectories()
-    {
-        var modelDir = Path.Combine(_tempDir, "nested-model");
-        var subDir = Path.Combine(modelDir, "subdir");
-        Directory.CreateDirectory(subDir);
-        await File.WriteAllTextAsync(Path.Combine(modelDir, "root.bin"), "root");
-        await File.WriteAllTextAsync(Path.Combine(subDir, "nested.bin"), "nested");
-
-        var newPath = Path.Combine(Path.GetTempPath(), $"LiveLingoNested_{Guid.NewGuid():N}");
-        try
-        {
-            await _manager.MigrateStoragePathAsync(newPath);
-
-            Assert.True(File.Exists(Path.Combine(newPath, "nested-model", "root.bin")));
-            Assert.True(File.Exists(Path.Combine(newPath, "nested-model", "subdir", "nested.bin")));
-            Assert.False(Directory.Exists(modelDir));
-        }
-        finally
-        {
-            if (Directory.Exists(newPath)) Directory.Delete(newPath, true);
-        }
     }
 
     [Fact]

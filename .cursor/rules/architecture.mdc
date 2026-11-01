@@ -1,5 +1,5 @@
 ---
-description: LiveLingo architecture boundaries — ViewModel / UI / Platform separation
+description: LiveLingo architecture boundaries — state in C#, the page only draws, platform code behind interfaces
 alwaysApply: true
 ---
 
@@ -7,31 +7,36 @@ alwaysApply: true
 
 ## Core Principle
 
-UI 不测试逻辑，逻辑不依赖 UI。
+UI 不测试逻辑，逻辑不依赖 UI。一个功能只由一个服务或组件实现；不为兼容旧行为堆叠分支。
 
-## ViewModel Layer
+## State and logic (C#)
 
-- ViewModel **禁止** 引用 `Avalonia.*` 命名空间
-- ViewModel **禁止** 使用 `Dispatcher`、`Dispatcher.UIThread` 或任何线程调度 API
-- ViewModel 只依赖接口 (`ISettingsService`, `ITranslationPipeline`, `ITextInjector`, `IModelManager` 等)
-- ViewModel 使用 `CommunityToolkit.Mvvm` (`ObservableObject`, `RelayCommand`)
-- 需要通知 UI 的行为通过事件 (`event Action? RequestClose`) 或属性变更实现
+- `ComposerViewModel`、`SettingsViewModel` 和 Core 持有全部状态与逻辑
+- ViewModel **禁止** 引用 `Avalonia.*`，禁止使用 `Dispatcher` 或任何线程调度 API
+- ViewModel 只依赖接口（`ISettingsService`、`IModelManager`、`IVoiceInput`、`ITextInjector` 等）
+- ViewModel 使用 `CommunityToolkit.Mvvm`；需要通知界面时用事件或属性变更
 
-## View Layer (Avalonia)
+## The page (Web UI)
 
-- View 只负责绑定和布局
-- View 中 `code-behind` 仅处理 Avalonia 特有交互 (窗口定位、焦点、动画)
-- Dispatcher 调用只允许出现在 View 或 `App.axaml.cs` 中
+- 窗口是包着 WebView 的薄壳；页面（`Web/Assets`，Preact + htm，无 Node 构建）只绘制整份快照，只发送封闭集合的意图
+- 页面**不持有逻辑**：是否可用、校验、同意、记忆都在 C# 决定
+- 窗口代码只处理 Avalonia 特有的事：定位、焦点、停放；`Dispatcher` 只出现在窗口或 `App.axaml.cs`
 
-## Platform Layer
+## Platform layer
 
-- 平台差异通过接口抽象 (`IPlatformServices`, `IClipboardService`, `ITextInjector`)
-- 具体实现放在 `Platform/Windows/` 或 `Platform/macOS/`
-- 禁止在 ViewModel 中直接使用 P/Invoke 或平台 API
+- 平台差异通过接口抽象（`IPlatformServices`、`IClipboardService`、`ITextInjector`、`IWindowTracker`）
+- 实现放在 `Platform/Windows/` 或 `Platform/macOS/`
+- 禁止在 ViewModel 中使用 P/Invoke 或平台 API
+- 产品只支持 Windows x64 与 macOS arm64（llama.cpp 运行时的固定版本）
+
+## Privacy
+
+- 默认语音和文本不离开本机；云端调用必须由用户按功能显式开启，且只发文本
+- 凭据只进系统密钥存储，不写入代码、日志或设置文件
 
 ## Testing
 
-- ViewModel 测试使用 NSubstitute mock 所有依赖
-- Stryker 变异测试 **不测试** Avalonia UI 项目（源生成器不兼容）
-- Stryker 只测试 `LiveLingo.Core` 项目
-- 代码覆盖率通过 `test.runsettings` 排除平台实现和 View 层
+- ViewModel 测试使用 NSubstitute 替换全部依赖；测试不碰真实磁盘、网络或界面框架
+- 页面由 `LiveLingo.Web.Tests`（Playwright，WebKit + Chromium）用黄金快照测试；夹具由 `Desktop.Tests` 用 `UPDATE_FIXTURES=1` 生成，且必须与时区、操作系统无关
+- Stryker 只测试 `LiveLingo.Core` 的纯逻辑模块（见 `tests/LiveLingo.Core.Tests/stryker-config.json`）
+- 代码覆盖率通过 `test.runsettings` 排除平台实现和窗口壳层
