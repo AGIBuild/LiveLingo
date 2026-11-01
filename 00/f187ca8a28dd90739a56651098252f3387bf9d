@@ -1,0 +1,31 @@
+src/LiveLingo.Desktop/Composer/ComposerViewModel.cs
+  s_6d6e9175f38e45::t_eb3059c1aa2608 491
+docs/superpowers/plans/2026-10-31-composer-implementation.md
+  s_6d6e9175f38e45::t_61f15c35b5f5f5 51
+src/LiveLingo.Desktop/Resources/i18n/zh-CN.json
+  s_6d6e9175f38e45::t_b805143f61095e 129
+CHANGELOG.md
+  s_6d6e9175f38e45::t_1f450b0383ab73 26-27
+src/LiveLingo.Desktop/Composer/IVoiceInput.cs
+  s_6d6e9175f38e45::t_987fb52811f4e6 26-30,44
+src/LiveLingo.Desktop/Resources/i18n/en-US.json
+  s_6d6e9175f38e45::t_e7a805f919da8f 129
+tests/LiveLingo.Desktop.Tests/Composer/MicrophoneVoiceInputTests.cs
+  s_6d6e9175f38e45::t_84f1655a406789 98,107-112,116
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "00f187ca8a28dd90739a56651098252f3387bf9d",
+  "prompts": {},
+  "sessions": {
+    "s_6d6e9175f38e45": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "f74d37e5-1d96-4ddc-a3f9-5ae24ff39e38",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
