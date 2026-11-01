@@ -55,7 +55,8 @@
         "text": "然后更新",
         "tail": true
       }
-    ]
+    ],
+    "resume": null
   },
   "result": {
     "visible": true,

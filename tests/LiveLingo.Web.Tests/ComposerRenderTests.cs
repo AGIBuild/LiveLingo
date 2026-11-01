@@ -23,6 +23,25 @@ public sealed class ComposerRenderTests(BrowserFixture browsers)
 
     [Theory]
     [MemberData(nameof(Engines))]
+    public async Task AnEmptyComposer_OffersTheUnsentDraftAsOneClick_AndShowsNothingOtherwise(string engine)
+    {
+        await using var none = await browsers.OpenAsync(engine, "empty");
+        Assert.Equal(0, await none.Page.Locator("#resume").CountAsync());
+
+        await using var page = await browsers.OpenAsync(engine, "resume-draft");
+
+        Assert.Equal("", await page.Page.Locator("#src").InputValueAsync());
+        var resume = page.Page.Locator("#resume");
+        Assert.Contains(ComposerPage.Str("resume"), await resume.InnerTextAsync());
+        Assert.Contains("这个 PR 先不要合并", await resume.InnerTextAsync());
+
+        await resume.ClickAsync();
+
+        Assert.Equal(0, (await page.LastIntentAsync<LiveLingo.Desktop.Web.RestoreRecentIntent>()).Index);
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
     public async Task Handshake_SendsReadyOnceAndTheFirstSnapshotDrawsTheEmptyComposer(string engine)
     {
         await using var page = await browsers.OpenAsync(engine);

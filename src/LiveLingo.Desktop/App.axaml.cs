@@ -266,9 +266,6 @@ public partial class App : Application
 
         var written = false;
         vm.Completed += () => written = true;
-        var restored = _recentDrafts.TakeUnsent();
-        if (restored.Length > 0)
-            vm.SourceText = restored;
 
         await window.PresentAsync(vm, new ComposerTexts(services.GetRequiredService<ILocalizationService>()), _recentDrafts, target);
 

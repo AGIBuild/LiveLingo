@@ -60,7 +60,8 @@
         "text": "风险有两个",
         "tail": false
       }
-    ]
+    ],
+    "resume": null
   },
   "result": {
     "visible": true,

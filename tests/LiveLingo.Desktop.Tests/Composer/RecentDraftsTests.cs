@@ -11,36 +11,36 @@ public class RecentDraftsTests
     }
 
     [Fact]
-    public void ClosingWithTextThatWasNotWritten_KeepsItForTheNextSummon_OnlyOnce()
+    public void ClosingWithTextThatWasNotWritten_OffersItAsTheUnsentDraft_WithoutTakingItAway()
     {
         var drafts = Create(out _);
 
         drafts.Close("a long thought", written: false);
 
-        Assert.Equal("a long thought", drafts.TakeUnsent());
-        Assert.Equal("", drafts.TakeUnsent());
-        Assert.Empty(drafts.Items);
+        Assert.Equal("a long thought", drafts.Unsent?.Text);
+        Assert.Equal("a long thought", drafts.Unsent?.Text);
+        Assert.Single(drafts.Items);
     }
 
     [Fact]
-    public void AWrittenDraft_IsListedButNotRestoredAutomatically()
+    public void AWrittenDraft_IsListedButNeverOfferedAsUnsent()
     {
         var drafts = Create(out _);
 
         drafts.Close("done", written: true);
 
-        Assert.Equal("", drafts.TakeUnsent());
+        Assert.Null(drafts.Unsent);
         Assert.Equal(["done"], drafts.Items.Select(d => d.Text).ToArray());
     }
 
     [Fact]
-    public void OnlyTheLatestDraftCanBeRestoredAutomatically()
+    public void OnlyTheLatestDraftCanBeUnsent()
     {
         var drafts = Create(out _);
         drafts.Close("older unsent", written: false);
         drafts.Close("newer written", written: true);
 
-        Assert.Equal("", drafts.TakeUnsent());
+        Assert.Null(drafts.Unsent);
         Assert.Equal(2, drafts.Items.Count);
     }
 
@@ -83,6 +83,7 @@ public class RecentDraftsTests
 
         Assert.Equal(["same", "other"], drafts.Items.Select(d => d.Text).ToArray());
         Assert.True(drafts.Items[0].Written);
+        Assert.Null(drafts.Unsent);
     }
 
     [Fact]
@@ -94,6 +95,6 @@ public class RecentDraftsTests
         drafts.Clear();
 
         Assert.Empty(drafts.Items);
-        Assert.Equal("", drafts.TakeUnsent());
+        Assert.Null(drafts.Unsent);
     }
 }
