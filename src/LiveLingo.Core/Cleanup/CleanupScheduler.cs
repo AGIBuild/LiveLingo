@@ -8,6 +8,7 @@ namespace LiveLingo.Core.Cleanup;
 /// Cleans the sentences of a <see cref="DraftSession"/> while the user is still speaking: one request at a time,
 /// always for the oldest sentence that has none. A sentence is cleaned once something follows it, because a long
 /// thinking pause can split one sentence in two; the last sentence waits at most <paramref name="holdback"/>.
+/// While the user types, the last sentence is cleaned only after a short pause in typing, not once per key.
 /// A result that fails the <see cref="FidelityGate"/> keeps the original sentence and records the reason.
 /// </summary>
 public sealed class CleanupScheduler : IAsyncDisposable
@@ -18,11 +19,16 @@ public sealed class CleanupScheduler : IAsyncDisposable
     private readonly TimeSpan _holdback;
     private readonly int _contextUnits;
     private readonly TimeProvider _time;
+    /// <summary>How long the source must be still before typed text is cleaned: shorter than a sentence, longer than a keystroke.</summary>
+    private static readonly TimeSpan TypingPause = TimeSpan.FromMilliseconds(400);
+
     private readonly object _gate = new();
     private readonly CancellationTokenSource _stop = new();
     private readonly ITimer _holdbackTimer;
     private readonly Dictionary<int, DateTimeOffset> _firstSeen = [];
 
+    private int _seenEditRevision;
+    private DateTimeOffset _editedAt = DateTimeOffset.MinValue;
     private bool _running;
     private bool _disposed;
     private Task _worker = Task.CompletedTask;
@@ -64,6 +70,13 @@ public sealed class CleanupScheduler : IAsyncDisposable
                 return;
 
             var now = _time.GetUtcNow();
+            var revision = _session.Read(draft => draft.EditRevision);
+            if (revision != _seenEditRevision)
+            {
+                _seenEditRevision = revision;
+                _editedAt = now;
+            }
+
             foreach (var id in _session.Read(draft => draft.Units.Select(unit => unit.Id).ToList()))
                 _firstSeen.TryAdd(id, now);
 
@@ -152,6 +165,10 @@ public sealed class CleanupScheduler : IAsyncDisposable
             var waited = now - _firstSeen.GetValueOrDefault(unit.Id, now);
             if (!continues && draft.Recording && waited < _holdback)
                 return (null, _holdback - waited);
+
+            var typing = TypingPause - (now - _editedAt);
+            if (!continues && typing > TimeSpan.Zero)
+                return (null, typing);
 
             return ((draft.TicketFor(i), new CleanupRequest(unit.Raw, PrecedingOf(draft, i), continues, _glossary)), null);
         }

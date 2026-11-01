@@ -1,8 +1,8 @@
-/* The composer, ported from the v3 prototype. The window is as wide as the panel plus an 18 px margin for the shadow. */
+/* The composer, ported from the v3 prototype. The window is as wide as the panel plus an 18 px margin for the shadow; a transparent window cannot blur what is behind it, so the panel is opaque and the shadow stays inside the margin. */
 html, body { background: transparent; }
 body { padding: 18px; overflow: hidden; }
 
-.composer { position: relative; width: 100%; max-height: 470px; display: flex; flex-direction: column; background: var(--glass); border: 1px solid var(--line); border-radius: 22px; box-shadow: var(--shadow); animation: rise .18s cubic-bezier(.2, .8, .3, 1); }
+.composer { position: relative; width: 100%; max-height: 470px; display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); border-radius: 22px; box-shadow: 0 4px 12px rgba(0, 0, 0, .28), 0 1px 2px rgba(0, 0, 0, .16); animation: rise .18s cubic-bezier(.2, .8, .3, 1); }
 @keyframes rise { from { opacity: 0; transform: translateY(10px) scale(.98); } }
 
 .chip { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: 999px; background: var(--hover); color: var(--muted); font-size: 12px; white-space: nowrap; }
