@@ -15,8 +15,6 @@ namespace LiveLingo.Desktop.Web;
 [JsonDerivedType(typeof(SizeIntent), "size")]
 [JsonDerivedType(typeof(DragIntent), "drag")]
 [JsonDerivedType(typeof(SourceIntent), "source")]
-[JsonDerivedType(typeof(MicDownIntent), "micDown")]
-[JsonDerivedType(typeof(MicUpIntent), "micUp")]
 [JsonDerivedType(typeof(MicToggleIntent), "micToggle")]
 [JsonDerivedType(typeof(OutputIntent), "output")]
 [JsonDerivedType(typeof(SwapLanguageIntent), "swapLanguage")]
@@ -135,10 +133,7 @@ internal sealed record SourceIntent(string Text, int Rev) : WebIntent
     protected override bool IsValid => Rev >= 0;
 }
 
-internal sealed record MicDownIntent : WebIntent;
-
-internal sealed record MicUpIntent : WebIntent;
-
+/// <summary>The microphone button or its shortcut: starts or stops listening.</summary>
 internal sealed record MicToggleIntent : WebIntent;
 
 internal sealed record OutputIntent(ComposerOutput Value) : WebIntent;

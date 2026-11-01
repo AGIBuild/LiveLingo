@@ -42,7 +42,7 @@
     render({ align, label, items, onPick }) {
       return html`<div class=${'menu ' + align} role="menu" aria-label=${label} ref=${this.setList} onKeyDown=${this.onKeyDown}>
         ${items.map((item) => html`${item.sepBefore && html`<hr/>`}<button type="button" key=${item.id} role=${role(item.id)} aria-checked=${checkable(item.id) ? item.checked : undefined}
-          disabled=${item.enabled === false} onClick=${() => onPick(item)}>${item.label}</button>`)}
+          disabled=${item.enabled === false} onClick=${() => onPick(item)}><span class="lbl">${item.label}</span>${LL.cap(item.id) && html`<kbd>${LL.cap(item.id)}</kbd>`}</button>`)}
       </div>`;
     }
   }

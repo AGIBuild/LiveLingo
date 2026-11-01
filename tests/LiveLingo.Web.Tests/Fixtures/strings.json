@@ -2,7 +2,7 @@
   "locale": "zh-CN",
   "strings": {
     "placeholder": "说话，或直接输入、粘贴…",
-    "hintMic": "按住麦克风说话",
+    "hintMic": "点麦克风或按 ⌘D 说话",
     "hintWrite": "写入",
     "hintNewline": "换行",
     "hintHide": "隐藏",

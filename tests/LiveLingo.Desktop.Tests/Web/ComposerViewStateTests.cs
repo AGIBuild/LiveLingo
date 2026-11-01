@@ -244,6 +244,18 @@ public sealed class ComposerViewStateTests
     }
 
     [Fact]
+    public async Task TheSnapshot_CarriesEveryShortcutOnceWithItsKeyCap()
+    {
+        var state = await ComposerScenarios.All["empty"]();
+
+        Assert.Equal("meta", state.Options.Modifier);
+        Assert.Equal(ComposerShortcuts.All.Select(s => s.Id), state.Options.Shortcuts.Select(s => s.Id));
+        Assert.Equal("⌘D", state.Options.Shortcuts.Single(s => s.Id == "dictate").Cap);
+        Assert.Equal("⇧⌘C", state.Options.Shortcuts.Single(s => s.Id == "copy").Cap);
+        Assert.Contains("⌘D", state.Footer.Mic.Aria);
+    }
+
+    [Fact]
     public async Task AnUnsentDraft_IsOfferedOnlyToAnEmptyComposer_AndNeverRestoredByItself()
     {
         await using var h = new Harness();

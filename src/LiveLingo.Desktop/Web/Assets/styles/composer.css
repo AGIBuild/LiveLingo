@@ -109,6 +109,8 @@ html[data-theme=dark] .toast { background: #eceef3; color: #15181e; }
 .menu.right { right: 0; } .menu.left { left: 0; }
 .menu button { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; padding: 8px 10px; border-radius: 9px; text-align: left; font-size: 14px; }
 .menu button:hover:not(:disabled), .menu button:focus-visible { background: var(--hover); outline: none; }
+.menu button .lbl { flex: 1; }
+.menu button kbd { flex: none; }
 .menu button[aria-checked=true]::after { content: "✓"; color: var(--accent-ink); font-weight: 700; }
 .menu hr { border: 0; border-top: 1px solid var(--line); margin: 5px 4px; }
 

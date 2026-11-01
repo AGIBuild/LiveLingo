@@ -5,8 +5,17 @@ using LiveLingo.Desktop.Services.Localization;
 namespace LiveLingo.Desktop.Composer;
 
 /// <summary>Turns view-model states into localized text, so the window only binds strings.</summary>
-public sealed class ComposerTexts(ILocalizationService loc)
+/// <param name="mac">Shortcut caps follow macOS conventions; defaults to the running operating system.</param>
+public sealed class ComposerTexts(ILocalizationService loc, bool? mac = null)
 {
+    private bool IsMac => mac ?? OperatingSystem.IsMacOS();
+
+    /// <summary>The key cap of a shortcut of <see cref="ComposerShortcuts"/>, e.g. "⌘D".</summary>
+    public string Cap(string shortcutId) => ComposerShortcuts.Cap(ComposerShortcuts.Of(shortcutId), IsMac);
+
+    /// <summary>Which modifier the shortcuts use: "meta" (Command) on macOS, "ctrl" elsewhere.</summary>
+    public string ShortcutModifier => IsMac ? "meta" : "ctrl";
+
     // ---- header ----------------------------------------------------------------
 
     public string DestAria => loc.T("composer.dest.aria");
@@ -95,7 +104,7 @@ public sealed class ComposerTexts(ILocalizationService loc)
     public string ResultLabel(ComposerOutput output, TargetLanguage target) =>
         output == ComposerOutput.Translate ? loc.T("composer.res.labelTo", LanguageName(target)) : loc.T("composer.res.label");
 
-    public string HintMic => loc.T("composer.hint.mic");
+    public string HintMic => loc.T("composer.hint.mic", Cap("dictate"));
     public string HintWrite => loc.T("composer.hint.write");
     public string HintNewline => loc.T("composer.hint.newline");
     public string HintHide => loc.T("composer.hint.hide");
@@ -132,8 +141,8 @@ public sealed class ComposerTexts(ILocalizationService loc)
 
     // ---- footer ------------------------------------------------------------------
 
-    public string MicStart => loc.T("composer.mic.start");
-    public string MicStop => loc.T("composer.mic.stop");
+    public string MicStart => loc.T("composer.mic.start", Cap("dictate"));
+    public string MicStop => loc.T("composer.mic.stop", Cap("dictate"));
     public string CopyAria => loc.T("composer.copy.aria");
 
     public string Status(StatusInfo info)
@@ -143,7 +152,7 @@ public sealed class ComposerTexts(ILocalizationService loc)
         if (info.Status == ComposerStatus.Starting)
             return loc.T("composer.status.starting");
         if (info.Status == ComposerStatus.Listening)
-            return loc.T(info.HandsFree ? "composer.status.listening.free" : "composer.status.listening.hold", Clock(info.RecordingSeconds));
+            return loc.T("composer.status.listening", Clock(info.RecordingSeconds), Cap("dictate"));
         if (info.Status == ComposerStatus.Transcribing)
             return loc.T("composer.status.transcribing", info.TranscribePercent);
         if (info.Armed)

@@ -21,6 +21,8 @@ providers, wizard and model catalog were removed; see the design and plan under 
   API key in the system secret store.
 - Recent drafts (memory only), side-by-side layout for transcripts and whole documents, accessible names and live
   regions.
+- Every summon starts with an empty composer. A draft that was closed without being written is offered as one click
+  ("Continue last draft") in the empty state, and stays in the recent drafts menu; it is never put back by itself.
 - The composer can be moved by dragging its header, and it always stays inside the working area of its screen: the
   window is re-placed whenever it grows, and the page scrolls inside its panel instead of growing past the screen.
 - Settings: hotkey, commit key (Enter or Ctrl+Enter), interface language, theme (light, dark, follow system), reduce
@@ -38,8 +40,14 @@ providers, wizard and model catalog were removed; see the design and plan under 
   removed. The composer window is kept parked off-screen between uses instead of hidden.
 - The note under a sentence whose cleanup was refused ("original wording kept") follows the interface language.
 
+- Dictation is a toggle: `⌘D` (`Ctrl+D`) or a click on the microphone starts it and the same key stops it. Hold-to-talk
+  is gone (nobody should have to keep the mouse button pressed), and dictation no longer stops when the window loses
+  focus. The composer's other actions have shortcuts as well (output `⌘1`–`⌘3`, swap language `⌘L`, copy `⇧⌘C`, new
+  draft `⌘N`, recent drafts `⌘R`, import `⌘O`, export `⌘S`, settings `⌘,`); they are defined once in C# and shown next
+  to the menu items.
+
 - The interface follows the v3 prototype (`docs/superpowers/prototypes/livelingo-ux-v3/`): destination, privacy and
-  output chips, per-sentence edit and "use original", tap-to-listen or hold-to-talk microphone, light and dark themes,
+  output chips, per-sentence edit and "use original", microphone, light and dark themes,
   system font.
 - All packages are on their latest stable versions; `xunit.v3` stays on 3.2.2 because 4.x only supports Microsoft
   Testing Platform.

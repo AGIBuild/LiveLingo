@@ -71,7 +71,7 @@
   "footer": {
     "mic": {
       "recording": false,
-      "aria": "开始听写，长按为按住说话"
+      "aria": "开始听写（⌘D）"
     },
     "status": {
       "text": "",
@@ -94,7 +94,76 @@
     "theme": "Auto",
     "commitKey": "enter",
     "commitKeyCap": "↵",
-    "newlineKeyCap": "⇧↵"
+    "newlineKeyCap": "⇧↵",
+    "modifier": "meta",
+    "shortcuts": [
+      {
+        "id": "dictate",
+        "code": "KeyD",
+        "shift": false,
+        "cap": "⌘D"
+      },
+      {
+        "id": "clean",
+        "code": "Digit1",
+        "shift": false,
+        "cap": "⌘1"
+      },
+      {
+        "id": "translate",
+        "code": "Digit2",
+        "shift": false,
+        "cap": "⌘2"
+      },
+      {
+        "id": "original",
+        "code": "Digit3",
+        "shift": false,
+        "cap": "⌘3"
+      },
+      {
+        "id": "swap",
+        "code": "KeyL",
+        "shift": false,
+        "cap": "⌘L"
+      },
+      {
+        "id": "copy",
+        "code": "KeyC",
+        "shift": true,
+        "cap": "⇧⌘C"
+      },
+      {
+        "id": "new",
+        "code": "KeyN",
+        "shift": false,
+        "cap": "⌘N"
+      },
+      {
+        "id": "recent",
+        "code": "KeyR",
+        "shift": false,
+        "cap": "⌘R"
+      },
+      {
+        "id": "import",
+        "code": "KeyO",
+        "shift": false,
+        "cap": "⌘O"
+      },
+      {
+        "id": "export",
+        "code": "KeyS",
+        "shift": false,
+        "cap": "⌘S"
+      },
+      {
+        "id": "settings",
+        "code": "Comma",
+        "shift": false,
+        "cap": "⌘,"
+      }
+    ]
   },
   "menus": {
     "target": [
