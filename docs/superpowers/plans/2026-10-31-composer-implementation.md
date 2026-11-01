@@ -84,6 +84,15 @@
 | 文档 | 完成 | README 改写为 2.0；CHANGELOG 增加 2.0.0 草案；CONTRIBUTING 更新旧模型清理与设置迁移 |
 | 真实语料对照 POC | 部分 | 语音：6 个场景回放通过（M2）；录音导入在 81 s 合成长录音上跑通，识别有同音错字（合成语音所致），未做 CER 对照；没有真实人声语料 |
 
+## M5 进度：Web UI 与发布移交（随实施更新，见 `2026-11-01-web-ui-and-release-handoff.md`）
+
+| 项目 | 状态 | 说明 |
+|---|---|---|
+| W0–W5 | 完成（实机待验） | Composer 与设置都由 `NativeWebView` 承载的页面渲染；状态与逻辑在 C#，页面只画快照、发封闭集合的意图；旧 Avalonia XAML、自绘控件与主题已删除。**GUI 启动、WKWebView 里的原生下拉菜单、热键录制、焦点归还需在 macOS 上手工确认；`./build.sh Run` 未在无界面环境运行** |
+| R9 原型缺口 | 部分完成 | 已做：整理开关（关闭时不创建 `CleanupScheduler`、不提供“整理”输出）、运行状态对话框（不含正文 / 术语 / 地址 / 密钥）、保真检查拒绝原因按界面语言显示（`GateRejection` 取代英文句子）。**不做**：识别语言（语音引擎没有语言参数，做了就是无效入口）、保留录音（现在没有任何落盘录音的能力，需先做隐私设计） |
+| R11 门禁复测 | 完成 | `./build.sh Test`：HfGguf 9、Core 445、Desktop 564、Web（Playwright，WebKit + Chromium）234 全绿；行覆盖 91.6%、分支覆盖 87.1%。`./build.sh Mutate`：变异得分 82.4%（门槛 80%）。README、CHANGELOG、CONTRIBUTING 已更新（CONTRIBUTING 里 96 / 92 的覆盖率门槛是过期写法，实际门槛 80 / 65） |
+| R1–R8、R10 | 未做 | 需要真机、账号、证书或负责人决定 |
+
 ## M0 地基
 
 ### Task 0.1 分支与基线提交

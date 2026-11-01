@@ -46,18 +46,22 @@ LiveLingo/
 │   │                                #   (Drafting, Dictation, Cleanup, Translation, Inference
 │   │                                #   and Speech/Native are added by the composer plan)
 │   │
-│   └── LiveLingo.Desktop/           # Avalonia UI application
+│   └── LiveLingo.Desktop/           # Avalonia shell + web UI
+│       ├── Composer/ Settings/      # View models, texts and the thin windows around the pages
+│       ├── Web/                     # Bridge, view-state snapshots, intents, and Assets/ (the page:
+│       │                            #   Preact + htm sources and CSS, embedded; no Node build)
 │       ├── Platform/
 │       │   ├── Windows/             # Win32 hotkeys, SendInput text injection
 │       │   └── macOS/               # CGEventTap hotkeys, Cocoa text injection
-│       ├── Services/                # Settings, localization, update service
-│       └── Styles/                  # AppTheme, adaptive color system
+│       └── Services/                # Settings, localization, update service
 │
 ├── docs/superpowers/                # Design specs, plans, UX prototypes (see below)
 ├── poc/                             # Validated POCs (sources only; corpora are not committed)
 ├── tests/
 │   ├── LiveLingo.Core.Tests/        # Unit tests for Core
-│   └── LiveLingo.Desktop.Tests/     # Unit tests for Desktop services and view models
+│   ├── LiveLingo.Desktop.Tests/     # Unit tests for Desktop services, view models and view states
+│   └── LiveLingo.Web.Tests/         # Playwright tests of the page on WebKit and Chromium
+│                                    #   (golden fixtures are written by Desktop.Tests with UPDATE_FIXTURES=1)
 │
 ├── build/                           # Nuke build automation
 │   ├── BuildTask.cs                 # All build targets
@@ -89,8 +93,8 @@ This is the single most important rule. It ensures ViewModels are fully testable
 
 ### View Layer
 
-- Views handle **binding and layout only**
-- Code-behind is limited to Avalonia-specific interactions: window positioning, focus, animation, drag
+- The windows are thin Avalonia shells around a web view; the page draws snapshots and **does not hold logic**
+- Window code is limited to Avalonia-specific interactions: window positioning, focus, parking
 - `Dispatcher` calls are only allowed in Views or `App.axaml.cs`
 
 ### Platform Layer
@@ -201,12 +205,12 @@ The `Test` target enforces three quality gates. **All must pass for CI to succee
 
 | Metric | Threshold | Measured by |
 |--------|-----------|-------------|
-| Line coverage | ≥ **96%** | XPlat Code Coverage (Cobertura) |
-| Branch coverage | ≥ **92%** | XPlat Code Coverage (Cobertura) |
+| Line coverage | ≥ **80%** | XPlat Code Coverage (Cobertura) |
+| Branch coverage | ≥ **65%** | XPlat Code Coverage (Cobertura) |
 
 **What's excluded from coverage** (configured in `test.runsettings`):
 - Platform implementations (`Platform.Windows.*`, `Platform.macOS.*`)
-- View layer (`Views.*`, `Controls.*`)
+- Window shells and the web view host (`ComposerWindow`, `SettingsWindow`, `WebSurface`, `StorageFileDialogs`)
 - Infrastructure (`Program`, `App`, `VelopackUpdateService`)
 - AI model hosts and native adapters (`Inference.LlamaServerHost*`, `Speech.Native.*`)
   — covered by end-to-end Nuke probe targets instead of unit-test mocks
@@ -259,7 +263,8 @@ Only final installer artifacts (`.exe`, `.msi`, `.pkg`) are published — no sou
 - Tests for new logic (ViewModels, Core services)
 - No Avalonia references leaked into ViewModels
 - Coverage and mutation thresholds maintained
-- Follows the v3 prototype (`docs/superpowers/prototypes/livelingo-ux-v3/`): design tokens in `Styles/AppTheme.axaml`, system font, light and dark themes
+- Follows the v3 prototype (`docs/superpowers/prototypes/livelingo-ux-v3/`): design tokens in `Web/Assets/styles/`, system font, light and dark themes
+- UI changes keep the contract: state lives in C#; the page only draws a snapshot and sends closed-set intents
 
 ---
 
