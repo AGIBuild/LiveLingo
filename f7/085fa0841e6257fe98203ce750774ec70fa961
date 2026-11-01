@@ -1,0 +1,29 @@
+src/LiveLingo.Core/Drafting/Draft.cs
+  s_821950ffe1bdcc::t_a062cc9bd1631b 33-35,79
+src/LiveLingo.Desktop/Web/Assets/styles/composer.css
+  s_821950ffe1bdcc::t_a135488015f30c 5
+  s_821950ffe1bdcc::t_b52b14a9d260fe 1
+tests/LiveLingo.Core.Tests/Cleanup/CleanupSchedulerTests.cs
+  s_821950ffe1bdcc::t_e19e0e9c0d3a38 43,237-238,243-257
+  s_821950ffe1bdcc::t_38d5fa60b4606a 258-259
+src/LiveLingo.Core/Cleanup/CleanupScheduler.cs
+  s_821950ffe1bdcc::t_af057bdf917ec2 11,22-24,75,78-79,171
+  s_821950ffe1bdcc::t_a062cc9bd1631b 30-31,73-74,76-77,169-170
+  s_821950ffe1bdcc::t_2130d51b037079 172
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "f7085fa0841e6257fe98203ce750774ec70fa961",
+  "prompts": {},
+  "sessions": {
+    "s_821950ffe1bdcc": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "2e07dbc3-b49b-4806-8ef7-b85cd318bb36",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
