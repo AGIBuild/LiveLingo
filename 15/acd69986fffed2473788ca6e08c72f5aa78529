@@ -1,0 +1,31 @@
+docs/superpowers/specs/2026-11-01-web-ui-design.md
+  s_6d6e9175f38e45::t_37198d50f4b2ac 1-94,96-191
+  s_6d6e9175f38e45::t_87e5a9c09208f1 95
+tools/WebViewSpike/Program.cs
+  s_6d6e9175f38e45::t_e9eac9631e359c 99-100,102
+  s_6d6e9175f38e45::t_b291aa2e2fc3a6 1-98,101,103-108
+tools/WebViewSpike/WebViewSpike.csproj
+  s_6d6e9175f38e45::t_c1a733e6b00a5c 1-18
+docs/superpowers/plans/2026-11-01-web-ui-and-release-handoff.md
+  s_6d6e9175f38e45::t_f071052305ea56 1-201
+docs/superpowers/plans/2026-10-31-composer-implementation.md
+  s_6d6e9175f38e45::t_b1673ef983b6b6 3
+docs/superpowers/specs/2026-10-31-livelingo-composer-design.md
+  s_6d6e9175f38e45::t_13d749adcb58ba 132-133
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "15acd69986fffed2473788ca6e08c72f5aa78529",
+  "prompts": {},
+  "sessions": {
+    "s_6d6e9175f38e45": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "f74d37e5-1d96-4ddc-a3f9-5ae24ff39e38",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
