@@ -169,7 +169,7 @@ tests/LiveLingo.Web.Tests/         xUnit + Microsoft.Playwright（WebKit 与 Chr
   Fixtures/*.json                  快照黄金文件（C# 生成并校验，Web 场景复用）
 ```
 
-- 技术：**Preact + htm**（`htm` 用模板字符串写 JSX 风格视图，不需要编译器），均为 MIT，随源码提交到 `vendor/`；运行时依赖合计约 17 KB。备选原生 DOM：重复原型 `app.js` 的命令式写法，状态与视图易漂移；Preact 的“快照 → 视图”函数最贴近本设计。**Preact 固定在 10.x**，因为只有 10.x 提供可直接 `<script>` 加载的 UMD 构建（11.x 只有 ES 模块）。
+- 技术：**Preact + htm**（`htm` 用模板字符串写 JSX 风格视图，不需要编译器），许可分别为 MIT（preact）与 Apache-2.0（htm），随源码提交到 `vendor/`；运行时依赖合计约 17 KB。备选原生 DOM：重复原型 `app.js` 的命令式写法，状态与视图易漂移；Preact 的“快照 → 视图”函数最贴近本设计。**Preact 固定在 10.x**，因为只有 10.x 提供可直接 `<script>` 加载的 UMD 构建（11.x 只有 ES 模块）。
 - 为什么是经典脚本：页面由 `NavigateToString` 加载，没有可供 `import` 解析的来源，且 CSP 是 `default-src 'none'`。所以脚本按顺序内联、共享一个全局命名空间 `LL`；不用 `import`。
 - 产物：运行时拼出的**一整页字符串**（样式与脚本都内联并带 nonce）。预算：拼好的页面 ≤ 400 KB，由 C# 测试检查。
 - 字体：系统字体栈，不打包字体（与原型一致）。

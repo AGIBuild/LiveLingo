@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="LiveLingo.Desktop.Tests" />
+    <InternalsVisibleTo Include="LiveLingo.Web.Tests" />
     <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
   </ItemGroup>
 
@@ -40,6 +41,7 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Resources\i18n\*.json" />
+    <EmbeddedResource Include="Web\Assets\**\*" />
   </ItemGroup>
 
   <ItemGroup>
