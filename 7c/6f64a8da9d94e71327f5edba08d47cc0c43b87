@@ -1,0 +1,208 @@
+tests/LiveLingo.Web.Tests/Fixtures/settings-models.json
+  s_821950ffe1bdcc::t_27028a5fc1d79d 20,38-76
+tests/LiveLingo.Web.Tests/Fixtures/no-cleanup.json
+  s_821950ffe1bdcc::t_27028a5fc1d79d 1-146
+src/LiveLingo.Core/Cleanup/CleanupScheduler.cs
+  s_821950ffe1bdcc::t_0bd88b433798b8 114
+tests/LiveLingo.Desktop.Tests/Web/SettingsViewStateTests.cs
+  s_821950ffe1bdcc::t_65048a4b44560b 86-102
+  s_821950ffe1bdcc::t_766ac56fd08135 110
+  s_821950ffe1bdcc::t_5d1f9a34640b0a 85
+tests/LiveLingo.Core.Tests/Probes/VoiceProbeTests.cs
+  s_821950ffe1bdcc::t_a80270f1fb5432 81
+tests/LiveLingo.Desktop.Tests/Composer/ComposerVoiceTests.cs
+  s_821950ffe1bdcc::t_c42b6f83bc8944 352-353
+src/LiveLingo.Desktop/Composer/ComposerTexts.cs
+  s_821950ffe1bdcc::t_547d536c07bf9e 1
+  s_821950ffe1bdcc::t_a37ebf0fd0d42e 127-128
+src/LiveLingo.Desktop/Web/ComposerIntents.cs
+  s_821950ffe1bdcc::t_47bc1fabf6a808 71-75
+tests/LiveLingo.Desktop.Tests/Composer/ComposerHarness.cs
+  s_821950ffe1bdcc::t_0bdaf756e49bb9 218-219
+  s_821950ffe1bdcc::t_32df5932c4c9cf 200
+tests/LiveLingo.Desktop.Tests/Web/ComposerIntentsTests.cs
+  s_821950ffe1bdcc::t_3133ceb02149e5 85,87
+  s_821950ffe1bdcc::t_0cf0d87dd97be4 86,88-93
+  s_821950ffe1bdcc::t_0fb50426a24354 84
+src/LiveLingo.Core/Drafting/GateRejection.cs
+  s_821950ffe1bdcc::t_0889c66b5d2863 1-23
+tests/LiveLingo.Desktop.Tests/Web/ComposerScenarios.cs
+  s_821950ffe1bdcc::t_5a259e8799e352 26-28
+  s_821950ffe1bdcc::t_5552bb35cd39bf 1
+  s_821950ffe1bdcc::t_361f38cc70fc62 35
+tests/LiveLingo.Desktop.Tests/Composer/ComposerSessionTests.cs
+  s_821950ffe1bdcc::t_b1c9fe83c77ba1 228-235
+  s_821950ffe1bdcc::t_c98dc5ec9b0a69 209-227,239
+tests/LiveLingo.Web.Tests/Fixtures/settings-voice.json
+  s_821950ffe1bdcc::t_27028a5fc1d79d 20,49-87
+src/LiveLingo.Desktop/Composer/ComposerViewModel.cs
+  s_821950ffe1bdcc::t_f0c3c84d141a06 73
+  s_821950ffe1bdcc::t_6b3947899ec558 631
+  s_821950ffe1bdcc::t_5bac861fbb23d2 70-72,74
+src/LiveLingo.Core/Drafting/DraftUnit.cs
+  s_821950ffe1bdcc::t_7600b2aafc126b 14-15,22
+  s_821950ffe1bdcc::t_2ccce4a4adbbcc 13
+src/LiveLingo.Desktop/Web/ComposerViewState.cs
+  s_821950ffe1bdcc::t_aa169250c28522 89
+  s_821950ffe1bdcc::t_0da2a1e593cc84 168
+src/LiveLingo.Desktop/Composer/ComposerTypes.cs
+  s_821950ffe1bdcc::t_92ccd56e4bc853 1-2
+  s_821950ffe1bdcc::t_74669826235866 48,51
+  s_821950ffe1bdcc::t_c3ed15c0cb745a 180-181,183
+src/LiveLingo.Core/Dictation/FidelityGate.cs
+  s_821950ffe1bdcc::t_b6cdf89119b5c6 48
+  s_821950ffe1bdcc::t_82d3af267db249 1,4,8-15
+  s_821950ffe1bdcc::t_936e9d4d03c6e2 52
+  s_821950ffe1bdcc::t_b4ebde9211ebeb 76
+  s_821950ffe1bdcc::t_9c840e641a2b0d 88
+  s_821950ffe1bdcc::t_327a2b2a55cdac 105,108
+  s_821950ffe1bdcc::t_0beaf83808d878 44
+  s_821950ffe1bdcc::t_0648b0baf41f29 66
+  s_821950ffe1bdcc::t_b683caf2278f43 85,89-90,93-94
+  s_821950ffe1bdcc::t_bbb14c6492f7cb 81
+  s_821950ffe1bdcc::t_0414fcb2f2a9da 61
+src/LiveLingo.Desktop/Settings/SettingsWindow.cs
+  s_821950ffe1bdcc::t_92c90d45231523 1
+  s_821950ffe1bdcc::t_9b43150c3a5ae9 24-28
+src/LiveLingo.Desktop/Web/Assets/app/31-settings.js
+  s_821950ffe1bdcc::t_79250e71f12639 112-114,116,122,128,138,140-143,149-166
+  s_821950ffe1bdcc::t_f313dd198573e3 182-190
+  s_821950ffe1bdcc::t_60435ae52347af 77-79,171,178
+  s_821950ffe1bdcc::t_6f337fa407bc52 175
+  s_821950ffe1bdcc::t_404c7adc6e9f88 167-170
+  s_821950ffe1bdcc::t_4140e3a5607c64 172-174
+  s_821950ffe1bdcc::t_aea67e9e11f431 176-177
+  s_821950ffe1bdcc::t_7f7596b3fd074c 179-181
+  s_821950ffe1bdcc::t_181129a63b9741 191
+tests/LiveLingo.Desktop.Tests/Settings/SettingsViewModelTests.cs
+  s_821950ffe1bdcc::t_7da18c9930d814 47,55
+  s_821950ffe1bdcc::t_9c436d83fb4a04 89,92
+src/LiveLingo.Desktop/Resources/i18n/zh-CN.json
+  s_821950ffe1bdcc::t_62bb33f94d65ea 225-234
+  s_821950ffe1bdcc::t_ab249b3b938e6d 179-180
+  s_821950ffe1bdcc::t_0671f552b3e112 83-93
+tests/LiveLingo.Desktop.Tests/Web/SettingsIntentsTests.cs
+  s_821950ffe1bdcc::t_92aa71d7edb54d 64-77
+  s_821950ffe1bdcc::t_30f81d75429cfd 63
+tests/LiveLingo.Core.Tests/Cleanup/CleanupSchedulerTests.cs
+  s_821950ffe1bdcc::t_eadea5974a7147 193
+  s_821950ffe1bdcc::t_43de0ef6813d6e 180
+  s_821950ffe1bdcc::t_103a6743354baf 70
+  s_821950ffe1bdcc::t_94d07c255fbcfa 208
+tests/LiveLingo.Desktop.Tests/Composer/ComposerTextsTests.cs
+  s_821950ffe1bdcc::t_ecfa5bf7040824 1
+  s_821950ffe1bdcc::t_dff7d0f91c742a 235-237
+tests/LiveLingo.Desktop.Tests/Web/ComposerViewStateTests.cs
+  s_821950ffe1bdcc::t_a7176a9538a61e 165
+  s_821950ffe1bdcc::t_6e1219d7806169 236-240,243-245
+  s_821950ffe1bdcc::t_1a3ae5e27a4477 241-242
+  s_821950ffe1bdcc::t_7f8fdd89b843ef 235
+tests/LiveLingo.Web.Tests/Fixtures/settings-hotkey-invalid.json
+  s_821950ffe1bdcc::t_27028a5fc1d79d 20,38-76
+tests/LiveLingo.Web.Tests/SettingsPageTests.cs
+  s_821950ffe1bdcc::t_4ae3a69dde15d2 134
+  s_821950ffe1bdcc::t_eaa00a283ad7e2 186-204
+  s_821950ffe1bdcc::t_7a7bcd2be2cde7 318,321
+  s_821950ffe1bdcc::t_8b22c3c95d0400 184-185
+tests/LiveLingo.Core.Tests/Drafting/DraftTests.cs
+  s_821950ffe1bdcc::t_be1e8c42ab4964 55,58
+tests/LiveLingo.Web.Tests/Fixtures/settings-general.json
+  s_821950ffe1bdcc::t_27028a5fc1d79d 20,38-76
+tests/LiveLingo.Web.Tests/Fixtures/settings-cloud-invalid.json
+  s_821950ffe1bdcc::t_27028a5fc1d79d 20,38-76
+src/LiveLingo.Desktop/Web/WebIntent.cs
+  s_821950ffe1bdcc::t_f79d45103dfcc6 207
+  s_821950ffe1bdcc::t_378936d4a04b47 224
+tests/LiveLingo.Desktop.Tests/Web/WebIntentTests.cs
+  s_821950ffe1bdcc::t_9ee5a7b6c74205 90
+tests/LiveLingo.Desktop.Tests/Web/SettingsWebSessionTests.cs
+  s_821950ffe1bdcc::t_447b22d59ac05b 22
+src/LiveLingo.Desktop/Web/SettingsIntents.cs
+  s_821950ffe1bdcc::t_7aeac2901bf58a 70
+src/LiveLingo.Desktop/Settings/SettingsTexts.cs
+  s_821950ffe1bdcc::t_2c66406f0dc386 30-31
+  s_821950ffe1bdcc::t_25a58a76af0a6a 19
+  s_821950ffe1bdcc::t_4945cb719eb2e1 46-52
+src/LiveLingo.Desktop/Web/SettingsWebSession.cs
+  s_821950ffe1bdcc::t_fc5d74aea0e719 32
+  s_821950ffe1bdcc::t_9e7a20e5746a43 21
+tests/LiveLingo.Web.Tests/Fixtures/settings-consent.json
+  s_821950ffe1bdcc::t_27028a5fc1d79d 20,38-76
+src/LiveLingo.Desktop/Web/Assets/styles/settings.css
+  s_821950ffe1bdcc::t_fa0e586e1bd67e 40-43
+src/LiveLingo.Core/Drafting/Draft.cs
+  s_821950ffe1bdcc::t_6c8d8b9451ae02 107,113,115
+src/LiveLingo.Desktop/Settings/SettingsViewModel.cs
+  s_821950ffe1bdcc::t_7d4d9ad683cf28 183
+  s_821950ffe1bdcc::t_aca433f7a0105f 137
+  s_821950ffe1bdcc::t_b585add1b861b5 92-94
+  s_821950ffe1bdcc::t_648b5348ab5dce 60
+tests/LiveLingo.Web.Tests/Fixtures/settings-strings.json
+  s_821950ffe1bdcc::t_27028a5fc1d79d 30-31,76-79
+src/LiveLingo.Desktop/Web/SettingsViewState.cs
+  s_821950ffe1bdcc::t_f6ee5f4674e9a2 49
+  s_821950ffe1bdcc::t_be8d4edfc706ad 1
+  s_821950ffe1bdcc::t_6880baf47a3e77 66
+  s_821950ffe1bdcc::t_c8bd900c3ab2a7 73-74,77-90
+  s_821950ffe1bdcc::t_b281b7388b8c21 24-31
+  s_821950ffe1bdcc::t_a65f7e31209206 14
+tests/LiveLingo.Core.Tests/Dictation/FidelityGateTests.cs
+  s_821950ffe1bdcc::t_c532e23eaed22e 49,87
+  s_821950ffe1bdcc::t_757642ba16d8db 61
+  s_821950ffe1bdcc::t_48e8fa50c06aa5 29
+  s_821950ffe1bdcc::t_3b0a692510cb2d 112
+  s_821950ffe1bdcc::t_4e2f66757c2e97 21
+  s_821950ffe1bdcc::t_4f9a106724aeaf 169
+  s_821950ffe1bdcc::t_19039bab85ca3d 2
+  s_821950ffe1bdcc::t_e6c800ffe9a1f8 25
+  s_821950ffe1bdcc::t_4d9760919eda3b 17
+  s_821950ffe1bdcc::t_5c92b38a8e191a 12,39,128,150,160
+  s_821950ffe1bdcc::t_9caa075dc10d70 118-120
+  s_821950ffe1bdcc::t_4ecf0ada51938b 121
+  s_821950ffe1bdcc::t_448a85d73711ef 72
+  s_821950ffe1bdcc::t_1ce1c40df93508 177
+tests/LiveLingo.Web.Tests/Fixtures/gate-warning.json
+  s_821950ffe1bdcc::t_f3f2a84830575a 57
+tests/LiveLingo.Web.Tests/Fixtures/settings-privacy.json
+  s_821950ffe1bdcc::t_27028a5fc1d79d 20,38-76
+src/LiveLingo.Desktop/Services/Configuration/SettingsModel.cs
+  s_821950ffe1bdcc::t_4cae11655f7336 72-74,77
+src/LiveLingo.Desktop/Resources/i18n/en-US.json
+  s_821950ffe1bdcc::t_c20c747d3f4578 83-93
+  s_821950ffe1bdcc::t_d7f7cbed5bb0c7 179-180
+  s_821950ffe1bdcc::t_a8359d67f5cc30 225-234
+tests/LiveLingo.Web.Tests/Fixtures/settings-dark.json
+  s_821950ffe1bdcc::t_27028a5fc1d79d 20,38-76
+tests/LiveLingo.Web.Tests/Fixtures/settings-cloud.json
+  s_821950ffe1bdcc::t_27028a5fc1d79d 20,38-76
+tests/LiveLingo.Web.Tests/Fixtures/settings-diagnostics.json
+  s_821950ffe1bdcc::t_27028a5fc1d79d 1-93
+src/LiveLingo.Desktop/App.axaml.cs
+  s_821950ffe1bdcc::t_be21ccbb145df7 235-239
+  s_821950ffe1bdcc::t_60e1444ee4a835 244-245
+  s_821950ffe1bdcc::t_a0978dbc6a5321 274-275
+src/LiveLingo.Desktop/Composer/ComposerViewModel.Session.cs
+  s_821950ffe1bdcc::t_dfb8f772548b33 43-47
+tests/LiveLingo.Desktop.Tests/Services/Configuration/SettingsModelTests.cs
+  s_821950ffe1bdcc::t_300267df0c6ca8 17
+tests/LiveLingo.Desktop.Tests/Web/SettingsScenarios.cs
+  s_821950ffe1bdcc::t_1a99eaeaaf2b58 49-50,52
+  s_821950ffe1bdcc::t_9930eb3ec72e4f 29
+  s_821950ffe1bdcc::t_4336739352c556 40-45
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "7c6f64a8da9d94e71327f5edba08d47cc0c43b87",
+  "prompts": {},
+  "sessions": {
+    "s_821950ffe1bdcc": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "2e07dbc3-b49b-4806-8ef7-b85cd318bb36",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
