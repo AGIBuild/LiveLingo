@@ -59,7 +59,8 @@
     "label": "原话",
     "routeChip": false,
     "hint": true,
-    "lines": []
+    "lines": [],
+    "resume": null
   },
   "result": {
     "visible": false,

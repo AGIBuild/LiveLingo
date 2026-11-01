@@ -19,6 +19,13 @@ internal static class ComposerScenarios
     public static IReadOnlyDictionary<string, Func<Task<ComposerViewState>>> All { get; } = new SortedDictionary<string, Func<Task<ComposerViewState>>>
     {
         ["empty"] = async () => { await using var h = new Harness(output: ComposerOutput.Clean); return State(h); },
+        ["resume-draft"] = async () =>
+        {
+            await using var h = new Harness(output: ComposerOutput.Clean);
+            var recent = new RecentDrafts(new FakeClock());
+            recent.Close("嗯，这个 PR 先不要合并，等 CI 跑完再说。", written: false);
+            return State(h, recent);
+        },
         ["clean-ready"] = () => Ready("那个我觉得这个方案可以。", ComposerOutput.Clean),
         ["translate-ready"] = () => Ready(Chat, ComposerOutput.Translate),
         ["original-ready"] = () => Ready(Chat, ComposerOutput.Original),

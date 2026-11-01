@@ -71,14 +71,17 @@ public sealed class ComposerTexts(ILocalizationService loc)
     public string RecentClear => loc.T("composer.recent.clear");
     public string RecentEmpty => loc.T("composer.recent.empty");
     public string RecentRestore => loc.T("composer.recent.restore");
+    public string Resume => loc.T("composer.resume");
 
-    /// <summary>"12:03 · first words of the draft" for the recent-drafts menu.</summary>
-    public static string RecentItem(RecentDraft draft)
+    /// <summary>The first words of a draft's first line, to recognize it by.</summary>
+    public static string RecentPreview(RecentDraft draft)
     {
         var firstLine = draft.Text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)[0];
-        var preview = firstLine.Length > 28 ? firstLine[..28] + "…" : firstLine;
-        return $"{draft.At.ToLocalTime():HH:mm} · {preview}";
+        return firstLine.Length > 28 ? firstLine[..28] + "…" : firstLine;
     }
+
+    /// <summary>"12:03 · first words of the draft" for the recent-drafts menu.</summary>
+    public static string RecentItem(RecentDraft draft) => $"{draft.At.ToLocalTime():HH:mm} · {RecentPreview(draft)}";
 
     // ---- source pane -------------------------------------------------------------
 
@@ -254,6 +257,7 @@ public sealed class ComposerTexts(ILocalizationService loc)
         ["recentClear"] = RecentClear,
         ["recentEmpty"] = RecentEmpty,
         ["recentRestore"] = RecentRestore,
+        ["resume"] = Resume,
         ["exportTitle"] = MoreExport,
         ["exportHint"] = ExportHint
     };

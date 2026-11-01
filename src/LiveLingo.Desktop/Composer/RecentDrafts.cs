@@ -1,7 +1,7 @@
 namespace LiveLingo.Desktop.Composer;
 
 /// <summary>A closed composer's source text.</summary>
-/// <param name="Written">The result was written or copied; an unwritten draft is restored on the next summon.</param>
+/// <param name="Written">The result was written or copied; a draft that was not is offered again on the next summon.</param>
 public sealed record RecentDraft(DateTimeOffset At, string Text, bool Written);
 
 /// <summary>
@@ -17,6 +17,12 @@ public sealed class RecentDrafts(TimeProvider? time = null)
 
     public IReadOnlyList<RecentDraft> Items => _items;
 
+    /// <summary>
+    /// The latest draft when it was closed without being written (hidden with Esc, say). The next composer starts empty
+    /// and offers it with one click; it is never put back by itself.
+    /// </summary>
+    public RecentDraft? Unsent => _items is [{ Written: false } latest, ..] ? latest : null;
+
     public void Close(string sourceText, bool written)
     {
         if (string.IsNullOrWhiteSpace(sourceText))
@@ -26,16 +32,6 @@ public sealed class RecentDrafts(TimeProvider? time = null)
         _items.Insert(0, new RecentDraft(_time.GetUtcNow(), sourceText, written));
         if (_items.Count > Capacity)
             _items.RemoveRange(Capacity, _items.Count - Capacity);
-    }
-
-    /// <summary>Returns the latest draft when it was never written, and forgets it; otherwise "".</summary>
-    public string TakeUnsent()
-    {
-        if (_items is not [{ Written: false } latest, ..])
-            return "";
-
-        _items.RemoveAt(0);
-        return latest.Text;
     }
 
     public void Clear() => _items.Clear();

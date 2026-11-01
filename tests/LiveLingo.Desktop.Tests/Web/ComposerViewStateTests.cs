@@ -244,6 +244,33 @@ public sealed class ComposerViewStateTests
     }
 
     [Fact]
+    public async Task AnUnsentDraft_IsOfferedOnlyToAnEmptyComposer_AndNeverRestoredByItself()
+    {
+        await using var h = new Harness();
+        var recent = new RecentDrafts();
+        recent.Close("嗯，这个 PR 先不要合并", written: false);
+
+        var empty = ComposerScenarios.State(h, recent);
+        h.Vm.SourceText = "typing now";
+        var typing = ComposerScenarios.State(h, recent);
+
+        Assert.Equal("", empty.Source.Text);
+        Assert.Equal(0, empty.Source.Resume?.Index);
+        Assert.Contains("嗯，这个 PR 先不要合并", empty.Source.Resume?.Label);
+        Assert.Null(typing.Source.Resume);
+    }
+
+    [Fact]
+    public async Task AWrittenDraft_IsNotOffered()
+    {
+        await using var h = new Harness();
+        var recent = new RecentDrafts();
+        recent.Close("done", written: true);
+
+        Assert.Null(ComposerScenarios.State(h, recent).Source.Resume);
+    }
+
+    [Fact]
     public async Task RecentDrafts_AreListedNewestFirst_AndRestorableOnlyWhenIdle()
     {
         await using var h = new Harness();

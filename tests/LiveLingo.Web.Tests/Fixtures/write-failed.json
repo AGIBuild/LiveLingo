@@ -50,7 +50,8 @@
     "label": "原话",
     "routeChip": false,
     "hint": false,
-    "lines": []
+    "lines": [],
+    "resume": null
   },
   "result": {
     "visible": true,

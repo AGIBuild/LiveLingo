@@ -54,6 +54,7 @@
   "composer.recent.clear": "Clear recent drafts",
   "composer.recent.empty": "No drafts yet. They appear here after you close or write; they are cleared when the app exits.",
   "composer.recent.restore": "Restore",
+  "composer.resume": "Continue last draft",
 
   "composer.placeholder": "Speak, or type or paste…",
   "composer.route.whole": "Whole text · keep layout",

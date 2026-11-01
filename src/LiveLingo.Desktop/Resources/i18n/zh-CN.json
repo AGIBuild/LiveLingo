@@ -54,6 +54,7 @@
   "composer.recent.clear": "清除最近草稿",
   "composer.recent.empty": "还没有草稿。关闭或写入后会出现在这里；退出应用后清除。",
   "composer.recent.restore": "恢复",
+  "composer.resume": "继续上次草稿",
 
   "composer.placeholder": "说话，或直接输入、粘贴…",
   "composer.route.whole": "整段 · 保留格式",

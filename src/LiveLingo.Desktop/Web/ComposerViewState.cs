@@ -16,10 +16,16 @@ internal sealed record BannerView(string Kind, string Tone, string Message, doub
 
 internal sealed record SourceLineState(string Time, string Text, bool Tail);
 
+/// <summary>The last draft was closed without being written: the empty composer offers to continue it (never automatically).</summary>
+/// <param name="Index">The draft's index in the recent drafts, for the <c>restoreRecent</c> intent.</param>
+internal sealed record ResumeState(int Index, string Label);
+
 /// <param name="Mode">"edit" shows the text box, "live" the listening or transcript lines.</param>
 /// <param name="SourceRev">The page adopts <paramref name="Text"/> only when this is newer than its own last revision (design 5.3).</param>
+/// <param name="Resume">Offered together with the hint of an empty composer; null otherwise.</param>
 internal sealed record SourceState(
-    string Mode, string Text, int SourceRev, bool Editable, string Label, bool RouteChip, bool Hint, IReadOnlyList<SourceLineState> Lines);
+    string Mode, string Text, int SourceRev, bool Editable, string Label, bool RouteChip, bool Hint, IReadOnlyList<SourceLineState> Lines,
+    ResumeState? Resume);
 
 internal sealed record RowState(
     int I, string State, string Text, string Note, string Time, bool Warn, bool Owned, bool Editing,
@@ -70,6 +76,7 @@ internal sealed record ComposerViewState(
     public static ComposerViewState From(ComposerViewModel vm, ComposerTexts texts, RecentDrafts recent, int sourceRev)
     {
         var live = vm.IsListening || vm.IsStartingListening || vm.HasTimeline;
+        var empty = vm.Lines.Count == 0 && !live && string.IsNullOrWhiteSpace(vm.SourceText);
         var hasResult = vm.Lines.Count > 0 && vm.Output != ComposerOutput.Original;
         var cloud = vm.CloudTranslate || vm.CloudClean;
         var armed = vm.IsWriteQueued;
@@ -96,8 +103,11 @@ internal sealed record ComposerViewState(
                 vm.IsEditable,
                 texts.SourceLabel(vm.IsListening || vm.IsStartingListening, vm.HasTimeline, vm.TranscriptName),
                 vm.IsWholeRoute,
-                vm.Lines.Count == 0 && !live && string.IsNullOrWhiteSpace(vm.SourceText),
-                [.. vm.SourceLines.Select(line => new SourceLineState(line.Time, line.Text, line.IsTail))]),
+                empty,
+                [.. vm.SourceLines.Select(line => new SourceLineState(line.Time, line.Text, line.IsTail))],
+                empty && recent.Unsent is { } unsent && vm.CanReplaceDraft
+                    ? new ResumeState(0, ComposerTexts.RecentPreview(unsent))
+                    : null),
             Result: new ResultState(
                 hasResult,
                 texts.ResultLabel(vm.Output, vm.TargetLanguage),
