@@ -1,6 +1,6 @@
 # LiveLingo 2.0 · Web UI 外壳设计
 
-状态：**提案，待负责人确认**。前置：[Composer 设计](./2026-10-31-livelingo-composer-design.md)、[原型 v3](../prototypes/livelingo-ux-v3/README.md)。实施见 [交接计划](../plans/2026-11-01-web-ui-and-release-handoff.md)。
+状态：**负责人已确认采用（2026-11-01，W0 在 macOS 通过）**。前置：[Composer 设计](./2026-10-31-livelingo-composer-design.md)、[原型 v3](../prototypes/livelingo-ux-v3/README.md)。实施见 [交接计划](../plans/2026-11-01-web-ui-and-release-handoff.md)。
 
 ## 1. 结论
 
@@ -53,6 +53,21 @@
 | S8e | 内存与进程：WebView 常驻增加的内存 | macOS ≤ 120 MB，Windows ≤ 200 MB（含渲染进程）；联合内存仍在 S1 的 16 GB 余量内 |
 | S8f | Windows 透明：WebView2 作为子窗口时分层窗口是否合成 alpha；不行则用 `WindowsWebView2EnvironmentRequestedEventArgs.ExperimentalOffscreen = true`（由 Avalonia 合成，场景 `OffscreenRenderer`） | 同 S8a |
 | S8g | `AdapterType.Headless` 是否能让 C# 侧集成测试在无界面环境跑 | 能则加入 CI；不能则桥的测试用假 `IWebHost` |
+
+### W0 实测记录（2026-11-01，macOS 通过；Windows 推迟到 R3）
+
+状态：**macOS 全部通过，负责人已确认采用 Avalonia + WebView 方案。** 环境：Apple M3 Pro / 36 GB（高于基线 M2 / 16 GB，绝对数偏乐观，用来判断趋势），macOS，Avalonia 12.1.4，WkWebView。Agent 进程无屏幕录制与辅助功能权限，肉眼项与 S8d 最终数据由用户在自己的终端取得。命令：`dotnet run --project tools/WebViewSpike -- [--auto | --bench [--park] [--hide-ms=N] | --headless]`。
+
+| 编号 | 状态 | 结论与数据 |
+|---|---|---|
+| 桥 / CSP（`--auto`） | ✅ macOS | 4 项 PASS；Windows 未跑 |
+| S8a 透明 | ✅ macOS | 用户肉眼确认：浅色与深色壁纸上都没有白底或黑角 |
+| S8b 焦点 | ✅ macOS | 用户确认：窗口出现后不点击即可直接打字；用户终端实测 `activeElement = textarea`、`hasFocus = true`。“关闭后焦点回到原应用并回填”属于 W4 步骤 2 |
+| S8c 输入法 | ✅ macOS 系统拼音（需一处特判） | 用户实测日志：组合中的按键 `isComposing:true`、`keyCode:229`；候选窗正常，能上屏中文。**但确认候选的回车到达时 `compositionend` 已先触发，该 `keydown` 是 `key:"Enter"`、`keyCode:229`、`isComposing:false`**；用户随后有意按的回车是 `keyCode:13`。只判 `isComposing` 会把确认候选误当成“写入”。**结论：Web 的回车处理必须同时忽略 `e.isComposing` 与 `e.keyCode === 229`（WebKit 的已知行为），只在这一处实现；W3 用 WebKit 项目加用例。** Windows 微软拼音未测 |
+| S8d 预热延迟 | ✅ macOS 采用“常驻 + 停放”（`Hide()` 不采用） | **用户终端实测（`--bench --park --hide-ms=2000`，n = 30）：冷启动首帧 24 ms；“脚本已执行、textarea 已聚焦”4–10 ms；首帧 p50 = 42 ms、p95 = 116 ms、max = 119 ms（≤ 150 ms）；结束时 `activeElement = textarea`、`hasFocus = true`。** 结论：W4 的预热窗口不要 `Hide()`，而是保持显示、透明、移出屏幕，唤起时移回。下面是 Agent 进程里较早的数据（应用不在前台、屏幕状态不明），尾部偏高，保留作对照，真实热键流程在 R2 复测。早期数据（首帧 = `requestAnimationFrame` 回调）：**`Hide()` 再 `Show()`**，n = 30：隐藏 0.4 s 时 p50 = 44 ms、p95 = 610 ms（4 次落在 323–650 ms）；隐藏 2 s 时 p50 = 58 ms、p95 = 618 ms（约 1/3 落在 360–650 ms）。**窗口常驻、只置透明并移出屏幕（`--park`）**：隐藏 0.4 s 时 p50 = 29 ms、p95 = 34 ms；隐藏 2 s 时 p50 = 44 ms、p95 = 358 ms（2/30 落在 358–613 ms）。尾部集中在 330 ms 与 650 ms 附近，像 WebKit 对不可见页面的节流恢复。`Hide()` 的路径没有在用户终端复测，因为已决定不用 |
+| S8e 内存 | ✅ macOS | 新增 WebKit 进程（用户终端实测）：WebContent 31 MB、GPU 25 MB、Networking 10 MB，合计约 66 MB（≤ 120 MB）。应用进程 184 MB 是整个 Avalonia 运行时，不能归给 WebView |
+| S8f Windows 透明 | ⏳ 推迟到 R3 | 负责人决定：现在没有 Windows 机器，W0 按 macOS 通过；Windows 的 `--auto`、透明（含 `ExperimentalOffscreen` 退路）、微软拼音与 WebView2 内存在 R3 实测。若 R3 失败，按 §8 退路处理 |
+| S8g Headless | ❌ 不可用，退路成立 | `Avalonia.Headless` 平台下 `NativeWebView` 不创建适配器（无 `AdapterCreated`，`InvokeScript` 抛“Unable to invoke script before any page was loaded”）；`AdapterPreference = [Headless]` 同样无效。`Headless` 适配器本身只是桩，由调用方提供 `ScriptEngine` 与 `HttpHandler`，不会运行页面。结论：桥的 C# 测试用假 `IWebHost`（§7 已规定） |
 
 ## 4. 架构
 
