@@ -1,0 +1,81 @@
+src/LiveLingo.Desktop/Styles/AppTheme.axaml
+  s_821950ffe1bdcc::t_68303ea6fd2cad 97
+src/LiveLingo.Desktop/Web/WebBridge.cs
+  s_821950ffe1bdcc::t_192d037d465e5e 27
+  s_821950ffe1bdcc::t_ff58a887eb6a30 119,125-139
+tests/LiveLingo.Desktop.Tests/Web/ComposerWebSessionTests.cs
+  s_821950ffe1bdcc::t_133ad150b64257 1-88,90-148
+  s_821950ffe1bdcc::t_43c74dc9a384c8 89
+src/LiveLingo.Desktop/Web/WebSurface.cs
+  s_821950ffe1bdcc::t_8a368de248fbb5 29-30,32-33
+  s_821950ffe1bdcc::t_8c30df78709f7d 28
+  s_821950ffe1bdcc::t_2d027ef308e387 31
+  s_821950ffe1bdcc::t_240349474768a5 51-53,58
+src/LiveLingo.Desktop/Composer/ComposerTexts.cs
+  s_821950ffe1bdcc::t_4444124d39afb0 217-219
+src/LiveLingo.Desktop/App.axaml.cs
+  s_821950ffe1bdcc::t_bfc46df0d16606 173,176
+  s_821950ffe1bdcc::t_59dd1c7a92fa9d 214,216-217,219
+  s_821950ffe1bdcc::t_c7ef30ece68710 265-271
+  s_821950ffe1bdcc::t_43455aaa8e785e 119-120,122
+tests/LiveLingo.Web.Tests/ComposerRenderTests.cs
+  s_821950ffe1bdcc::t_42fbadfcea049b 33
+src/LiveLingo.Desktop/Platform/IWindowTracker.cs
+  s_821950ffe1bdcc::t_d819c3692de47a 9-11
+src/LiveLingo.Desktop/Settings/SettingsWindow.axaml.cs
+  s_821950ffe1bdcc::t_96fc7b28a6c1bc 213
+  s_821950ffe1bdcc::t_e40f4269e816fe 225-270
+src/LiveLingo.Desktop/Platform/Windows/WindowsPlatformServices.cs
+  s_821950ffe1bdcc::t_22f7abbeb22079 21
+src/LiveLingo.Desktop/Platform/macOS/MacTextInjector.cs
+  s_821950ffe1bdcc::t_b27cbb2375e651 11,13,16,24
+src/LiveLingo.Desktop/Platform/macOS/MacWindowTracker.cs
+  s_821950ffe1bdcc::t_14d484a8c2f2c4 59-87
+  s_821950ffe1bdcc::t_52081a7a9b95ac 3
+docs/superpowers/specs/2026-11-01-web-ui-design.md
+  s_821950ffe1bdcc::t_4c40e564f39097 129-132
+tests/LiveLingo.Desktop.Tests/Composer/ComposerSessionTests.cs
+  s_821950ffe1bdcc::t_a3398e799306bf 345
+  s_821950ffe1bdcc::t_fc0192914bab14 326-344,346-352
+src/LiveLingo.Desktop/Platform/Windows/Win32WindowTracker.cs
+  s_821950ffe1bdcc::t_acd1995bb603a2 45-64
+src/LiveLingo.Desktop/Platform/Windows/Win32TextInjector.cs
+  s_821950ffe1bdcc::t_4529e1239b223b 38
+  s_821950ffe1bdcc::t_3e41143d4110ca 22,25,27-28
+  s_821950ffe1bdcc::t_8d61712833b02c 12,14,17
+  s_821950ffe1bdcc::t_2f53dc4e720d36 53,60
+  s_821950ffe1bdcc::t_7ef93f2ca90fb9 69,71
+src/LiveLingo.Desktop/Platform/macOS/MacPlatformServices.cs
+  s_821950ffe1bdcc::t_dff4c8f8355a70 21
+src/LiveLingo.Desktop/Web/ComposerWebSession.cs
+  s_821950ffe1bdcc::t_f9b461c13e964f 66-68
+  s_821950ffe1bdcc::t_8c56912050eb6e 1-46,48-65,69-95
+  s_821950ffe1bdcc::t_26181500acd3ba 47
+src/LiveLingo.Desktop/Composer/StorageFileDialogs.cs
+  s_821950ffe1bdcc::t_5d8a6b96a4f010 1-38
+src/LiveLingo.Desktop/Web/Assets/app/00-store.js
+  s_821950ffe1bdcc::t_4dcc42f0d84b8c 85
+test.runsettings
+  s_821950ffe1bdcc::t_e02f6f04b82ef3 8
+src/LiveLingo.Desktop/Composer/ComposerViewModel.cs
+  s_821950ffe1bdcc::t_4245a30e227817 340-348
+  s_821950ffe1bdcc::t_1dbb46a38c4b85 371
+src/LiveLingo.Desktop/Composer/ComposerWindow.cs
+  s_821950ffe1bdcc::t_121514b425884e 1-148
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "77362bfa7411e3d8405786ab5c5e2ade4c30d5aa",
+  "prompts": {},
+  "sessions": {
+    "s_821950ffe1bdcc": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "2e07dbc3-b49b-4806-8ef7-b85cd318bb36",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
