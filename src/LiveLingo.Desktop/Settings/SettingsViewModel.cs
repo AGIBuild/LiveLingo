@@ -57,6 +57,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         _themeIndex = Math.Max(0, Themes.ToList().IndexOf(current.Appearance.Theme));
         _reduceMotion = !current.Appearance.Animations;
         _targetIndex = Math.Max(0, Targets.ToList().IndexOf(current.Composer.TargetLanguage));
+        _cleanupEnabled = current.Composer.CleanupEnabled;
         _tierIndex = Math.Max(0, Tiers.ToList().IndexOf(current.Composer.TranslatorTier));
         _microphoneNames = [""];
         _microphoneIndex = 0;
@@ -87,6 +88,9 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     [ObservableProperty] private int _microphoneIndex;
     [ObservableProperty] private int _targetIndex;
+
+    /// <summary>Whether dictated and typed sentences are cleaned up at all; off offers only the original wording.</summary>
+    [ObservableProperty] private bool _cleanupEnabled;
 
     public ObservableCollection<TermEntry> Terms { get; }
 
@@ -130,6 +134,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     partial void OnReduceMotionChanged(bool value) => Apply();
     partial void OnMicrophoneIndexChanged(int value) => ApplyIfSelected(value);
     partial void OnTargetIndexChanged(int value) => ApplyIfSelected(value);
+    partial void OnCleanupEnabledChanged(bool value) => Apply();
     partial void OnTierIndexChanged(int value) => ApplyIfSelected(value);
 
     /// <summary>A combo box reports -1 while its items are being replaced; that is not a choice.</summary>
@@ -175,6 +180,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         model.Appearance.Theme = Themes[ThemeIndex];
         model.Appearance.Animations = !ReduceMotion;
         model.Composer.TargetLanguage = Targets[TargetIndex];
+        model.Composer.CleanupEnabled = CleanupEnabled;
         model.Composer.TranslatorTier = Tiers[TierIndex];
         if (_devicesLoaded)
             model.Composer.Microphone = MicrophoneIndex < MicrophoneNames.Count ? MicrophoneNames[MicrophoneIndex] : "";

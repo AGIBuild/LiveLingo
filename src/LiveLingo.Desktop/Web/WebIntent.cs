@@ -204,6 +204,7 @@ internal sealed record SettingIntent(string Key, string Value) : WebIntent
         public const string ReduceMotion = "reduceMotion";
         public const string Microphone = "microphone";
         public const string Direction = "direction";
+        public const string Cleanup = "cleanup";
         public const string Tier = "tier";
         public const string CloudBaseUrl = "cloudBaseUrl";
         public const string CloudModel = "cloudModel";
@@ -220,7 +221,7 @@ internal sealed record SettingIntent(string Key, string Value) : WebIntent
         Names.Theme => SettingsViewModel.Themes.Contains(Value),
         Names.Direction => SettingsViewModel.Targets.Contains(Value),
         Names.Tier => SettingsViewModel.Tiers.Contains(Value),
-        Names.ReduceMotion => Value is "true" or "false",
+        Names.ReduceMotion or Names.Cleanup => Value is "true" or "false",
         _ => false
     };
 }

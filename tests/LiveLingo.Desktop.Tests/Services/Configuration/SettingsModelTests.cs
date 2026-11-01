@@ -14,6 +14,7 @@ public class SettingsModelTests
         Assert.Equal("Ctrl+Alt+T", s.Hotkeys.Summon);
         Assert.Equal("en-US", s.Appearance.Language);
         Assert.True(s.Appearance.Animations);
+        Assert.True(s.Composer.CleanupEnabled);
         Assert.Equal(UpdateSettings.DefaultUpdateUrl, s.Update.UpdateUrl);
         Assert.Equal(4, s.Update.CheckIntervalHours);
         Assert.Null(s.Advanced.ModelStoragePath);

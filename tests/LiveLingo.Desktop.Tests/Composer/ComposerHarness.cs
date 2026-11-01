@@ -197,7 +197,7 @@ internal sealed class Harness : IAsyncDisposable
         bool modelsInstalled = true,
         bool hasTarget = true,
         SynchronizationContext? notifyOn = null,
-        ComposerOutput output = ComposerOutput.Translate,
+        ComposerOutput? output = ComposerOutput.Translate,
         ComposerOptions? options = null)
     {
         Session = new DraftSession(hasTarget, notifyOn);
@@ -215,7 +215,8 @@ internal sealed class Harness : IAsyncDisposable
         Vm = new ComposerViewModel(
             Session, Scheduler, plan, Models, Downloads, Platform, Voice, Transcriber, [],
             options ?? ComposerOptions.Default, hasTarget ? Target : null, notifyOn, Time);
-        Vm.Output = output;
+        if (output is { } start)
+            Vm.Output = start;
         Vm.Completed += () => Events.Add("completed");
         Vm.CloseRequested += () => Events.Add("close");
     }

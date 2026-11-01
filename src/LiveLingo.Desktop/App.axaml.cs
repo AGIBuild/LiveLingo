@@ -232,13 +232,17 @@ public partial class App : Application
         var scheduler = new TranslationScheduler(
             session, services.GetRequiredService<ITranslator>(), targetLanguage, TailIdleDelay,
             glossary: glossary);
-        var cleanup = new CleanupScheduler(
-            session, services.GetRequiredService<ITextCleaner>(), glossary.Terms, CleanupHoldback, contextUnits: 2);
+        // With cleanup off no scheduler listens to the draft, so no sentence is ever sent to a cleaner.
+        var cleanup = settings.Composer.CleanupEnabled
+            ? new CleanupScheduler(
+                session, services.GetRequiredService<ITextCleaner>(), glossary.Terms, CleanupHoldback, contextUnits: 2)
+            : null;
         platform.Microphone.PreferredDevice = settings.Composer.Microphone;
         var voice = new MicrophoneVoiceInput(services.GetRequiredService<IDictationSessionFactory>(), platform.Microphone);
         var options = new ComposerOptions(
             settings.Cloud.Translate, settings.Cloud.Clean,
-            Enum.Parse<CommitKey>(settings.Composer.CommitKey), settings.Appearance.Animations, settings.Appearance.Theme);
+            Enum.Parse<CommitKey>(settings.Composer.CommitKey), settings.Appearance.Animations, settings.Appearance.Theme,
+            settings.Composer.CleanupEnabled);
         var vm = new ComposerViewModel(
             session,
             scheduler,
@@ -267,7 +271,8 @@ public partial class App : Application
 
         _recentDrafts.Close(vm.HasTimeline ? "" : vm.SourceText, written);
         await vm.DisposeAsync();
-        await cleanup.DisposeAsync();
+        if (cleanup is not null)
+            await cleanup.DisposeAsync();
         await scheduler.DisposeAsync();
     }
 

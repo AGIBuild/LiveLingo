@@ -1,3 +1,4 @@
+using System.Globalization;
 using LiveLingo.Desktop.Settings;
 
 namespace LiveLingo.Desktop.Web;
@@ -10,7 +11,7 @@ internal sealed record TermState(int I, string Source, string Target);
 
 /// <param name="Microphones">Device names; the first, empty one is the system default.</param>
 internal sealed record VoiceSettingsState(
-    IReadOnlyList<string> Microphones, string Microphone, string Direction, IReadOnlyList<TermState> Terms);
+    IReadOnlyList<string> Microphones, string Microphone, string Direction, bool Cleanup, IReadOnlyList<TermState> Terms);
 
 /// <summary>There is no key here, only whether one is stored: the key itself never goes back to the page.</summary>
 /// <param name="Consent">The step the user is being asked to authorize, or null.</param>
@@ -20,7 +21,14 @@ internal sealed record PrivacySettingsState(
 /// <param name="Text">What the old models are and how much room they take; empty when there are none.</param>
 internal sealed record LegacyModelsState(int Count, string Text);
 
-internal sealed record ModelsSettingsState(string Tier, LegacyModelsState Legacy, string Version);
+/// <summary>One line of the status the user can read out when asking for help; values never contain what the user wrote.</summary>
+internal sealed record DiagnosticLine(string Label, string Value);
+
+internal sealed record ModelsSettingsState(
+    string Tier, LegacyModelsState Legacy, string Version, IReadOnlyList<DiagnosticLine> Diagnostics);
+
+/// <summary>What the host knows about itself: the app version and the system it runs on.</summary>
+internal sealed record AppInfo(string Version, string Platform);
 
 /// <param name="Theme">One of <see cref="SettingsViewModel.Themes"/>.</param>
 internal sealed record SettingsOptionsState(bool Animations, string Theme);
@@ -38,7 +46,7 @@ internal sealed record SettingsViewState(
     ModelsSettingsState Models,
     SettingsOptionsState Options)
 {
-    public static SettingsViewState From(SettingsViewModel vm, SettingsTexts texts, string section, string version)
+    public static SettingsViewState From(SettingsViewModel vm, SettingsTexts texts, string section, AppInfo app)
     {
         var theme = SettingsViewModel.Themes[vm.ThemeIndex];
         return new SettingsViewState(
@@ -55,13 +63,29 @@ internal sealed record SettingsViewState(
                 vm.MicrophoneNames,
                 vm.MicrophoneNames[vm.MicrophoneIndex],
                 SettingsViewModel.Targets[vm.TargetIndex],
+                vm.CleanupEnabled,
                 [.. vm.Terms.Select((term, i) => new TermState(i, term.Source, term.Target))]),
             new PrivacySettingsState(
                 vm.CloudTranslate, vm.CloudClean, vm.CloudBaseUrl, vm.CloudModel, vm.HasStoredKey, vm.CloudInvalid, vm.PendingConsent),
             new ModelsSettingsState(
                 SettingsViewModel.Tiers[vm.TierIndex],
                 new LegacyModelsState(vm.LegacyCount, vm.HasLegacyModels ? texts.LegacyDescription(vm.LegacyCount, vm.LegacyBytes) : ""),
-                version),
+                app.Version,
+                Diagnostics(vm, texts, app)),
             new SettingsOptionsState(!vm.ReduceMotion, theme));
     }
+
+    /// <summary>Only settings that are switches or closed choices: terms, endpoints, device names and keys never go in.</summary>
+    private static DiagnosticLine[] Diagnostics(SettingsViewModel vm, SettingsTexts texts, AppInfo app) =>
+    [
+        new(texts.Label("version"), app.Version),
+        new(texts.Label("diag.platform"), app.Platform),
+        new(texts.Label("language"), SettingsViewModel.Languages[vm.LanguageIndex]),
+        new(texts.Label("model"), SettingsViewModel.Tiers[vm.TierIndex]),
+        new(texts.Label("cleanup"), texts.OnOff(vm.CleanupEnabled)),
+        new(texts.Label("cloud.translate"), texts.OnOff(vm.CloudTranslate)),
+        new(texts.Label("cloud.clean"), texts.OnOff(vm.CloudClean)),
+        new(texts.Label("cloud.apiKey"), texts.Stored(vm.HasStoredKey)),
+        new(texts.Label("legacy"), vm.LegacyCount.ToString(CultureInfo.InvariantCulture))
+    ];
 }

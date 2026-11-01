@@ -349,8 +349,8 @@ public class ComposerVoiceTests
         h.Vm.SourceText = "端口改成 8080。再补测试。";
         await Wait.Until(() => h.Vm.Status == ComposerStatus.Ready);
 
-        Assert.NotEqual("", h.Vm.Lines[0].Warning);
-        Assert.Equal("", h.Vm.Lines[1].Warning);
+        Assert.Equal(new GateRejection(GateReason.NumberLost, "8080"), h.Vm.Lines[0].Rejection);
+        Assert.Null(h.Vm.Lines[1].Rejection);
         Assert.Equal("端口改成 8080。再补测试。", h.Vm.BuildExport(ExportFormat.Txt));
     }
 }

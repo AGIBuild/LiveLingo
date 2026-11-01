@@ -74,6 +74,9 @@
     <${Row} id="mic" title=${LL.t('mic')} desc=${LL.t('mic.desc')}>
       <${Select} id="mic" value=${v.microphone} options=${v.microphones.map((name) => [name, name || LL.t('mic.default')])} onChange=${set('microphone')}/>
     <//>
+    <${Row} id="cleanup" title=${LL.t('cleanup')} desc=${LL.t('cleanup.desc')}>
+      <${Switch} id="cleanup" checked=${v.cleanup} onChange=${(on) => set('cleanup')(String(on))}/>
+    <//>
     <${Row} id="direction" title=${LL.t('direction')} desc=${LL.t('direction.desc')}>
       <${Select} id="direction" value=${v.direction} options=${choices(['English', 'Chinese'], ['direction.zhEn', 'direction.enZh'])} onChange=${set('direction')}/>
     <//>
@@ -106,40 +109,24 @@
     <//>
   </div>`;
 
-  const Models = ({ m }) => html`<div>
-    <div class="chips">${['models.speech', 'models.clean', 'models.translate'].map((key) => html`<span class="chip" key=${key}>${LL.t(key)}</span>`)}</div>
-    <${Row} id="tier" title=${LL.t('model')} desc=${LL.t('model.desc')}>
-      <${Select} id="tier" value=${m.tier} options=${choices(['Quality', 'Fast'], ['model.quality', 'model.fast'])} onChange=${set('tier')}/>
-    <//>
-    ${m.legacy.count > 0 && html`<${Row} id="legacy-remove" title=${LL.t('legacy')} desc=${m.legacy.text}>
-      <button type="button" id="legacy-remove" class="btn" onClick=${() => LL.send('removeLegacyModels')}>${LL.t('legacy.remove')}</button>
-    <//>`}
-    <${Row} id="version" title=${LL.t('version')} desc=${LL.t('version.desc')}>
-      <span id="version" class="chip">${m.version}</span>
-    <//>
-  </div>`;
-
-  // Turning a cloud step on needs the user's consent every time. C# says when to ask; the safe answer is the first button.
-  class Consent extends preact.Component {
+  // A modal dialog: keeps the focus inside, closes on Escape and gives the focus back to what opened it.
+  // The child marked data-initial takes the focus first; it is the safe answer.
+  class Modal extends preact.Component {
     componentDidMount() {
-      this.keepLocal.focus();
+      this.pane.querySelector('[data-initial]').focus();
       document.addEventListener('keydown', this.onKeyDown);
     }
 
     componentWillUnmount() {
       document.removeEventListener('keydown', this.onKeyDown);
-      // The dialog closes into the switch that opened it.
-      document.getElementById('cloud-' + this.props.step)?.focus();
+      document.getElementById(this.props.returnTo)?.focus();
     }
-
-    answer = (allow) => LL.send('consent', { allow });
 
     onKeyDown = (e) => {
       if (e.key === 'Escape') {
         e.preventDefault();
-        this.answer(false);
+        this.props.onClose();
       } else if (e.key === 'Tab') {
-        // A modal dialog keeps the focus inside.
         const buttons = [...this.pane.querySelectorAll('button')];
         const at = buttons.indexOf(document.activeElement);
         const next = (at + (e.shiftKey ? -1 : 1) + buttons.length) % buttons.length;
@@ -148,20 +135,59 @@
       }
     };
 
-    render({ step }) {
+    render({ id, title, onClose, children }) {
       return html`<div class="scrim">
-        <section class="dialog" role="dialog" aria-modal="true" aria-labelledby="consent-title" ref=${(el) => (this.pane = el)}>
-          <header><h2 id="consent-title">${LL.t('consent.' + step)}</h2>
-            <button type="button" class="icon-btn" aria-label=${LL.t('closeAria')} onClick=${() => this.answer(false)}><${LL.Icon} name="close"/></button></header>
-          <p>${LL.t('consent.body')}</p>
-          <div class="dlg-actions">
-            <button type="button" id="consent-keep" class="btn" ref=${(el) => (this.keepLocal = el)} onClick=${() => this.answer(false)}>${LL.t('consent.keepLocal')}</button>
-            <button type="button" id="consent-allow" class="btn primary" onClick=${() => this.answer(true)}>${LL.t('consent.allow')}</button>
-          </div>
+        <section class="dialog" role="dialog" aria-modal="true" aria-labelledby=${id + '-title'} ref=${(el) => (this.pane = el)}>
+          <header><h2 id=${id + '-title'}>${title}</h2>
+            <button type="button" class="icon-btn" aria-label=${LL.t('closeAria')} onClick=${onClose}><${LL.Icon} name="close"/></button></header>
+          ${children}
         </section>
       </div>`;
     }
   }
+
+  class Diagnostics extends preact.Component {
+    state = { open: false };
+
+    show = () => this.setState({ open: true });
+
+    hide = () => this.setState({ open: false });
+
+    render({ lines }, { open }) {
+      return html`<${Row} id="diag-open" title=${LL.t('diag')} desc=${LL.t('diag.desc')}>
+        <button type="button" id="diag-open" class="btn" onClick=${this.show}>${LL.t('diag.open')}</button>
+      <//>
+      ${open && html`<${Modal} id="diag" title=${LL.t('diag.title')} returnTo="diag-open" onClose=${this.hide}>
+        <dl id="diag-text" class="diag">${lines.map((line) => html`<div key=${line.label}><dt>${line.label}</dt><dd>${line.value}</dd></div>`)}</dl>
+        <div class="dlg-actions"><button type="button" id="diag-close" class="btn primary" data-initial onClick=${this.hide}>${LL.t('closeAria')}</button></div>
+      <//>`}`;
+    }
+  }
+
+  const Models = ({ m }) => html`<div>
+    <div class="chips">${['models.speech', 'models.clean', 'models.translate'].map((key) => html`<span class="chip" key=${key}>${LL.t(key)}</span>`)}</div>
+    <${Row} id="tier" title=${LL.t('model')} desc=${LL.t('model.desc')}>
+      <${Select} id="tier" value=${m.tier} options=${choices(['Quality', 'Fast'], ['model.quality', 'model.fast'])} onChange=${set('tier')}/>
+    <//>
+    ${m.legacy.count > 0 && html`<${Row} id="legacy-remove" title=${LL.t('legacy')} desc=${m.legacy.text}>
+      <button type="button" id="legacy-remove" class="btn" onClick=${() => LL.send('removeLegacyModels')}>${LL.t('legacy.remove')}</button>
+    <//>`}
+    <${Diagnostics} lines=${m.diagnostics}/>
+    <${Row} id="version" title=${LL.t('version')} desc=${LL.t('version.desc')}>
+      <span id="version" class="chip">${m.version}</span>
+    <//>
+  </div>`;
+
+  // Turning a cloud step on needs the user's consent every time. C# says when to ask; the safe answer is the first button.
+  const answer = (allow) => LL.send('consent', { allow });
+
+  const Consent = ({ step }) => html`<${Modal} id="consent" title=${LL.t('consent.' + step)} returnTo=${'cloud-' + step} onClose=${() => answer(false)}>
+    <p>${LL.t('consent.body')}</p>
+    <div class="dlg-actions">
+      <button type="button" id="consent-keep" class="btn" data-initial onClick=${() => answer(false)}>${LL.t('consent.keepLocal')}</button>
+      <button type="button" id="consent-allow" class="btn primary" onClick=${() => answer(true)}>${LL.t('consent.allow')}</button>
+    </div>
+  <//>`;
 
   LL.Settings = () => {
     const s = LL.state.settings;

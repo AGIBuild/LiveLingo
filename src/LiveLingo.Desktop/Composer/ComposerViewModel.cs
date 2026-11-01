@@ -67,6 +67,11 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
         _time = time ?? TimeProvider.System;
         _targetLanguage = scheduler.Target;
 
+        Outputs = options.Cleanup
+            ? [ComposerOutput.Clean, ComposerOutput.Translate, ComposerOutput.Original]
+            : [ComposerOutput.Translate, ComposerOutput.Original];
+        _output = options.Cleanup ? ComposerOutput.Clean : ComposerOutput.Original;
+
         _modelsReady = IsInstalled(_plan.For(_output));
         ApplyDraftOutput();
         _session.Changed += OnDraftChanged;
@@ -623,7 +628,7 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
                 : LineState.Pending;
             lines.Add(new ResultLine(
                 i, result.Text ?? "", state, result.Error, TimeLabel(i),
-                Output == ComposerOutput.Clean ? result.Warning : "", result.IsOwned));
+                Output == ComposerOutput.Clean ? result.Rejection : null, result.IsOwned));
         }
         return lines;
     }

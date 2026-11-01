@@ -67,7 +67,7 @@ public class CleanupSchedulerTests
 
         public string ErrorOf(int index) => Session.Read(draft => draft.Units[index].Clean.Error);
 
-        public string WarningOf(int index) => Session.Read(draft => draft.Units[index].Clean.Warning);
+        public GateRejection? RejectionOf(int index) => Session.Read(draft => draft.Units[index].Clean.Rejection);
 
         public async Task<FakeCleaner.Call> NextCall(int count)
         {
@@ -177,7 +177,7 @@ public class CleanupSchedulerTests
 
         await WaitUntil(() => h.CleanOf(0) is not null);
         Assert.Equal("先改接口。", h.CleanOf(0));
-        Assert.Equal("", h.WarningOf(0));
+        Assert.Null(h.RejectionOf(0));
     }
 
     [Fact]
@@ -190,7 +190,7 @@ public class CleanupSchedulerTests
 
         await WaitUntil(() => h.CleanOf(0) is not null);
         Assert.Equal("端口改成 8080。", h.CleanOf(0));
-        Assert.NotEqual("", h.WarningOf(0));
+        Assert.Equal(new GateRejection(GateReason.NumberLost, "8080"), h.RejectionOf(0));
     }
 
     [Fact]
@@ -205,7 +205,7 @@ public class CleanupSchedulerTests
 
         await WaitUntil(() => h.CleanOf(0) is not null);
         Assert.Equal("用 CancellationToken 取消请求。", h.CleanOf(0));
-        Assert.NotEqual("", h.WarningOf(0));
+        Assert.Equal(GateReason.TermLost, h.RejectionOf(0)?.Reason);
     }
 
     [Fact]

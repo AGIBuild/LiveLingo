@@ -69,8 +69,12 @@ public partial class ComposerSettings : ObservableObject
     /// <summary>Name of the input device used for dictation; empty means the system default.</summary>
     [ObservableProperty] private string _microphone = "";
 
+    /// <summary>False turns cleanup off: no sentence is cleaned, the original wording is offered instead.</summary>
+    [ObservableProperty] private bool _cleanupEnabled = true;
+
     public ComposerSettings DeepClone() => new()
     {
+        CleanupEnabled = CleanupEnabled,
         TranslatorTier = TranslatorTier,
         Glossary = Glossary,
         CommitKey = CommitKey,

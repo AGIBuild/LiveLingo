@@ -1,3 +1,4 @@
+using LiveLingo.Core.Drafting;
 using LiveLingo.Core.Transcription;
 using LiveLingo.Core.Translation;
 using LiveLingo.Desktop.Composer;
@@ -22,15 +23,16 @@ internal static class ComposerScenarios
         ["translate-ready"] = () => Ready(Chat, ComposerOutput.Translate),
         ["original-ready"] = () => Ready(Chat, ComposerOutput.Original),
         ["copy-only"] = () => Ready(Chat, ComposerOutput.Translate, hasTarget: false),
-        ["cloud-ctrl-enter"] = () => Ready(Chat, ComposerOutput.Translate, options: new ComposerOptions(true, true, CommitKey.CtrlEnter, true, "Auto")),
-        ["reduced-motion"] = () => Ready(Chat, ComposerOutput.Translate, options: new ComposerOptions(false, false, CommitKey.Enter, false, "Auto")),
+        ["cloud-ctrl-enter"] = () => Ready(Chat, ComposerOutput.Translate, options: new ComposerOptions(true, true, CommitKey.CtrlEnter, true, "Auto", true)),
+        ["reduced-motion"] = () => Ready(Chat, ComposerOutput.Translate, options: new ComposerOptions(false, false, CommitKey.Enter, false, "Auto", true)),
+        ["no-cleanup"] = () => Ready(Chat, ComposerOutput.Original, options: ComposerOptions.Default with { Cleanup = false }),
         ["translate-pending"] = () => Pending(commit: false),
         ["translate-armed"] = () => Pending(commit: true),
         ["written"] = () => Ready(Chat, ComposerOutput.Translate, then: h => h.Vm.CommitAsync(fromKey: true)),
         ["editing"] = () => Ready(Chat, ComposerOutput.Clean, then: h => { h.Vm.StartEditCommand.Execute(0); return Task.CompletedTask; }),
         ["gate-warning"] = () => Ready(Chat, ComposerOutput.Clean, then: h =>
         {
-            h.Vm.Lines = [new ResultLine(0, "先检查缓存。", LineState.Ready, "", Warning: "数字被改动", IsOwned: false), h.Vm.Lines[1]];
+            h.Vm.Lines = [new ResultLine(0, "先检查缓存。", LineState.Ready, "", Rejection: new GateRejection(GateReason.NumberLost, "8080"), IsOwned: false), h.Vm.Lines[1]];
             return Task.CompletedTask;
         }),
         ["row-failed"] = RowFailed,

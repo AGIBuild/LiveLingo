@@ -104,15 +104,15 @@ public sealed class Draft
     }
 
     /// <summary>Stores a model result. Returns false when the ticket is stale or the user owns the text.</summary>
-    public bool Complete(JobTicket ticket, UnitKind kind, string text, string warning = "")
+    public bool Complete(JobTicket ticket, UnitKind kind, string text, GateRejection? rejection = null)
     {
         if (!TryResolve(ticket, kind, out var unit))
             return false;
 
         var result = unit.Result(kind);
-        result.Text = warning.Length > 0 ? unit.Raw : text;
+        result.Text = rejection is null ? text : unit.Raw;
         result.Error = "";
-        result.Warning = warning;
+        result.Rejection = rejection;
         return true;
     }
 

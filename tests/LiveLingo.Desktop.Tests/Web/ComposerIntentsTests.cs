@@ -82,6 +82,16 @@ public sealed class ComposerIntentsTests
     }
 
     [Fact]
+    public async Task AnOutputThatIsNotOffered_IsRefused()
+    {
+        await using var h = new Harness(output: null, options: ComposerOptions.Default with { Cleanup = false });
+        var sut = new ComposerIntents(h.Vm, new RecentDrafts(), new FakeFiles(), new ListLogger());
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => sut.Handle(new OutputIntent(ComposerOutput.Clean) { V = 1 }));
+        Assert.Equal(ComposerOutput.Original, h.Vm.Output);
+    }
+
+    [Fact]
     public async Task Output_Swap_AndTheThreeSwitches_ReachTheViewModel()
     {
         await using var rig = new Rig();

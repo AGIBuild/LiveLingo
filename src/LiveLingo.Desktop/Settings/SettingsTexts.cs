@@ -16,6 +16,7 @@ public sealed class SettingsTexts(ILocalizationService loc)
         "theme", "theme.desc", "theme.auto", "theme.light", "theme.dark",
         "motion", "motion.desc",
         "mic", "mic.desc", "mic.default",
+        "cleanup", "cleanup.desc",
         "direction", "direction.desc", "direction.zhEn", "direction.enZh",
         "terms", "terms.source", "terms.target", "terms.sourceExample", "terms.targetExample", "terms.add", "terms.remove", "terms.hint",
         "cloud.translate", "cloud.translate.desc", "cloud.clean", "cloud.clean.desc",
@@ -26,7 +27,8 @@ public sealed class SettingsTexts(ILocalizationService loc)
         "models.speech", "models.clean", "models.translate",
         "model", "model.desc", "model.quality", "model.fast",
         "legacy", "legacy.remove",
-        "version", "version.desc"
+        "version", "version.desc",
+        "diag", "diag.desc", "diag.open", "diag.title"
     ];
 
     /// <summary>The interface language, for the page's lang attribute.</summary>
@@ -40,6 +42,13 @@ public sealed class SettingsTexts(ILocalizationService loc)
         strings["closeAria"] = loc.T("composer.close");
         return strings;
     }
+
+    /// <summary>A label by its key without the "settings." prefix.</summary>
+    public string Label(string key) => loc.T("settings." + key);
+
+    public string OnOff(bool on) => loc.T(on ? "settings.diag.on" : "settings.diag.off");
+
+    public string Stored(bool stored) => loc.T(stored ? "settings.diag.stored" : "settings.diag.notStored");
 
     /// <summary>What the old models still on disk are and how much room they take.</summary>
     public string LegacyDescription(int count, long bytes) =>

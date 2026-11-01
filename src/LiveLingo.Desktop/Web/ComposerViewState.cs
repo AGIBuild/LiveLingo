@@ -67,8 +67,6 @@ internal sealed record ComposerViewState(
     MenusState Menus,
     DialogsState Dialogs)
 {
-    private static readonly ComposerOutput[] Outputs = [ComposerOutput.Clean, ComposerOutput.Translate, ComposerOutput.Original];
-
     public static ComposerViewState From(ComposerViewModel vm, ComposerTexts texts, RecentDrafts recent, int sourceRev)
     {
         var live = vm.IsListening || vm.IsStartingListening || vm.HasTimeline;
@@ -88,7 +86,7 @@ internal sealed record ComposerViewState(
                 Name(vm.Output),
                 texts.OutputPill(vm.Output, vm.TargetLanguage),
                 vm.Output == ComposerOutput.Translate,
-                [.. Outputs.Select(o => new MenuItemState(Name(o), texts.OutputMenu(o, vm.TargetLanguage), vm.Output == o, true))],
+                [.. vm.Outputs.Select(o => new MenuItemState(Name(o), texts.OutputMenu(o, vm.TargetLanguage), vm.Output == o, true))],
                 texts.SwapMenu(vm.TargetLanguage)),
             Banner: BannerOf(vm.Banner, texts),
             Source: new SourceState(
@@ -167,7 +165,7 @@ internal sealed record ComposerViewState(
         texts.Line(line),
         texts.RowNote(line),
         line.Time,
-        line.Warning.Length > 0,
+        line.Rejection is not null,
         line.IsOwned,
         vm.EditingIndex == line.Index,
         vm.CanEditRows,

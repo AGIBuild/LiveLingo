@@ -1,3 +1,5 @@
+using LiveLingo.Core.Drafting;
+
 namespace LiveLingo.Desktop.Composer;
 
 /// <summary>The output pill: what is written into the target.</summary>
@@ -43,10 +45,10 @@ public enum LineState
 
 /// <summary>One sentence of the "will be written" pane.</summary>
 /// <param name="Time">Where the line starts in an imported recording ("1:05"); empty for typed or spoken text.</param>
-/// <param name="Warning">Why a cleanup was rejected and the original wording was kept; empty otherwise.</param>
+/// <param name="Rejection">Why a cleanup was rejected and the original wording was kept; null otherwise.</param>
 /// <param name="IsOwned">The user edited this sentence; model results never replace it.</param>
 public sealed record ResultLine(
-    int Index, string Text, LineState State, string Error, string Time = "", string Warning = "", bool IsOwned = false);
+    int Index, string Text, LineState State, string Error, string Time = "", GateRejection? Rejection = null, bool IsOwned = false);
 
 /// <summary>One line of the source pane while listening or showing a transcript.</summary>
 /// <param name="IsTail">The sentence still being spoken (not settled yet).</param>
@@ -175,7 +177,8 @@ public sealed record StatusInfo(
 /// <param name="CloudClean">Cleanup runs on the user's cloud endpoint (shown in the privacy chip).</param>
 /// <param name="Animations">False when the user asked to reduce motion.</param>
 /// <param name="Theme">"Auto" (follow the system), "Light" or "Dark".</param>
-public sealed record ComposerOptions(bool CloudTranslate, bool CloudClean, CommitKey CommitKey, bool Animations, string Theme)
+/// <param name="Cleanup">False when the user turned cleanup off: "Clean" is not offered and the composer starts on the original wording.</param>
+public sealed record ComposerOptions(bool CloudTranslate, bool CloudClean, CommitKey CommitKey, bool Animations, string Theme, bool Cleanup)
 {
-    public static ComposerOptions Default { get; } = new(false, false, CommitKey.Enter, true, "Auto");
+    public static ComposerOptions Default { get; } = new(false, false, CommitKey.Enter, true, "Auto", true);
 }
