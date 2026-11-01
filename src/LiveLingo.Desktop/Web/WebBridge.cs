@@ -24,7 +24,7 @@ internal sealed record StringsData(string Locale, IReadOnlyDictionary<string, st
 
 /// <summary>
 /// One message envelope. C# to page: <c>strings</c>, the state type (<c>composer</c>/<c>settings</c>), <c>toast</c>,
-/// <c>focus</c>, <c>openMenu</c>, <c>reset</c>. Page to C#: always a <see cref="WebIntent"/>.
+/// <c>focus</c>, <c>openMenu</c>. Page to C#: always a <see cref="WebIntent"/>.
 /// </summary>
 internal sealed record WebMessage(int V, string Type, object? Data);
 
@@ -116,12 +116,25 @@ internal sealed class WebBridge : IDisposable
 
         if (intent is ReadyIntent)
         {
-            _ready = true;
-            ResendStrings();
-            Push();
+            Start();
             return;
         }
 
         _handler.Handle(intent);
     }
+
+    /// <summary>
+    /// The page is ready to be told everything: the strings, then the first snapshot. Called for the page's own
+    /// <c>ready</c> message, and by a host that attached this bridge to a page that had announced itself earlier.
+    /// </summary>
+    public void Start()
+    {
+        _ready = true;
+        ResendStrings();
+        Push();
+        Started?.Invoke();
+    }
+
+    /// <summary>Raised after the strings and the first snapshot were sent.</summary>
+    public event Action? Started;
 }

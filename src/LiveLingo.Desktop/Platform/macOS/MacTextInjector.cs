@@ -8,10 +8,12 @@ namespace LiveLingo.Desktop.Platform.macOS;
 internal sealed class MacTextInjector : ITextInjector
 {
     private readonly IClipboardService _clipboard;
+    private readonly IWindowTracker _windows;
 
-    public MacTextInjector(IClipboardService clipboard)
+    public MacTextInjector(IClipboardService clipboard, IWindowTracker windows)
     {
         _clipboard = clipboard;
+        _windows = windows;
     }
 
     public async Task InjectAsync(TargetWindowInfo target, string text, bool autoSend, CancellationToken ct)
@@ -19,7 +21,7 @@ internal sealed class MacTextInjector : ITextInjector
         Log.Information("InjectAsync: autoSend={AutoSend}, target={Process}, textLen={Len}",
             autoSend, target.ProcessName, text.Length);
 
-        ActivateProcess(target);
+        _windows.Activate(target);
         await Task.Delay(100, ct);
 
         await _clipboard.SetTextAsync(text, ct);
@@ -36,35 +38,6 @@ internal sealed class MacTextInjector : ITextInjector
             PostKeystroke(kVK_Return, flags: 0);
             Log.Debug("Posted Return (send)");
         }
-    }
-
-    private static void ActivateProcess(TargetWindowInfo target)
-    {
-        if (string.IsNullOrEmpty(target.ProcessName)) return;
-
-        var workspace = objc_msgSend(
-            objc_getClass("NSWorkspace"),
-            sel_registerName("sharedWorkspace"));
-        var apps = objc_msgSend(workspace, sel_registerName("runningApplications"));
-        var count = objc_msgSend_int(apps, sel_registerName("count"));
-
-        for (var i = 0; i < count; i++)
-        {
-            var app = objc_msgSend(apps, sel_registerName("objectAtIndex:"), (IntPtr)i);
-            var namePtr = objc_msgSend(app, sel_registerName("localizedName"));
-            var name = CFStringToString(namePtr);
-
-            if (name is not null && target.ProcessName.Contains(name, StringComparison.OrdinalIgnoreCase))
-            {
-                objc_msgSend(app,
-                    sel_registerName("activateWithOptions:"),
-                    (IntPtr)3); // NSApplicationActivateIgnoringOtherApps | NSApplicationActivateAllWindows
-                Log.Debug("Activated target process: {Name}", name);
-                return;
-            }
-        }
-
-        Log.Debug("Could not find target process to activate: {Name}", target.ProcessName);
     }
 
     private static void PostKeystroke(ushort keycode, ulong flags)

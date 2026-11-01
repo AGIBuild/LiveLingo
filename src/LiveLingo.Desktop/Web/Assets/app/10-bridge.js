@@ -38,8 +38,4 @@
     queued = true;
     requestAnimationFrame(measure);
   };
-
-  LL.resetMeasure = () => {
-    lastSize = '';
-  };
 })();

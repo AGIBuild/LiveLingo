@@ -30,6 +30,7 @@ public sealed class ComposerRenderTests(BrowserFixture browsers)
         Assert.Single(intents, i => i is LiveLingo.Desktop.Web.ReadyIntent);
         Assert.Equal(JsonNode.Parse(ComposerPage.FixtureText("strings"))!["strings"]!["placeholder"]!.GetValue<string>(),
             await page.Page.Locator("#src").GetAttributeAsync("placeholder"));
+        Assert.Equal("zh-CN", await page.Page.EvaluateAsync<string>("document.documentElement.lang"));
         Assert.Equal(0, await page.Page.Locator("#res").CountAsync());
         Assert.True(await page.Page.Locator("#commit").IsDisabledAsync());
         Assert.Empty(page.ConsoleErrors);
@@ -242,20 +243,6 @@ public sealed class ComposerRenderTests(BrowserFixture browsers)
         await page.ReceiveAsync("toast", new JsonObject { ["text"] = "已复制" });
 
         Assert.Equal("已复制", await page.Page.Locator("#toast").InnerTextAsync());
-    }
-
-    [Theory]
-    [MemberData(nameof(Engines))]
-    public async Task Reset_ClosesMenusDialogsAndToast(string engine)
-    {
-        await using var page = await browsers.OpenAsync(engine, "translate-ready");
-        await page.Page.Locator("#out-pill").ClickAsync();
-        await page.ReceiveAsync("toast", new JsonObject { ["text"] = "x" });
-
-        await page.ReceiveAsync("reset", null);
-
-        Assert.Equal(0, await page.Page.Locator(".menu").CountAsync());
-        Assert.Equal(0, await page.Page.Locator("#toast").CountAsync());
     }
 
     [Theory]

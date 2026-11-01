@@ -323,4 +323,31 @@ public class ComposerSessionTests
         Assert.Contains("close", h.Events);
         Assert.Equal("先检查缓存。", h.Vm.SourceText);
     }
+
+    [Fact]
+    public async Task Closing_ReturnsTheKeyboardToTheApplicationTheUserCameFrom()
+    {
+        await using var h = await Translated("先检查缓存。");
+
+        h.Vm.HideCommand.Execute(null);
+        await h.Vm.CancelCommand.ExecuteAsync(null);
+
+        h.Tracker.Received(2).Activate(Harness.Target);
+    }
+
+    [Fact]
+    public async Task Closing_LeavesTheFocusAloneWhenThereIsNoApplicationToGoBackTo()
+    {
+        await using var withoutTarget = new Harness(hasTarget: false);
+        withoutTarget.Vm.HideCommand.Execute(null);
+
+        await using var lost = await Translated("先检查缓存。");
+        lost.Tracker.IsAlive(Arg.Any<LiveLingo.Desktop.Platform.TargetWindowInfo>()).Returns(false);
+        await lost.Vm.CommitAsync(fromKey: true);
+        lost.Vm.HideCommand.Execute(null);
+
+        withoutTarget.Tracker.DidNotReceiveWithAnyArgs().Activate(default!);
+        lost.Tracker.DidNotReceiveWithAnyArgs().Activate(default!);
+        Assert.Contains("close", withoutTarget.Events);
+    }
 }

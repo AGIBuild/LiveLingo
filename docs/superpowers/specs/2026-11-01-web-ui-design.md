@@ -126,9 +126,10 @@ W2 落地时的补充：`micToggle`（键盘 Space/Enter 切换听写，对应 `
 | `strings` | `{locale, dict}`：所有静态文案 | 页面 `ready` 后、语言变更时 |
 | `composer` | `ComposerViewState`（整份） | 每次 VM 变化；C# 侧用 16 ms 定时器合并，保证最多 60 次/s |
 | `settings` | `SettingsViewState`（整份） | 同上 |
-| `toast` | `{kind,text}` | `ToastRaised` |
-| `focus` | `{target:"source"\|"mic"\|"edit"}` | 窗口显示后；横幅操作后 |
-| `reset` | 无 | 重新唤起时清掉 Web 里的瞬时状态（悬停、菜单、对话框） |
+| `toast` | `{text}` | `ToastRaised` |
+| `focus` | `{target:"source"\|"mic"\|"edit"}` | 页面启动后；横幅操作后 |
+
+没有 `reset`：窗口停放（预热）时页面被重新加载一次，下次唤起得到的是全新页面，所以瞬时状态（悬停、菜单、对话框、`sentRev`）不需要清理。窗口在页面首次上报 `size`（说明首份快照已画好）后才移回并显示。
 
 信封统一为 `{"v":1,"type":"…","data":…}`；另有 `openMenu{id:"target"}`（`RetargetRequested` 要求打开目标菜单）。静态文案键见 `ComposerTexts.WebStrings()`。
 

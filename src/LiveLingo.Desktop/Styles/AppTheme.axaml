@@ -94,18 +94,8 @@
             <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPointerOver" Color="#FFFFFFFF"/>
             <SolidColorBrush x:Key="ToggleSwitchKnobFillOnPressed" Color="#FFFFFFFF"/>
 
-            <!-- icons of the prototype sprite, 24x24 -->
-            <StreamGeometry x:Key="IcMic">M9,6 A3,3 0 0 1 15,6 L15,11 A3,3 0 0 1 9,11 Z M5,11 A7,7 0 0 0 19,11 M12,18 L12,21</StreamGeometry>
-            <StreamGeometry x:Key="IcCopy">M11.5,9 L17.5,9 A2.5,2.5 0 0 1 20,11.5 L20,17.5 A2.5,2.5 0 0 1 17.5,20 L11.5,20 A2.5,2.5 0 0 1 9,17.5 L9,11.5 A2.5,2.5 0 0 1 11.5,9 Z M5,15 L5,6 A2,2 0 0 1 7,4 L16,4</StreamGeometry>
-            <StreamGeometry x:Key="IcEdit">M12,20 L21,20 M16.5,3.5 A2.1,2.1 0 0 1 19.5,6.5 L7,19 L3,20 L4,16 Z</StreamGeometry>
-            <StreamGeometry x:Key="IcUndo">M9,14 L4,9 L9,4 M4,9 L14,9 A6,6 0 0 1 14,21 L11,21</StreamGeometry>
-            <StreamGeometry x:Key="IcTarget">M7,17 L17,7 M8,7 L17,7 L17,16</StreamGeometry>
-            <StreamGeometry x:Key="IcGlobe">M3,12 A9,9 0 1 1 21,12 A9,9 0 1 1 3,12 Z M3,12 L21,12 M12,3 A14,14 0 0 1 12,21 M12,3 A14,14 0 0 0 12,21</StreamGeometry>
-            <StreamGeometry x:Key="IcChevron">M7,10 L12,15 L17,10</StreamGeometry>
+            <!-- the close icon of the consent dialog; goes with the settings page (W5) -->
             <StreamGeometry x:Key="IcClose">M6,6 L18,18 M18,6 L6,18</StreamGeometry>
-            <StreamGeometry x:Key="IcAlert">M12,4 L21,20 L3,20 Z M12,10 L12,14 M12,17 L12,17.01</StreamGeometry>
-            <StreamGeometry x:Key="IcInfo">M3,12 A9,9 0 1 1 21,12 A9,9 0 1 1 3,12 Z M12,11 L12,16 M12,8 L12,8.01</StreamGeometry>
-            <StreamGeometry x:Key="IcCheck">M5,12.5 L9.5,17 L19,7</StreamGeometry>
         </ResourceDictionary>
     </Styles.Resources>
 

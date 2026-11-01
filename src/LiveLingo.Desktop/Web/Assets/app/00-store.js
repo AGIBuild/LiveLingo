@@ -82,6 +82,7 @@
     switch (message.type) {
       case 'strings':
         s.strings = message.data.strings;
+        document.documentElement.lang = message.data.locale;
         break;
       case 'composer':
         if (message.data.rev <= s.rev) return; // a late or repeated snapshot
@@ -97,12 +98,6 @@
       case 'openMenu':
         LL.openMenu(message.data.id);
         return;
-      case 'reset':
-        s.menu = null;
-        s.dialog = null;
-        s.toast = '';
-        opener = null;
-        break;
       default:
         throw new Error('Unknown message type: ' + message.type);
     }

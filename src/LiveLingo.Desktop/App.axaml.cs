@@ -116,8 +116,10 @@ public partial class App : Application
             SetupTrayIcon(desktop, platform);
             if (platform is not null)
             {
+                _composer = new ComposerWindow(_serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<ComposerWindow>());
+                _composer.Park();
                 RegisterHotkey(platform, settings.Hotkeys.Summon);
-                platform.Hotkey.HotkeyTriggered += _ => Dispatcher.UIThread.Post(() => Summon(platform));
+                platform.Hotkey.HotkeyTriggered += _ => Dispatcher.UIThread.Post(async () => await SummonAsync(platform));
                 settingsService.SettingsChanged += () => Dispatcher.UIThread.Post(() =>
                 {
                     ApplySettings(platform, settingsService.Current);
@@ -168,10 +170,10 @@ public partial class App : Application
         var loc = _serviceProvider!.GetRequiredService<ILocalizationService>();
 
         var openItem = new NativeMenuItem(loc.T("tray.openComposer")) { IsEnabled = platform is not null };
-        openItem.Click += (_, _) => Dispatcher.UIThread.Post(() =>
+        openItem.Click += (_, _) => Dispatcher.UIThread.Post(async () =>
         {
             if (platform is not null)
-                Summon(platform);
+                await SummonAsync(platform);
         });
 
         var settingsItem = new NativeMenuItem(loc.T("tray.settings"));
@@ -209,11 +211,12 @@ public partial class App : Application
     private static readonly TimeSpan TailIdleDelay = TimeSpan.FromSeconds(1.5);
     private static readonly TimeSpan CleanupHoldback = TimeSpan.FromSeconds(2);
 
-    private void Summon(IPlatformServices platform)
+    private async Task SummonAsync(IPlatformServices platform)
     {
-        if (_composer is { IsVisible: true } open)
+        var window = _composer!;
+        if (window.IsPresenting)
         {
-            open.Close();
+            window.RequestHide();
             return;
         }
 
@@ -254,23 +257,18 @@ public partial class App : Application
             context);
         vm.SettingsRequested += section => ShowSettings(section);
 
-        var loc = services.GetRequiredService<ILocalizationService>();
-        var window = new ComposerWindow(vm, new ComposerTexts(loc), target, _recentDrafts);
         var written = false;
         vm.Completed += () => written = true;
         var restored = _recentDrafts.TakeUnsent();
         if (restored.Length > 0)
             vm.SourceText = restored;
-        window.Closed += async (_, _) =>
-        {
-            _composer = null;
-            _recentDrafts.Close(vm.HasTimeline ? "" : vm.SourceText, written);
-            await vm.DisposeAsync();
-            await cleanup.DisposeAsync();
-            await scheduler.DisposeAsync();
-        };
-        _composer = window;
-        window.Show();
+
+        await window.PresentAsync(vm, new ComposerTexts(services.GetRequiredService<ILocalizationService>()), _recentDrafts, target);
+
+        _recentDrafts.Close(vm.HasTimeline ? "" : vm.SourceText, written);
+        await vm.DisposeAsync();
+        await cleanup.DisposeAsync();
+        await scheduler.DisposeAsync();
     }
 
     private void ShowSettings(string section = "general")

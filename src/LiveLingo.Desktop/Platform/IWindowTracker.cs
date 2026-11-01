@@ -6,4 +6,7 @@ public interface IWindowTracker
 
     /// <summary>True while the window captured earlier still exists, so text is never injected into a different window.</summary>
     bool IsAlive(TargetWindowInfo target);
+
+    /// <summary>Brings the target's application to the front, so the keyboard goes back to it.</summary>
+    void Activate(TargetWindowInfo target);
 }

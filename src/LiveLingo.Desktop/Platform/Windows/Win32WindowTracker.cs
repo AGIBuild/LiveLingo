@@ -42,6 +42,26 @@ internal sealed class Win32WindowTracker : IWindowTracker
 
     public bool IsAlive(TargetWindowInfo target) => IsWindow(target.Handle);
 
+    public void Activate(TargetWindowInfo target)
+    {
+        var hwnd = target.Handle;
+        AllowSetForegroundWindow(ASFW_ANY);
+        ShowWindow(hwnd, SW_SHOW);
+        BringWindowToTop(hwnd);
+
+        var myThread = GetCurrentThreadId();
+        var fgHwnd = GetForegroundWindow();
+        var fgThread = GetWindowThreadProcessId(fgHwnd, out _);
+
+        if (myThread != fgThread)
+            AttachThreadInput(myThread, fgThread, true);
+
+        SetForegroundWindow(hwnd);
+
+        if (myThread != fgThread)
+            AttachThreadInput(myThread, fgThread, false);
+    }
+
     private static nint FindInputChild(nint mainWindow, uint threadId)
     {
         var renderer = FindChromeRenderer(mainWindow);
