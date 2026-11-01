@@ -16,6 +16,11 @@
 
 ## 2. 备选与取舍
 
+**不随包带浏览器内核。** `NativeWebView` 使用系统自带的引擎：macOS 的 WKWebView（随系统）、Windows 的 WebView2（Windows 11 预装；Windows 10 可能缺，见 §11）。应用只增加约 1.5 MB 的 NuGet 包。代价是引擎版本由用户系统决定，因此：
+
+- Web 代码的特性基线以 WebKit（macOS 最低支持版本自带的 Safari 内核）与 Chromium（WebView2）的**交集**为准；用到较新的 CSS / JS 特性（`:has()`、`backdrop-filter`、容器查询等）前，先在两个引擎的 Playwright 项目里验证。
+- 前端测试同时跑 WebKit 与 Chromium（§7），分别对应 macOS 与 Windows。
+
 | 方案 | 做法 | 结论 | 原因 |
 |---|---|---|---|
 | **A（推荐）Avalonia 外壳 + NativeWebView** | 一个透明无边框 Avalonia 窗口承载 WebView；JSON 消息桥 | **采用** | 重用全部 C#；MIT 许可，随 Avalonia 12 开源（Avalonia.Controls.WebView 12.1.1，net10.0）；不带 Chromium |
