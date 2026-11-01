@@ -52,10 +52,10 @@ public class DraftTests
     {
         var draft = new Draft(hasTarget: true);
         var ticket = draft.Append("超时为 30 秒。");
-        draft.Complete(ticket, UnitKind.Clean, "超时为 30 分钟。", warning: "候选改动了单位");
+        draft.Complete(ticket, UnitKind.Clean, "超时为 30 分钟。", new GateRejection(GateReason.NumberInvented, "30"));
 
         Assert.Equal("超时为 30 秒。", draft.Units[0].Clean.Text);
-        Assert.Equal("候选改动了单位", draft.Units[0].Clean.Warning);
+        Assert.Equal(new GateRejection(GateReason.NumberInvented, "30"), draft.Units[0].Clean.Rejection);
         Assert.Equal("超时为 30 秒。", draft.RequestCommit().Snapshot!.Text);
     }
 

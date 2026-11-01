@@ -131,6 +131,7 @@ public sealed class SettingsPageTests(BrowserFixture browsers)
 
         Assert.Equal([S("mic.default"), "USB Mic", "Built-in"], (await page.Page.Locator("#mic option").AllInnerTextsAsync()).Select(t => t.Trim()));
         Assert.Equal("USB Mic", await page.Page.Locator("#mic").InputValueAsync());
+        Assert.False(await page.Page.Locator("#cleanup").IsCheckedAsync());
         Assert.Equal(2, await page.Page.Locator(".term").CountAsync());
         Assert.Contains("cache penetration", await page.Page.Locator(".term").Nth(1).InnerTextAsync());
         Assert.True(await page.Page.Locator("#term-add").IsDisabledAsync());
@@ -178,6 +179,27 @@ public sealed class SettingsPageTests(BrowserFixture browsers)
         Assert.Equal(3, await page.Page.Locator(".chips .chip").CountAsync());
         Assert.Equal("2.0.0", (await page.Page.Locator("#version").InnerTextAsync()).Trim());
         Assert.Contains("8.5", await page.Page.Locator("#legacy-remove").Locator("xpath=ancestor::div[contains(@class,'srow')]").InnerTextAsync());
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public async Task Diagnostics_OpenInAModalDialog_ListTheStatus_AndEscapeGivesTheFocusBack(string engine)
+    {
+        await using var page = await browsers.OpenSettingsAsync(engine, "settings-diagnostics");
+
+        await page.Page.Locator("#diag-open").ClickAsync();
+
+        Assert.Equal("diag-close", await page.Page.EvaluateAsync<string>("document.activeElement.id"));
+        var text = await page.Page.Locator("#diag-text").InnerTextAsync();
+        Assert.Contains("2.0.0", text);
+        Assert.Contains("macOS 15.0 Arm64", text);
+        Assert.DoesNotContain("sk-stored", text);
+
+        await page.Page.Keyboard.PressAsync("Escape");
+
+        Assert.Equal(0, await page.Page.Locator("#diag-text").CountAsync());
+        Assert.Equal("diag-open", await page.Page.EvaluateAsync<string>("document.activeElement.id"));
+        Assert.All(await page.IntentsAsync(), intent => Assert.IsType<ReadyIntent>(intent));
     }
 
     [Theory]
@@ -293,9 +315,10 @@ public sealed class SettingsPageTests(BrowserFixture browsers)
 
         await page.Page.Locator("#mic").SelectOptionAsync("Built-in");
         await page.Page.Locator("#direction").SelectOptionAsync("Chinese");
+        await page.Page.Locator("#cleanup").ClickAsync();
 
         Assert.Equal(
-            [("microphone", "Built-in"), ("direction", "Chinese")],
+            [("microphone", "Built-in"), ("direction", "Chinese"), ("cleanup", "true")],
             (await page.IntentsAsync()).OfType<SettingIntent>().Select(s => (s.Key, s.Value)));
     }
 

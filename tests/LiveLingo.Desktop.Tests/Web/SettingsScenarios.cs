@@ -26,6 +26,7 @@ internal static class SettingsScenarios
         ["settings-voice"] = () => Open("voice", model: m =>
         {
             m.Composer.Microphone = "USB Mic";
+            m.Composer.CleanupEnabled = false;
             m.Composer.Glossary = "Redis\n缓存穿透=cache penetration";
         }),
         ["settings-privacy"] = () => Open("privacy"),
@@ -36,11 +37,19 @@ internal static class SettingsScenarios
             f.Vm.SetCloud(CloudStep.Translate, on: true);
             f.Vm.AnswerConsent(allow: true);
         }),
+        ["settings-diagnostics"] = () => Open("models", model: m =>
+        {
+            Cloud(m);
+            m.Composer.Glossary = "Redis\n缓存穿透=cache penetration";
+            m.Composer.Microphone = "USB Mic";
+        }, key: "sk-stored"),
         ["settings-models"] = () => Open("models", before: f => f.Models.ListInstalled().Returns([Legacy("old-a", 5_500_000_000), Legacy("old-b", 3_000_000_000)])),
     };
 
+    public static AppInfo App { get; } = new("2.0.0", "macOS 15.0 Arm64");
+
     public static SettingsViewState State(SettingsViewModel vm, string section = "general") =>
-        SettingsViewState.From(vm, Texts.ChineseSettings(), section, "2.0.0") with { Rev = 1 };
+        SettingsViewState.From(vm, Texts.ChineseSettings(), section, App) with { Rev = 1 };
 
     private static void Cloud(SettingsModel model)
     {

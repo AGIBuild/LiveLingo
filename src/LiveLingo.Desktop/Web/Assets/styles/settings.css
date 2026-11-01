@@ -37,3 +37,7 @@ button.danger:hover { background: var(--hover); }
 
 .scrim { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; background: rgba(10, 14, 22, .4); }
 .scrim .dialog { width: min(520px, calc(100% - 48px)); padding: 20px 22px; border: 1px solid var(--line); border-radius: 18px; background: var(--panel); box-shadow: var(--shadow); }
+.diag { display: grid; grid-template-columns: max-content 1fr; gap: 6px 18px; margin: 8px 0 0; user-select: text; }
+.diag > div { display: contents; }
+.diag dt { color: var(--muted); }
+.diag dd { margin: 0; overflow-wrap: anywhere; }

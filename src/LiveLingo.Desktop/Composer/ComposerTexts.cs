@@ -1,3 +1,4 @@
+using LiveLingo.Core.Drafting;
 using LiveLingo.Core.Translation;
 using LiveLingo.Desktop.Services.Localization;
 
@@ -123,7 +124,8 @@ public sealed class ComposerTexts(ILocalizationService loc)
 
     /// <summary>The note under a sentence: why the cleanup was not used, or that the user edited it.</summary>
     public string RowNote(ResultLine line) =>
-        line.Warning.Length > 0 ? loc.T("composer.row.kept", line.Warning) : line.IsOwned ? loc.T("composer.row.edited") : "";
+        line.Rejection is { } rejection ? loc.T("composer.row.kept", loc.T($"composer.gate.{rejection.Reason}", rejection.Detail))
+        : line.IsOwned ? loc.T("composer.row.edited") : "";
 
     // ---- footer ------------------------------------------------------------------
 

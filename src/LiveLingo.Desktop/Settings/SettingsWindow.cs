@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Avalonia.Controls;
 using LiveLingo.Desktop.Web;
 using Microsoft.Extensions.Logging;
@@ -20,7 +21,11 @@ internal sealed class SettingsWindow : Window
         Content = web.View;
 
         _session = new SettingsWebSession(
-            vm, texts, section, typeof(SettingsWindow).Assembly.GetName().Version?.ToString(3) ?? "", web,
+            vm, texts, section,
+            new AppInfo(
+                typeof(SettingsWindow).Assembly.GetName().Version?.ToString(3) ?? "",
+                $"{RuntimeInformation.OSDescription} {RuntimeInformation.OSArchitecture}"),
+            web,
             SynchronizationContext.Current ?? throw new InvalidOperationException("The settings are shown from the UI thread."),
             TimeProvider.System, logger);
         Closed += (_, _) => _session.Dispose();

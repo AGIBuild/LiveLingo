@@ -78,7 +78,7 @@ public class VoiceProbeTests(ITestOutputHelper output)
             var (raw, cleaned, warnings) = draft.Read(d => (
                 d.SourceText(),
                 TextUnits.Join(d.Units.Select(u => (u.Lead, u.Clean.Text ?? u.Raw, u.Trail))),
-                d.Units.Count(u => u.Clean.Warning.Length > 0)));
+                d.Units.Count(u => u.Clean.Rejection is not null)));
             var spoken = scenarios[id];
             output.WriteLine($"[{id}] stop settled in {settled} ms, cleanup drained in {stopping.ElapsedMilliseconds} ms, replay {clock.ElapsedMilliseconds} ms");
             output.WriteLine($"[{id}] spoken : {spoken}");

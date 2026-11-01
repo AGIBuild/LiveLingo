@@ -17,6 +17,7 @@
     ],
     "microphone": "",
     "direction": "English",
+    "cleanup": true,
     "terms": []
   },
   "privacy": {
@@ -34,7 +35,45 @@
       "count": 0,
       "text": ""
     },
-    "version": "2.0.0"
+    "version": "2.0.0",
+    "diagnostics": [
+      {
+        "label": "版本",
+        "value": "2.0.0"
+      },
+      {
+        "label": "系统",
+        "value": "macOS 15.0 Arm64"
+      },
+      {
+        "label": "界面语言",
+        "value": "en-US"
+      },
+      {
+        "label": "翻译模型",
+        "value": "Fast"
+      },
+      {
+        "label": "整理句子",
+        "value": "开"
+      },
+      {
+        "label": "云端翻译",
+        "value": "开"
+      },
+      {
+        "label": "云端整理",
+        "value": "关"
+      },
+      {
+        "label": "API 密钥",
+        "value": "已保存"
+      },
+      {
+        "label": "旧版本模型",
+        "value": "0"
+      }
+    ]
   },
   "options": {
     "animations": true,

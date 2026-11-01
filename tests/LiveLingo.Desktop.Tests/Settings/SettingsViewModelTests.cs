@@ -44,6 +44,7 @@ public class SettingsViewModelTests
         model.Composer.CommitKey = "CtrlEnter";
         model.Composer.TargetLanguage = "Chinese";
         model.Composer.TranslatorTier = "Fast";
+        model.Composer.CleanupEnabled = false;
         model.Composer.Glossary = "Redis\n缓存穿透=cache penetration";
         model.Cloud.BaseUrl = "https://api.example.com/v1";
         model.Cloud.Model = "m";
@@ -51,6 +52,7 @@ public class SettingsViewModelTests
 
         var vm = new Fixture(model).Vm;
 
+        Assert.False(vm.CleanupEnabled);
         Assert.Equal("Alt+Space", vm.SummonHotkey);
         Assert.Equal(1, vm.LanguageIndex);
         Assert.Equal(2, vm.ThemeIndex);
@@ -84,8 +86,10 @@ public class SettingsViewModelTests
         f.Vm.ReduceMotion = true;
         f.Vm.TargetIndex = 1;
         f.Vm.TierIndex = 1;
+        f.Vm.CleanupEnabled = false;
 
         var model = f.Last;
+        Assert.False(model.Composer.CleanupEnabled);
         Assert.Equal("Ctrl+Shift+L", model.Hotkeys.Summon);
         Assert.Equal("en-US", model.Appearance.Language);
         Assert.Equal("Light", model.Appearance.Theme);

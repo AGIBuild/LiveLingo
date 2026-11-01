@@ -61,6 +61,21 @@ public sealed class SettingsIntentsTests
     }
 
     [Fact]
+    public void TheCleanupSwitch_IsStored()
+    {
+        var rig = new Rig();
+
+        rig.Set(SettingIntent.Names.Cleanup, "false");
+
+        Assert.False(rig.Vm.CleanupEnabled);
+        Assert.False(rig.F.Last.Composer.CleanupEnabled);
+
+        rig.Set(SettingIntent.Names.Cleanup, "true");
+
+        Assert.True(rig.F.Last.Composer.CleanupEnabled);
+    }
+
+    [Fact]
     public void ACloudEndpoint_IsStored()
     {
         var rig = new Rig();

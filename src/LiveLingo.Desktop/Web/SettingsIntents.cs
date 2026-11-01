@@ -67,6 +67,7 @@ internal sealed class SettingsIntents : IIntentHandler
             case SettingIntent.Names.Direction: _vm.TargetIndex = IndexOf(SettingsViewModel.Targets, value); break;
             case SettingIntent.Names.Tier: _vm.TierIndex = IndexOf(SettingsViewModel.Tiers, value); break;
             case SettingIntent.Names.ReduceMotion: _vm.ReduceMotion = value == "true"; break;
+            case SettingIntent.Names.Cleanup: _vm.CleanupEnabled = value == "true"; break;
             case SettingIntent.Names.CloudBaseUrl: _vm.CloudBaseUrl = value; break;
             case SettingIntent.Names.CloudModel: _vm.CloudModel = value; break;
             case SettingIntent.Names.Microphone:

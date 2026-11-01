@@ -87,6 +87,7 @@ public sealed class WebIntentTests
     [InlineData("""{"v":1,"name":"setting","key":"theme","value":"Neon"}""", "invalid")]
     [InlineData("""{"v":1,"name":"setting","key":"commitKey","value":"enter"}""", "invalid")]
     [InlineData("""{"v":1,"name":"setting","key":"reduceMotion","value":"yes"}""", "invalid")]
+    [InlineData("""{"v":1,"name":"setting","key":"cleanup","value":"yes"}""", "invalid")]
     [InlineData("""{"v":1,"name":"setting","key":"tier","value":"Cloud"}""", "invalid")]
     [InlineData("""{"v":1,"name":"setting","key":"theme"}""", "JsonException")]
     [InlineData("""{"v":1,"name":"removeTerm","index":-1}""", "invalid")]

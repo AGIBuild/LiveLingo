@@ -27,6 +27,8 @@
     "mic": "麦克风",
     "mic.desc": "听写使用的输入设备",
     "mic.default": "系统默认",
+    "cleanup": "整理句子",
+    "cleanup.desc": "去掉语气词和重复；关闭后只提供原话",
     "direction": "翻译方向",
     "direction.desc": "中文与英文互译",
     "direction.zhEn": "中文 → English",
@@ -71,6 +73,10 @@
     "legacy.remove": "删除",
     "version": "版本",
     "version.desc": "模型和运行时只在你同意后下载",
+    "diag": "运行状态",
+    "diag.desc": "不含正文、术语、地址和密钥，便于排查",
+    "diag.open": "查看",
+    "diag.title": "运行状态（不含正文）",
     "closeAria": "隐藏并保留草稿"
   }
 }

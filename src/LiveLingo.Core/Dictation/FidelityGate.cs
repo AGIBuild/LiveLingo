@@ -1,9 +1,18 @@
+using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
+using LiveLingo.Core.Drafting;
 
 namespace LiveLingo.Core.Dictation;
 
-public readonly record struct GateResult(bool Accepted, string? Reason);
+public readonly record struct GateResult(GateRejection? Rejection)
+{
+    public bool Accepted => Rejection is null;
+
+    public static GateResult Accept => default;
+
+    public static GateResult Refuse(GateReason reason, string detail = "") => new(new GateRejection(reason, detail));
+}
 
 /// <summary>
 /// Deterministic checks that reject a cleanup result that is not a faithful edit. They do not prove semantic fidelity;
@@ -32,15 +41,15 @@ public static partial class FidelityGate
     public static GateResult Check(string raw, string cleaned, IReadOnlyList<string>? glossary = null)
     {
         if (string.IsNullOrWhiteSpace(cleaned))
-            return new(false, "empty output");
+            return GateResult.Refuse(GateReason.Empty);
 
         // One sentence in, one sentence out. A line break means the model echoed the prompt layout ("词表：… 目标：…").
         if (cleaned.Contains('\n') && !raw.Contains('\n'))
-            return new(false, "multi-line output");
+            return GateResult.Refuse(GateReason.MultiLine);
 
         foreach (var (open, close) in QuotePairs)
             if (Balance(raw, open, close) != Balance(cleaned, open, close))
-                return new(false, "quotes or brackets unbalanced");
+                return GateResult.Refuse(GateReason.Brackets);
 
         var rawNorm = Normalize(raw);
         var cleanedNorm = Normalize(cleaned);
@@ -49,12 +58,12 @@ public static partial class FidelityGate
 
         foreach (Match digits in DigitRun().Matches(raw))
             if (!cleanedNorm.Contains(digits.Value, StringComparison.Ordinal))
-                return new(false, $"number lost: {digits.Value}");
+                return GateResult.Refuse(GateReason.NumberLost, digits.Value);
 
         // Numbers are never invented: turning garbled Chinese numerals into digits is a guess, so it is left to the recognizer.
         foreach (Match digits in DigitRun().Matches(cleaned))
             if (!rawNorm.Contains(digits.Value, StringComparison.Ordinal))
-                return new(false, $"number invented: {digits.Value}");
+                return GateResult.Refuse(GateReason.NumberInvented, digits.Value);
 
         // An English word the cleaner removed is acceptable only when a glossary term took its place.
         // A run of adjacent English words ("Max Oce") is one phonetic guess, so it needs one replacement.
@@ -64,23 +73,25 @@ public static partial class FidelityGate
             .ToList();
         var replacements = glossaryNorm.Count(g => cleanedNorm.Contains(g, StringComparison.Ordinal) && !rawNorm.Contains(g, StringComparison.Ordinal));
         if (lostRuns.Count > replacements)
-            return new(false, $"term lost: {lostRuns[0]}");
+            return GateResult.Refuse(GateReason.TermLost, lostRuns[0]!);
 
         // An English word the cleaner introduced must come from the glossary.
         foreach (var word in Words(cleaned))
             if (!rawNorm.Contains(word, StringComparison.Ordinal) && !glossaryNorm.Any(g => g.Contains(word, StringComparison.Ordinal)))
-                return new(false, $"term not in glossary: {word}");
+                return GateResult.Refuse(GateReason.TermNotInGlossary, word);
 
         var rawCjk = Cjk(raw);
         var cleanedCjk = Cjk(cleaned);
-        if (rawCjk.Length == 0) return new(true, null);
+        if (rawCjk.Length == 0) return GateResult.Accept;
 
         var ratio = (double)cleanedCjk.Length / rawCjk.Length;
-        if (ratio < MinLengthRatio) return new(false, $"too short ({ratio:F2})");
-        if (ratio > MaxLengthRatio) return new(false, $"too long ({ratio:F2})");
+        var shown = (ratio * 100).ToString("F0", CultureInfo.InvariantCulture) + "%";
+        if (ratio < MinLengthRatio) return GateResult.Refuse(GateReason.TooShort, shown);
+        if (ratio > MaxLengthRatio) return GateResult.Refuse(GateReason.TooLong, shown);
 
         var (dropped, added) = Align(rawCjk, cleanedCjk);
-        if (added > Math.Max(6, cleanedCjk.Length / 5)) return new(false, $"added {added} characters");
+        if (added > Math.Max(6, cleanedCjk.Length / 5))
+            return GateResult.Refuse(GateReason.Added, added.ToString(CultureInfo.InvariantCulture));
 
         var garbageBudget = replacements * GlossaryDropPerReplacement;
         foreach (var (start, length) in dropped)
@@ -91,10 +102,10 @@ public static partial class FidelityGate
                 garbageBudget -= length;
                 continue;
             }
-            return new(false, $"deleted without explanation: {rawCjk.Substring(start, length)}");
+            return GateResult.Refuse(GateReason.Deleted, rawCjk.Substring(start, length));
         }
 
-        return new(true, null);
+        return GateResult.Accept;
     }
 
     private static readonly (char Open, char Close)[] QuotePairs =

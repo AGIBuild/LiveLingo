@@ -19,7 +19,7 @@ public sealed class SettingsWebSessionTests
         public Rig(SettingsModel? model = null, string? storedKey = null, string section = "general")
         {
             F = new SettingsViewModelTests.Fixture(model, storedKey);
-            Session = new SettingsWebSession(F.Vm, Texts.ChineseSettings(), section, "2.0.0", Host, new InlineContext(), Time, new ListLogger());
+            Session = new SettingsWebSession(F.Vm, Texts.ChineseSettings(), section, SettingsScenarios.App, Host, new InlineContext(), Time, new ListLogger());
             Host.FromPage("""{"v":1,"name":"ready"}""");
         }
 

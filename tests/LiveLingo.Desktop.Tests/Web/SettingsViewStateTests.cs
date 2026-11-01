@@ -83,12 +83,31 @@ public sealed class SettingsViewStateTests
     }
 
     [Fact]
+    public async Task Diagnostics_ListTheStateOfTheAppAndNothingTheUserWrote()
+    {
+        var state = await SettingsScenarios.All["settings-diagnostics"]();
+
+        var lines = state.Models.Diagnostics.ToDictionary(l => l.Label, l => l.Value);
+        Assert.Equal("2.0.0", lines["版本"]);
+        Assert.Equal("macOS 15.0 Arm64", lines["系统"]);
+        Assert.Equal("开", lines["云端翻译"]);
+        Assert.Equal("关", lines["云端整理"]);
+        Assert.Equal("已保存", lines["API 密钥"]);
+
+        // The terms, the endpoint, the deployment, the device and the key are the user's own; none of it may show.
+        var all = string.Join('\n', lines.Select(l => l.Key + l.Value));
+        foreach (var secret in new[] { "Redis", "缓存穿透", "api.example.com", "gpt-deploy", "USB Mic", "sk-stored" })
+            Assert.DoesNotContain(secret, all);
+    }
+
+    [Fact]
     public async Task TheVoiceGroup_ListsTheDevicesAndTheTerms()
     {
         var state = await SettingsScenarios.All["settings-voice"]();
 
         Assert.Equal(["", "USB Mic", "Built-in"], state.Voice.Microphones);
         Assert.Equal("USB Mic", state.Voice.Microphone);
+        Assert.False(state.Voice.Cleanup);
         Assert.Equal([new TermState(0, "Redis", "Redis"), new TermState(1, "缓存穿透", "cache penetration")], state.Voice.Terms);
     }
 

@@ -1,3 +1,4 @@
+using LiveLingo.Core.Drafting;
 using LiveLingo.Core.Translation;
 using LiveLingo.Desktop.Composer;
 using LiveLingo.Desktop.Services.Localization;
@@ -231,7 +232,9 @@ public class ComposerTextsTests
     {
         var texts = Create();
 
-        Assert.Equal("[composer.row.kept:added a fact]", texts.RowNote(new ResultLine(0, "a", LineState.Ready, "", Warning: "added a fact")));
+        Assert.Equal(
+            "[composer.row.kept:[composer.gate.NumberLost:8080]]",
+            texts.RowNote(new ResultLine(0, "a", LineState.Ready, "", Rejection: new GateRejection(GateReason.NumberLost, "8080"))));
         Assert.Equal("[composer.row.edited]", texts.RowNote(new ResultLine(0, "a", LineState.Ready, "", IsOwned: true)));
         Assert.Equal("", texts.RowNote(new ResultLine(0, "a", LineState.Ready, "")));
         Assert.Equal("[composer.row.edit.aria:2]", texts.RowEditAria(1));

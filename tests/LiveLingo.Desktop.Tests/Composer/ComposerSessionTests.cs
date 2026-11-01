@@ -207,9 +207,36 @@ public class ComposerSessionTests
     }
 
     [Fact]
+    public async Task WithCleanup_TheComposerStartsOnCleanAndOffersAllThreeOutputs()
+    {
+        await using var h = new Harness(output: null);
+
+        Assert.Equal(ComposerOutput.Clean, h.Vm.Output);
+        Assert.Equal([ComposerOutput.Clean, ComposerOutput.Translate, ComposerOutput.Original], h.Vm.Outputs);
+    }
+
+    [Fact]
+    public async Task WithoutCleanup_TheComposerStartsOnTheOriginalAndDoesNotOfferClean()
+    {
+        await using var h = new Harness(output: null, options: ComposerOptions.Default with { Cleanup = false });
+
+        Assert.Equal(ComposerOutput.Original, h.Vm.Output);
+        Assert.Equal([ComposerOutput.Translate, ComposerOutput.Original], h.Vm.Outputs);
+    }
+
+    [Fact]
+    public async Task WithoutCleanup_TheCloudChipDoesNotClaimACloudCleanup()
+    {
+        await using var h = new Harness(options: ComposerOptions.Default with { CloudClean = true, Cleanup = false });
+
+        Assert.False(h.Vm.CloudClean);
+        Assert.False(h.Vm.StatusInfo.UsesCloud);
+    }
+
+    [Fact]
     public async Task Options_AreExposedToTheWindow()
     {
-        await using var h = new Harness(options: new ComposerOptions(true, false, CommitKey.CtrlEnter, false, "Auto"));
+        await using var h = new Harness(options: new ComposerOptions(true, false, CommitKey.CtrlEnter, false, "Auto", true));
 
         Assert.True(h.Vm.CloudTranslate);
         Assert.False(h.Vm.CloudClean);

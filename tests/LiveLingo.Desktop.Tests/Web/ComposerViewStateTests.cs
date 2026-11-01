@@ -162,7 +162,7 @@ public sealed class ComposerViewStateTests
         var state = await ComposerScenarios.All["gate-warning"]();
 
         Assert.True(state.Result.Rows[0].Warn);
-        Assert.Contains("数字被改动", state.Result.Rows[0].Note);
+        Assert.Contains("丢了数字 8080", state.Result.Rows[0].Note);
     }
 
     [Fact]
@@ -230,6 +230,17 @@ public sealed class ComposerViewStateTests
         Assert.True(state.Options.Animations);
         Assert.False(still.Options.Animations);
         Assert.False(still.Privacy.Cloud);
+    }
+
+    [Fact]
+    public async Task WithoutCleanup_TheOutputMenuHasNoCleanEntry()
+    {
+        var all = await ComposerScenarios.All["original-ready"]();
+        var none = await ComposerScenarios.All["no-cleanup"]();
+
+        Assert.Equal(["clean", "translate", "original"], all.Output.Menu.Select(m => m.Id));
+        Assert.Equal(["translate", "original"], none.Output.Menu.Select(m => m.Id));
+        Assert.Equal("original", none.Output.Value);
     }
 
     [Fact]

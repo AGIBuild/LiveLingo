@@ -18,7 +18,7 @@ internal sealed class SettingsWebSession : IDisposable
         SettingsViewModel vm,
         SettingsTexts texts,
         string section,
-        string version,
+        AppInfo app,
         IWebHost host,
         SynchronizationContext ui,
         TimeProvider time,
@@ -29,7 +29,7 @@ internal sealed class SettingsWebSession : IDisposable
         _intents = new SettingsIntents(vm, section, logger);
         _bridge = new WebBridge(
             host, "settings",
-            rev => SettingsViewState.From(vm, texts, _intents.Section, version) with { Rev = rev },
+            rev => SettingsViewState.From(vm, texts, _intents.Section, app) with { Rev = rev },
             () => new StringsData(texts.Locale, texts.WebStrings()),
             _intents, ui, time, logger);
 

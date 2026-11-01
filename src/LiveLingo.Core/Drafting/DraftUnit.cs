@@ -10,14 +10,16 @@ public sealed class UnitResult
     public bool IsOwned { get; internal set; }
 
     public string Error { get; internal set; } = "";
-    public string Warning { get; internal set; } = "";
+
+    /// <summary>Set when a cleanup result was refused and the original wording was kept.</summary>
+    public GateRejection? Rejection { get; internal set; }
 
     internal void Clear()
     {
         Text = null;
         IsOwned = false;
         Error = "";
-        Warning = "";
+        Rejection = null;
     }
 }
 

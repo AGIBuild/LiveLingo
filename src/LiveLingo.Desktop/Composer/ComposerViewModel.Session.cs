@@ -40,7 +40,11 @@ public sealed partial class ComposerViewModel
     [ObservableProperty] private IReadOnlyList<SourceLine> _sourceLines = [];
 
     public bool CloudTranslate => _options.CloudTranslate;
-    public bool CloudClean => _options.CloudClean;
+    /// <summary>Cleanup runs on the user's endpoint; false when cleanup is off, because then nothing is sent.</summary>
+    public bool CloudClean => _options.CloudClean && _options.Cleanup;
+
+    /// <summary>The outputs the pill offers, in menu order.</summary>
+    public IReadOnlyList<ComposerOutput> Outputs { get; }
     public CommitKey CommitKey => _options.CommitKey;
     public bool Animations => _options.Animations;
     public string Theme => _options.Theme;

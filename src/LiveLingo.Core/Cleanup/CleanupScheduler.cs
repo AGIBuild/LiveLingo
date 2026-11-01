@@ -111,9 +111,7 @@ public sealed class CleanupScheduler : IAsyncDisposable
             {
                 var cleaned = (await _cleaner.CleanAsync(request, cancel.Token).ConfigureAwait(false)).Trim();
                 var gate = FidelityGate.Check(request.Target, cleaned, _glossary);
-                _session.Mutate(draft => gate.Accepted
-                    ? draft.Complete(ticket, UnitKind.Clean, cleaned)
-                    : draft.Complete(ticket, UnitKind.Clean, cleaned, warning: gate.Reason ?? "rejected"));
+                _session.Mutate(draft => draft.Complete(ticket, UnitKind.Clean, cleaned, gate.Rejection));
             }
             catch (OperationCanceledException) when (cancel.IsCancellationRequested)
             {
