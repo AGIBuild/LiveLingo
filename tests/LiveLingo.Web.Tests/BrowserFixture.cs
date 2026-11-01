@@ -1,3 +1,4 @@
+using System.Text.Json.Nodes;
 using LiveLingo.Desktop.Web;
 using Microsoft.Playwright;
 
@@ -11,6 +12,10 @@ namespace LiveLingo.Web.Tests;
 /// </summary>
 public sealed class BrowserFixture : IAsyncLifetime
 {
+    /// <summary>The page the window gives the web view: the 620 px panel plus its 18 px shadow margin on both sides.</summary>
+    public const int NarrowWidth = 656;
+    public const int WideWidth = 976;
+
     private IPlaywright? _playwright;
     private readonly Dictionary<string, IBrowser> _browsers = [];
 
@@ -26,11 +31,35 @@ public sealed class BrowserFixture : IAsyncLifetime
         _browsers["chromium"] = await _playwright.Chromium.LaunchAsync();
     }
 
-    public async Task<PageSession> OpenAsync(string engine, string nonce)
+    /// <summary>Opens the page without any snapshot: C# has not answered <c>ready</c> yet.</summary>
+    public async Task<ComposerPage> OpenBareAsync(string engine, int width = NarrowWidth, ColorScheme scheme = ColorScheme.Light)
     {
-        var page = await _browsers[engine].NewPageAsync();
-        var session = new PageSession(page);
-        await page.SetContentAsync(WebPage.Build(nonce));
+        var page = await _browsers[engine].NewPageAsync(new BrowserNewPageOptions
+        {
+            ViewportSize = new ViewportSize { Width = width, Height = 900 },
+            ColorScheme = scheme,
+        });
+        var session = new ComposerPage(page);
+        // The host injects invokeCSharpAction into every page; here it records what the page would have sent.
+        await page.AddInitScriptAsync("window.__raw = []; window.invokeCSharpAction = (s) => { window.__raw.push(s); };");
+        // Served from the base URI the host uses, so the page runs with the same origin and the init script applies.
+        await page.RouteAsync(ComposerPage.BaseUri, route => route.FulfillAsync(new RouteFulfillOptions
+        {
+            ContentType = "text/html; charset=utf-8",
+            Body = WebPage.Build(WebPageTests.Nonce),
+        }));
+        await page.GotoAsync(ComposerPage.BaseUri);
+        await session.WaitForIntentAsync("ready");
+        return session;
+    }
+
+    /// <summary>Opens the page and plays the host's part of the handshake: strings, then the first snapshot.</summary>
+    public async Task<ComposerPage> OpenAsync(string engine, string fixture = "empty", int width = NarrowWidth,
+        ColorScheme scheme = ColorScheme.Light)
+    {
+        var session = await OpenBareAsync(engine, width, scheme);
+        await session.PushStringsAsync();
+        await session.PushAsync(fixture);
         return session;
     }
 
@@ -42,10 +71,12 @@ public sealed class BrowserFixture : IAsyncLifetime
     }
 }
 
-/// <summary>An open page plus everything the page reported while it ran.</summary>
-public sealed class PageSession : IAsyncDisposable
+/// <summary>An open page, the host messages it receives and everything it reported while it ran.</summary>
+public sealed class ComposerPage : IAsyncDisposable
 {
-    public PageSession(IPage page)
+    private int _rev;
+
+    public ComposerPage(IPage page)
     {
         Page = page;
         page.Console += (_, m) =>
@@ -54,12 +85,62 @@ public sealed class PageSession : IAsyncDisposable
                 ConsoleErrors.Add(m.Text);
         };
         page.PageError += (_, e) => ConsoleErrors.Add(e);
-        page.Request += (_, r) => Requests.Add(r.Url);
+        page.Request += (_, r) =>
+        {
+            if (r.Url != BaseUri)
+                Requests.Add(r.Url);
+        };
     }
+
+    public const string BaseUri = "https://livelingo.invalid/";
 
     public IPage Page { get; }
     public List<string> ConsoleErrors { get; } = [];
     public List<string> Requests { get; } = [];
+
+    public static string FixtureText(string name) =>
+        File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures", name + ".json"));
+
+    /// <summary>A label of the strings message, so tests name controls the way the user sees them.</summary>
+    public static string Str(string key) => JsonNode.Parse(FixtureText("strings"))!["strings"]![key]!.GetValue<string>();
+
+    public Task PushStringsAsync()
+    {
+        var data = JsonNode.Parse(FixtureText("strings"))!;
+        return ReceiveAsync("strings", data);
+    }
+
+    /// <summary>Pushes a golden snapshot with the next revision; <paramref name="edit"/> may adjust it first.</summary>
+    public Task PushAsync(string fixture, Action<JsonObject>? edit = null)
+    {
+        var snapshot = JsonNode.Parse(FixtureText(fixture))!.AsObject();
+        edit?.Invoke(snapshot);
+        snapshot["rev"] = ++_rev;
+        return ReceiveAsync("composer", snapshot);
+    }
+
+    public Task ReceiveAsync(string type, JsonNode? data)
+    {
+        var envelope = new JsonObject { ["v"] = 1, ["type"] = type, ["data"] = data };
+        return Page.EvaluateAsync("json => LL.receive(json)", envelope.ToJsonString());
+    }
+
+    /// <summary>Everything the page sent since the last <see cref="ClearIntentsAsync"/>, parsed by the real host parser.</summary>
+    internal async Task<IReadOnlyList<WebIntent>> IntentsAsync()
+    {
+        var raw = await Page.EvaluateAsync<string[]>("window.__raw");
+        return [.. raw.Select(json =>
+            WebIntent.Parse(json, out var reason) ?? throw new InvalidOperationException($"The host would reject {json}: {reason}"))];
+    }
+
+    public Task ClearIntentsAsync() => Page.EvaluateAsync("window.__raw.length = 0");
+
+    internal async Task<T> LastIntentAsync<T>() where T : WebIntent => (await IntentsAsync()).OfType<T>().Last();
+
+    internal async Task<int> CountAsync<T>() where T : WebIntent => (await IntentsAsync()).OfType<T>().Count();
+
+    public Task WaitForIntentAsync(string name) =>
+        Page.WaitForFunctionAsync("name => window.__raw.some(s => JSON.parse(s).name === name)", name);
 
     public async ValueTask DisposeAsync() => await Page.CloseAsync();
 }

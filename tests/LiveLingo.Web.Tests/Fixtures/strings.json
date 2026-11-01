@@ -1,0 +1,31 @@
+{
+  "locale": "zh-CN",
+  "strings": {
+    "placeholder": "说话，或直接输入、粘贴…",
+    "hintMic": "按住麦克风说话",
+    "hintWrite": "写入",
+    "hintNewline": "换行",
+    "hintHide": "隐藏",
+    "destAria": "回填目标",
+    "outputAria": "输出内容",
+    "moreAria": "更多操作",
+    "closeAria": "隐藏并保留草稿",
+    "copyAria": "复制将写入的内容",
+    "resultAria": "将写入的内容",
+    "routeChip": "整段 · 保留格式",
+    "rowRetry": "重试",
+    "rowManual": "手动输入",
+    "rowSave": "保存",
+    "rowCancel": "取消",
+    "rowProcessing": "处理中",
+    "rowUseOriginal": "改用原话",
+    "rowEdit": "编辑",
+    "progressAria": "下载进度",
+    "recentTitle": "最近草稿",
+    "recentClear": "清除最近草稿",
+    "recentEmpty": "还没有草稿。关闭或写入后会出现在这里；退出应用后清除。",
+    "recentRestore": "恢复",
+    "exportTitle": "导出…",
+    "exportHint": "导出当前选定的内容。"
+  }
+}

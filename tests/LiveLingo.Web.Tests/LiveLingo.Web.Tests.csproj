@@ -26,6 +26,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The golden files are written by LiveLingo.Desktop.Tests and replayed here into the real page. -->
+    <None Include="Fixtures\*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\LiveLingo.Desktop\LiveLingo.Desktop.csproj" />
   </ItemGroup>
 
