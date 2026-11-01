@@ -80,6 +80,8 @@
         ${live && html`<div id="src-live" class="src-live" ref=${this.setLive}>${source.lines.map((line, i) => html`<div class=${'line' + (line.tail ? ' tail' : '')} key=${i}>
           ${line.time && html`<time>${line.time}</time>`}<span>${line.text}</span>${line.tail && html`<i class="caret"></i>`}</div>`)}</div>`}
         ${source.hint && html`<p id="hint" class="hint">${LL.t('hintMic')} · <kbd>${options.commitKeyCap}</kbd> ${LL.t('hintWrite')} · <kbd>${options.newlineKeyCap}</kbd> ${LL.t('hintNewline')} · <kbd>Esc</kbd> ${LL.t('hintHide')}</p>`}
+        ${source.remembered && html`<p id="remembered" class="remembered"><span>${source.remembered.text}</span>
+          <button type="button" id="restore-defaults" class="link" onClick=${() => LL.send('restoreDefaults')}>${source.remembered.action}</button></p>`}
         ${source.resume && html`<button type="button" id="resume" class="resume" onClick=${() => LL.send('restoreRecent', { index: source.resume.index })}>
           <${LL.Icon} name="undo"/><span class="resume-lbl">${LL.t('resume')}</span><span class="resume-txt">${source.resume.label}</span></button>`}
       </section>`;

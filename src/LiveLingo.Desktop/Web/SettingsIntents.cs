@@ -48,6 +48,8 @@ internal sealed class SettingsIntents : IIntentHandler
                 break;
             case ForgetKeyIntent: Run(() => _vm.ForgetCloudKeyCommand.ExecuteAsync(null)); break;
             case ClearRecentIntent: _vm.ClearRecentCommand.Execute(null); break;
+            case ForgetAppIntent forget: _vm.ForgetApp(forget.AppId); break;
+            case ClearAppsIntent: _vm.ClearApps(); break;
             case RemoveLegacyModelsIntent: Run(() => _vm.RemoveLegacyModelsCommand.ExecuteAsync(null)); break;
             default: throw new ArgumentOutOfRangeException(nameof(intent), intent.GetType().Name, "Not a settings intent.");
         }
@@ -66,6 +68,9 @@ internal sealed class SettingsIntents : IIntentHandler
             case SettingIntent.Names.Theme: _vm.ThemeIndex = IndexOf(SettingsViewModel.Themes, value); break;
             case SettingIntent.Names.Direction: _vm.TargetIndex = IndexOf(SettingsViewModel.Targets, value); break;
             case SettingIntent.Names.Tier: _vm.TierIndex = IndexOf(SettingsViewModel.Tiers, value); break;
+            case SettingIntent.Names.DefaultOutput: _vm.DefaultOutputIndex = IndexOf(SettingsViewModel.DefaultOutputs, value); break;
+            case SettingIntent.Names.AutoDictate: _vm.AutoDictate = value == "true"; break;
+            case SettingIntent.Names.RememberChoices: _vm.RememberChoices = value == "true"; break;
             case SettingIntent.Names.ReduceMotion: _vm.ReduceMotion = value == "true"; break;
             case SettingIntent.Names.Cleanup: _vm.CleanupEnabled = value == "true"; break;
             case SettingIntent.Names.CloudBaseUrl: _vm.CloudBaseUrl = value; break;

@@ -41,6 +41,12 @@ public sealed class WebIntentTests
     [InlineData("""{"v":1,"name":"saveKey","value":"sk-1"}""", typeof(SaveKeyIntent))]
     [InlineData("""{"v":1,"name":"forgetKey"}""", typeof(ForgetKeyIntent))]
     [InlineData("""{"v":1,"name":"removeLegacyModels"}""", typeof(RemoveLegacyModelsIntent))]
+    [InlineData("""{"v":1,"name":"restoreDefaults"}""", typeof(RestoreDefaultsIntent))]
+    [InlineData("""{"v":1,"name":"forgetApp","appId":"com.tinyspeck.slackmacgap"}""", typeof(ForgetAppIntent))]
+    [InlineData("""{"v":1,"name":"clearApps"}""", typeof(ClearAppsIntent))]
+    [InlineData("""{"v":1,"name":"setting","key":"defaultOutput","value":"Translate"}""", typeof(SettingIntent))]
+    [InlineData("""{"v":1,"name":"setting","key":"autoDictate","value":"true"}""", typeof(SettingIntent))]
+    [InlineData("""{"v":1,"name":"setting","key":"rememberChoices","value":"false"}""", typeof(SettingIntent))]
     public void Parse_AcceptsEveryIntentOfTheClosedSet(string json, Type expected)
     {
         var intent = WebIntent.Parse(json, out var reason);
@@ -89,6 +95,10 @@ public sealed class WebIntentTests
     [InlineData("""{"v":1,"name":"setting","key":"reduceMotion","value":"yes"}""", "invalid")]
     [InlineData("""{"v":1,"name":"setting","key":"cleanup","value":"yes"}""", "invalid")]
     [InlineData("""{"v":1,"name":"setting","key":"tier","value":"Cloud"}""", "invalid")]
+    [InlineData("""{"v":1,"name":"setting","key":"defaultOutput","value":"Cloud"}""", "invalid")]
+    [InlineData("""{"v":1,"name":"setting","key":"autoDictate","value":"1"}""", "invalid")]
+    [InlineData("""{"v":1,"name":"setting","key":"rememberChoices","value":"maybe"}""", "invalid")]
+    [InlineData("""{"v":1,"name":"forgetApp","appId":""}""", "invalid")]
     [InlineData("""{"v":1,"name":"setting","key":"theme"}""", "JsonException")]
     [InlineData("""{"v":1,"name":"removeTerm","index":-1}""", "invalid")]
     [InlineData("""{"v":1,"name":"cloudToggle","step":"everything","on":true}""", "JsonException")]

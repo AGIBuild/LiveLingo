@@ -154,6 +154,16 @@ public sealed class SettingsViewStateTests
     }
 
     [Fact]
+    public async Task TheRememberedApps_AreNamedAndSummarizedInTheWordsOfTheOutputMenu()
+    {
+        var state = await SettingsScenarios.All["settings-apps"]();
+
+        Assert.Equal(["Slack", "Code", "仅复制"], state.Privacy.Apps.Select(app => app.Name));
+        Assert.Equal(["翻译成 English", "保持中文（整理）", "翻译成 中文"], state.Privacy.Apps.Select(app => app.Summary));
+        Assert.Equal("com.tinyspeck.slackmacgap", state.Privacy.Apps[0].Id);
+    }
+
+    [Fact]
     public async Task NoSnapshot_ContainsAnUnexpectedField()
     {
         using var document = JsonDocument.Parse(JsonSerializer.Serialize(await SettingsScenarios.All["settings-cloud"](), WebJson.Wire));
@@ -162,7 +172,7 @@ public sealed class SettingsViewStateTests
             ["general", "models", "options", "privacy", "rev", "section", "voice"],
             document.RootElement.EnumerateObject().Select(p => p.Name).Order(StringComparer.Ordinal));
         Assert.Equal(
-            ["baseUrl", "cloudClean", "cloudTranslate", "consent", "hasKey", "invalid", "model"],
+            ["apps", "baseUrl", "cloudClean", "cloudTranslate", "consent", "hasKey", "invalid", "model"],
             document.RootElement.GetProperty("privacy").EnumerateObject().Select(p => p.Name).Order(StringComparer.Ordinal));
     }
 

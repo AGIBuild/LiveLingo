@@ -81,6 +81,17 @@ public sealed class ComposerTexts(ILocalizationService loc, bool? mac = null)
     public string RecentEmpty => loc.T("composer.recent.empty");
     public string RecentRestore => loc.T("composer.recent.restore");
     public string Resume => loc.T("composer.resume");
+    public string RestoreDefaults => loc.T("composer.remember.restore");
+
+    /// <summary>The application's name; the context without an input box (copy only) has none and is called by what it does.</summary>
+    public string ContextName(string name) => name.Length > 0 ? name : loc.T("composer.remember.clipboard");
+
+    /// <summary>"Using your last choice for Slack: translate to English", shown while a remembered choice stands.</summary>
+    public string RememberedNote(RememberContext context, ComposerOutput output, TargetLanguage target) =>
+        loc.T("composer.remember.note", ContextName(context.Name), OutputMenu(output, target));
+
+    /// <summary>The line of the output menu that says whose choices are remembered.</summary>
+    public string RememberMenuNote(RememberContext context) => loc.T("composer.remember.menu", ContextName(context.Name));
 
     /// <summary>The first words of a draft's first line, to recognize it by.</summary>
     public static string RecentPreview(RecentDraft draft)
@@ -267,6 +278,7 @@ public sealed class ComposerTexts(ILocalizationService loc, bool? mac = null)
         ["recentEmpty"] = RecentEmpty,
         ["recentRestore"] = RecentRestore,
         ["resume"] = Resume,
+        ["restoreDefaults"] = RestoreDefaults,
         ["exportTitle"] = MoreExport,
         ["exportHint"] = ExportHint
     };

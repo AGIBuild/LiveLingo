@@ -72,9 +72,27 @@ public partial class ComposerSettings : ObservableObject
     /// <summary>False turns cleanup off: no sentence is cleaned, the original wording is offered instead.</summary>
     [ObservableProperty] private bool _cleanupEnabled = true;
 
+    /// <summary>
+    /// Name of a <see cref="LiveLingo.Desktop.Composer.ComposerOutput"/>: what a composer starts with in an application
+    /// that has no remembered choice. Cleanup unless the user says otherwise.
+    /// </summary>
+    [ObservableProperty] private string _defaultOutput = nameof(LiveLingo.Desktop.Composer.ComposerOutput.Clean);
+
+    /// <summary>The microphone opens as soon as the composer appears (off: the user starts dictation).</summary>
+    [ObservableProperty] private bool _autoDictate;
+
+    /// <summary>
+    /// The output and the translation direction last chosen for an application are used the next time the composer
+    /// opens for it (see <c>ComposerPreferences</c>). On by default; nothing but the application's identity is kept.
+    /// </summary>
+    [ObservableProperty] private bool _rememberChoices = true;
+
     public ComposerSettings DeepClone() => new()
     {
         CleanupEnabled = CleanupEnabled,
+        DefaultOutput = DefaultOutput,
+        AutoDictate = AutoDictate,
+        RememberChoices = RememberChoices,
         TranslatorTier = TranslatorTier,
         Glossary = Glossary,
         CommitKey = CommitKey,

@@ -19,6 +19,14 @@ internal static class ComposerScenarios
     public static IReadOnlyDictionary<string, Func<Task<ComposerViewState>>> All { get; } = new SortedDictionary<string, Func<Task<ComposerViewState>>>
     {
         ["empty"] = async () => { await using var h = new Harness(output: ComposerOutput.Clean); return State(h); },
+        ["remembered"] = async () =>
+        {
+            await using var h = new Harness(output: ComposerOutput.Clean);
+            h.Vm.Begin(new ComposerStart(
+                ComposerOutput.Translate, TargetLanguage.English, ComposerOutput.Clean, TargetLanguage.English,
+                new RememberContext("com.tinyspeck.slackmacgap", "Slack", Applied: true)));
+            return State(h);
+        },
         ["resume-draft"] = async () =>
         {
             await using var h = new Harness(output: ComposerOutput.Clean);
@@ -27,6 +35,12 @@ internal static class ComposerScenarios
             return State(h, recent);
         },
         ["clean-ready"] = () => Ready("那个我觉得这个方案可以。", ComposerOutput.Clean),
+        ["export-last"] = () => Ready(Chat, ComposerOutput.Clean, then: h =>
+        {
+            h.Vm.Begin(new ComposerStart(
+                ComposerOutput.Clean, h.Vm.TargetLanguage, ComposerOutput.Clean, h.Vm.TargetLanguage, null, ExportFormat.Markdown));
+            return Task.CompletedTask;
+        }),
         ["translate-ready"] = () => Ready(Chat, ComposerOutput.Translate),
         ["original-ready"] = () => Ready(Chat, ComposerOutput.Original),
         ["copy-only"] = () => Ready(Chat, ComposerOutput.Translate, hasTarget: false),

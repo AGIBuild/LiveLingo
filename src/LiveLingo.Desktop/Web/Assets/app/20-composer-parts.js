@@ -65,7 +65,7 @@
       <div class="anchor">
         <button type="button" id="out-pill" class="pill" aria-label=${LL.t('outputAria')} aria-haspopup="menu" aria-expanded=${open === 'output'}
           onClick=${toggle('output')}>${c.output.globe && html`<${Icon} name="globe"/>`}${c.output.pill}<${Icon} name="chevron"/></button>
-        <${LL.Menu} id="output" align="right" label=${LL.t('outputAria')} items=${output} onPick=${pickOutput}/>
+        <${LL.Menu} id="output" align="right" label=${LL.t('outputAria')} items=${output} note=${c.output.note} onPick=${pickOutput}/>
       </div>
       <div class="anchor">
         <button type="button" id="more" class="icon-btn" aria-label=${LL.t('moreAria')} title=${LL.t('moreAria')} aria-haspopup="menu"

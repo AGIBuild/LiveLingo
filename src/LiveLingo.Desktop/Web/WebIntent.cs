@@ -18,6 +18,7 @@ namespace LiveLingo.Desktop.Web;
 [JsonDerivedType(typeof(MicToggleIntent), "micToggle")]
 [JsonDerivedType(typeof(OutputIntent), "output")]
 [JsonDerivedType(typeof(SwapLanguageIntent), "swapLanguage")]
+[JsonDerivedType(typeof(RestoreDefaultsIntent), "restoreDefaults")]
 [JsonDerivedType(typeof(CommitIntent), "commit")]
 [JsonDerivedType(typeof(CopyIntent), "copy")]
 [JsonDerivedType(typeof(CancelIntent), "cancel")]
@@ -46,6 +47,8 @@ namespace LiveLingo.Desktop.Web;
 [JsonDerivedType(typeof(SaveKeyIntent), "saveKey")]
 [JsonDerivedType(typeof(ForgetKeyIntent), "forgetKey")]
 [JsonDerivedType(typeof(RemoveLegacyModelsIntent), "removeLegacyModels")]
+[JsonDerivedType(typeof(ForgetAppIntent), "forgetApp")]
+[JsonDerivedType(typeof(ClearAppsIntent), "clearApps")]
 internal abstract record WebIntent
 {
     public const int Version = 1;
@@ -140,6 +143,9 @@ internal sealed record OutputIntent(ComposerOutput Value) : WebIntent;
 
 internal sealed record SwapLanguageIntent : WebIntent;
 
+/// <summary>"Restore defaults" of the remembered-choice note: back to the settings' output and direction, and forget the memory.</summary>
+internal sealed record RestoreDefaultsIntent : WebIntent;
+
 internal sealed record CommitIntent(bool FromKey) : WebIntent;
 
 internal sealed record CopyIntent : WebIntent;
@@ -209,6 +215,9 @@ internal sealed record SettingIntent(string Key, string Value) : WebIntent
         public const string Direction = "direction";
         public const string Cleanup = "cleanup";
         public const string Tier = "tier";
+        public const string DefaultOutput = "defaultOutput";
+        public const string AutoDictate = "autoDictate";
+        public const string RememberChoices = "rememberChoices";
         public const string CloudBaseUrl = "cloudBaseUrl";
         public const string CloudModel = "cloudModel";
     }
@@ -224,7 +233,8 @@ internal sealed record SettingIntent(string Key, string Value) : WebIntent
         Names.Theme => SettingsViewModel.Themes.Contains(Value),
         Names.Direction => SettingsViewModel.Targets.Contains(Value),
         Names.Tier => SettingsViewModel.Tiers.Contains(Value),
-        Names.ReduceMotion or Names.Cleanup => Value is "true" or "false",
+        Names.DefaultOutput => SettingsViewModel.DefaultOutputs.Contains(Value),
+        Names.ReduceMotion or Names.Cleanup or Names.AutoDictate or Names.RememberChoices => Value is "true" or "false",
         _ => false
     };
 }
@@ -254,3 +264,11 @@ internal sealed record SaveKeyIntent(string Value) : WebIntent
 internal sealed record ForgetKeyIntent : WebIntent;
 
 internal sealed record RemoveLegacyModelsIntent : WebIntent;
+
+/// <summary>Forgets what was remembered for one application.</summary>
+internal sealed record ForgetAppIntent(string AppId) : WebIntent
+{
+    protected override bool IsValid => AppId.Length is >= 1 and <= 512;
+}
+
+internal sealed record ClearAppsIntent : WebIntent;

@@ -21,6 +21,7 @@ using LiveLingo.Desktop.Platform.Windows;
 using LiveLingo.Desktop.Services.Cloud;
 using LiveLingo.Desktop.Services.Configuration;
 using LiveLingo.Desktop.Services.Localization;
+using LiveLingo.Desktop.Services.Preferences;
 using LiveLingo.Desktop.Services.Update;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -86,6 +87,10 @@ public partial class App : Application
         {
             services.AddSingleton<ISecretStore, InMemorySecretStore>();
         }
+
+        services.AddSingleton<IPreferencesStore>(sp =>
+            new JsonPreferencesStore(Path.Combine(GetUserDataDirectory(), "preferences.json"), sp.GetService<ILogger<JsonPreferencesStore>>()));
+        services.AddSingleton<ComposerPreferences>();
 
         // Registered after AddLiveLingoCore so it replaces the local-only default: roles go to the cloud only when the user enabled them.
         services.AddSingleton<ICloudRoutes, SettingsCloudRoutes>();
@@ -231,9 +236,14 @@ public partial class App : Application
         var settings = services.GetRequiredService<ISettingsService>().Current;
         var glossary = Glossary.Parse(settings.Composer.Glossary);
         var session = new DraftSession(hasTarget: target is not null, notifyOn: context);
-        var targetLanguage = Enum.Parse<TargetLanguage>(settings.Composer.TargetLanguage);
+        var options = new ComposerOptions(
+            settings.Cloud.Translate, settings.Cloud.Clean,
+            Enum.Parse<CommitKey>(settings.Composer.CommitKey), settings.Appearance.Animations, settings.Appearance.Theme,
+            settings.Composer.CleanupEnabled);
+        var preferences = services.GetRequiredService<ComposerPreferences>();
+        var start = preferences.Resolve(target, options.Outputs) with { LastExport = preferences.LastExportFormat };
         var scheduler = new TranslationScheduler(
-            session, services.GetRequiredService<ITranslator>(), targetLanguage, TailIdleDelay,
+            session, services.GetRequiredService<ITranslator>(), start.Target, TailIdleDelay,
             glossary: glossary);
         // With cleanup off no scheduler listens to the draft, so no sentence is ever sent to a cleaner.
         var cleanup = settings.Composer.CleanupEnabled
@@ -242,10 +252,6 @@ public partial class App : Application
             : null;
         platform.Microphone.PreferredDevice = settings.Composer.Microphone;
         var voice = new MicrophoneVoiceInput(services.GetRequiredService<IDictationSessionFactory>(), platform.Microphone);
-        var options = new ComposerOptions(
-            settings.Cloud.Translate, settings.Cloud.Clean,
-            Enum.Parse<CommitKey>(settings.Composer.CommitKey), settings.Appearance.Animations, settings.Appearance.Theme,
-            settings.Composer.CleanupEnabled);
         var vm = new ComposerViewModel(
             session,
             scheduler,
@@ -263,11 +269,18 @@ public partial class App : Application
             target,
             context);
         vm.SettingsRequested += section => ShowSettings(section);
+        vm.Begin(start);
+        vm.ChoiceMade += choice => preferences.Remember(target, choice.Output, choice.Target);
+        vm.DefaultsRestored += () => preferences.Forget(start.Remember!.AppId);
+        vm.Exported += preferences.RememberExportFormat;
 
         var written = false;
         vm.Completed += () => written = true;
 
-        await window.PresentAsync(vm, new ComposerTexts(services.GetRequiredService<ILocalizationService>()), _recentDrafts, target);
+        var presented = window.PresentAsync(vm, new ComposerTexts(services.GetRequiredService<ILocalizationService>()), _recentDrafts, target);
+        if (settings.Composer.AutoDictate)
+            await vm.StartListeningAsync();
+        await presented;
 
         _recentDrafts.Close(vm.HasTimeline ? "" : vm.SourceText, written);
         await vm.DisposeAsync();
@@ -288,7 +301,8 @@ public partial class App : Application
         var services = _serviceProvider!;
         var vm = new SettingsViewModel(
             services.GetRequiredService<ISettingsService>(), services.GetRequiredService<ISecretStore>(),
-            services.GetRequiredService<IModelManager>(), _recentDrafts, services.GetRequiredService<IPlatformServices>().Microphone);
+            services.GetRequiredService<IModelManager>(), _recentDrafts, services.GetRequiredService<IPlatformServices>().Microphone,
+            services.GetRequiredService<ComposerPreferences>());
         _settingsWindow = new SettingsWindow(
             vm, new SettingsTexts(services.GetRequiredService<ILocalizationService>()), section,
             services.GetRequiredService<ILoggerFactory>().CreateLogger<SettingsWindow>());

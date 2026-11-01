@@ -62,9 +62,7 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
         _time = time ?? TimeProvider.System;
         _targetLanguage = scheduler.Target;
 
-        Outputs = options.Cleanup
-            ? [ComposerOutput.Clean, ComposerOutput.Translate, ComposerOutput.Original]
-            : [ComposerOutput.Translate, ComposerOutput.Original];
+        Outputs = options.Outputs;
         _output = options.Cleanup ? ComposerOutput.Clean : ComposerOutput.Original;
 
         _modelsReady = IsInstalled(_plan.For(_output));
@@ -150,8 +148,11 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
     }
 
     [RelayCommand]
-    private void SwapLanguage() =>
+    private void SwapLanguage()
+    {
         TargetLanguage = TargetLanguage == TargetLanguage.English ? TargetLanguage.Chinese : TargetLanguage.English;
+        Chosen();
+    }
 
     // ---- listening -----------------------------------------------------------
 

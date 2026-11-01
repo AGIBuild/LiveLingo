@@ -42,6 +42,38 @@ public sealed class ComposerRenderTests(BrowserFixture browsers)
 
     [Theory]
     [MemberData(nameof(Engines))]
+    public async Task ARememberedChoice_IsSaidUnderTheHintWithOneClickBack_AndTheOutputMenuSaysWhoseChoicesAreKept(string engine)
+    {
+        await using var none = await browsers.OpenAsync(engine, "empty");
+        Assert.Equal(0, await none.Page.Locator("#remembered").CountAsync());
+
+        await using var page = await browsers.OpenAsync(engine, "remembered");
+
+        var note = page.Page.Locator("#remembered");
+        Assert.Contains("Slack", await note.InnerTextAsync());
+        await page.Page.Locator("#restore-defaults").ClickAsync();
+        Assert.IsType<LiveLingo.Desktop.Web.RestoreDefaultsIntent>((await page.IntentsAsync()).Last());
+
+        await page.Page.Locator("#out-pill").ClickAsync();
+        Assert.Contains("Slack", await page.Page.Locator(".menu-note").InnerTextAsync());
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public async Task TheExportDialog_MarksAndFocusesTheFormatExportedLast(string engine)
+    {
+        await using var page = await browsers.OpenAsync(engine, "export-last");
+        await page.Page.Locator("#more").ClickAsync();
+        await page.Page.Locator(".menu button", new() { HasText = "导出" }).ClickAsync();
+
+        var markdown = page.Page.GetByRole(AriaRole.Button, new() { Name = "Markdown" });
+        Assert.Equal("true", await markdown.GetAttributeAsync("aria-current"));
+        Assert.Equal(1, await page.Page.Locator(".dlg-actions .last").CountAsync());
+        Assert.True(await markdown.EvaluateAsync<bool>("el => el === document.activeElement"));
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
     public async Task Handshake_SendsReadyOnceAndTheFirstSnapshotDrawsTheEmptyComposer(string engine)
     {
         await using var page = await browsers.OpenAsync(engine);

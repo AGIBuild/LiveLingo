@@ -1,0 +1,105 @@
+{
+  "rev": 1,
+  "section": "privacy",
+  "general": {
+    "hotkey": "Ctrl+Alt+T",
+    "hotkeyInvalid": false,
+    "commitKey": "Enter",
+    "language": "en-US",
+    "theme": "Auto",
+    "reduceMotion": false,
+    "rememberChoices": true
+  },
+  "voice": {
+    "microphones": [
+      "",
+      "USB Mic",
+      "Built-in"
+    ],
+    "microphone": "",
+    "direction": "English",
+    "cleanup": true,
+    "defaultOutput": "Clean",
+    "autoDictate": false,
+    "terms": []
+  },
+  "privacy": {
+    "cloudTranslate": false,
+    "cloudClean": false,
+    "baseUrl": "",
+    "model": "",
+    "hasKey": false,
+    "invalid": false,
+    "consent": null,
+    "apps": [
+      {
+        "id": "com.tinyspeck.slackmacgap",
+        "name": "Slack",
+        "summary": "翻译成 English",
+        "used": "2026-11-02"
+      },
+      {
+        "id": "com.microsoft.VSCode",
+        "name": "Code",
+        "summary": "保持中文（整理）",
+        "used": "2026-11-01"
+      },
+      {
+        "id": "·clipboard",
+        "name": "仅复制",
+        "summary": "翻译成 中文",
+        "used": "2026-10-30"
+      }
+    ]
+  },
+  "models": {
+    "tier": "Fast",
+    "legacy": {
+      "count": 0,
+      "text": ""
+    },
+    "version": "2.0.0",
+    "diagnostics": [
+      {
+        "label": "版本",
+        "value": "2.0.0"
+      },
+      {
+        "label": "系统",
+        "value": "macOS 15.0 Arm64"
+      },
+      {
+        "label": "界面语言",
+        "value": "en-US"
+      },
+      {
+        "label": "翻译模型",
+        "value": "Fast"
+      },
+      {
+        "label": "整理句子",
+        "value": "开"
+      },
+      {
+        "label": "云端翻译",
+        "value": "关"
+      },
+      {
+        "label": "云端整理",
+        "value": "关"
+      },
+      {
+        "label": "API 密钥",
+        "value": "未保存"
+      },
+      {
+        "label": "旧版本模型",
+        "value": "0"
+      }
+    ]
+  },
+  "options": {
+    "animations": true,
+    "theme": "Auto"
+  }
+}

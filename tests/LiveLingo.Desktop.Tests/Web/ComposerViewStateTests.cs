@@ -311,6 +311,65 @@ public sealed class ComposerViewStateTests
     }
 
     [Fact]
+    public async Task ARememberedStart_IsNamedAndCanBeUndone_AndTheOutputMenuSaysWhatIsRemembered()
+    {
+        var state = await ComposerScenarios.All["remembered"]();
+
+        Assert.Equal("已沿用「Slack」上次的选择：翻译成 English", state.Source.Remembered?.Text);
+        Assert.Equal("恢复默认", state.Source.Remembered?.Action);
+        Assert.Equal("选择会为「Slack」记住", state.Output.Note);
+    }
+
+    [Fact]
+    public async Task WithoutARememberedStart_NothingIsAnnounced_ButTheMenuStillSaysWhatIsRemembered()
+    {
+        await using var h = new Harness();
+        h.Vm.Begin(new ComposerStart(
+            ComposerOutput.Clean, Core.Translation.TargetLanguage.English, ComposerOutput.Clean, Core.Translation.TargetLanguage.English,
+            new RememberContext("com.slack", "Slack", Applied: false)));
+
+        var state = ComposerScenarios.State(h);
+
+        Assert.Null(state.Source.Remembered);
+        Assert.Equal("选择会为「Slack」记住", state.Output.Note);
+    }
+
+    [Fact]
+    public async Task TheClipboardContext_IsCalledCopyOnly()
+    {
+        await using var h = new Harness(hasTarget: false);
+        h.Vm.Begin(new ComposerStart(
+            ComposerOutput.Translate, Core.Translation.TargetLanguage.Chinese, ComposerOutput.Clean, Core.Translation.TargetLanguage.English,
+            new RememberContext(LiveLingo.Desktop.Services.Preferences.ComposerPreferences.ClipboardId, "", Applied: true)));
+
+        var state = ComposerScenarios.State(h);
+
+        Assert.Equal("已沿用「仅复制」上次的选择：翻译成 中文", state.Source.Remembered?.Text);
+    }
+
+    [Fact]
+    public async Task WhenRememberingIsOff_NeitherTheNoteNorTheMenuLineIsShown()
+    {
+        var state = await ComposerScenarios.All["empty"]();
+
+        Assert.Null(state.Source.Remembered);
+        Assert.Null(state.Output.Note);
+    }
+
+    [Fact]
+    public async Task TheLastExportFormat_IsMarkedInTheExportDialog()
+    {
+        await using var h = new Harness();
+        Assert.Null(ComposerScenarios.State(h).Dialogs.Export.Last);
+
+        h.Vm.Begin(new ComposerStart(
+            ComposerOutput.Clean, Core.Translation.TargetLanguage.English, ComposerOutput.Clean, Core.Translation.TargetLanguage.English,
+            null, ExportFormat.Markdown));
+
+        Assert.Equal("markdown", ComposerScenarios.State(h).Dialogs.Export.Last);
+    }
+
+    [Fact]
     public async Task TheSourceRevision_IsWhatTheCallerPassed()
     {
         await using var h = new Harness();

@@ -5,18 +5,24 @@ namespace LiveLingo.Desktop.Web;
 
 /// <param name="Theme">One of <see cref="SettingsViewModel.Themes"/>.</param>
 internal sealed record GeneralSettingsState(
-    string Hotkey, bool HotkeyInvalid, string CommitKey, string Language, string Theme, bool ReduceMotion);
+    string Hotkey, bool HotkeyInvalid, string CommitKey, string Language, string Theme, bool ReduceMotion, bool RememberChoices);
 
 internal sealed record TermState(int I, string Source, string Target);
 
 /// <param name="Microphones">Device names; the first, empty one is the system default.</param>
+/// <param name="DefaultOutput">One of <see cref="SettingsViewModel.DefaultOutputs"/>.</param>
 internal sealed record VoiceSettingsState(
-    IReadOnlyList<string> Microphones, string Microphone, string Direction, bool Cleanup, IReadOnlyList<TermState> Terms);
+    IReadOnlyList<string> Microphones, string Microphone, string Direction, bool Cleanup, string DefaultOutput, bool AutoDictate,
+    IReadOnlyList<TermState> Terms);
+
+/// <summary>One application the composer remembers a choice for; the summary reads like the output menu ("Translate to English").</summary>
+internal sealed record AppPreferenceState(string Id, string Name, string Summary, string Used);
 
 /// <summary>There is no key here, only whether one is stored: the key itself never goes back to the page.</summary>
 /// <param name="Consent">The step the user is being asked to authorize, or null.</param>
 internal sealed record PrivacySettingsState(
-    bool CloudTranslate, bool CloudClean, string BaseUrl, string Model, bool HasKey, bool Invalid, CloudStep? Consent);
+    bool CloudTranslate, bool CloudClean, string BaseUrl, string Model, bool HasKey, bool Invalid, CloudStep? Consent,
+    IReadOnlyList<AppPreferenceState> Apps);
 
 /// <param name="Text">What the old models are and how much room they take; empty when there are none.</param>
 internal sealed record LegacyModelsState(int Count, string Text);
@@ -58,15 +64,19 @@ internal sealed record SettingsViewState(
                 SettingsViewModel.CommitKeys[vm.CommitKeyIndex],
                 SettingsViewModel.Languages[vm.LanguageIndex],
                 theme,
-                vm.ReduceMotion),
+                vm.ReduceMotion,
+                vm.RememberChoices),
             new VoiceSettingsState(
                 vm.MicrophoneNames,
                 vm.MicrophoneNames[vm.MicrophoneIndex],
                 SettingsViewModel.Targets[vm.TargetIndex],
                 vm.CleanupEnabled,
+                SettingsViewModel.DefaultOutputs[vm.DefaultOutputIndex],
+                vm.AutoDictate,
                 [.. vm.Terms.Select((term, i) => new TermState(i, term.Source, term.Target))]),
             new PrivacySettingsState(
-                vm.CloudTranslate, vm.CloudClean, vm.CloudBaseUrl, vm.CloudModel, vm.HasStoredKey, vm.CloudInvalid, vm.PendingConsent),
+                vm.CloudTranslate, vm.CloudClean, vm.CloudBaseUrl, vm.CloudModel, vm.HasStoredKey, vm.CloudInvalid, vm.PendingConsent,
+                [.. vm.Apps.Select(app => new AppPreferenceState(app.AppId, texts.AppName(app.Name), texts.AppSummary(app.Output, app.Target), texts.Date(app.UsedAt)))]),
             new ModelsSettingsState(
                 SettingsViewModel.Tiers[vm.TierIndex],
                 new LegacyModelsState(vm.LegacyCount, vm.HasLegacyModels ? texts.LegacyDescription(vm.LegacyCount, vm.LegacyBytes) : ""),

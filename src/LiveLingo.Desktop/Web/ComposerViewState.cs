@@ -8,7 +8,8 @@ internal sealed record PrivacyState(string Text, bool Cloud, string Aria);
 
 internal sealed record MenuItemState(string Id, string Label, bool Checked, bool Enabled);
 
-internal sealed record OutputState(string Value, string Pill, bool Globe, IReadOnlyList<MenuItemState> Menu, string Swap);
+/// <param name="Note">Whose choices are remembered ("Your choice is remembered for Slack"); null when remembering is off or unknown.</param>
+internal sealed record OutputState(string Value, string Pill, bool Globe, IReadOnlyList<MenuItemState> Menu, string Swap, string? Note);
 
 internal sealed record ActionState(string Id, string Label);
 
@@ -20,12 +21,16 @@ internal sealed record SourceLineState(string Time, string Text, bool Tail);
 /// <param name="Index">The draft's index in the recent drafts, for the <c>restoreRecent</c> intent.</param>
 internal sealed record ResumeState(int Index, string Label);
 
+/// <summary>The composer stands on a choice remembered for the application: the note says so and offers the way back.</summary>
+internal sealed record RememberedState(string Text, string Action);
+
 /// <param name="Mode">"edit" shows the text box, "live" the listening or transcript lines.</param>
 /// <param name="SourceRev">The page adopts <paramref name="Text"/> only when this is newer than its own last revision (design 5.3).</param>
 /// <param name="Resume">Offered together with the hint of an empty composer; null otherwise.</param>
+/// <param name="Remembered">Said together with the hint of an empty composer that stands on a remembered choice; null otherwise.</param>
 internal sealed record SourceState(
     string Mode, string Text, int SourceRev, bool Editable, string Label, bool RouteChip, bool Hint, IReadOnlyList<SourceLineState> Lines,
-    ResumeState? Resume);
+    ResumeState? Resume, RememberedState? Remembered);
 
 internal sealed record RowState(
     int I, string State, string Text, string Note, string Time, bool Warn, bool Owned, bool Editing,
@@ -57,7 +62,8 @@ internal sealed record MenusState(IReadOnlyList<MenuItemState> Target, IReadOnly
 
 internal sealed record RecentItemState(int Index, string Label);
 
-internal sealed record ExportState(bool Txt, bool Markdown, bool Srt);
+/// <param name="Last">The format the user exported last (<c>txt</c>, <c>markdown</c> or <c>srt</c>), which the dialog offers first; null before any export.</param>
+internal sealed record ExportState(bool Txt, bool Markdown, bool Srt, string? Last);
 
 internal sealed record DialogsState(IReadOnlyList<RecentItemState> Recent, bool CanRestore, ExportState Export);
 
@@ -100,7 +106,8 @@ internal sealed record ComposerViewState(
                 texts.OutputPill(vm.Output, vm.TargetLanguage),
                 vm.Output == ComposerOutput.Translate,
                 [.. vm.Outputs.Select(o => new MenuItemState(Name(o), texts.OutputMenu(o, vm.TargetLanguage), vm.Output == o, true))],
-                texts.SwapMenu(vm.TargetLanguage)),
+                texts.SwapMenu(vm.TargetLanguage),
+                vm.RememberFor is { } rememberFor ? texts.RememberMenuNote(rememberFor) : null),
             Banner: BannerOf(vm.Banner, texts),
             Source: new SourceState(
                 live ? "live" : "edit",
@@ -113,6 +120,9 @@ internal sealed record ComposerViewState(
                 [.. vm.SourceLines.Select(line => new SourceLineState(line.Time, line.Text, line.IsTail))],
                 empty && recent.Unsent is { } unsent && vm.CanReplaceDraft
                     ? new ResumeState(0, ComposerTexts.RecentPreview(unsent))
+                    : null,
+                empty && vm.Remembered is { } remembered
+                    ? new RememberedState(texts.RememberedNote(remembered, vm.Output, vm.TargetLanguage), texts.RestoreDefaults)
                     : null),
             Result: new ResultState(
                 hasResult,
@@ -157,8 +167,15 @@ internal sealed record ComposerViewState(
             Dialogs: new DialogsState(
                 [.. recent.Items.Select((draft, i) => new RecentItemState(i, ComposerTexts.RecentItem(draft)))],
                 vm.CanReplaceDraft,
-                new ExportState(true, true, vm.HasTimeline)));
+                new ExportState(true, true, vm.HasTimeline, vm.LastExportFormat is { } last ? Name(last) : null)));
     }
+
+    private static string Name(ExportFormat format) => format switch
+    {
+        ExportFormat.Txt => "txt",
+        ExportFormat.Markdown => "markdown",
+        _ => "srt"
+    };
 
     private static string Name(ComposerOutput output) => output switch
     {

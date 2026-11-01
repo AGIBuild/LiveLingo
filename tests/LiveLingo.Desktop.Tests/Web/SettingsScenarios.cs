@@ -1,5 +1,8 @@
 using LiveLingo.Core.Models;
+using LiveLingo.Core.Translation;
+using LiveLingo.Desktop.Composer;
 using LiveLingo.Desktop.Services.Configuration;
+using LiveLingo.Desktop.Services.Preferences;
 using LiveLingo.Desktop.Settings;
 using LiveLingo.Desktop.Tests.Settings;
 using LiveLingo.Desktop.Web;
@@ -30,6 +33,15 @@ internal static class SettingsScenarios
             m.Composer.Glossary = "Redis\n缓存穿透=cache penetration";
         }),
         ["settings-privacy"] = () => Open("privacy"),
+        ["settings-apps"] = () => Open("privacy", remembered: new PreferencesData
+        {
+            Apps =
+            [
+                new AppChoice("com.tinyspeck.slackmacgap", "Slack", ComposerOutput.Translate, TargetLanguage.English, new DateTimeOffset(2026, 11, 2, 12, 0, 0, TimeSpan.Zero)),
+                new AppChoice("com.microsoft.VSCode", "Code", ComposerOutput.Clean, TargetLanguage.English, new DateTimeOffset(2026, 11, 1, 12, 0, 0, TimeSpan.Zero)),
+                new AppChoice(ComposerPreferences.ClipboardId, "", ComposerOutput.Translate, TargetLanguage.Chinese, new DateTimeOffset(2026, 10, 30, 12, 0, 0, TimeSpan.Zero))
+            ]
+        }),
         ["settings-cloud"] = () => Open("privacy", Cloud, key: "sk-stored"),
         ["settings-consent"] = () => Open("privacy", Cloud, key: "sk-stored", then: f => f.Vm.SetCloud(CloudStep.Clean, on: true)),
         ["settings-cloud-invalid"] = () => Open("privacy", then: f =>
@@ -67,12 +79,13 @@ internal static class SettingsScenarios
         string section = "general",
         Action<SettingsModel>? model = null,
         string? key = null,
+        PreferencesData? remembered = null,
         Action<SettingsViewModelTests.Fixture>? before = null,
         Action<SettingsViewModelTests.Fixture>? then = null)
     {
         var current = new SettingsModel();
         model?.Invoke(current);
-        var f = new SettingsViewModelTests.Fixture(current, key);
+        var f = new SettingsViewModelTests.Fixture(current, key, remembered);
         before?.Invoke(f);
         await f.Vm.InitializeAsync();
         then?.Invoke(f);

@@ -70,11 +70,8 @@ internal sealed class ComposerIntents : IIntentHandler
                 _vm.SourceText = source.Text;
                 break;
             case MicToggleIntent: Run(() => _vm.ToggleListeningCommand.ExecuteAsync(null)); break;
-            case OutputIntent output:
-                if (!_vm.Outputs.Contains(output.Value))
-                    throw new ArgumentOutOfRangeException(nameof(intent), output.Value, "That output is not offered.");
-                _vm.Output = output.Value;
-                break;
+            case OutputIntent output: _vm.ChooseOutput(output.Value); break;
+            case RestoreDefaultsIntent: _vm.RestoreDefaultsCommand.Execute(null); break;
             case SwapLanguageIntent: _vm.SwapLanguageCommand.Execute(null); break;
             case CommitIntent commit: Run(() => _vm.CommitAsync(commit.FromKey)); break;
             case CopyIntent: Run(() => _vm.CopyCommand.ExecuteAsync(null)); break;

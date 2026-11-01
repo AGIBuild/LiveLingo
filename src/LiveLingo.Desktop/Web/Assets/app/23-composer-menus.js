@@ -39,16 +39,17 @@
       buttons[next].focus();
     };
 
-    render({ align, label, items, onPick }) {
+    render({ align, label, items, note, onPick }) {
       return html`<div class=${'menu ' + align} role="menu" aria-label=${label} ref=${this.setList} onKeyDown=${this.onKeyDown}>
         ${items.map((item) => html`${item.sepBefore && html`<hr/>`}<button type="button" key=${item.id} role=${role(item.id)} aria-checked=${checkable(item.id) ? item.checked : undefined}
           disabled=${item.enabled === false} onClick=${() => onPick(item)}><span class="lbl">${item.label}</span>${LL.cap(item.id) && html`<kbd>${LL.cap(item.id)}</kbd>`}</button>`)}
+        ${note && html`<p class="menu-note">${note}</p>`}
       </div>`;
     }
   }
 
-  LL.Menu = ({ id, align, label, items, onPick }) =>
-    LL.state.menu === id ? html`<${MenuList} align=${align} label=${label} items=${items} onPick=${onPick}/>` : null;
+  LL.Menu = ({ id, align, label, items, note, onPick }) =>
+    LL.state.menu === id ? html`<${MenuList} align=${align} label=${label} items=${items} note=${note} onPick=${onPick}/>` : null;
 
   class Dialog extends preact.Component {
     setPane = (el) => {
@@ -56,7 +57,8 @@
     };
 
     componentDidMount() {
-      this.pane.querySelector('.dlg-actions button:not(:disabled), .hist button:not(:disabled)')?.focus();
+      const pane = this.pane;
+      (pane.querySelector('.dlg-actions .last:not(:disabled)') || pane.querySelector('.dlg-actions button:not(:disabled), .hist button:not(:disabled)'))?.focus();
     }
 
     render({ id, dialogs }) {
@@ -66,8 +68,8 @@
           : html`${dialogs.recent.map((item) => html`<div class="hist" key=${item.index}><span>${item.label}</span>
               <button type="button" class="btn" disabled=${!dialogs.canRestore} onClick=${() => { LL.send('restoreRecent', { index: item.index }); LL.closeDialog(); }}>${LL.t('recentRestore')}</button></div>`)}
             <div class="dlg-actions"><button type="button" class="btn" onClick=${() => LL.send('clearRecent')}>${LL.t('recentClear')}</button></div>`}`
-        : html`<p>${LL.t('exportHint')}</p><div class="dlg-actions">${[['txt', 'TXT'], ['markdown', 'Markdown'], ['srt', 'SRT']].map(([format, label]) => html`<button type="button" class="btn" key=${format}
-            disabled=${format === 'srt' && !dialogs.export.srt} onClick=${() => { LL.send('export', { format }); LL.closeDialog(); }}>${label}</button>`)}</div>`;
+        : html`<p>${LL.t('exportHint')}</p><div class="dlg-actions">${[['txt', 'TXT'], ['markdown', 'Markdown'], ['srt', 'SRT']].map(([format, label]) => html`<button type="button" class=${'btn' + (format === dialogs.export.last ? ' last' : '')} key=${format}
+            aria-current=${format === dialogs.export.last ? 'true' : undefined} disabled=${format === 'srt' && !dialogs.export.srt} onClick=${() => { LL.send('export', { format }); LL.closeDialog(); }}>${label}</button>`)}</div>`;
       return html`<section class="dialog" role="dialog" aria-modal="true" aria-labelledby="dlg-title" ref=${this.setPane}>
         <header><h2 id="dlg-title">${LL.t(recent ? 'recentTitle' : 'exportTitle')}</h2>
           <button type="button" id="dlg-close" class="icon-btn" aria-label=${LL.t('closeAria')} onClick=${LL.closeDialog}><${Icon} name="close"/></button></header>
