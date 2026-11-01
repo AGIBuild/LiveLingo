@@ -1,0 +1,22 @@
+src/LiveLingo.Core/Cleanup/CleanupScheduler.cs
+  s_6d6e9175f38e45::t_97d8ce3d1f498b 73,85-98,117-118
+tests/LiveLingo.Desktop.Tests/Web/SettingsWebSessionTests.cs
+  s_6d6e9175f38e45::t_70b2c9f391d37f 28-37,59
+  s_6d6e9175f38e45::t_efd2a5daac0ad2 71,86
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e12f9798e418a777c4cbbc7284d34dee8f913ebd",
+  "prompts": {},
+  "sessions": {
+    "s_6d6e9175f38e45": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "f74d37e5-1d96-4ddc-a3f9-5ae24ff39e38",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
