@@ -57,10 +57,11 @@ internal sealed class ComposerWindow : Window
     public void Park()
     {
         Opacity = 0;
-        Position = ParkedAt;
         _placed = false;
+        // Show before moving: a window whose first position is far off screen comes up 0 x 0 on macOS.
         if (!IsVisible)
             Show();
+        Position = ParkedAt;
     }
 
     /// <summary>Puts the composer in front of the user; completes when it was dismissed (written, hidden, or toggled away).</summary>
@@ -77,7 +78,10 @@ internal sealed class ComposerWindow : Window
         vm.Completed += Dismiss;
         vm.CloseRequested += Dismiss;
 
+        // On screen but still transparent: WebKit does not run animation frames for an off-screen page, and the page
+        // can only report its size from one.
         ApplyWidth();
+        Place();
         if (_web.IsReady)
             _session.Start();
         return _dismissed.Task;
