@@ -7,7 +7,8 @@
     "commitKey": "Enter",
     "language": "en-US",
     "theme": "Auto",
-    "reduceMotion": false
+    "reduceMotion": false,
+    "rememberChoices": true
   },
   "voice": {
     "microphones": [
@@ -18,6 +19,8 @@
     "microphone": "USB Mic",
     "direction": "English",
     "cleanup": true,
+    "defaultOutput": "Clean",
+    "autoDictate": false,
     "terms": [
       {
         "i": 0,
@@ -38,7 +41,8 @@
     "model": "gpt-deploy",
     "hasKey": true,
     "invalid": false,
-    "consent": null
+    "consent": null,
+    "apps": []
   },
   "models": {
     "tier": "Fast",

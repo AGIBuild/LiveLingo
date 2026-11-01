@@ -26,6 +26,7 @@
     "recentEmpty": "还没有草稿。关闭或写入后会出现在这里；退出应用后清除。",
     "recentRestore": "恢复",
     "resume": "继续上次草稿",
+    "restoreDefaults": "恢复默认",
     "exportTitle": "导出…",
     "exportHint": "导出当前选定的内容。"
   }

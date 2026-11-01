@@ -33,7 +33,8 @@
         "enabled": true
       }
     ],
-    "swap": "语言：中文 → English\u3000⇄ 互换"
+    "swap": "语言：中文 → English\u3000⇄ 互换",
+    "note": null
   },
   "banner": null,
   "source": {
@@ -48,7 +49,8 @@
     "resume": {
       "index": 0,
       "label": "嗯，这个 PR 先不要合并，等 CI 跑完再说。"
-    }
+    },
+    "remembered": null
   },
   "result": {
     "visible": false,
@@ -224,7 +226,8 @@
     "export": {
       "txt": true,
       "markdown": true,
-      "srt": false
+      "srt": false,
+      "last": null
     }
   }
 }

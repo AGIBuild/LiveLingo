@@ -1,7 +1,9 @@
 using LiveLingo.Core.Models;
+using LiveLingo.Core.Translation;
 using LiveLingo.Desktop.Composer;
 using LiveLingo.Desktop.Platform;
 using LiveLingo.Desktop.Services.Configuration;
+using LiveLingo.Desktop.Services.Preferences;
 using LiveLingo.Desktop.Settings;
 using NSubstitute;
 
@@ -17,17 +19,20 @@ public class SettingsViewModelTests
         public IModelManager Models { get; } = Substitute.For<IModelManager>();
         public IMicrophone Microphone { get; } = Substitute.For<IMicrophone>();
         public RecentDrafts Recent { get; } = new();
+        public Services.Preferences.MemoryPreferencesStore PreferenceStore { get; } = new();
         public SettingsViewModel Vm { get; }
 
-        public Fixture(SettingsModel? current = null, string? storedKey = null)
+        public Fixture(SettingsModel? current = null, string? storedKey = null, PreferencesData? remembered = null)
         {
             Current = current ?? new SettingsModel();
+            PreferenceStore.Data = remembered ?? new PreferencesData();
             var service = Substitute.For<ISettingsService>();
+            service.Current.Returns(_ => Saved.Count > 0 ? Saved[^1] : Current);
             service.CloneCurrent().Returns(_ => Saved.Count > 0 ? Saved[^1].DeepClone() : Current.DeepClone());
             service.When(s => s.Replace(Arg.Any<SettingsModel>())).Do(call => Saved.Add(call.Arg<SettingsModel>()));
             Secrets.GetSecretAsync(CloudSettings.ApiKeySecretId, Arg.Any<CancellationToken>()).Returns(storedKey);
             Microphone.InputDevices().Returns(["USB Mic", "Built-in"]);
-            Vm = new SettingsViewModel(service, Secrets, Models, Recent, Microphone);
+            Vm = new SettingsViewModel(service, Secrets, Models, Recent, Microphone, new ComposerPreferences(PreferenceStore, service));
         }
 
         public SettingsModel Last => Saved[^1];
@@ -97,6 +102,52 @@ public class SettingsViewModelTests
         Assert.False(model.Appearance.Animations);
         Assert.Equal("Chinese", model.Composer.TargetLanguage);
         Assert.Equal("Fast", model.Composer.TranslatorTier);
+    }
+
+    [Fact]
+    public void ThePreferencesOfTheComposer_StartFromTheSettingsAndAreAppliedAtOnce()
+    {
+        var model = new SettingsModel();
+        Assert.True(model.Composer.RememberChoices);
+        Assert.False(model.Composer.AutoDictate);
+        Assert.Equal("Clean", model.Composer.DefaultOutput);
+
+        var f = new Fixture();
+        f.Vm.RememberChoices = false;
+        f.Vm.AutoDictate = true;
+        f.Vm.DefaultOutputIndex = SettingsViewModel.DefaultOutputs.ToList().IndexOf("Translate");
+
+        Assert.False(f.Last.Composer.RememberChoices);
+        Assert.True(f.Last.Composer.AutoDictate);
+        Assert.Equal("Translate", f.Last.Composer.DefaultOutput);
+    }
+
+    [Fact]
+    public void TheRememberedApps_CanBeForgottenOneByOne_OrAllAtOnce()
+    {
+        var now = DateTimeOffset.UnixEpoch;
+        var data = new PreferencesData
+        {
+            Apps =
+            [
+                new AppChoice("slack", "Slack", ComposerOutput.Translate, TargetLanguage.English, now),
+                new AppChoice("code", "Code", ComposerOutput.Clean, TargetLanguage.English, now)
+            ],
+            ExportFormat = ExportFormat.Markdown
+        };
+        var f = new Fixture(remembered: data);
+        var changed = new List<string?>();
+        f.Vm.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        f.Vm.ForgetApp("slack");
+
+        Assert.Equal(["code"], f.Vm.Apps.Select(app => app.AppId));
+        Assert.Contains(nameof(SettingsViewModel.Apps), changed);
+
+        f.Vm.ClearApps();
+
+        Assert.Empty(f.Vm.Apps);
+        Assert.Null(f.PreferenceStore.Data.ExportFormat);
     }
 
     [Fact]

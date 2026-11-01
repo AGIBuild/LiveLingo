@@ -11,7 +11,7 @@ internal sealed class MacWindowTracker : IWindowTracker
     /// <summary>The frontmost app's top window, or null when it has none: a target always has a real window number.</summary>
     public TargetWindowInfo? GetForegroundWindowInfo()
     {
-        var (pid, processName) = GetFrontmostApp();
+        var (pid, processName, appId) = GetFrontmostApp();
         // Our own parked composer is never a target: it would be placed relative to itself, off screen.
         if (pid <= 0 || pid == Environment.ProcessId) return null;
 
@@ -23,7 +23,7 @@ internal sealed class MacWindowTracker : IWindowTracker
 
         try
         {
-            return FindWindowForPid(windowList, pid, processName);
+            return FindWindowForPid(windowList, pid, processName, appId);
         }
         finally
         {
@@ -86,27 +86,32 @@ internal sealed class MacWindowTracker : IWindowTracker
         Log.Debug("Could not find target process to activate: {Name}", target.ProcessName);
     }
 
-    private static (int pid, string name) GetFrontmostApp()
+    private static (int pid, string name, string appId) GetFrontmostApp()
     {
         var nsWorkspace = objc_getClass("NSWorkspace");
         var workspace = objc_msgSend(nsWorkspace, sel_registerName("sharedWorkspace"));
         var frontApp = objc_msgSend(workspace, sel_registerName("frontmostApplication"));
-        if (frontApp == IntPtr.Zero) return (0, "Unknown");
+        if (frontApp == IntPtr.Zero) return (0, "Unknown", "");
 
         var pid = objc_msgSend_int(frontApp, sel_registerName("processIdentifier"));
 
-        var nameObj = objc_msgSend(frontApp, sel_registerName("localizedName"));
-        var nameUtf8 = nameObj != IntPtr.Zero
-            ? objc_msgSend(nameObj, sel_registerName("UTF8String"))
-            : IntPtr.Zero;
-        var name = nameUtf8 != IntPtr.Zero
-            ? Marshal.PtrToStringUTF8(nameUtf8) ?? "Unknown"
-            : "Unknown";
+        var name = ObjCString(objc_msgSend(frontApp, sel_registerName("localizedName"))) ?? "Unknown";
+        // A process that is not an application bundle has no identifier; it is then known by its name.
+        var appId = ObjCString(objc_msgSend(frontApp, sel_registerName("bundleIdentifier"))) ?? name;
 
-        return (pid, name);
+        return (pid, name, appId);
     }
 
-    private static TargetWindowInfo? FindWindowForPid(IntPtr windowList, int pid, string processName)
+    private static string? ObjCString(IntPtr nsString)
+    {
+        if (nsString == IntPtr.Zero)
+            return null;
+
+        var utf8 = objc_msgSend(nsString, sel_registerName("UTF8String"));
+        return utf8 != IntPtr.Zero ? Marshal.PtrToStringUTF8(utf8) : null;
+    }
+
+    private static TargetWindowInfo? FindWindowForPid(IntPtr windowList, int pid, string processName, string appId)
     {
         var count = CFArrayGetCount(windowList);
         var kOwnerPID = CreateCFString("kCGWindowOwnerPID");
@@ -146,7 +151,7 @@ internal sealed class MacWindowTracker : IWindowTracker
 
                 return new TargetWindowInfo(
                     (nint)windowNumber, IntPtr.Zero, processName, title,
-                    x, y, w, h);
+                    x, y, w, h, appId);
             }
         }
         finally

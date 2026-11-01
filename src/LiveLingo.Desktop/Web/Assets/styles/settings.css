@@ -34,6 +34,14 @@ button.danger:hover { background: var(--hover); }
 .term { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); }
 .term .arrow { color: var(--muted); }
 .term button { margin-left: auto; }
+.apps { padding-top: 12px; border-top: 1px solid var(--line); }
+.apps-head { display: flex; align-items: start; justify-content: space-between; gap: 16px; }
+.apps .hint { padding: 2px 0 6px; }
+.app-list { list-style: none; margin: 0; padding: 0; }
+.app { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-top: 1px solid var(--line); }
+.app-name { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.app-summary { flex: 1; min-width: 0; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.app time { color: var(--faint); font-size: 12px; }
 
 .scrim { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; background: rgba(10, 14, 22, .4); }
 .scrim .dialog { width: min(520px, calc(100% - 48px)); padding: 20px 22px; border: 1px solid var(--line); border-radius: 18px; background: var(--panel); box-shadow: var(--shadow); }

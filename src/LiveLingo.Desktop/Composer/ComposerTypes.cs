@@ -180,4 +180,29 @@ public sealed record StatusInfo(
 public sealed record ComposerOptions(bool CloudTranslate, bool CloudClean, CommitKey CommitKey, bool Animations, string Theme, bool Cleanup)
 {
     public static ComposerOptions Default { get; } = new(false, false, CommitKey.Enter, true, "Auto", true);
+
+    /// <summary>The outputs the composer offers: "Clean" only while cleanup is on; the original wording is always there.</summary>
+    public IReadOnlyList<ComposerOutput> Outputs => Cleanup
+        ? [ComposerOutput.Clean, ComposerOutput.Translate, ComposerOutput.Original]
+        : [ComposerOutput.Translate, ComposerOutput.Original];
 }
+
+/// <summary>Where a composer begins: the output and the translation direction, and what they came from.</summary>
+/// <param name="DefaultOutput">What the settings say for an application without a remembered choice ("restore defaults" goes back to it).</param>
+/// <param name="Remember">The context whose choices are remembered; null when remembering is off or the target cannot be identified.</param>
+/// <param name="LastExport">The format exported last, which the export dialog offers first.</param>
+public sealed record ComposerStart(
+    ComposerOutput Output,
+    Core.Translation.TargetLanguage Target,
+    ComposerOutput DefaultOutput,
+    Core.Translation.TargetLanguage DefaultTarget,
+    RememberContext? Remember,
+    ExportFormat? LastExport = null);
+
+/// <param name="AppId">Identity of the application (or the clipboard context) the choices belong to.</param>
+/// <param name="Name">What the user knows it as; empty for the clipboard context (the window says "copy only").</param>
+/// <param name="Applied">The start is a remembered choice that differs from the defaults, which the composer says so.</param>
+public sealed record RememberContext(string AppId, string Name, bool Applied);
+
+/// <summary>What the user chose in the composer: the output and the direction in force after the choice.</summary>
+public sealed record ComposerChoice(ComposerOutput Output, Core.Translation.TargetLanguage Target);

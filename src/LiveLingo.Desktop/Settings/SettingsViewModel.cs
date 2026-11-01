@@ -7,6 +7,7 @@ using LiveLingo.Core.Translation;
 using LiveLingo.Desktop.Composer;
 using LiveLingo.Desktop.Platform;
 using LiveLingo.Desktop.Services.Configuration;
+using LiveLingo.Desktop.Services.Preferences;
 
 namespace LiveLingo.Desktop.Settings;
 
@@ -31,24 +32,28 @@ public sealed partial class SettingsViewModel : ObservableObject
     public static readonly IReadOnlyList<string> Themes = ["Auto", "Light", "Dark"];
     public static readonly IReadOnlyList<string> Targets = [nameof(TargetLanguage.English), nameof(TargetLanguage.Chinese)];
     public static readonly IReadOnlyList<string> Tiers = [nameof(TranslatorTier.Quality), nameof(TranslatorTier.Fast)];
+    public static readonly IReadOnlyList<string> DefaultOutputs = [nameof(ComposerOutput.Clean), nameof(ComposerOutput.Translate), nameof(ComposerOutput.Original)];
 
     private readonly ISettingsService _settings;
     private readonly ISecretStore _secrets;
     private readonly IModelManager _models;
     private readonly RecentDrafts _recent;
     private readonly IMicrophone _microphone;
+    private readonly ComposerPreferences _preferences;
     private IReadOnlyList<string> _legacyIds = [];
     private bool _loading = true;
     private bool _devicesLoaded;
 
     public SettingsViewModel(
-        ISettingsService settings, ISecretStore secrets, IModelManager models, RecentDrafts recent, IMicrophone microphone)
+        ISettingsService settings, ISecretStore secrets, IModelManager models, RecentDrafts recent, IMicrophone microphone,
+        ComposerPreferences preferences)
     {
         _settings = settings;
         _secrets = secrets;
         _models = models;
         _recent = recent;
         _microphone = microphone;
+        _preferences = preferences;
 
         var current = settings.CloneCurrent();
         _summonHotkey = current.Hotkeys.Summon;
@@ -58,6 +63,9 @@ public sealed partial class SettingsViewModel : ObservableObject
         _reduceMotion = !current.Appearance.Animations;
         _targetIndex = Math.Max(0, Targets.ToList().IndexOf(current.Composer.TargetLanguage));
         _cleanupEnabled = current.Composer.CleanupEnabled;
+        _defaultOutputIndex = Math.Max(0, DefaultOutputs.ToList().IndexOf(current.Composer.DefaultOutput));
+        _autoDictate = current.Composer.AutoDictate;
+        _rememberChoices = current.Composer.RememberChoices;
         _tierIndex = Math.Max(0, Tiers.ToList().IndexOf(current.Composer.TranslatorTier));
         _microphoneNames = [""];
         _microphoneIndex = 0;
@@ -91,6 +99,30 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     /// <summary>Whether dictated and typed sentences are cleaned up at all; off offers only the original wording.</summary>
     [ObservableProperty] private bool _cleanupEnabled;
+
+    /// <summary>The output a composer begins with where nothing is remembered; an index into <see cref="DefaultOutputs"/>.</summary>
+    [ObservableProperty] private int _defaultOutputIndex;
+
+    /// <summary>Whether the microphone starts listening as soon as the composer opens.</summary>
+    [ObservableProperty] private bool _autoDictate;
+
+    /// <summary>Whether the output and direction last chosen for an application are used the next time it is the target.</summary>
+    [ObservableProperty] private bool _rememberChoices;
+
+    /// <summary>What is remembered per application, the one chosen in most recently first.</summary>
+    public IReadOnlyList<AppChoice> Apps => _preferences.Apps;
+
+    public void ForgetApp(string appId)
+    {
+        _preferences.Forget(appId);
+        OnPropertyChanged(nameof(Apps));
+    }
+
+    public void ClearApps()
+    {
+        _preferences.Clear();
+        OnPropertyChanged(nameof(Apps));
+    }
 
     public ObservableCollection<TermEntry> Terms { get; }
 
@@ -135,6 +167,9 @@ public sealed partial class SettingsViewModel : ObservableObject
     partial void OnMicrophoneIndexChanged(int value) => ApplyIfSelected(value);
     partial void OnTargetIndexChanged(int value) => ApplyIfSelected(value);
     partial void OnCleanupEnabledChanged(bool value) => Apply();
+    partial void OnDefaultOutputIndexChanged(int value) => ApplyIfSelected(value);
+    partial void OnAutoDictateChanged(bool value) => Apply();
+    partial void OnRememberChoicesChanged(bool value) => Apply();
     partial void OnTierIndexChanged(int value) => ApplyIfSelected(value);
 
     /// <summary>A combo box reports -1 while its items are being replaced; that is not a choice.</summary>
@@ -181,6 +216,9 @@ public sealed partial class SettingsViewModel : ObservableObject
         model.Appearance.Animations = !ReduceMotion;
         model.Composer.TargetLanguage = Targets[TargetIndex];
         model.Composer.CleanupEnabled = CleanupEnabled;
+        model.Composer.DefaultOutput = DefaultOutputs[DefaultOutputIndex];
+        model.Composer.AutoDictate = AutoDictate;
+        model.Composer.RememberChoices = RememberChoices;
         model.Composer.TranslatorTier = Tiers[TierIndex];
         if (_devicesLoaded)
             model.Composer.Microphone = MicrophoneIndex < MicrophoneNames.Count ? MicrophoneNames[MicrophoneIndex] : "";

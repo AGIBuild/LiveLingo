@@ -33,7 +33,8 @@ internal sealed class Win32WindowTracker : IWindowTracker
                 rect.Left,
                 rect.Top,
                 rect.Right - rect.Left,
-                rect.Bottom - rect.Top);
+                rect.Bottom - rect.Top,
+                process.ProcessName.ToLowerInvariant());
         }
         catch
         {

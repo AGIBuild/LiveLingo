@@ -30,6 +30,9 @@
     <${Row} id="motion" title=${LL.t('motion')} desc=${LL.t('motion.desc')}>
       <${Switch} id="motion" checked=${g.reduceMotion} onChange=${(on) => set('reduceMotion')(String(on))}/>
     <//>
+    <${Row} id="remember" title=${LL.t('remember')} desc=${LL.t('remember.desc')}>
+      <${Switch} id="remember" checked=${g.rememberChoices} onChange=${(on) => set('rememberChoices')(String(on))}/>
+    <//>
   </div>`;
 
   class Terms extends preact.Component {
@@ -80,8 +83,26 @@
     <${Row} id="direction" title=${LL.t('direction')} desc=${LL.t('direction.desc')}>
       <${Select} id="direction" value=${v.direction} options=${choices(['English', 'Chinese'], ['direction.zhEn', 'direction.enZh'])} onChange=${set('direction')}/>
     <//>
+    <${Row} id="output" title=${LL.t('output')} desc=${LL.t('output.desc')}>
+      <${Select} id="output" value=${v.defaultOutput} options=${choices(['Clean', 'Translate', 'Original'], ['output.clean', 'output.translate', 'output.original'])} onChange=${set('defaultOutput')}/>
+    <//>
+    <${Row} id="auto-dictate" title=${LL.t('autoDictate')} desc=${LL.t('autoDictate.desc')}>
+      <${Switch} id="auto-dictate" checked=${v.autoDictate} onChange=${(on) => set('autoDictate')(String(on))}/>
+    <//>
     <${Terms} terms=${v.terms}/>
   </div>`;
+
+  const Apps = ({ apps }) => html`<section class="apps" aria-labelledby="apps-title">
+    <div class="apps-head"><div><h2 id="apps-title">${LL.t('apps')}</h2><p class="hint">${LL.t('apps.desc')}</p></div>
+      <button type="button" id="apps-clear" class="btn" disabled=${apps.length === 0} onClick=${() => LL.send('clearApps')}>${LL.t('apps.clear')}</button></div>
+    ${apps.length === 0
+      ? html`<p id="apps-empty" class="hint">${LL.t('apps.empty')}</p>`
+      : html`<ul class="app-list">${apps.map((app) => html`<li class="app" key=${app.id}>
+          <span class="app-name">${app.name}</span><span class="app-summary">${app.summary}</span><time>${app.used}</time>
+          <button type="button" class="danger" aria-label=${LL.t('apps.forget') + ' ' + app.name}
+            onClick=${() => LL.send('forgetApp', { appId: app.id })}>${LL.t('apps.forget')}</button>
+        </li>`)}</ul>`}
+  </section>`;
 
   const cloudToggle = (step) => (on) => LL.send('cloudToggle', { step, on });
 
@@ -107,6 +128,7 @@
     <${Row} id="recent-clear" title=${LL.t('recent')} desc=${LL.t('recent.desc')}>
       <button type="button" id="recent-clear" class="btn" onClick=${() => LL.send('clearRecent')}>${LL.t('recent.clear')}</button>
     <//>
+    <${Apps} apps=${p.apps}/>
   </div>`;
 
   // A modal dialog: keeps the focus inside, closes on Escape and gives the focus back to what opened it.

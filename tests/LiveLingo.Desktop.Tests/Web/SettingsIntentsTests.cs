@@ -1,5 +1,8 @@
 using LiveLingo.Core.Models;
+using LiveLingo.Core.Translation;
+using LiveLingo.Desktop.Composer;
 using LiveLingo.Desktop.Services.Configuration;
+using LiveLingo.Desktop.Services.Preferences;
 using LiveLingo.Desktop.Settings;
 using LiveLingo.Desktop.Tests.Composer;
 using LiveLingo.Desktop.Tests.Settings;
@@ -16,9 +19,9 @@ public sealed class SettingsIntentsTests
         public ListLogger Log { get; } = new();
         public SettingsIntents Sut { get; }
 
-        public Rig(SettingsModel? model = null, string? storedKey = null, string section = "general")
+        public Rig(SettingsModel? model = null, string? storedKey = null, string section = "general", PreferencesData? remembered = null)
         {
-            F = new SettingsViewModelTests.Fixture(model, storedKey);
+            F = new SettingsViewModelTests.Fixture(model, storedKey, remembered);
             Sut = new SettingsIntents(F.Vm, section, Log);
         }
 
@@ -196,6 +199,31 @@ public sealed class SettingsIntentsTests
 
         Assert.Contains("InvalidOperationException", rig.Log.Lines[0]);
         Assert.DoesNotContain("sk-secret", rig.Log.Lines[0]);
+    }
+
+    [Fact]
+    public void TheComposerPreferences_ReachTheViewModel_AndTheRememberedAppsAreForgotten()
+    {
+        var data = new PreferencesData
+        {
+            Apps = [new AppChoice("slack", "Slack", ComposerOutput.Translate, TargetLanguage.English, DateTimeOffset.UnixEpoch)]
+        };
+        var rig = new Rig(remembered: data);
+
+        rig.Set(SettingIntent.Names.DefaultOutput, "Original");
+        rig.Set(SettingIntent.Names.AutoDictate, "true");
+        rig.Set(SettingIntent.Names.RememberChoices, "false");
+
+        Assert.Equal("Original", rig.F.Last.Composer.DefaultOutput);
+        Assert.True(rig.F.Last.Composer.AutoDictate);
+        Assert.False(rig.F.Last.Composer.RememberChoices);
+
+        rig.Do(new ForgetAppIntent("slack") { V = 1 });
+        Assert.Empty(rig.Vm.Apps);
+
+        rig.F.PreferenceStore.Data.Apps.Add(new AppChoice("code", "Code", ComposerOutput.Clean, TargetLanguage.English, DateTimeOffset.UnixEpoch));
+        rig.Do(new ClearAppsIntent { V = 1 });
+        Assert.Empty(rig.Vm.Apps);
     }
 
     [Fact]

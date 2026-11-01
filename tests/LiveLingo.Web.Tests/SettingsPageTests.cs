@@ -26,7 +26,7 @@ public sealed class SettingsPageTests(BrowserFixture browsers)
         Assert.Single(await page.IntentsAsync(), i => i is ReadyIntent);
         Assert.Equal("zh-CN", await page.Page.EvaluateAsync<string>("document.documentElement.lang"));
         Assert.Equal("page", await page.Page.Locator("#nav-general").GetAttributeAsync("aria-current"));
-        Assert.Equal(5, await page.Page.Locator("#panel .srow").CountAsync());
+        Assert.Equal(6, await page.Page.Locator("#panel .srow").CountAsync());
         Assert.True(page.ConsoleErrors.Count == 0, string.Join("\n", page.ConsoleErrors));
         Assert.Empty(page.Requests);
     }
@@ -305,6 +305,52 @@ public sealed class SettingsPageTests(BrowserFixture browsers)
         Assert.Equal(
             [("commitKey", "CtrlEnter"), ("language", "en-US"), ("theme", "Dark")],
             (await page.IntentsAsync()).OfType<SettingIntent>().Select(s => (s.Key, s.Value)));
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public async Task TheComposerPreferences_AreShownAndSentLikeAnyOtherSetting(string engine)
+    {
+        await using var general = await browsers.OpenSettingsAsync(engine);
+        Assert.True(await general.Page.Locator("#remember").IsCheckedAsync());
+        await general.Page.Locator("#remember").ClickAsync();
+        var remember = await general.LastIntentAsync<SettingIntent>();
+        Assert.Equal(("rememberChoices", "false"), (remember.Key, remember.Value));
+
+        await using var voice = await browsers.OpenSettingsAsync(engine, "settings-voice");
+        Assert.Equal("Clean", await voice.Page.Locator("#output").InputValueAsync());
+        Assert.False(await voice.Page.Locator("#auto-dictate").IsCheckedAsync());
+        await voice.Page.Locator("#output").SelectOptionAsync("Translate");
+        await voice.Page.Locator("#auto-dictate").ClickAsync();
+
+        Assert.Equal(
+            [("defaultOutput", "Translate"), ("autoDictate", "true")],
+            (await voice.IntentsAsync()).OfType<SettingIntent>().Select(s => (s.Key, s.Value)));
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public async Task TheRememberedApps_AreListedAndForgottenOneByOneOrAllAtOnce(string engine)
+    {
+        await using var none = await browsers.OpenSettingsAsync(engine, "settings-privacy");
+        Assert.Equal(0, await none.Page.Locator(".app").CountAsync());
+        Assert.Equal(S("apps.empty"), (await none.Page.Locator("#apps-empty").InnerTextAsync()).Trim());
+        Assert.True(await none.Page.Locator("#apps-clear").IsDisabledAsync());
+
+        await using var page = await browsers.OpenSettingsAsync(engine, "settings-apps");
+
+        var rows = page.Page.Locator(".app");
+        Assert.Equal(3, await rows.CountAsync());
+        Assert.Contains("Slack", await rows.Nth(0).InnerTextAsync());
+        Assert.Contains("2026-11-0", await rows.Nth(0).InnerTextAsync());
+        Assert.Contains("English", await rows.Nth(0).InnerTextAsync());
+        Assert.Contains("仅复制", await rows.Nth(2).InnerTextAsync());
+
+        await rows.Nth(1).GetByRole(AriaRole.Button).ClickAsync();
+        Assert.Equal("com.microsoft.VSCode", (await page.LastIntentAsync<ForgetAppIntent>()).AppId);
+
+        await page.Page.Locator("#apps-clear").ClickAsync();
+        Assert.IsType<ClearAppsIntent>((await page.IntentsAsync()).Last());
     }
 
     [Theory]

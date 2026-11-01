@@ -145,6 +145,8 @@ public sealed partial class ComposerViewModel
         try
         {
             await File.WriteAllTextAsync(path, BuildExport(format), new System.Text.UTF8Encoding(false)).ConfigureAwait(true);
+            LastExportFormat = format;
+            Exported?.Invoke(format);
             ToastRaised?.Invoke(ToastKind.Exported);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
