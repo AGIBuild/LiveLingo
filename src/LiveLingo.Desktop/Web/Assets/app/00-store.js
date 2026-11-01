@@ -10,6 +10,7 @@
   LL.state = {
     strings: {},
     composer: null,
+    settings: null,
     rev: 0,
     // The revision of the last text the page sent or adopted (design 5.3); a snapshot overwrites the text box only when newer.
     sentRev: 0,
@@ -24,6 +25,19 @@
   let focusCount = 0;
 
   LL.t = (key) => LL.state.strings[key] ?? '';
+
+  // Theme and motion come with every snapshot (options). "Auto" follows the system, anything else is the user's choice.
+  const dark = matchMedia('(prefers-color-scheme: dark)');
+  let options = { theme: 'Auto', animations: true };
+
+  const applyOptions = () => {
+    const root = document.documentElement;
+    root.dataset.theme = options.theme === 'Auto' ? (dark.matches ? 'dark' : 'light') : options.theme.toLowerCase();
+    root.dataset.motion = options.animations ? '' : 'off';
+  };
+
+  applyOptions();
+  dark.addEventListener('change', applyOptions);
 
   LL.mount = (component) => {
     root = () => preact.render(preact.h(component, null), document.getElementById('app'));
@@ -88,6 +102,13 @@
         if (message.data.rev <= s.rev) return; // a late or repeated snapshot
         s.rev = message.data.rev;
         s.composer = message.data;
+        options = message.data.options;
+        break;
+      case 'settings':
+        if (message.data.rev <= s.rev) return;
+        s.rev = message.data.rev;
+        s.settings = message.data;
+        options = message.data.options;
         break;
       case 'toast':
         toast(message.data.text);
@@ -101,6 +122,7 @@
       default:
         throw new Error('Unknown message type: ' + message.type);
     }
+    applyOptions();
     LL.update();
   };
 })();

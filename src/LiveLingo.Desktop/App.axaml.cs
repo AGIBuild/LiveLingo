@@ -238,7 +238,7 @@ public partial class App : Application
         var voice = new MicrophoneVoiceInput(services.GetRequiredService<IDictationSessionFactory>(), platform.Microphone);
         var options = new ComposerOptions(
             settings.Cloud.Translate, settings.Cloud.Clean,
-            Enum.Parse<CommitKey>(settings.Composer.CommitKey), settings.Appearance.Animations);
+            Enum.Parse<CommitKey>(settings.Composer.CommitKey), settings.Appearance.Animations, settings.Appearance.Theme);
         var vm = new ComposerViewModel(
             session,
             scheduler,
@@ -284,7 +284,9 @@ public partial class App : Application
         var vm = new SettingsViewModel(
             services.GetRequiredService<ISettingsService>(), services.GetRequiredService<ISecretStore>(),
             services.GetRequiredService<IModelManager>(), _recentDrafts, services.GetRequiredService<IPlatformServices>().Microphone);
-        _settingsWindow = new SettingsWindow(vm, services.GetRequiredService<ILocalizationService>(), section);
+        _settingsWindow = new SettingsWindow(
+            vm, new SettingsTexts(services.GetRequiredService<ILocalizationService>()), section,
+            services.GetRequiredService<ILoggerFactory>().CreateLogger<SettingsWindow>());
         _settingsWindow.Closed += (_, _) => _settingsWindow = null;
         _settingsWindow.Show();
     }

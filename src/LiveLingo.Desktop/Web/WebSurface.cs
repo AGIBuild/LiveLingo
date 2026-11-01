@@ -16,11 +16,14 @@ internal sealed class WebSurface : IWebHost
 {
     private static readonly Uri BaseUri = new("https://livelingo.invalid/");
 
+    private readonly string _entry;
     private readonly ILogger _logger;
     private bool _navigated;
 
-    public WebSurface(ILogger logger)
+    /// <param name="entry">Which screen of the bundle this view shows (<see cref="WebPage"/>).</param>
+    public WebSurface(string entry, ILogger logger)
     {
+        _entry = entry;
         _logger = logger;
         View = new NativeWebView { Background = Brushes.Transparent };
         View.EnvironmentRequested += (_, e) => Isolate(e);
@@ -56,7 +59,7 @@ internal sealed class WebSurface : IWebHost
     {
         _navigated = false;
         IsReady = false;
-        View.NavigateToString(WebPage.Build(Nonce()), BaseUri);
+        View.NavigateToString(WebPage.Build(Nonce(), _entry), BaseUri);
     }
 
     public void Post(string json) => _ = Run(View.InvokeScript($"void LL.receive({JsonSerializer.Serialize(json)})"));

@@ -43,6 +43,7 @@ public sealed partial class ComposerViewModel
     public bool CloudClean => _options.CloudClean;
     public CommitKey CommitKey => _options.CommitKey;
     public bool Animations => _options.Animations;
+    public string Theme => _options.Theme;
 
     /// <summary>The user wants the settings (the section id is "voice" for the input device).</summary>
     public event Action<string>? SettingsRequested;

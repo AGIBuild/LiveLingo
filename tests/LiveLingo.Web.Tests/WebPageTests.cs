@@ -16,9 +16,10 @@ public sealed class WebPageTests
     [Fact]
     public void Build_WritesTheNonceIntoEveryInlineTagAndLeavesNoPlaceholder()
     {
-        var page = WebPage.Build(Nonce);
+        var page = WebPage.Build(Nonce, WebPage.ComposerEntry);
 
         Assert.DoesNotContain("__NONCE__", page);
+        Assert.DoesNotContain("__ENTRY__", page);
         Assert.DoesNotContain("__STYLES__", page);
         Assert.DoesNotContain("__SCRIPTS__", page);
         var opening = Regex.Matches(page, "<(?<tag>script|style)(?<attrs>[^>]*)>");
@@ -32,17 +33,34 @@ public sealed class WebPageTests
     [Fact]
     public void Build_AllowsOnlyTheNonceScriptsAndNoNetwork()
     {
-        var page = WebPage.Build(Nonce);
+        var page = WebPage.Build(Nonce, WebPage.SettingsEntry);
 
         Assert.Contains(
-            $"content=\"default-src 'none'; script-src 'nonce-{Nonce}'; style-src 'nonce-{Nonce}'; img-src data:; font-src 'none'; connect-src 'none'; base-uri 'none'; form-action 'none'\"",
+            $"content=\"default-src 'none'; script-src 'nonce-{Nonce}'; style-src 'nonce-{Nonce}'; style-src-attr 'unsafe-inline'; img-src data:; font-src 'none'; connect-src 'none'; base-uri 'none'; form-action 'none'\"",
             page);
     }
 
     [Fact]
     public void Build_StaysWithinTheSizeBudget()
     {
-        Assert.InRange(Encoding.UTF8.GetByteCount(WebPage.Build(Nonce)), 1, 400 * 1024);
+        Assert.InRange(Encoding.UTF8.GetByteCount(WebPage.Build(Nonce, WebPage.ComposerEntry)), 1, 400 * 1024);
+    }
+
+    [Theory]
+    [InlineData(WebPage.ComposerEntry)]
+    [InlineData(WebPage.SettingsEntry)]
+    public void Build_NamesTheScreenThePageMounts(string entry)
+    {
+        Assert.Contains($"<html data-entry=\"{entry}\">", WebPage.Build(Nonce, entry));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("admin")]
+    [InlineData("composer\"><script>")]
+    public void Build_RejectsAnEntryThatIsNotAScreen(string entry)
+    {
+        Assert.Throws<ArgumentException>(() => WebPage.Build(Nonce, entry));
     }
 
     [Theory]
@@ -51,7 +69,7 @@ public sealed class WebPageTests
     [InlineData("a\"onload=alert(1) b=cccccccccc")]
     public void Build_RejectsANonceThatCouldBreakOutOfTheAttribute(string nonce)
     {
-        Assert.Throws<ArgumentException>(() => WebPage.Build(nonce));
+        Assert.Throws<ArgumentException>(() => WebPage.Build(nonce, WebPage.ComposerEntry));
     }
 
     [Fact]

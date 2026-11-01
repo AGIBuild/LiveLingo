@@ -5,7 +5,7 @@
       <DataCollector friendlyName="XPlat code coverage">
         <Configuration>
           <Format>cobertura</Format>
-          <Exclude>[*]LiveLingo.Desktop.Platform.Windows.*,[*]LiveLingo.Desktop.Platform.macOS.*,[*]LiveLingo.Desktop.Views.*,[*]LiveLingo.Desktop.Controls.*,[*]LiveLingo.Desktop.Web.WebSurface*,[*]LiveLingo.Desktop.Composer.ComposerWindow*,[*]LiveLingo.Desktop.Composer.StorageFileDialogs,[*]LiveLingo.Desktop.Platform.PortAudioMicrophone,[*]LiveLingo.Desktop.Program,[*]LiveLingo.Desktop.App,[*]LiveLingo.Desktop.Services.Update.VelopackUpdateService,[*]LiveLingo.Core.Inference.LlamaProcessLauncher*,[*]LiveLingo.Core.Inference.HttpHealthProbe,[*]LiveLingo.Core.Inference.LoopbackPortAllocator,[*]LiveLingo.Core.Speech.Native.*</Exclude>
+          <Exclude>[*]LiveLingo.Desktop.Platform.Windows.*,[*]LiveLingo.Desktop.Platform.macOS.*,[*]LiveLingo.Desktop.Views.*,[*]LiveLingo.Desktop.Web.WebSurface*,[*]LiveLingo.Desktop.Composer.ComposerWindow*,[*]LiveLingo.Desktop.Settings.SettingsWindow*,[*]LiveLingo.Desktop.Composer.StorageFileDialogs,[*]LiveLingo.Desktop.Platform.PortAudioMicrophone,[*]LiveLingo.Desktop.Program,[*]LiveLingo.Desktop.App,[*]LiveLingo.Desktop.Services.Update.VelopackUpdateService,[*]LiveLingo.Core.Inference.LlamaProcessLauncher*,[*]LiveLingo.Core.Inference.HttpHealthProbe,[*]LiveLingo.Core.Inference.LoopbackPortAllocator,[*]LiveLingo.Core.Speech.Native.*</Exclude>
           <ExcludeByAttribute>Obsolete,GeneratedCodeAttribute,CompilerGeneratedAttribute</ExcludeByAttribute>
         </Configuration>
       </DataCollector>

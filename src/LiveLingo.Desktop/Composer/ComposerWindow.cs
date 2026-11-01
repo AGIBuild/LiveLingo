@@ -31,7 +31,7 @@ internal sealed class ComposerWindow : Window
     public ComposerWindow(ILogger logger)
     {
         _logger = logger;
-        _web = new WebSurface(logger);
+        _web = new WebSurface(WebPage.ComposerEntry, logger);
         Width = NarrowWidth;
         Height = 260;
         CanResize = false;

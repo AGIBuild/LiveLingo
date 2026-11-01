@@ -45,7 +45,7 @@ public sealed class ComposerViewStateTests
     public void EveryFixtureFile_HasAScenario()
     {
         var files = Directory.GetFiles(FixtureDirectory(), "*.json").Select(Path.GetFileNameWithoutExtension)
-            .Where(name => name != StringsFixture);
+            .Where(name => name != StringsFixture && !name!.StartsWith("settings-", StringComparison.Ordinal));
 
         Assert.Equal(ComposerScenarios.All.Keys.Order(StringComparer.Ordinal), files.Order(StringComparer.Ordinal));
     }

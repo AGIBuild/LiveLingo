@@ -1,0 +1,43 @@
+{
+  "rev": 1,
+  "section": "general",
+  "general": {
+    "hotkey": "Ctrl+Alt+T",
+    "hotkeyInvalid": false,
+    "commitKey": "CtrlEnter",
+    "language": "en-US",
+    "theme": "Dark",
+    "reduceMotion": true
+  },
+  "voice": {
+    "microphones": [
+      "",
+      "USB Mic",
+      "Built-in"
+    ],
+    "microphone": "",
+    "direction": "English",
+    "terms": []
+  },
+  "privacy": {
+    "cloudTranslate": false,
+    "cloudClean": false,
+    "baseUrl": "",
+    "model": "",
+    "hasKey": false,
+    "invalid": false,
+    "consent": null
+  },
+  "models": {
+    "tier": "Fast",
+    "legacy": {
+      "count": 0,
+      "text": ""
+    },
+    "version": "2.0.0"
+  },
+  "options": {
+    "animations": false,
+    "theme": "Dark"
+  }
+}

@@ -209,7 +209,7 @@ public class ComposerSessionTests
     [Fact]
     public async Task Options_AreExposedToTheWindow()
     {
-        await using var h = new Harness(options: new ComposerOptions(true, false, CommitKey.CtrlEnter, false));
+        await using var h = new Harness(options: new ComposerOptions(true, false, CommitKey.CtrlEnter, false, "Auto"));
 
         Assert.True(h.Vm.CloudTranslate);
         Assert.False(h.Vm.CloudClean);

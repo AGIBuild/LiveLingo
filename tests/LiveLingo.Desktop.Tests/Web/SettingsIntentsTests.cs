@@ -1,0 +1,242 @@
+using LiveLingo.Core.Models;
+using LiveLingo.Desktop.Services.Configuration;
+using LiveLingo.Desktop.Settings;
+using LiveLingo.Desktop.Tests.Composer;
+using LiveLingo.Desktop.Tests.Settings;
+using LiveLingo.Desktop.Web;
+using NSubstitute;
+
+namespace LiveLingo.Desktop.Tests.Web;
+
+public sealed class SettingsIntentsTests
+{
+    private sealed class Rig
+    {
+        public SettingsViewModelTests.Fixture F { get; }
+        public ListLogger Log { get; } = new();
+        public SettingsIntents Sut { get; }
+
+        public Rig(SettingsModel? model = null, string? storedKey = null, string section = "general")
+        {
+            F = new SettingsViewModelTests.Fixture(model, storedKey);
+            Sut = new SettingsIntents(F.Vm, section, Log);
+        }
+
+        public SettingsViewModel Vm => F.Vm;
+
+        public void Do(WebIntent intent) => Sut.Handle(intent);
+
+        public void Set(string key, string value) => Do(new SettingIntent(key, value) { V = 1 });
+    }
+
+    private static SettingsModel ConfiguredCloud()
+    {
+        var model = new SettingsModel();
+        model.Cloud.BaseUrl = "https://api.example.com/v1";
+        model.Cloud.Model = "m";
+        return model;
+    }
+
+    [Fact]
+    public void EachSetting_ReachesItsViewModelProperty_AndIsStored()
+    {
+        var rig = new Rig();
+
+        rig.Set(SettingIntent.Names.Hotkey, "Ctrl+Shift+K");
+        rig.Set(SettingIntent.Names.CommitKey, "CtrlEnter");
+        rig.Set(SettingIntent.Names.Language, "en-US");
+        rig.Set(SettingIntent.Names.Theme, "Dark");
+        rig.Set(SettingIntent.Names.Direction, "Chinese");
+        rig.Set(SettingIntent.Names.Tier, "Fast");
+        rig.Set(SettingIntent.Names.ReduceMotion, "true");
+
+        var stored = rig.F.Last;
+        Assert.Equal("Ctrl+Shift+K", stored.Hotkeys.Summon);
+        Assert.Equal("CtrlEnter", stored.Composer.CommitKey);
+        Assert.Equal("en-US", stored.Appearance.Language);
+        Assert.Equal("Dark", stored.Appearance.Theme);
+        Assert.Equal("Chinese", stored.Composer.TargetLanguage);
+        Assert.Equal("Fast", stored.Composer.TranslatorTier);
+        Assert.False(stored.Appearance.Animations);
+    }
+
+    [Fact]
+    public void ACloudEndpoint_IsStored()
+    {
+        var rig = new Rig();
+
+        rig.Set(SettingIntent.Names.CloudBaseUrl, "https://api.example.com/v1");
+        rig.Set(SettingIntent.Names.CloudModel, "gpt-deploy");
+
+        Assert.Equal("https://api.example.com/v1", rig.Vm.CloudBaseUrl);
+        Assert.Equal("gpt-deploy", rig.Vm.CloudModel);
+        Assert.Equal("gpt-deploy", rig.F.Last.Cloud.Model);
+    }
+
+    [Fact]
+    public void AnUnusableHotkey_IsFlaggedByTheViewModel_AndNotStored()
+    {
+        var rig = new Rig();
+
+        rig.Set(SettingIntent.Names.Hotkey, "Ctrl+");
+
+        Assert.True(rig.Vm.HotkeyInvalid);
+        Assert.NotEqual("Ctrl+", rig.F.Last.Hotkeys.Summon);
+    }
+
+    [Fact]
+    public async Task AMicrophone_IsChosenByName_AndOneThatIsGoneChangesNothing()
+    {
+        var rig = new Rig();
+        await rig.Vm.InitializeAsync();
+
+        rig.Set(SettingIntent.Names.Microphone, "Built-in");
+        Assert.Equal(2, rig.Vm.MicrophoneIndex);
+
+        rig.Set(SettingIntent.Names.Microphone, "Unplugged");
+        Assert.Equal(2, rig.Vm.MicrophoneIndex);
+
+        rig.Set(SettingIntent.Names.Microphone, "");
+        Assert.Equal(0, rig.Vm.MicrophoneIndex);
+    }
+
+    [Fact]
+    public void AGlossaryTerm_IsAddedWithItsTranslation_AndRemovedByPosition()
+    {
+        var rig = new Rig();
+
+        rig.Do(new AddTermIntent("缓存穿透", "cache penetration") { V = 1 });
+        rig.Do(new AddTermIntent("Redis", "") { V = 1 });
+
+        Assert.Equal([new TermEntry("缓存穿透", "cache penetration"), new TermEntry("Redis", "Redis")], rig.Vm.Terms);
+
+        rig.Do(new RemoveTermIntent(0) { V = 1 });
+
+        Assert.Equal([new TermEntry("Redis", "Redis")], rig.Vm.Terms);
+        Assert.Equal("Redis", rig.F.Last.Composer.Glossary);
+    }
+
+    [Fact]
+    public void RemovingATermThatIsNotThere_ChangesNothing()
+    {
+        var rig = new Rig();
+        rig.Do(new AddTermIntent("Redis", "Redis") { V = 1 });
+
+        rig.Do(new RemoveTermIntent(7) { V = 1 });
+
+        Assert.Single(rig.Vm.Terms);
+    }
+
+    [Fact]
+    public async Task ACloudStep_NeedsTheUsersAnswerBeforeItTurnsOn()
+    {
+        var rig = new Rig(ConfiguredCloud(), storedKey: "sk");
+        await rig.Vm.InitializeAsync();
+
+        rig.Do(new CloudToggleIntent(CloudStep.Translate, On: true) { V = 1 });
+        Assert.Equal(CloudStep.Translate, rig.Vm.PendingConsent);
+        Assert.False(rig.Vm.CloudTranslate);
+
+        rig.Do(new ConsentIntent(Allow: true) { V = 1 });
+        Assert.Null(rig.Vm.PendingConsent);
+        Assert.True(rig.F.Last.Cloud.Translate);
+
+        rig.Do(new CloudToggleIntent(CloudStep.Translate, On: false) { V = 1 });
+        Assert.False(rig.F.Last.Cloud.Translate);
+    }
+
+    [Fact]
+    public async Task TheKey_GoesToTheSecretStoreOnly()
+    {
+        var rig = new Rig();
+
+        rig.Do(new SaveKeyIntent("sk-typed") { V = 1 });
+        await Wait.Until(() => rig.Vm.HasStoredKey);
+
+        await rig.F.Secrets.Received(1).SetSecretAsync(CloudSettings.ApiKeySecretId, "sk-typed", Arg.Any<CancellationToken>());
+        Assert.Equal("", rig.Vm.CloudApiKey);
+        Assert.DoesNotContain(rig.Log.Lines, line => line.Contains("sk-typed", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ForgettingTheKey_DeletesItAndTurnsTheCloudOff()
+    {
+        var rig = new Rig(ConfiguredCloud(), storedKey: "sk");
+        await rig.Vm.InitializeAsync();
+
+        rig.Do(new ForgetKeyIntent { V = 1 });
+        await Wait.Until(() => !rig.Vm.HasStoredKey);
+
+        await rig.F.Secrets.Received(1).DeleteSecretAsync(CloudSettings.ApiKeySecretId, Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task AFailingSecretStore_IsLoggedByTypeOnly()
+    {
+        var rig = new Rig();
+        rig.F.Secrets.SetSecretAsync(default!, default!, TestContext.Current.CancellationToken).ReturnsForAnyArgs(Task.FromException(new InvalidOperationException("sk-secret rejected")));
+
+        rig.Do(new SaveKeyIntent("sk-secret") { V = 1 });
+        await Wait.Until(() => rig.Log.Lines.Count > 0);
+
+        Assert.Contains("InvalidOperationException", rig.Log.Lines[0]);
+        Assert.DoesNotContain("sk-secret", rig.Log.Lines[0]);
+    }
+
+    [Fact]
+    public void RecentDrafts_AreClearedByTheViewModel()
+    {
+        var rig = new Rig();
+        rig.F.Recent.Close("yesterday", written: true);
+
+        rig.Do(new ClearRecentIntent { V = 1 });
+
+        Assert.Empty(rig.F.Recent.Items);
+    }
+
+    [Fact]
+    public async Task ModelsFromEarlierVersions_AreRemovedOnRequest()
+    {
+        var rig = new Rig();
+        rig.F.Models.ListInstalled().Returns([new InstalledModel("old", "old", "/m/old", 10, ModelType.Translation, DateTime.UnixEpoch)]);
+        await rig.Vm.InitializeAsync();
+
+        rig.Do(new RemoveLegacyModelsIntent { V = 1 });
+        await Wait.Until(() => !rig.Vm.HasLegacyModels);
+
+        await rig.F.Models.Received(1).CleanObsoleteModelsAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public void TheSection_IsOwnedHere_AndChangesWithTheNavigation()
+    {
+        var rig = new Rig(section: "voice");
+        Assert.Equal("voice", rig.Sut.Section);
+
+        rig.Do(new OpenSettingsIntent("privacy") { V = 1 });
+
+        Assert.Equal("privacy", rig.Sut.Section);
+    }
+
+    [Fact]
+    public void EveryIntent_TellsThePageToLookAgain()
+    {
+        var rig = new Rig();
+        var changes = 0;
+        rig.Sut.Changed += () => changes++;
+
+        rig.Do(new OpenSettingsIntent("models") { V = 1 });
+        rig.Do(new RemoveTermIntent(3) { V = 1 });
+
+        Assert.Equal(2, changes);
+    }
+
+    [Fact]
+    public void AnIntentOutsideTheSettingsSet_IsABug()
+    {
+        var rig = new Rig();
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => rig.Do(new CommitIntent(true) { V = 1 }));
+        Assert.Throws<ArgumentOutOfRangeException>(() => rig.Do(new SettingIntent("deleteEverything", "") { V = 1 }));
+    }
+}

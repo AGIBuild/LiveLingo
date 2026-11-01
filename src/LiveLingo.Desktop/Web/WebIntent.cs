@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using LiveLingo.Desktop.Composer;
+using LiveLingo.Desktop.Settings;
 
 namespace LiveLingo.Desktop.Web;
 
@@ -38,6 +39,14 @@ namespace LiveLingo.Desktop.Web;
 [JsonDerivedType(typeof(CopyOnlyIntent), "copyOnly")]
 [JsonDerivedType(typeof(BannerIntent), "banner")]
 [JsonDerivedType(typeof(OpenSettingsIntent), "openSettings")]
+[JsonDerivedType(typeof(SettingIntent), "setting")]
+[JsonDerivedType(typeof(AddTermIntent), "addTerm")]
+[JsonDerivedType(typeof(RemoveTermIntent), "removeTerm")]
+[JsonDerivedType(typeof(CloudToggleIntent), "cloudToggle")]
+[JsonDerivedType(typeof(ConsentIntent), "consent")]
+[JsonDerivedType(typeof(SaveKeyIntent), "saveKey")]
+[JsonDerivedType(typeof(ForgetKeyIntent), "forgetKey")]
+[JsonDerivedType(typeof(RemoveLegacyModelsIntent), "removeLegacyModels")]
 internal abstract record WebIntent
 {
     public const int Version = 1;
@@ -182,3 +191,62 @@ internal sealed record OpenSettingsIntent(string Section) : WebIntent
 {
     protected override bool IsValid => IsSection(Section);
 }
+
+/// <summary>One value of the settings changed. Unknown keys, and values outside a closed choice, are dropped here.</summary>
+internal sealed record SettingIntent(string Key, string Value) : WebIntent
+{
+    public static class Names
+    {
+        public const string Hotkey = "hotkey";
+        public const string CommitKey = "commitKey";
+        public const string Language = "language";
+        public const string Theme = "theme";
+        public const string ReduceMotion = "reduceMotion";
+        public const string Microphone = "microphone";
+        public const string Direction = "direction";
+        public const string Tier = "tier";
+        public const string CloudBaseUrl = "cloudBaseUrl";
+        public const string CloudModel = "cloudModel";
+    }
+
+    protected override bool IsValid => Key switch
+    {
+        // Free text is bounded here; whether it is a usable hotkey or endpoint is the view model's call.
+        Names.Hotkey => Value.Length <= 64,
+        Names.Microphone or Names.CloudModel => Value.Length <= 256,
+        Names.CloudBaseUrl => Value.Length <= 2_048,
+        Names.CommitKey => SettingsViewModel.CommitKeys.Contains(Value),
+        Names.Language => SettingsViewModel.Languages.Contains(Value),
+        Names.Theme => SettingsViewModel.Themes.Contains(Value),
+        Names.Direction => SettingsViewModel.Targets.Contains(Value),
+        Names.Tier => SettingsViewModel.Tiers.Contains(Value),
+        Names.ReduceMotion => Value is "true" or "false",
+        _ => false
+    };
+}
+
+internal sealed record AddTermIntent(string Source, string Target) : WebIntent
+{
+    protected override bool IsValid => Source.Length <= 200 && Target.Length <= 200;
+}
+
+internal sealed record RemoveTermIntent(int Index) : WebIntent
+{
+    protected override bool IsValid => IsIndex(Index);
+}
+
+internal sealed record CloudToggleIntent(CloudStep Step, bool On) : WebIntent;
+
+internal sealed record ConsentIntent(bool Allow) : WebIntent;
+
+/// <summary>The API key the user typed. It crosses once, here, and is never part of a snapshot or a log line.</summary>
+internal sealed record SaveKeyIntent(string Value) : WebIntent
+{
+    protected override bool IsValid => Value.Length is >= 1 and <= 4_096;
+
+    public override string ToString() => nameof(SaveKeyIntent);
+}
+
+internal sealed record ForgetKeyIntent : WebIntent;
+
+internal sealed record RemoveLegacyModelsIntent : WebIntent;

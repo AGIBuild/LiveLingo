@@ -165,10 +165,10 @@ LIVELINGO_ENABLE_VOICE_PROBE=1 ./build.sh ProbeVoice   # 语音探针（仅 macO
 
 **文件：** `src/LiveLingo.Desktop/Web/Assets/app/30-settings-*.js`；`Settings/SettingsWindow` 改为薄外壳；删除 `SettingsWindow.axaml(.cs)`、`Controls/HotkeyRecorder.cs`、多余的 `AppTheme.axaml` 样式及其测试。
 
-- [ ] **步骤 1：** 四组设置（通用 / 语音与翻译 / 隐私与云端 / 模型与关于），即改即存；云端开关由 C# 决定是否弹同意（同意对话框在 Web 内）。
-- [ ] **步骤 2：** 热键录制：Web 采集 `event.code` + 修饰键，发 `setting{summonHotkey}`，由 C# `HotkeyParser` 校验并重新注册。
-- [ ] **步骤 3：** 密钥：`saveKey` 一次性意图；界面只显示“已保存”与“忘记密钥”。
-- [ ] **步骤 4：** 测试与删除，同 W4；提交：`feat(settings): render the settings in the web view`。
+- [x] **步骤 1：** 四组设置（通用 / 语音与翻译 / 隐私与云端 / 模型与关于），即改即存；云端开关由 C# 决定是否弹同意（同意对话框在 Web 内）。
+- [x] **步骤 2：** 热键录制：Web 采集 `event.code` + 修饰键，发 `setting{summonHotkey}`，由 C# `HotkeyParser` 校验并重新注册。
+- [x] **步骤 3：** 密钥：`saveKey` 一次性意图；界面只显示“已保存”与“忘记密钥”。
+- [x] **步骤 4：** 测试与删除，同 W4；提交：`feat(settings): render the settings in the web view`。
 
 验收：设置所有行为与现有 `SettingsViewModelTests` 一致；旧设置界面代码全部删除。
 

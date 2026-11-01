@@ -18,7 +18,6 @@
     after() {
       const { composer: c, focus } = LL.state;
       if (!c) return;
-      document.documentElement.dataset.motion = c.options.animations ? '' : 'off';
       if (focus && focus.n !== this.focusHandled) {
         this.focusHandled = focus.n;
         focusTarget(focus.target);

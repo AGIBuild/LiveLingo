@@ -174,7 +174,8 @@ public sealed record StatusInfo(
 /// <param name="CloudTranslate">Translation runs on the user's cloud endpoint (shown in the privacy chip).</param>
 /// <param name="CloudClean">Cleanup runs on the user's cloud endpoint (shown in the privacy chip).</param>
 /// <param name="Animations">False when the user asked to reduce motion.</param>
-public sealed record ComposerOptions(bool CloudTranslate, bool CloudClean, CommitKey CommitKey, bool Animations)
+/// <param name="Theme">"Auto" (follow the system), "Light" or "Dark".</param>
+public sealed record ComposerOptions(bool CloudTranslate, bool CloudClean, CommitKey CommitKey, bool Animations, string Theme)
 {
-    public static ComposerOptions Default { get; } = new(false, false, CommitKey.Enter, true);
+    public static ComposerOptions Default { get; } = new(false, false, CommitKey.Enter, true, "Auto");
 }

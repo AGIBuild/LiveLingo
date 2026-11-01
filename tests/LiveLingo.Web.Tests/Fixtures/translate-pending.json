@@ -104,6 +104,7 @@
   },
   "options": {
     "animations": true,
+    "theme": "Auto",
     "commitKey": "enter",
     "commitKeyCap": "↵",
     "newlineKeyCap": "⇧↵"
