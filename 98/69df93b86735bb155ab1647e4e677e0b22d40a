@@ -1,0 +1,98 @@
+tests/LiveLingo.Web.Tests/Fixtures/gate-warning.json
+  s_6d6e9175f38e45::t_68ede023e59297 47-48
+tests/LiveLingo.Desktop.Tests/Composer/RecentDraftsTests.cs
+  s_6d6e9175f38e45::t_1cf79492d03bc7 14,20-22,26,32,37,43,86,98
+src/LiveLingo.Desktop/Composer/ComposerTexts.cs
+  s_6d6e9175f38e45::t_71d019b01cd02c 74,76-77,80,83-85,260
+tests/LiveLingo.Web.Tests/Fixtures/cloud-ctrl-enter.json
+  s_6d6e9175f38e45::t_68ede023e59297 47-48
+tests/LiveLingo.Web.Tests/Fixtures/copy-only.json
+  s_6d6e9175f38e45::t_68ede023e59297 47-48
+tests/LiveLingo.Web.Tests/Fixtures/original-ready.json
+  s_6d6e9175f38e45::t_68ede023e59297 47-48
+tests/LiveLingo.Web.Tests/Fixtures/row-failed.json
+  s_6d6e9175f38e45::t_68ede023e59297 47-48
+tests/LiveLingo.Web.Tests/Fixtures/write-failed.json
+  s_6d6e9175f38e45::t_68ede023e59297 53-54
+tests/LiveLingo.Web.Tests/Fixtures/written.json
+  s_6d6e9175f38e45::t_68ede023e59297 47-48
+tests/LiveLingo.Web.Tests/Fixtures/translate-pending.json
+  s_6d6e9175f38e45::t_68ede023e59297 47-48
+tests/LiveLingo.Web.Tests/Fixtures/listening.json
+  s_6d6e9175f38e45::t_68ede023e59297 58-59
+src/LiveLingo.Desktop/Web/Assets/app/21-composer-source.js
+  s_6d6e9175f38e45::t_27236007d8c9be 83-84
+tests/LiveLingo.Web.Tests/Fixtures/mic-denied.json
+  s_6d6e9175f38e45::t_68ede023e59297 62-63
+tests/LiveLingo.Web.Tests/Fixtures/downloading.json
+  s_6d6e9175f38e45::t_68ede023e59297 58-59
+tests/LiveLingo.Web.Tests/Fixtures/editing.json
+  s_6d6e9175f38e45::t_68ede023e59297 47-48
+tests/LiveLingo.Web.Tests/Fixtures/reduced-motion.json
+  s_6d6e9175f38e45::t_68ede023e59297 47-48
+tests/LiveLingo.Web.Tests/Fixtures/no-cleanup.json
+  s_6d6e9175f38e45::t_68ede023e59297 41-42
+tests/LiveLingo.Web.Tests/Fixtures/strings.json
+  s_6d6e9175f38e45::t_68ede023e59297 28
+tests/LiveLingo.Web.Tests/Fixtures/empty.json
+  s_6d6e9175f38e45::t_68ede023e59297 47-48
+tests/LiveLingo.Web.Tests/ComposerRenderTests.cs
+  s_6d6e9175f38e45::t_394f3f18d1f377 26-42
+  s_6d6e9175f38e45::t_35305fbe4e96ae 24-25
+tests/LiveLingo.Desktop.Tests/Web/ComposerViewStateTests.cs
+  s_6d6e9175f38e45::t_dbf5b5ab0cd2bf 246-272
+src/LiveLingo.Desktop/Web/ComposerViewState.cs
+  s_6d6e9175f38e45::t_898db338c1df79 19-22,25,27-28,79,106-110
+src/LiveLingo.Desktop/Resources/i18n/zh-CN.json
+  s_6d6e9175f38e45::t_b035aadab2862a 57
+tests/LiveLingo.Web.Tests/Fixtures/clean-ready.json
+  s_6d6e9175f38e45::t_68ede023e59297 47-48
+tests/LiveLingo.Web.Tests/Fixtures/model-missing.json
+  s_6d6e9175f38e45::t_68ede023e59297 58-59
+tests/LiveLingo.Web.Tests/Fixtures/target-lost.json
+  s_6d6e9175f38e45::t_68ede023e59297 62-63
+src/LiveLingo.Desktop/Composer/RecentDrafts.cs
+  s_6d6e9175f38e45::t_fe4ca596eba323 4,20-25
+tests/LiveLingo.Web.Tests/Fixtures/timeline.json
+  s_6d6e9175f38e45::t_68ede023e59297 63-64
+tests/LiveLingo.Desktop.Tests/Web/ComposerScenarios.cs
+  s_6d6e9175f38e45::t_9d3ac3a18be5cf 22-28
+tests/LiveLingo.Web.Tests/Fixtures/no-microphone.json
+  s_6d6e9175f38e45::t_68ede023e59297 62-63
+tests/LiveLingo.Web.Tests/Fixtures/translate-ready.json
+  s_6d6e9175f38e45::t_68ede023e59297 47-48
+tests/LiveLingo.Web.Tests/Fixtures/no-speech.json
+  s_6d6e9175f38e45::t_68ede023e59297 58-59
+src/LiveLingo.Desktop/Web/Assets/styles/composer.css
+  s_6d6e9175f38e45::t_c264c359787619 49-53
+tests/LiveLingo.Web.Tests/Fixtures/slow.json
+  s_6d6e9175f38e45::t_68ede023e59297 62-63
+tests/LiveLingo.Web.Tests/Fixtures/resume-draft.json
+  s_6d6e9175f38e45::t_68ede023e59297 1-161
+tests/LiveLingo.Web.Tests/Fixtures/translate-armed.json
+  s_6d6e9175f38e45::t_68ede023e59297 47-48
+src/LiveLingo.Desktop/Resources/i18n/en-US.json
+  s_6d6e9175f38e45::t_767ae3f39a58ce 57
+tests/LiveLingo.Web.Tests/Fixtures/whole-wide.json
+  s_6d6e9175f38e45::t_68ede023e59297 47-48
+tests/LiveLingo.Web.Tests/Fixtures/download-failed.json
+  s_6d6e9175f38e45::t_68ede023e59297 58-59
+docs/superpowers/plans/2026-10-31-composer-implementation.md
+  s_6d6e9175f38e45::t_a2b40a16eeae2d 61
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9869df93b86735bb155ab1647e4e677e0b22d40a",
+  "prompts": {},
+  "sessions": {
+    "s_6d6e9175f38e45": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "f74d37e5-1d96-4ddc-a3f9-5ae24ff39e38",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
