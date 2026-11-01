@@ -1,0 +1,39 @@
+CHANGELOG.md
+  s_821950ffe1bdcc::t_8d3a4df269bfb0 51-52
+  s_821950ffe1bdcc::t_ebb7d1ff9c7c2b 28-29,33-37
+  s_821950ffe1bdcc::t_15f4825eee01aa 38
+CONTRIBUTING.md
+  s_821950ffe1bdcc::t_d95d16c3c5c7e5 208-209,213
+  s_821950ffe1bdcc::t_04337ca1b00ede 49-52,56,62-64
+  s_821950ffe1bdcc::t_077d016c37322c 266-267
+  s_821950ffe1bdcc::t_852f75dafa3397 96-97
+README.md
+  s_821950ffe1bdcc::t_3bbc8e7d82eea1 56-57
+  s_821950ffe1bdcc::t_09c2e6061044f7 23-24
+docs/superpowers/plans/2026-10-31-composer-implementation.md
+  s_6d6e9175f38e45::t_00c37f5ec7c0f2 87-95
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8ab4b70060748c18fe72292e95c75e3cdf8a440a",
+  "prompts": {},
+  "sessions": {
+    "s_6d6e9175f38e45": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "f74d37e5-1d96-4ddc-a3f9-5ae24ff39e38",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    },
+    "s_821950ffe1bdcc": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "2e07dbc3-b49b-4806-8ef7-b85cd318bb36",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
