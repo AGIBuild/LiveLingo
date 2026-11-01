@@ -20,7 +20,8 @@ release is tag `v1.4.2`.
    else; copy still works.
 
 Cleanup is checked by a fidelity gate: a rewrite that adds facts, drops negations or numbers, or drifts from what you
-said is rejected and that sentence keeps your words.
+said is rejected and that sentence keeps your words. Cleanup can be switched off in Settings; the composer then offers
+only *Translate* and *Original*.
 
 Imported recordings become a read-only timeline that goes through the same cleanup and translation, and can be
 exported as SRT.
@@ -52,6 +53,8 @@ Licenses are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 - Target hardware: Apple M2 or newer with 16 GB, or an equivalent Windows 11 PC. macOS 12+ and Windows 10/11.
 - macOS needs Accessibility (to type into other apps) and Microphone permission.
+- The interface is drawn by the system web view: WKWebView on macOS, WebView2 on Windows (Windows 11 includes it; how the
+  runtime reaches Windows 10 is not decided yet).
 - Developed and measured on an M3 Pro (36 GB). **Not yet verified:** an M2/16 GB machine (memory with all models
   resident, latency), anything running on Windows beyond a successful build and bundled native libraries, and a real
   Foundry/OpenAI endpoint.

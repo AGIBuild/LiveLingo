@@ -25,8 +25,16 @@ providers, wizard and model catalog were removed; see the design and plan under 
   motion, microphone, translation direction, glossary list, cloud model, translator tier, removal of models from
   earlier versions. Changes apply at once; there is no save button.
 - Settings migration from schema 2; `THIRD_PARTY_NOTICES.md`.
+- Settings: a switch to turn sentence cleanup off (the composer then offers only *Translate* and *Original* and starts on
+  *Original*), and a status dialog (version, system, switch states) that never contains text, terms, addresses or keys.
 
 ### Changed
+
+- The composer and the settings are rendered by the system web view (WKWebView on macOS, WebView2 on Windows) inside
+  thin Avalonia windows. State and logic stay in C#; the page, built from embedded Preact + htm sources without a Node
+  build, draws whole snapshots and sends closed-set intents. The Avalonia XAML views, custom controls and theme were
+  removed. The composer window is kept parked off-screen between uses instead of hidden.
+- The note under a sentence whose cleanup was refused ("original wording kept") follows the interface language.
 
 - The interface follows the v3 prototype (`docs/superpowers/prototypes/livelingo-ux-v3/`): destination, privacy and
   output chips, per-sentence edit and "use original", tap-to-listen or hold-to-talk microphone, light and dark themes,
@@ -40,6 +48,8 @@ providers, wizard and model catalog were removed; see the design and plan under 
 
 - Validated on an M3 Pro only; M2/16 GB and Windows runtime behaviour are unverified.
 - Recording import reads uncompressed WAV only.
+- The web UI has not been exercised in a real window on Windows, and WebView2 runtime distribution for Windows 10 is
+  not decided. There is no recognition-language option (the speech engine has none) and recordings are never kept.
 - The composer window is not blurred (alpha glass only); the prototype's backdrop blur is not reproduced.
 
 ## [1.4.0] - 2026-04-25
