@@ -1,0 +1,23 @@
+src/LiveLingo.Desktop/App.axaml.cs
+  s_821950ffe1bdcc::t_2b71f0f0f9f131 201-202
+src/LiveLingo.Desktop/Platform/Windows/Win32WindowTracker.cs
+  s_821950ffe1bdcc::t_2b71f0f0f9f131 16-17
+src/LiveLingo.Desktop/Platform/macOS/MacWindowTracker.cs
+  s_821950ffe1bdcc::t_2b71f0f0f9f131 15-16
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d52c9858a4f57cdb2e464a304f3311e4d5d7974b",
+  "prompts": {},
+  "sessions": {
+    "s_821950ffe1bdcc": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "2e07dbc3-b49b-4806-8ef7-b85cd318bb36",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
