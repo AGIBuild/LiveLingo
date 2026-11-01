@@ -189,6 +189,13 @@ internal static partial class NativeMethods
     [return: MarshalAs(UnmanagedType.Bool)]
     public static partial bool PostMessageW(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
 
+    [LibraryImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static partial bool ReleaseCapture();
+
+    [LibraryImport("user32.dll")]
+    public static partial IntPtr SendMessageW(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
+
     public const uint WM_PASTE = 0x0302;
     public const uint WM_KEYUP = 0x0101;
 

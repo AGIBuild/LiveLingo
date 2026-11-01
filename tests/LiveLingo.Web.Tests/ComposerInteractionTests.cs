@@ -528,6 +528,92 @@ public sealed class ComposerInteractionTests(BrowserFixture browsers)
         Assert.True((await page.LastIntentAsync<SizeIntent>()).Height >= menuBottom + 18 - 1);
     }
 
+    // --- moving and fitting the window ------------------------------------------------------------------------------
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public async Task DraggingTheHeader_ReportsTheDragOnce(string engine)
+    {
+        await using var page = await browsers.OpenAsync(engine, "translate-ready");
+        var spacer = (await page.Page.Locator(".c-head .spacer").BoundingBoxAsync())!;
+        var (x, y) = (spacer.X + spacer.Width / 2, spacer.Y + spacer.Height / 2);
+        await page.ClearIntentsAsync();
+
+        await page.Page.Mouse.MoveAsync(x, y);
+        await page.Page.Mouse.DownAsync();
+        await page.Page.Mouse.MoveAsync(x + 20, y + 10, new() { Steps = 5 });
+        await page.Page.Mouse.MoveAsync(x + 60, y + 30, new() { Steps = 5 });
+        await page.Page.Mouse.UpAsync();
+
+        Assert.Equal(1, await page.CountAsync<DragIntent>());
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public async Task AClickOnTheHeaderThatBarelyMoves_IsNotADrag(string engine)
+    {
+        await using var page = await browsers.OpenAsync(engine, "translate-ready");
+        var spacer = (await page.Page.Locator(".c-head .spacer").BoundingBoxAsync())!;
+        var (x, y) = (spacer.X + spacer.Width / 2, spacer.Y + spacer.Height / 2);
+        await page.ClearIntentsAsync();
+
+        await page.Page.Mouse.MoveAsync(x, y);
+        await page.Page.Mouse.DownAsync();
+        await page.Page.Mouse.MoveAsync(x + 2, y + 1);
+        await page.Page.Mouse.UpAsync();
+        await page.Page.Mouse.MoveAsync(x + 80, y);
+
+        Assert.Equal(0, await page.CountAsync<DragIntent>());
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public async Task PressingAControlInTheHeader_IsNotADrag(string engine)
+    {
+        await using var page = await browsers.OpenAsync(engine, "translate-ready");
+        var pill = (await page.Page.Locator("#out-pill").BoundingBoxAsync())!;
+        await page.ClearIntentsAsync();
+
+        await page.Page.Mouse.MoveAsync(pill.X + 5, pill.Y + 5);
+        await page.Page.Mouse.DownAsync();
+        await page.Page.Mouse.MoveAsync(pill.X + 40, pill.Y + 30, new() { Steps = 5 });
+        await page.Page.Mouse.UpAsync();
+
+        Assert.Equal(0, await page.CountAsync<DragIntent>());
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public async Task PressingTheBody_IsNotADrag(string engine)
+    {
+        await using var page = await browsers.OpenAsync(engine, "translate-ready");
+        var footer = (await page.Page.Locator(".c-foot").BoundingBoxAsync())!;
+        await page.ClearIntentsAsync();
+
+        await page.Page.Mouse.MoveAsync(footer.X + footer.Width / 2, footer.Y + 2);
+        await page.Page.Mouse.DownAsync();
+        await page.Page.Mouse.MoveAsync(footer.X + footer.Width / 2 + 60, footer.Y + 2, new() { Steps = 5 });
+        await page.Page.Mouse.UpAsync();
+
+        Assert.Equal(0, await page.CountAsync<DragIntent>());
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public async Task ThePanelLimitOfTheHost_ShortensThePanelAndTheBodyScrolls(string engine)
+    {
+        await using var page = await browsers.OpenAsync(engine, "whole-wide");
+        var before = (await page.Page.Locator("#composer").BoundingBoxAsync())!.Height;
+
+        await page.ReceiveAsync("limit", new JsonObject { ["maxHeight"] = 200 });
+
+        var after = (await page.Page.Locator("#composer").BoundingBoxAsync())!.Height;
+        Assert.True(before > 200, $"The fixture must be taller than the limit to prove anything (was {before}).");
+        Assert.True(after <= 200, $"The panel is {after} px tall with a limit of 200.");
+        Assert.True(await page.Page.EvaluateAsync<bool>("(() => { const b = document.querySelector('.c-body'); return b.scrollHeight > b.clientHeight; })()"));
+        Assert.True(await page.Page.Locator("#commit").IsVisibleAsync());
+    }
+
     private static async Task OpenDialogAsync(ComposerPage page, string item)
     {
         await page.Page.Locator("#more").ClickAsync();

@@ -9,6 +9,8 @@ internal sealed record FocusData(string Target);
 
 internal sealed record OpenMenuData(string Id);
 
+internal sealed record LimitData(int MaxHeight);
+
 /// <summary>
 /// One summon of the composer: connects its view model to a page. The view model changes, the page gets a snapshot; the
 /// page acts, the view model is told. The window around the page only follows <see cref="SizeChanged"/> and
@@ -20,7 +22,7 @@ internal sealed class ComposerWebSession : IDisposable
     private readonly ComposerIntents _intents;
     private readonly ComposerTexts _texts;
     private bool _wide;
-
+    private int? _limit;
     public ComposerWebSession(
         ComposerViewModel vm,
         ComposerTexts texts,
@@ -45,14 +47,26 @@ internal sealed class ComposerWebSession : IDisposable
         vm.ToastRaised += OnToast;
         vm.RetargetRequested += OnRetarget;
         _bridge.Started += SendFocus;
+        _bridge.Started += ResendLimit;
         _intents.Changed += _bridge.Invalidate;
         _intents.SizeChanged += size => SizeChanged?.Invoke(size);
+        _intents.Dragged += () => Dragged?.Invoke();
     }
 
     public ComposerViewModel Vm { get; }
 
     /// <summary>The page measured its content.</summary>
     public event Action<SizeIntent>? SizeChanged;
+
+    /// <summary>The user started dragging the composer by its header.</summary>
+    public event Action? Dragged;
+
+    /// <summary>Tells the page how tall its panel may get on the screen it is on; beyond that the page scrolls inside.</summary>
+    public void LimitPanelHeight(int cssPixels)
+    {
+        _limit = cssPixels;
+        _bridge.Send("limit", new LimitData(cssPixels));
+    }
 
     /// <summary>The composer switched between the narrow and the wide layout, so the window changes width.</summary>
     public event Action? WideChanged;
@@ -64,6 +78,12 @@ internal sealed class ComposerWebSession : IDisposable
     /// the conversation itself with its <c>ready</c> message.
     /// </summary>
     public void Start() => _bridge.Start();
+
+    private void ResendLimit()
+    {
+        if (_limit is { } limit)
+            _bridge.Send("limit", new LimitData(limit));
+    }
 
     private void SendFocus()
     {

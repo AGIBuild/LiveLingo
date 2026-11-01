@@ -52,6 +52,9 @@ internal sealed class ComposerIntents : IIntentHandler
     /// <summary>The page measured its content; the window follows.</summary>
     public event Action<SizeIntent>? SizeChanged;
 
+    /// <summary>The user started dragging the composer by its header; the window is moved by the system.</summary>
+    public event Action? Dragged;
+
     /// <summary>State that is not on the view model changed (the recent drafts).</summary>
     public event Action? Changed;
 
@@ -60,6 +63,7 @@ internal sealed class ComposerIntents : IIntentHandler
         switch (intent)
         {
             case SizeIntent size: SizeChanged?.Invoke(size); break;
+            case DragIntent: Dragged?.Invoke(); break;
             case SourceIntent source:
                 _pageText = source.Text;
                 SourceRev = source.Rev;
