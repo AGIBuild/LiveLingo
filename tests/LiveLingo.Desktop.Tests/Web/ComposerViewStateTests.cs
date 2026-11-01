@@ -29,12 +29,28 @@ public sealed class ComposerViewStateTests
     }
 
     [Fact]
+    public async Task Strings_MatchTheirGoldenFile()
+    {
+        var json = JsonSerializer.Serialize(
+            new StringsData("zh-CN", Texts.Chinese().WebStrings()), WebJson.Fixture) + "\n";
+        var path = Path.Combine(FixtureDirectory(), StringsFixture + ".json");
+
+        if (Environment.GetEnvironmentVariable("UPDATE_FIXTURES") == "1")
+            File.WriteAllText(path, json);
+
+        Assert.Equal(await File.ReadAllTextAsync(path, TestContext.Current.CancellationToken), json);
+    }
+
+    [Fact]
     public void EveryFixtureFile_HasAScenario()
     {
-        var files = Directory.GetFiles(FixtureDirectory(), "*.json").Select(Path.GetFileNameWithoutExtension);
+        var files = Directory.GetFiles(FixtureDirectory(), "*.json").Select(Path.GetFileNameWithoutExtension)
+            .Where(name => name != StringsFixture);
 
         Assert.Equal(ComposerScenarios.All.Keys.Order(StringComparer.Ordinal), files.Order(StringComparer.Ordinal));
     }
+
+    private const string StringsFixture = "strings";
 
     [Theory]
     [InlineData("target-lost", "targetLost")]
