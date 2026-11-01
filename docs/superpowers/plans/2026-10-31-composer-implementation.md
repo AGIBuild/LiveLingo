@@ -1,6 +1,6 @@
 # LiveLingo Composer 实施计划
 
-设计见 [composer 设计](../specs/2026-10-31-livelingo-composer-design.md)。本计划按优先级拆分；**M0、M1 给出可直接执行的步骤**，M2 起在前一个里程碑验收后再细化（其前提取决于 M1 的实测结果，如 S1）。
+设计见 [composer 设计](../specs/2026-10-31-livelingo-composer-design.md)。**接手后续工作请从 [Web UI 迁移与发布交接计划](./2026-11-01-web-ui-and-release-handoff.md) 开始**；本文件保留 M0–M4 的实施记录与实测数据。本计划按优先级拆分；**M0、M1 给出可直接执行的步骤**，M2 起在前一个里程碑验收后再细化（其前提取决于 M1 的实测结果，如 S1）。
 
 规则：每个任务先写失败的测试再实现；每步结束运行 `dotnet build LiveLingo.slnx` 与相关测试；每个任务一个本地提交，英文提交信息，带 `Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>`；不推送。
 
