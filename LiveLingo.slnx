@@ -9,5 +9,6 @@
     <Project Path="tests/LiveLingo.Desktop.Tests/LiveLingo.Desktop.Tests.csproj" />
     <Project Path="tests/LiveLingo.Core.Tests/LiveLingo.Core.Tests.csproj" />
     <Project Path="tests/LiveLingo.HfGguf.Tests/LiveLingo.HfGguf.Tests.csproj" />
+    <Project Path="tests/LiveLingo.Web.Tests/LiveLingo.Web.Tests.csproj" />
   </Folder>
 </Solution>

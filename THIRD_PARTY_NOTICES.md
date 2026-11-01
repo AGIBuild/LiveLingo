@@ -27,6 +27,8 @@ Every download is verified against a pinned SHA256 before it is used.
 | sherpa-onnx 2.0.1 (`org.k2fsa.sherpa.onnx`) with ONNX Runtime | Speech recognition | Apache-2.0 (sherpa-onnx), MIT (ONNX Runtime) |
 | PortAudio via PortAudioSharp2 | Microphone capture | MIT |
 | Avalonia 12 preview | UI | MIT |
+| Preact 10.29.8 (`dist/preact.min.js`, sha256 `25aa00978fef96e4fd0020cc723a41c3b1a1e81c9c087eff26a77e07a4867e8e`) | Renders the composer and settings in the web view; vendored in `src/LiveLingo.Desktop/Web/Assets/vendor` | MIT |
+| htm 3.1.1 (`dist/htm.js`, sha256 `80e39afe20fd61183412eda89efa10532d57945e6364642aceacd50eb2384b4b`) | Template-literal views for Preact; vendored next to it | Apache-2.0 |
 | CommunityToolkit.Mvvm | View models | MIT |
 | Velopack | Updates and installers | MIT |
 | Serilog | Logging | Apache-2.0 |

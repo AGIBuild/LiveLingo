@@ -29,7 +29,19 @@ jobs:
       - name: Restore tools
         run: dotnet tool restore
 
-      - name: Test + Coverage + Mutation
+      - name: Build
         run: |
           chmod +x build.sh
-          ./build.sh Test
+          ./build.sh Build
+
+      # The web tests drive WebKit and Chromium; the browsers' system libraries need apt, which the test fixture cannot do.
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('tests/LiveLingo.Web.Tests/*.csproj') }}
+
+      - name: Install browsers for the web tests
+        run: pwsh tests/LiveLingo.Web.Tests/bin/Release/net10.0/playwright.ps1 install --with-deps webkit chromium
+
+      - name: Test + Coverage + Mutation
+        run: ./build.sh Test

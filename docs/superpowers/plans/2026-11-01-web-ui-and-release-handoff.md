@@ -110,10 +110,10 @@ LIVELINGO_ENABLE_VOICE_PROBE=1 ./build.sh ProbeVoice   # 语音探针（仅 macO
 
 ### W1：Web 工程脚手架
 
-**文件（无 Node，设计 §7 / D20）：** 新建 `src/LiveLingo.Desktop/Web/{WebPage.cs,Assets/page.html,Assets/styles/*,Assets/vendor/*,Assets/app/*}`、`tests/LiveLingo.Web.Tests/*`；修改 `LiveLingo.Desktop.csproj`（嵌入 `Web/Assets/**`，`InternalsVisibleTo` 加 `LiveLingo.Web.Tests`）、`LiveLingo.slnx`（加入测试项目）、`THIRD_PARTY_NOTICES.md`（preact、htm 的版本与 MIT 许可）、`.github/workflows/ci.yml`（无需 Node；仅在需要时安装 Playwright 浏览器依赖）。
+**文件（无 Node，设计 §7 / D20）：** 新建 `src/LiveLingo.Desktop/Web/{WebPage.cs,Assets/page.html,Assets/styles/*,Assets/vendor/*,Assets/app/*}`、`tests/LiveLingo.Web.Tests/*`；修改 `LiveLingo.Desktop.csproj`（嵌入 `Web/Assets/**`，`InternalsVisibleTo` 加 `LiveLingo.Web.Tests`）、`LiveLingo.slnx`（加入测试项目）、`THIRD_PARTY_NOTICES.md`（preact 的 MIT、htm 的 Apache-2.0，及版本与 SHA-256）、`.github/workflows/ci.yml`（无需 Node；仅在需要时安装 Playwright 浏览器依赖）。
 
 - [ ] **步骤 1（先写失败测试）：** `WebPage.Build(nonce)` 返回含 nonce 的单页；页面带 CSP meta（设计 §6.2）；预算 ≤ 400 KB；自有源文件无禁用 API；WebKit 与 Chromium 中页面加载后 `LL` 已定义、渲染出注入的快照、零控制台错误、零网络请求。
-- [ ] **步骤 2：** 固定版本放入 `vendor/`：`preact@10.29.8`（`dist/preact.min.js`）、`htm@3.1.1`（`dist/htm.js`），记录 SHA-256，随附 MIT 许可到 `THIRD_PARTY_NOTICES.md`。
+- [ ] **步骤 2：** 固定版本放入 `vendor/`：`preact@10.29.8`（`dist/preact.min.js`）、`htm@3.1.1`（`dist/htm.js`），记录 SHA-256，许可写入 `THIRD_PARTY_NOTICES.md`。
 - [ ] **步骤 3：** 把原型 `style.css` 拆为 `styles/tokens.css`（令牌，名称不变）与 `styles/base.css`；`page.html` 带 `__NONCE__`、`__STYLES__`、`__SCRIPTS__` 占位。
 - [ ] **步骤 4：** `WebPage.cs` 按固定顺序拼接嵌入资源；`app/` 下只放最小占位（`99-main.js`：读取入口并渲染“最新快照的 rev”），W3 再替换。
 - [ ] **步骤 5：** 新测试项目接入 `LiveLingo.slnx`；夹具里首次使用时安装 Playwright 浏览器。
