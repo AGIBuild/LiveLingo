@@ -1,0 +1,46 @@
+.gitignore
+  s_6d6e9175f38e45::t_d63577fb8a5a5b 432-434
+docs/superpowers/specs/2026-11-01-web-ui-design.md
+  s_6d6e9175f38e45::t_4337aa124834d5 35
+docs/superpowers/plans/2026-11-01-web-ui-and-release-handoff.md
+  s_6d6e9175f38e45::t_38ef6a7f04399e 22,100
+src/LiveLingo.Desktop/Services/Configuration/SettingsModel.cs
+  s_6d6e9175f38e45::t_101987540526fd 117
+CONTRIBUTING.md
+  s_6d6e9175f38e45::t_2dd999fcc7ba84 52
+  s_6d6e9175f38e45::t_e89ca6373d179f 45-50,200
+  s_6d6e9175f38e45::t_401a3ab1bc8556 95
+  s_6d6e9175f38e45::t_c18cc3d62fc188 23
+  s_6d6e9175f38e45::t_39cbb5600b4387 51
+src/LiveLingo.Core/Models/Installations/InstalledModelStore.cs
+  s_6d6e9175f38e45::t_823764e3992508 6-7
+CHANGELOG.md
+  s_6d6e9175f38e45::t_643ed2442de017 115-117,290-292
+  s_6d6e9175f38e45::t_8d71c72a227b0f 8-21
+src/LiveLingo.HfGguf/HfResolveDownloader.cs
+  s_6d6e9175f38e45::t_555a2ee80a62ac 9
+src/LiveLingo.Core/Models/IModelManager.cs
+  s_6d6e9175f38e45::t_cc77693daf8c7b 9,11-12
+.cursor/rules/architecture.mdc
+  s_6d6e9175f38e45::t_d82de8ccb0eba2 2,10,12,14-17,19,21-23,25,27-35,39-42
+test.runsettings
+  s_6d6e9175f38e45::t_579f8917e79cb4 8
+src/LiveLingo.Core/Models/ModelManager.cs
+  s_6d6e9175f38e45::t_82b1a329445f02 11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "7131c8c8426d515acb5ca672312404faa6948814",
+  "prompts": {},
+  "sessions": {
+    "s_6d6e9175f38e45": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "f74d37e5-1d96-4ddc-a3f9-5ae24ff39e38",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
