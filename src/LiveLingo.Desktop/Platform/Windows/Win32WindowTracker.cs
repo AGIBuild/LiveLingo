@@ -13,7 +13,8 @@ internal sealed class Win32WindowTracker : IWindowTracker
             return null;
 
         var threadId = GetWindowThreadProcessId(hwnd, out var pid);
-        if (pid == 0)
+        // Our own parked composer is never a target.
+        if (pid == 0 || pid == Environment.ProcessId)
             return null;
 
         try
