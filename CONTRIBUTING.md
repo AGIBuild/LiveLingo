@@ -20,7 +20,7 @@ Thanks for your interest in contributing! This guide covers everything you need 
 ## Quick Start
 
 ```bash
-git clone https://github.com/user/LiveLingo.git
+git clone https://github.com/AGIBuild/LiveLingo.git
 cd LiveLingo
 
 # Restore CLI tools (Velopack, WiX, Stryker)
@@ -42,9 +42,14 @@ dotnet run --project src/LiveLingo.Desktop
 LiveLingo/
 ├── src/
 │   ├── LiveLingo.Core/              # Pure C# — composer domain, inference, models
-│   │   └── Models/                  # Model download / install / cleanup collaborators
-│   │                                #   (Drafting, Dictation, Cleanup, Translation, Inference
-│   │                                #   and Speech/Native are added by the composer plan)
+│   │   ├── Drafting/ Dictation/     # The draft, dictation session, fidelity gate
+│   │   ├── Cleanup/ Translation/    # Sentence cleanup and translation schedulers over llama-server
+│   │   ├── Inference/ Cloud/        # llama-server host, local and opt-in cloud chat clients
+│   │   ├── Speech/Native/           # sherpa-onnx adapters (excluded from unit coverage)
+│   │   ├── Transcription/           # WAV import and SRT export
+│   │   └── Models/                  # Catalog, download / install / cleanup collaborators
+│   │
+│   ├── LiveLingo.HfGguf/            # Hugging Face resolve URLs and the resumable downloader
 │   │
 │   └── LiveLingo.Desktop/           # Avalonia shell + web UI
 │       ├── Composer/ Settings/      # View models, texts and the thin windows around the pages
@@ -87,7 +92,7 @@ This is the single most important rule. It ensures ViewModels are fully testable
 
 - **No Avalonia references** — ViewModels must never import `Avalonia.*` namespaces
 - **No threading** — No `Dispatcher`, `Dispatcher.UIThread`, or thread scheduling APIs
-- **Interface-only dependencies** — `ISettingsService`, `ITranslationPipeline`, `ITextInjector`, `IModelManager`, etc.
+- **Interface-only dependencies** — `ISettingsService`, `IModelManager`, `ITextInjector`, `IVoiceInput`, etc.
 - **CommunityToolkit.Mvvm** — Use `ObservableObject`, `RelayCommand`, `[ObservableProperty]`
 - **UI communication** — Via events (`event Action? RequestClose`) or property change notifications
 
@@ -192,8 +197,7 @@ is the single owner of that lifecycle.
    `Raise.Event<EventHandler<ModelDownloadState>>(...)`) for ViewModel unit
    tests that want to drive specific lifecycle events.
 
-For tests / design-time scenarios that genuinely don't need a real
-coordinator, use `NullModelDownloadCoordinator.Instance`.
+For tests that don't need a real coordinator, substitute `IModelDownloadCoordinator`.
 
 ---
 

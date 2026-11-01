@@ -5,6 +5,20 @@ All notable changes to LiveLingo are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- The default update URL pointed at a placeholder repository; it is now `https://github.com/AGIBuild/LiveLingo`.
+
+### Removed
+
+- Code that nothing in 2.0 uses: model deletion, disk-usage and storage-relocation operations of `IModelManager`, the
+  stub model manager and null download coordinator, Hugging Face repository listing and quantization choosing (and the
+  `LiveLingo.HfGguf.Cli` tool that used them), unused native declarations, and tests that only checked record equality.
+- The 1.x product design, proposals, roadmap and demo images, the WebView feasibility spike (`tools/WebViewSpike`) and
+  stray scratch files.
+
 ## [2.0.0] - 2026-11-01
 
 Rewrite around a single composer window (branch `feat/composer-v3`). The 1.x translator overlay, its cloud and Ollama
@@ -98,7 +112,9 @@ providers, wizard and model catalog were removed; see the design and plan under 
 - **Velopack NotInstalledException in dev mode**: `CheckForUpdateAsync` now
   returns early when `UpdateManager.IsInstalled` is false.
 
-## [Unreleased]
+## [1.4.1 – 1.4.2] - 2026-04-30
+
+Notes written while these versions were in progress; they belong to the 1.x line, which 2.0 replaces.
 
 The voice-input arc — replacing the legacy Whisper engine with a sherpa-onnx-based
 pipeline, surfacing model routing in the UI, and reclaiming disk used by the retired
@@ -271,5 +287,6 @@ process-wide task with shared progress and dedup across every UI surface.
 
 See `git log v0.1.4` for the pre-CHANGELOG history.
 
-[Unreleased]: https://github.com/user/LiveLingo/compare/v0.1.4...HEAD
-[0.1.4]: https://github.com/user/LiveLingo/releases/tag/v0.1.4
+[2.0.0]: https://github.com/AGIBuild/LiveLingo/releases/tag/v2.0.0
+[1.4.0]: https://github.com/AGIBuild/LiveLingo/releases/tag/v1.4.0
+[0.1.4]: https://github.com/AGIBuild/LiveLingo/releases/tag/v0.1.4

@@ -36,17 +36,6 @@ public class ModelManagerEdgeCaseTests : IDisposable
     }
 
     [Fact]
-    public void GetTotalDiskUsage_ReturnsZero_WhenDirNotExists()
-    {
-        var options = Options.Create(new CoreOptions { ModelStoragePath = Path.Combine(_tempDir, "nonexist") });
-        var http = new HttpClient(new FakeHttpMessageHandler());
-        var logger = Substitute.For<ILogger<ModelManager>>();
-        var mgr = new ModelManager(options, http, logger);
-
-        Assert.Equal(0, mgr.GetTotalDiskUsage());
-    }
-
-    [Fact]
     public async Task EnsureModelAsync_ConcurrentCalls_OnlyDownloadsOnce()
     {
         var callCount = 0;

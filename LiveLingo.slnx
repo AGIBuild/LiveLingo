@@ -3,7 +3,6 @@
     <Project Path="src/LiveLingo.Desktop/LiveLingo.Desktop.csproj" />
     <Project Path="src/LiveLingo.Core/LiveLingo.Core.csproj" />
     <Project Path="src/LiveLingo.HfGguf/LiveLingo.HfGguf.csproj" />
-    <Project Path="src/LiveLingo.HfGguf.Cli/LiveLingo.HfGguf.Cli.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/LiveLingo.Desktop.Tests/LiveLingo.Desktop.Tests.csproj" />

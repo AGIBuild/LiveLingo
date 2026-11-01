@@ -6,10 +6,10 @@ public interface IModelManager
 {
     /// <summary>
     /// Low-level "fetch model bytes to disk" primitive. Prefer
-    /// <see cref="IModelDownloadCoordinator.StartAsync"/> for any UI-visible
+    /// <see cref="IModelDownloadCoordinator.StartAsync"/> for any user-visible
     /// download — the coordinator is the single source of truth for download
-    /// progress / state across the Settings, Wizard, and Overlay surfaces, and
-    /// it deduplicates concurrent calls. Direct callers of this method bypass
+    /// progress / state across the composer and the settings, and it
+    /// deduplicates concurrent calls. Direct callers of this method bypass
     /// that observability and should be limited to engines performing internal,
     /// non-user-facing on-demand model loads (where byte-level dedup is still
     /// provided by InflightDownloadRegistry).
@@ -27,10 +27,7 @@ public interface IModelManager
     /// </summary>
     bool HasAllExpectedLocalAssets(ModelDescriptor descriptor);
 
-    Task DeleteModelAsync(string modelId, CancellationToken ct = default);
-    long GetTotalDiskUsage();
     string GetModelDirectory(string modelId);
-    Task MigrateStoragePathAsync(string newPath, CancellationToken ct = default);
 
     /// <summary>
     /// Removes residue of model ids no longer in the model catalog

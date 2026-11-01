@@ -44,10 +44,4 @@ public sealed class AudioBuffer
             return result;
         }
     }
-
-    public void TrimBefore(long sample)
-    {
-        lock (_gate)
-            _chunks.RemoveAll(c => c.Start + c.Data.Length <= sample);
-    }
 }

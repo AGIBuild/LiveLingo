@@ -6,7 +6,7 @@ namespace LiveLingo.HfGguf;
 /// <summary>
 /// Downloads via <c>/{repo}/resolve/{rev}/{path}</c> with Range resume and a sidecar <c>.part</c> file.
 /// </summary>
-public sealed class HfResolveDownloader(HttpClient http, string hubResolveBase = "https://huggingface.co") : IHfDownloader
+public sealed class HfResolveDownloader(HttpClient http, string hubResolveBase = "https://huggingface.co")
 {
     private readonly string _hubResolveBase = hubResolveBase.TrimEnd('/');
 

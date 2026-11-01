@@ -43,19 +43,6 @@ public class AudioBufferTests
     }
 
     [Fact]
-    public void TrimBefore_DropsWholeChunksThatEndBeforeTheSample()
-    {
-        var buffer = new AudioBuffer();
-        buffer.Append([1f, 2f]);
-        buffer.Append([3f, 4f]);
-
-        buffer.TrimBefore(2);
-
-        Assert.Equal([3f, 4f], buffer.Slice(2, 4));
-        Assert.Equal(4, buffer.TotalSamples);
-    }
-
-    [Fact]
     public void AudioFormat_ConvertsBetweenSamplesAndMilliseconds()
     {
         Assert.Equal(16000, AudioFormat.MsToSamples(1000));

@@ -8,7 +8,7 @@ namespace LiveLingo.Core.Models;
 
 /// <summary>
 /// Public entry point for model lifecycle: download/repair, install enumeration,
-/// disk usage, deletion, storage relocation, and the HF mirror fallback latch.
+/// removal of obsolete models, and the HF mirror fallback latch.
 ///
 /// All real work is delegated to single-purpose collaborators in
 /// <see cref="LiveLingo.Core.Models.Downloads"/> and
@@ -21,7 +21,6 @@ public sealed class ModelManager : IModelManager
     private readonly HuggingFaceMirrorPolicy _mirrorPolicy;
     private readonly ModelDownloadOrchestrator _orchestrator;
     private readonly InstalledModelStore _installedStore;
-    private readonly ModelStoragePathMigrator _pathMigrator;
     private readonly ObsoleteModelCleaner _obsoleteCleaner;
 
     public ModelManager(IOptions<CoreOptions> options, HttpClient http, ILogger<ModelManager> logger)
@@ -37,7 +36,6 @@ public sealed class ModelManager : IModelManager
 
         _orchestrator = new ModelDownloadOrchestrator(opts, assetDownloader, inflight, logger);
         _installedStore = new InstalledModelStore(opts, logger);
-        _pathMigrator = new ModelStoragePathMigrator(opts, logger);
         _obsoleteCleaner = new ObsoleteModelCleaner(opts, logger);
     }
 
@@ -52,15 +50,7 @@ public sealed class ModelManager : IModelManager
     public bool HasAllExpectedLocalAssets(ModelDescriptor descriptor) =>
         _installedStore.HasAllExpectedLocalAssets(descriptor);
 
-    public Task DeleteModelAsync(string modelId, CancellationToken ct = default) =>
-        _installedStore.DeleteAsync(modelId, ct);
-
-    public long GetTotalDiskUsage() => _installedStore.GetTotalDiskUsage();
-
     public string GetModelDirectory(string modelId) => _installedStore.GetModelDirectory(modelId);
-
-    public Task MigrateStoragePathAsync(string newPath, CancellationToken ct = default) =>
-        _pathMigrator.MigrateAsync(newPath, ct);
 
     public Task<long> CleanObsoleteModelsAsync(
         IEnumerable<string> obsoleteModelIds,

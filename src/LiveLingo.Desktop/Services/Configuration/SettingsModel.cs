@@ -114,7 +114,7 @@ public partial class AppearanceSettings : ObservableObject
 
 public partial class UpdateSettings : ObservableObject
 {
-    public const string DefaultUpdateUrl = "https://github.com/user/LiveLingo";
+    public const string DefaultUpdateUrl = "https://github.com/AGIBuild/LiveLingo";
 
     [ObservableProperty] private string _updateUrl = DefaultUpdateUrl;
     [ObservableProperty] private int _checkIntervalHours = 4;
