@@ -1,0 +1,55 @@
+docs/superpowers/plans/2026-11-01-web-ui-and-release-handoff.md
+  s_821950ffe1bdcc::t_9772ca2d7c7218 116
+  s_821950ffe1bdcc::t_b4e713065cc733 113
+src/LiveLingo.Desktop/Web/Assets/styles/base.css
+  s_821950ffe1bdcc::t_acd58255aad5c0 1-20
+src/LiveLingo.Desktop/Web/Assets/page.html
+  s_821950ffe1bdcc::t_99ad4913a7e0cc 1-13
+src/LiveLingo.Desktop/Web/Assets/styles/tokens.css
+  s_821950ffe1bdcc::t_481fcfa59a451f 1-22
+src/LiveLingo.Desktop/Web/WebPage.cs
+  s_821950ffe1bdcc::t_1518651b064cf3 1-52
+.github/workflows/ci.yml
+  s_821950ffe1bdcc::t_9de7ca58e101c5 32,35-47
+docs/superpowers/specs/2026-11-01-web-ui-design.md
+  s_821950ffe1bdcc::t_787a0a1cad5974 172
+src/LiveLingo.Desktop/Web/Assets/app/99-main.js
+  s_821950ffe1bdcc::t_76a97d1f044812 1-20
+src/LiveLingo.Desktop/LiveLingo.Desktop.csproj
+  s_821950ffe1bdcc::t_ac369ae60f25fc 16
+  s_821950ffe1bdcc::t_5f8445f1bf6aa0 44
+tests/LiveLingo.Web.Tests/WebPageTests.cs
+  s_821950ffe1bdcc::t_7ae070aa6f3d29 1-76
+tests/LiveLingo.Web.Tests/LiveLingo.Web.Tests.csproj
+  s_821950ffe1bdcc::t_807171ea6210da 1-32
+LiveLingo.slnx
+  s_821950ffe1bdcc::t_e7e2d873762838 12
+THIRD_PARTY_NOTICES.md
+  s_821950ffe1bdcc::t_52c629bdf5c7ca 30-31
+tests/LiveLingo.Web.Tests/WebPageBrowserTests.cs
+  s_821950ffe1bdcc::t_d966196f212253 1-21,23-25,28-45
+  s_821950ffe1bdcc::t_8980688494b2fe 22,26-27
+tests/LiveLingo.Web.Tests/BrowserFixture.cs
+  s_821950ffe1bdcc::t_1e0cada3673222 64
+  s_821950ffe1bdcc::t_686daf02971d7e 1-63,65
+src/LiveLingo.Desktop/Web/Assets/vendor/htm.js
+  s_821950ffe1bdcc::t_4280b6133b0c0d 1
+src/LiveLingo.Desktop/Web/Assets/vendor/preact.min.js
+  s_821950ffe1bdcc::t_a405a41b081b4d 1-2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "292220f76f3eeece2a0dcca75379084db1052ebe",
+  "prompts": {},
+  "sessions": {
+    "s_821950ffe1bdcc": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "2e07dbc3-b49b-4806-8ef7-b85cd318bb36",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
