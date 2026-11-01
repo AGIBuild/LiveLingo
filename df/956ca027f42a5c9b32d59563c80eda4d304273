@@ -1,0 +1,25 @@
+tests/LiveLingo.Desktop.Tests/Web/ComposerScenarios.cs
+  s_6d6e9175f38e45::t_6ad2b6547f11ac 103,111-114
+.github/workflows/release.yml
+  s_6d6e9175f38e45::t_13696aa0af0812 55,58,78,81-93
+tests/LiveLingo.Web.Tests/Fixtures/resume-draft.json
+  s_6d6e9175f38e45::t_1328d5290bde6b 222
+.github/workflows/ci.yml
+  s_6d6e9175f38e45::t_6248c82fee3124 13,15,38,41,45
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "df956ca027f42a5c9b32d59563c80eda4d304273",
+  "prompts": {},
+  "sessions": {
+    "s_6d6e9175f38e45": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "f74d37e5-1d96-4ddc-a3f9-5ae24ff39e38",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
