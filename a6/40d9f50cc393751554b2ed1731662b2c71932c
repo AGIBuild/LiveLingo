@@ -1,0 +1,38 @@
+docs/superpowers/plans/2026-11-01-web-ui-and-release-handoff.md
+  s_821950ffe1bdcc::t_29fa8d42294f48 193
+  s_821950ffe1bdcc::t_82b3909eee0759 133
+  s_821950ffe1bdcc::t_9670f537ecfc95 126
+  s_821950ffe1bdcc::t_d201214bbb10ed 9
+  s_821950ffe1bdcc::t_ac94eefd8c7ce6 147,149
+  s_821950ffe1bdcc::t_a353bdc702448e 166
+  s_821950ffe1bdcc::t_41313903b7a19e 140,142
+  s_821950ffe1bdcc::t_2725fe95c7f253 113,115-120,122
+  s_821950ffe1bdcc::t_7cf2a0a9e8dadb 77
+  s_821950ffe1bdcc::t_cb5c4b92d2dc66 136
+docs/superpowers/specs/2026-11-01-web-ui-design.md
+  s_821950ffe1bdcc::t_db271f602292a8 206
+  s_821950ffe1bdcc::t_c021a1a5524d61 146
+  s_821950ffe1bdcc::t_018a98cedb1d17 93
+  s_821950ffe1bdcc::t_79784c434dcd4f 153-154,156-159,161-169,172-174,176,178-182
+  s_821950ffe1bdcc::t_940a44219a5486 204
+  s_821950ffe1bdcc::t_96e98445e61a00 213
+  s_821950ffe1bdcc::t_4524ee608773a4 77
+  s_821950ffe1bdcc::t_2dcca7eb7ea949 147
+  s_821950ffe1bdcc::t_a933fc17377980 208
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "a640d9f50cc393751554b2ed1731662b2c71932c",
+  "prompts": {},
+  "sessions": {
+    "s_821950ffe1bdcc": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "2e07dbc3-b49b-4806-8ef7-b85cd318bb36",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
