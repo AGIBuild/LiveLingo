@@ -171,17 +171,17 @@ public sealed class ComposerInteractionTests(BrowserFixture browsers)
 
     [Theory]
     [MemberData(nameof(Engines))]
-    public async Task Mic_PointerSendsDownThenUpAndNoToggle(string engine)
+    public async Task Mic_ClickToggles_AndPressingAloneDoesNot(string engine)
     {
         await using var page = await browsers.OpenAsync(engine, "translate-ready");
         var box = (await page.Page.Locator("#mic").BoundingBoxAsync())!;
-
         await page.Page.Mouse.MoveAsync(box.X + box.Width / 2, box.Y + box.Height / 2);
+
         await page.Page.Mouse.DownAsync();
+        Assert.Equal(0, await page.CountAsync<MicToggleIntent>());
         await page.Page.Mouse.UpAsync();
 
-        Assert.Equal(["MicDownIntent", "MicUpIntent"],
-            (await page.IntentsAsync()).Where(i => i is MicDownIntent or MicUpIntent or MicToggleIntent).Select(i => i.GetType().Name));
+        Assert.Equal(1, await page.CountAsync<MicToggleIntent>());
     }
 
     [Theory]
@@ -194,7 +194,192 @@ public sealed class ComposerInteractionTests(BrowserFixture browsers)
         await page.Page.Keyboard.PressAsync("Space");
 
         Assert.Equal(1, await page.CountAsync<MicToggleIntent>());
-        Assert.Equal(0, await page.CountAsync<MicDownIntent>());
+    }
+
+    // --- shortcuts ------------------------------------------------------------------------------------------------
+
+    public static TheoryData<string, string, string> Shortcuts()
+    {
+        var data = new TheoryData<string, string, string>();
+        foreach (var engine in new[] { "webkit", "chromium" })
+        {
+            data.Add(engine, "Meta+D", nameof(MicToggleIntent));
+            data.Add(engine, "Meta+1", nameof(OutputIntent));
+            data.Add(engine, "Meta+2", nameof(OutputIntent));
+            data.Add(engine, "Meta+3", nameof(OutputIntent));
+            data.Add(engine, "Meta+L", nameof(SwapLanguageIntent));
+            data.Add(engine, "Meta+Shift+C", nameof(CopyIntent));
+            data.Add(engine, "Meta+N", nameof(NewDraftIntent));
+            data.Add(engine, "Meta+,", nameof(OpenSettingsIntent));
+        }
+
+        return data;
+    }
+
+    [Theory]
+    [MemberData(nameof(Shortcuts))]
+    public async Task Shortcut_SendsTheIntentOfItsButton_FromTheTextBox(string engine, string keys, string intent)
+    {
+        await using var page = await browsers.OpenAsync(engine, "translate-ready");
+        await page.Page.Locator("#src").FocusAsync();
+        var text = await page.Page.Locator("#src").InputValueAsync();
+        await page.ClearIntentsAsync();
+
+        await page.Page.Keyboard.PressAsync(keys);
+
+        Assert.Equal([intent], (await page.IntentsAsync()).Select(i => i.GetType().Name));
+        Assert.Equal(text, await page.Page.Locator("#src").InputValueAsync());
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public async Task OutputShortcuts_SelectTheOutputOfTheirNumber(string engine)
+    {
+        await using var page = await browsers.OpenAsync(engine, "translate-ready");
+        await page.Page.Locator("#src").FocusAsync();
+        await page.ClearIntentsAsync();
+
+        await page.Page.Keyboard.PressAsync("Meta+1");
+        await page.Page.Keyboard.PressAsync("Meta+2");
+        await page.Page.Keyboard.PressAsync("Meta+3");
+
+        Assert.Equal(
+            [LiveLingo.Desktop.Composer.ComposerOutput.Clean, LiveLingo.Desktop.Composer.ComposerOutput.Translate, LiveLingo.Desktop.Composer.ComposerOutput.Original],
+            (await page.IntentsAsync()).OfType<OutputIntent>().Select(i => i.Value));
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public async Task OutputShortcut_OfAnOutputTheSettingsDoNotOffer_DoesNothing(string engine)
+    {
+        await using var page = await browsers.OpenAsync(engine, "no-cleanup");
+        await page.ClearIntentsAsync();
+
+        await page.Page.Keyboard.PressAsync("Meta+1");
+
+        Assert.Equal(0, await page.CountAsync<OutputIntent>());
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public async Task DialogShortcuts_OpenTheRecentAndTheExportDialog(string engine)
+    {
+        await using var page = await browsers.OpenAsync(engine, "translate-ready");
+
+        await page.Page.Keyboard.PressAsync("Meta+R");
+        Assert.Equal(ComposerPage.Str("recentTitle"), await page.Page.Locator("#dlg-title").InnerTextAsync());
+        await page.Page.Keyboard.PressAsync("Escape");
+        Assert.Equal(0, await page.Page.Locator(".dialog").CountAsync());
+
+        await page.Page.Keyboard.PressAsync("Meta+S");
+        Assert.Equal(ComposerPage.Str("exportTitle"), await page.Page.Locator("#dlg-title").InnerTextAsync());
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public async Task ActionsThatAreNotAvailable_AreNotRunByTheirShortcut(string engine)
+    {
+        // Nothing to copy in an empty composer; importing is only for an empty one, so it is available here.
+        await using var empty = await browsers.OpenAsync(engine, "empty");
+        await empty.ClearIntentsAsync();
+        await empty.Page.Keyboard.PressAsync("Meta+Shift+C");
+        Assert.Equal(0, await empty.CountAsync<CopyIntent>());
+        await empty.Page.Keyboard.PressAsync("Meta+O");
+        Assert.Equal(1, await empty.CountAsync<ImportIntent>());
+
+        await using var typed = await browsers.OpenAsync(engine, "translate-ready");
+        await typed.ClearIntentsAsync();
+        await typed.Page.Keyboard.PressAsync("Meta+O");
+        Assert.Equal(0, await typed.CountAsync<ImportIntent>());
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public async Task Shortcuts_FollowTheModifierOfTheSnapshot(string engine)
+    {
+        await using var page = await browsers.OpenAsync(engine, "translate-ready");
+        await page.PushAsync("translate-ready", s => s["options"]!["modifier"] = "ctrl");
+        await page.ClearIntentsAsync();
+
+        await page.Page.Keyboard.PressAsync("Meta+D");
+        Assert.Equal(0, await page.CountAsync<MicToggleIntent>());
+        await page.Page.Keyboard.PressAsync("Control+D");
+        Assert.Equal(1, await page.CountAsync<MicToggleIntent>());
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public async Task PlainKeysAndOtherChords_DoNotTriggerAShortcut(string engine)
+    {
+        await using var page = await browsers.OpenAsync(engine, "empty");
+        await page.Page.Locator("#src").FocusAsync();
+        await page.ClearIntentsAsync();
+
+        await page.Page.Keyboard.PressAsync("D");
+        await page.Page.Keyboard.PressAsync("Meta+Alt+D");
+        await page.Page.Keyboard.PressAsync("Meta+Shift+D");
+        await page.Page.Keyboard.PressAsync("Control+D");
+
+        Assert.DoesNotContain((await page.IntentsAsync()), i => i is not SourceIntent);
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public async Task AShortcutInTheMiddleOfAnImeComposition_IsNotRun(string engine)
+    {
+        await using var page = await browsers.OpenAsync(engine, "empty");
+        await page.ClearIntentsAsync();
+
+        await page.Page.EvaluateAsync(@"() => document.getElementById('src').dispatchEvent(
+            new KeyboardEvent('keydown', { code: 'KeyD', key: 'd', metaKey: true, isComposing: true, bubbles: true, cancelable: true }))");
+
+        Assert.Equal(0, await page.CountAsync<MicToggleIntent>());
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public async Task ShortcutsAreSuspendedWhileADialogIsOpen(string engine)
+    {
+        await using var page = await browsers.OpenAsync(engine, "translate-ready");
+        await page.Page.Keyboard.PressAsync("Meta+R");
+        await page.ClearIntentsAsync();
+
+        await page.Page.Keyboard.PressAsync("Meta+D");
+
+        Assert.Equal(0, await page.CountAsync<MicToggleIntent>());
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public async Task AShortcutWhileAMenuIsOpen_ClosesTheMenuAndRuns(string engine)
+    {
+        await using var page = await browsers.OpenAsync(engine, "translate-ready");
+        await page.Page.Locator("#more").ClickAsync();
+        await page.ClearIntentsAsync();
+
+        await page.Page.Keyboard.PressAsync("Meta+N");
+
+        Assert.Equal(1, await page.CountAsync<NewDraftIntent>());
+        Assert.Equal(0, await page.Page.Locator(".menu").CountAsync());
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public async Task TheKeyCapsOfTheShortcuts_AreShownInTheMenusAndOnTheMicrophone(string engine)
+    {
+        await using var page = await browsers.OpenAsync(engine, "translate-ready");
+
+        Assert.Contains("⌘D", await page.Page.Locator("#mic").GetAttributeAsync("aria-label"));
+        await page.Page.Locator("#more").ClickAsync();
+        var menu = await page.Page.Locator(".menu").InnerTextAsync();
+        Assert.Contains("⌘N", menu);
+        Assert.Contains("⌘,", menu);
+        await page.Page.Keyboard.PressAsync("Escape");
+        await page.Page.Locator("#out-pill").ClickAsync();
+        var output = await page.Page.Locator(".menu").InnerTextAsync();
+        Assert.Contains("⌘1", output);
+        Assert.Contains("⌘2", output);
+        Assert.Contains("⌘L", output);
     }
 
     // --- sentences ------------------------------------------------------------------------------------------------

@@ -60,6 +60,34 @@
     return commitKey === 'ctrlEnter' ? ctrl : !ctrl && !e.altKey;
   }
 
+  // The shortcuts are defined once, in C#, and arrive with the snapshot: Command (macOS) or Ctrl plus a physical key,
+  // so they work with any keyboard layout and while an input method is active.
+  function shortcutOf(e, options) {
+    const mod = options.modifier === 'meta' ? e.metaKey && !e.ctrlKey : e.ctrlKey && !e.metaKey;
+    if (!mod || e.altKey) return null;
+    return options.shortcuts.find((s) => s.code === e.code && s.shift === e.shiftKey) ?? null;
+  }
+
+  // What a shortcut does is what the button or menu item of the same id does; an action that is not available
+  // (nothing to copy, an output the settings do not offer) is simply not run.
+  function runShortcut(id, c) {
+    const offered = (output) => c.output.menu.some((item) => item.id === output);
+    switch (id) {
+      case 'dictate': LL.send('micToggle'); break;
+      case 'clean':
+      case 'translate':
+      case 'original': if (offered(id)) LL.send('output', { value: id }); break;
+      case 'swap': LL.send('swapLanguage'); break;
+      case 'copy': if (c.footer.copyEnabled) LL.send('copy'); break;
+      case 'new': LL.send('newDraft'); break;
+      case 'recent': LL.openDialog('recent'); break;
+      case 'import': if (c.menus.more.find((item) => item.id === 'import').enabled) LL.send('import'); break;
+      case 'export': LL.openDialog('export'); break;
+      case 'settings': LL.send('openSettings', { section: 'general' }); break;
+      default: throw new Error('Unknown shortcut: ' + id);
+    }
+  }
+
   document.addEventListener('keydown', (e) => {
     const { composer: c, menu, dialog } = LL.state;
     if (!c || composing(e)) return;
@@ -71,6 +99,15 @@
       }
       return;
     }
+
+    const shortcut = shortcutOf(e, c.options);
+    if (shortcut) {
+      e.preventDefault();
+      if (menu) LL.closeMenu();
+      runShortcut(shortcut.id, c);
+      return;
+    }
+
     if (menu) {
       if (e.key === 'Escape') {
         e.preventDefault();

@@ -10,8 +10,6 @@ public sealed class WebIntentTests
     [InlineData("""{"v":1,"name":"size","width":656,"height":300}""", typeof(SizeIntent))]
     [InlineData("""{"v":1,"name":"drag"}""", typeof(DragIntent))]
     [InlineData("""{"v":1,"name":"source","text":"hi","rev":3}""", typeof(SourceIntent))]
-    [InlineData("""{"v":1,"name":"micDown"}""", typeof(MicDownIntent))]
-    [InlineData("""{"v":1,"name":"micUp"}""", typeof(MicUpIntent))]
     [InlineData("""{"v":1,"name":"micToggle"}""", typeof(MicToggleIntent))]
     [InlineData("""{"v":1,"name":"output","value":"translate"}""", typeof(OutputIntent))]
     [InlineData("""{"v":1,"name":"swapLanguage"}""", typeof(SwapLanguageIntent))]

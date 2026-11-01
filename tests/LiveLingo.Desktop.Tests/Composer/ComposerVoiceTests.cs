@@ -59,49 +59,43 @@ public class ComposerVoiceTests
     }
 
     [Fact]
-    public async Task ATap_StartsHandsFree_AndAnotherTapStopsIt()
+    public async Task ToggleListening_StartsListening_AndTheNextToggleStopsIt()
     {
         await using var h = Create();
 
-        await h.Vm.PressMicAsync();
-        h.Time.Advance(TimeSpan.FromMilliseconds(120));
-        await h.Vm.ReleaseMicAsync();
+        await h.Vm.ToggleListeningCommand.ExecuteAsync(null);
         Assert.True(h.Vm.IsListening);
 
-        await h.Vm.PressMicAsync();
-        Assert.False(h.Vm.IsListening);
-        await h.Vm.ReleaseMicAsync();
+        await h.Vm.ToggleListeningCommand.ExecuteAsync(null);
         Assert.False(h.Vm.IsListening);
         Assert.Equal(1, h.Voice.Starts);
         Assert.Equal(1, h.Voice.Stops);
     }
 
     [Fact]
-    public async Task AHold_IsPushToTalk_AndReleasingStopsListening()
+    public async Task ListeningGoesOnUntilItIsStopped_NoMatterHowLongTheKeyWasDown()
     {
         await using var h = Create();
 
-        await h.Vm.PressMicAsync();
-        h.Time.Advance(ComposerViewModel.HoldThreshold + TimeSpan.FromMilliseconds(50));
-        await h.Vm.ReleaseMicAsync();
+        await h.Vm.ToggleListeningCommand.ExecuteAsync(null);
+        h.Time.Advance(TimeSpan.FromSeconds(30));
 
-        Assert.False(h.Vm.IsListening);
-        Assert.Equal(1, h.Voice.Stops);
+        Assert.True(h.Vm.IsListening);
+        Assert.Equal(0, h.Voice.Stops);
     }
 
     [Fact]
-    public async Task ReleasingAHoldWhileTheModelsAreStillLoading_StopsAsSoonAsListeningBegins()
+    public async Task TogglingWhileTheModelsAreStillLoading_CancelsTheStart()
     {
         await using var h = Create();
         h.Voice.StartGate = new TaskCompletionSource();
 
-        var press = h.Vm.PressMicAsync();
+        var first = h.Vm.ToggleListeningCommand.ExecuteAsync(null);
         Assert.True(h.Vm.IsStartingListening);
         Assert.Equal(ComposerStatus.Starting, h.Vm.Status);
-        h.Time.Advance(TimeSpan.FromSeconds(2));
-        await h.Vm.ReleaseMicAsync();
+        await h.Vm.ToggleListeningCommand.ExecuteAsync(null);
         h.Voice.StartGate.SetResult();
-        await press;
+        await first;
 
         Assert.False(h.Vm.IsListening);
         Assert.False(h.Vm.IsStartingListening);

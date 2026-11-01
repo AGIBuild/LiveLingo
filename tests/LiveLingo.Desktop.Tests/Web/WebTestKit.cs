@@ -66,7 +66,7 @@ internal static class Texts
     {
         var loc = new LocalizationService();
         loc.SetCulture("zh-CN");
-        return new ComposerTexts(loc);
+        return new ComposerTexts(loc, mac: true);
     }
 
     public static SettingsTexts ChineseSettings()

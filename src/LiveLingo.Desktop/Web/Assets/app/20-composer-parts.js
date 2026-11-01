@@ -87,35 +87,20 @@
     </div>`;
   };
 
-  // Tap and hold are told apart by C# (350 ms); the page only reports the pointer and the keyboard.
-  let micPressed = false;
-  const micDown = (e) => {
-    if (e.button !== 0) return;
-    micPressed = true;
-    e.currentTarget.setPointerCapture(e.pointerId);
-    LL.send('micDown');
-  };
-  const micUp = () => {
-    if (!micPressed) return;
-    micPressed = false;
-    LL.send('micUp');
-  };
-  // A click without pointer (Space on the focused button) toggles; a pointer click was already handled above.
-  const micClick = (e) => {
-    if (e.detail === 0) LL.send('micToggle');
-  };
+  // The key cap of a shortcut (snapshot options), for menus and tooltips; "" when the shortcut does not exist.
+  LL.cap = (id) => LL.state.composer?.options.shortcuts.find((s) => s.id === id)?.cap ?? '';
 
   LL.Footer = ({ c }) => {
     const f = c.footer;
     const cm = f.commit;
     return html`<footer class="c-foot">
       <button type="button" id="mic" class=${'mic' + (f.mic.recording ? ' recording' : '')} aria-label=${f.mic.aria} title=${f.mic.aria}
-        onPointerDown=${micDown} onPointerUp=${micUp} onPointerCancel=${micUp} onClick=${micClick}>
+        onClick=${() => LL.send('micToggle')}>
         <svg class="ic mic-ic" aria-hidden="true"><use href="#i-mic"/></svg>
         <span class="bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
       </button>
       <p id="status" class=${'status' + (f.status.tone === 'warn' ? ' warn' : '')} role="status" aria-live="polite">${f.status.text}</p>
-      <button type="button" id="copy" class="icon-btn" aria-label=${LL.t('copyAria')} title=${LL.t('copyAria')} disabled=${!f.copyEnabled}
+      <button type="button" id="copy" class="icon-btn" aria-label=${LL.t('copyAria')} title=${LL.t('copyAria') + ' (' + LL.cap('copy') + ')'} disabled=${!f.copyEnabled}
         onClick=${() => LL.send('copy')}><${Icon} name="copy"/></button>
       <button type="button" id="commit" class="btn primary" disabled=${!cm.enabled} aria-label=${cm.aria}
         onClick=${() => LL.send('commit', { fromKey: false })}>${cm.armed

@@ -14,9 +14,6 @@ namespace LiveLingo.Desktop.Composer;
 /// </summary>
 public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposable
 {
-    /// <summary>A microphone press shorter than this is a tap (hands-free); a longer one is push-to-talk.</summary>
-    public static readonly TimeSpan HoldThreshold = TimeSpan.FromMilliseconds(350);
-
     private readonly DraftSession _session;
     private readonly TranslationScheduler _scheduler;
     private readonly ComposerModelPlan _plan;
@@ -34,8 +31,6 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
     private bool _applyingDraftText;
     private bool _wantsVoice;
     private bool _stopAfterStart;
-    private bool _tapStopsListening;
-    private DateTimeOffset _micPressedAt;
 
     public ComposerViewModel(
         DraftSession session,
@@ -160,45 +155,22 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
 
     // ---- listening -----------------------------------------------------------
 
-    /// <summary>The microphone was pressed: starts listening, or stops it when it was already on.</summary>
-    public async Task PressMicAsync()
+    /// <summary>
+    /// The microphone button and its shortcut: starts listening, or stops it. Listening goes on until it is stopped
+    /// (no hold-to-talk); a second press while the speech models are still starting cancels the start.
+    /// </summary>
+    [RelayCommand]
+    private async Task ToggleListeningAsync()
     {
-        _micPressedAt = _time.GetUtcNow();
-        _stopAfterStart = false;
-        if (IsListening)
-        {
-            _tapStopsListening = true;
-            await StopListeningAsync().ConfigureAwait(true);
-            return;
-        }
-
-        _tapStopsListening = false;
-        await StartListeningAsync(handsFree: false).ConfigureAwait(true);
-    }
-
-    /// <summary>The microphone was released: a long press that started listening is push-to-talk and ends it.</summary>
-    public async Task ReleaseMicAsync()
-    {
-        if (_tapStopsListening)
-        {
-            _tapStopsListening = false;
-            return;
-        }
-
-        if (_time.GetUtcNow() - _micPressedAt < HoldThreshold)
-        {
-            IsHandsFree = true;
-            return;
-        }
-
         if (IsStartingListening)
             _stopAfterStart = true;
-        else
+        else if (IsListening)
             await StopListeningAsync().ConfigureAwait(true);
+        else
+            await StartListeningAsync().ConfigureAwait(true);
     }
 
-    /// <param name="handsFree">True when listening continues until the microphone is tapped again; false while it is held.</param>
-    public async Task StartListeningAsync(bool handsFree = true)
+    public async Task StartListeningAsync()
     {
         if (IsListening || IsStartingListening || IsTranscribing || HasTimeline || _committed is not null)
             return;
@@ -206,7 +178,6 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
         if (EditingIndex >= 0)
             SaveEdit();
 
-        IsHandsFree = handsFree;
         if (_platform.MicrophonePermission.Status == MicrophoneAccess.Denied)
         {
             Banner = new BannerState(BannerKind.MicrophoneDenied);
@@ -262,9 +233,6 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
         Refresh();
     }
 
-    [RelayCommand]
-    private Task ToggleListeningAsync() => IsListening ? StopListeningAsync() : StartListeningAsync();
-
     // ---- writing -------------------------------------------------------------
 
     [RelayCommand]
@@ -276,7 +244,7 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
     public bool IsWritten => _committed is not null;
 
     public StatusInfo StatusInfo => new(
-        Status, IsWritten, IsHandsFree, RecordingSeconds, IsWriteQueued, Lines.Count, Output,
+        Status, IsWritten, RecordingSeconds, IsWriteQueued, Lines.Count, Output,
         CloudTranslate || CloudClean, (int)TranscribeProgress);
 
     /// <summary>Writes the result, or queues the write while it is still being produced.</summary>
@@ -350,13 +318,6 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
         if (_target is not null && HasOriginalTarget)
             _platform.WindowTracker.Activate(_target);
         CloseRequested?.Invoke();
-    }
-
-    /// <summary>The window lost focus: a held microphone must not stay open without its button being held.</summary>
-    public async Task WindowDeactivatedAsync()
-    {
-        if (IsListening && !IsHandsFree)
-            await StopListeningAsync().ConfigureAwait(true);
     }
 
     public void OpenSettings(string section = "general") => SettingsRequested?.Invoke(section);

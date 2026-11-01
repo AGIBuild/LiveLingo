@@ -45,7 +45,13 @@ internal sealed record FooterState(MicState Mic, StatusState Status, bool CopyEn
 internal sealed record LayoutState(bool Wide);
 
 /// <param name="Theme">"Auto", "Light" or "Dark".</param>
-internal sealed record OptionsState(bool Animations, string Theme, string CommitKey, string CommitKeyCap, string NewlineKeyCap);
+/// <param name="Modifier">"meta" (Command, macOS) or "ctrl": the modifier of every shortcut.</param>
+internal sealed record OptionsState(
+    bool Animations, string Theme, string CommitKey, string CommitKeyCap, string NewlineKeyCap, string Modifier,
+    IReadOnlyList<ShortcutState> Shortcuts);
+
+/// <summary>A keyboard shortcut of the page (<see cref="ComposerShortcuts"/>), with its key cap for menus and hints.</summary>
+internal sealed record ShortcutState(string Id, string Code, bool Shift, string Cap);
 
 internal sealed record MenusState(IReadOnlyList<MenuItemState> Target, IReadOnlyList<MenuItemState> More);
 
@@ -131,7 +137,9 @@ internal sealed record ComposerViewState(
                 vm.Theme,
                 vm.CommitKey == CommitKey.Enter ? "enter" : "ctrlEnter",
                 ComposerTexts.CommitKeyLabel(vm.CommitKey),
-                ComposerTexts.NewlineKeyLabel),
+                ComposerTexts.NewlineKeyLabel,
+                texts.ShortcutModifier,
+                [.. ComposerShortcuts.All.Select(s => new ShortcutState(s.Id, s.Code, s.Shift, texts.Cap(s.Id)))]),
             Menus: new MenusState(
                 [
                     new MenuItemState("target", texts.TargetMenuSome(targetName), vm.HasTarget, vm.HasOriginalTarget),

@@ -69,8 +69,6 @@ internal sealed class ComposerIntents : IIntentHandler
                 SourceRev = source.Rev;
                 _vm.SourceText = source.Text;
                 break;
-            case MicDownIntent: Run(_vm.PressMicAsync); break;
-            case MicUpIntent: Run(_vm.ReleaseMicAsync); break;
             case MicToggleIntent: Run(() => _vm.ToggleListeningCommand.ExecuteAsync(null)); break;
             case OutputIntent output:
                 if (!_vm.Outputs.Contains(output.Value))

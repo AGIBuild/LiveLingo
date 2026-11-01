@@ -8,19 +8,19 @@ namespace LiveLingo.Desktop.Tests.Composer;
 
 public class ComposerTextsTests
 {
-    private static ComposerTexts Create()
+    private static ComposerTexts Create(bool mac = true)
     {
         var loc = Substitute.For<ILocalizationService>();
         loc.T(Arg.Any<string>()).Returns(call => "[" + call.Arg<string>() + "]");
         loc.T(Arg.Any<string>(), Arg.Any<object[]>())
             .Returns(call => "[" + call.ArgAt<string>(0) + ":" + string.Join(",", call.ArgAt<object[]>(1)) + "]");
-        return new ComposerTexts(loc);
+        return new ComposerTexts(loc, mac);
     }
 
     private static StatusInfo Info(
-        ComposerStatus status = ComposerStatus.Empty, bool written = false, bool handsFree = true, int seconds = 0,
+        ComposerStatus status = ComposerStatus.Empty, bool written = false, int seconds = 0,
         bool armed = false, int units = 0, ComposerOutput output = ComposerOutput.Translate, bool cloud = false, int percent = 0) =>
-        new(status, written, handsFree, seconds, armed, units, output, cloud, percent);
+        new(status, written, seconds, armed, units, output, cloud, percent);
 
     [Theory]
     [InlineData(ComposerStatus.Empty, "")]
@@ -32,12 +32,23 @@ public class ComposerTextsTests
     }
 
     [Fact]
-    public void Status_Listening_ShowsTheClockAndHowToStop()
+    public void Status_Listening_ShowsTheClockAndTheShortcutThatStopsIt()
+    {
+        Assert.Equal("[composer.status.listening:1:05,⌘D]", Create().Status(Info(ComposerStatus.Listening, seconds: 65)));
+        Assert.Equal("[composer.status.listening:0:07,Ctrl+D]", Create(mac: false).Status(Info(ComposerStatus.Listening, seconds: 7)));
+    }
+
+    [Fact]
+    public void TheMicrophoneTexts_NameTheShortcut()
     {
         var texts = Create();
 
-        Assert.Equal("[composer.status.listening.free:1:05]", texts.Status(Info(ComposerStatus.Listening, handsFree: true, seconds: 65)));
-        Assert.Equal("[composer.status.listening.hold:0:07]", texts.Status(Info(ComposerStatus.Listening, handsFree: false, seconds: 7)));
+        Assert.Equal("[composer.mic.start:⌘D]", texts.MicStart);
+        Assert.Equal("[composer.mic.stop:⌘D]", texts.MicStop);
+        Assert.Equal("[composer.hint.mic:⌘D]", texts.HintMic);
+        Assert.Equal("⇧⌘C", texts.Cap("copy"));
+        Assert.Equal("meta", texts.ShortcutModifier);
+        Assert.Equal("ctrl", Create(mac: false).ShortcutModifier);
     }
 
     [Fact]

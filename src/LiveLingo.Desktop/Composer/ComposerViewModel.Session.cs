@@ -16,9 +16,6 @@ public sealed partial class ComposerViewModel
     /// <summary>The imported file shown in the source label.</summary>
     [ObservableProperty] private string _transcriptName = "";
 
-    /// <summary>Listening continues until the microphone is tapped again (false while it is held).</summary>
-    [ObservableProperty] private bool _isHandsFree;
-
     [ObservableProperty] private int _recordingSeconds;
 
     /// <summary>Process the source as one document, keeping its layout (the "whole" menu item).</summary>

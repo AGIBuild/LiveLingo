@@ -50,11 +50,6 @@ internal sealed class ComposerWindow : Window
         WindowStartupLocation = WindowStartupLocation.Manual;
         Title = "LiveLingo";
         Content = _web.View;
-        Deactivated += async (_, _) =>
-        {
-            if (_session is { } session)
-                await session.Vm.WindowDeactivatedAsync();
-        };
     }
 
     public bool IsPresenting => _session is not null;

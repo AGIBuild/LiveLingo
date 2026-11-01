@@ -15,52 +15,7 @@ public class ComposerSessionTests
         return h;
     }
 
-    // ---- microphone gesture --------------------------------------------------------
-
-    [Fact]
-    public async Task ATapOnTheMicrophone_ListensHandsFree_AndAnotherTapStopsIt()
-    {
-        await using var h = new Harness(output: ComposerOutput.Original);
-
-        await h.Vm.PressMicAsync();
-        h.Time.Advance(TimeSpan.FromMilliseconds(120));
-        await h.Vm.ReleaseMicAsync();
-
-        Assert.True(h.Vm.IsListening);
-        Assert.True(h.Vm.IsHandsFree);
-
-        await h.Vm.PressMicAsync();
-        await h.Vm.ReleaseMicAsync();
-
-        Assert.False(h.Vm.IsListening);
-    }
-
-    [Fact]
-    public async Task HoldingTheMicrophone_IsPushToTalk_AndReleasingStopsIt()
-    {
-        await using var h = new Harness(output: ComposerOutput.Original);
-
-        await h.Vm.PressMicAsync();
-        Assert.False(h.Vm.IsHandsFree);
-        h.Time.Advance(ComposerViewModel.HoldThreshold + TimeSpan.FromMilliseconds(50));
-        await h.Vm.ReleaseMicAsync();
-
-        Assert.False(h.Vm.IsListening);
-    }
-
-    [Fact]
-    public async Task LosingFocus_StopsPushToTalk_ButNotHandsFreeListening()
-    {
-        await using var h = new Harness(output: ComposerOutput.Original);
-        await h.Vm.StartListeningAsync(handsFree: false);
-
-        await h.Vm.WindowDeactivatedAsync();
-        Assert.False(h.Vm.IsListening);
-
-        await h.Vm.StartListeningAsync(handsFree: true);
-        await h.Vm.WindowDeactivatedAsync();
-        Assert.True(h.Vm.IsListening);
-    }
+    // ---- microphone ----------------------------------------------------------------
 
     [Fact]
     public async Task TheRecordingClock_CountsWhileListening_AndResetsAfterwards()

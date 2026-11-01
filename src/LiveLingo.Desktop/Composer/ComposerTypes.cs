@@ -164,7 +164,6 @@ public enum ToastKind
 public sealed record StatusInfo(
     ComposerStatus Status,
     bool Written,
-    bool HandsFree,
     int RecordingSeconds,
     bool Armed,
     int Units,
