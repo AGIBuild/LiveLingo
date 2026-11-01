@@ -141,7 +141,7 @@ LIVELINGO_ENABLE_VOICE_PROBE=1 ./build.sh ProbeVoice   # 语音探针（仅 macO
 
 - [ ] **步骤 1（先写失败测试）：** 把原型 `browser.test.cjs` 的场景改写为“快照序列 → 断言 DOM 与发出的意图”，Playwright 跑 WebKit 与 Chromium。
 - [ ] **步骤 2：** 移植原型标记与样式：头部（目的地 / 隐私 / 输出胶囊 / 更多 / 关闭）、横幅、原话区（编辑 / 实时）、结果行（骨架、警告条、悬停工具、行内编辑）、页脚（麦克风 / 状态 / 复制 / 写入）、三个菜单、最近草稿与导出对话框、Toast。
-- [ ] **步骤 3：** 键盘语义（设计 §5）：Enter 写入（按设置也可 Ctrl+Enter）、Shift+Enter 换行、Esc 逐级、输入法组合中不触发、麦克风 Space / Enter；麦克风只发 `micDown` / `micUp`，时序由 C# 决定；`pointer capture`。
+- [ ] **步骤 3：** 键盘语义（设计 §5）：Enter 写入（按设置也可 Ctrl+Enter）、Shift+Enter 换行、Esc 逐级、输入法组合中不触发（WebKit 里确认候选的回车是 `isComposing:false` 且 `keyCode:229`，必须同时判 `e.isComposing || e.keyCode === 229`，W3 用 WebKit 项目加用例）、麦克风 Space / Enter；麦克风只发 `micDown` / `micUp`，时序由 C# 决定；`pointer capture`。
 - [ ] **步骤 4：** `source{text,rev}` 规则与光标保持；`ResizeObserver` 上报高度。
 - [ ] **步骤 5：** 视觉回归（对原型 PNG 的像素差阈值）、axe 零违规、无小于 12 px 文字、零控制台错误、零网络请求；深浅色与减少动画。
 - [ ] **步骤 6：** `./build.sh WebTest` 全绿；提交：`feat(web): render the composer from view-state snapshots`。
@@ -154,7 +154,7 @@ LIVELINGO_ENABLE_VOICE_PROBE=1 ./build.sh ProbeVoice   # 语音探针（仅 macO
 
 - [ ] **步骤 1：** 外壳窗口：透明、置顶、无边框、不在任务栏；承载 `WebSurface`；沿用 `ComposerPlacement`；宽度由 `layout.wide` 决定，高度来自 `size` 意图。
 - [ ] **步骤 2：** 激活与焦点：显示后 `web.Focus()` 并发 `focus{source}`；`Deactivated` → `VM.WindowDeactivatedAsync()`；关闭后焦点还给目标应用（回填仍走现有 `ITextInjector`）。
-- [ ] **步骤 3：** 预热：应用启动后创建隐藏窗口并加载页面；唤起时 `reset` + 新状态；测 p95。
+- [ ] **步骤 3：** 预热：应用启动后创建窗口并加载页面，之后**不要 `Hide()`**（W0 实测 `Hide()` 再 `Show()` 有 330–650 ms 尾部），而是保持显示、透明、移出屏幕（“停放”）；唤起时移回原位 + `reset` + 新状态；测 p95（W0 的 park 数据：首帧 p95 116 ms）。
 - [ ] **步骤 4：** 文件选择器与导出对话框的“选择文件”仍在 C#（`StorageProvider`）；其余对话框在 Web。
 - [ ] **步骤 5：** 删除旧实现与测试，更新 `App.axaml.cs`；`./build.sh Test` 全绿、`Run` 0 警告。
 - [ ] **步骤 6：** 在用户终端完成 **macOS 手工清单**：唤起 → 打字 → 回车写入；语音听写（点按与按住）；翻译；导入录音；各横幅；深浅色；减少动画。提交：`feat(desktop): host the composer in a web view`。
