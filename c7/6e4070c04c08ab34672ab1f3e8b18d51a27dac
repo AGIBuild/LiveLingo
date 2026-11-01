@@ -1,0 +1,27 @@
+build/_build.csproj
+  s_6d6e9175f38e45::t_ab72498a71a6db 18-20
+tests/LiveLingo.Core.Tests/LiveLingo.Core.Tests.csproj
+  s_6d6e9175f38e45::t_5106b1437d6612 11,15-18,20
+dotnet-tools.json
+  s_6d6e9175f38e45::t_aa60221dfd644e 6,13,20
+tests/LiveLingo.HfGguf.Tests/LiveLingo.HfGguf.Tests.csproj
+  s_6d6e9175f38e45::t_bdc561e66ecb92 9,11
+src/LiveLingo.Core/LiveLingo.Core.csproj
+  s_6d6e9175f38e45::t_f709dda6ec881f 14-18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "c76e4070c04c08ab34672ab1f3e8b18d51a27dac",
+  "prompts": {},
+  "sessions": {
+    "s_6d6e9175f38e45": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "f74d37e5-1d96-4ddc-a3f9-5ae24ff39e38",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
