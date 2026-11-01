@@ -115,6 +115,8 @@ C# 用多态反序列化为封闭的 `WebIntent` 联合；未知 `name`、缺字
 | 导航 | `openSettings{section}` | `OpenSettings` |
 | 设置 | `setting{key,value}`；`addTerm{source,target}`；`removeTerm{index}`；`cloudToggle{step,on}`（C# 决定是否弹同意）；`saveKey{value}`；`forgetKey`；`clearRecent`；`removeLegacyModels` | `SettingsViewModel` |
 
+W2 落地时的补充：`micToggle`（键盘 Space/Enter 切换听写，对应 `ToggleListeningCommand`，与旧窗口行为一致）；`size` 范围 1–4000，`index/i` 范围 0–9999，`openSettings.section` 只允许 `general|voice|privacy|models`；枚举只接受 camelCase 字符串；`v` 必须为 1；多余字段同样拒绝；拒绝原因只记类别（`too large`/`JsonException`/`version`/`invalid`），不回显消息内容。
+
 秘钥规则：`saveKey` 的值只在这一条消息里出现，C# 立即写入密钥库；快照里只有 `hasStoredKey`；日志不得记录消息体。
 
 ### 5.2 C# → Web
@@ -128,7 +130,9 @@ C# 用多态反序列化为封闭的 `WebIntent` 联合；未知 `name`、缺字
 | `focus` | `{target:"source"\|"mic"\|"edit"}` | 窗口显示后；横幅操作后 |
 | `reset` | 无 | 重新唤起时清掉 Web 里的瞬时状态（悬停、菜单、对话框） |
 
-`ComposerViewState` 字段（由现有 `ComposerViewModel` 与 `ComposerTexts` 直接得出）：`rev`；`dest{text,kind:"target"|"copyOnly"|"lost",icon}`；`privacy{text,cloud,aria}`；`output{value,pill,menu[],swap}`；`banner{kind,tone,message,progress,actions[{id,label}]}`；`source{mode:"edit"|"live",text,sourceRev,editable,placeholder,label,routeChip,lines[{time,text,tail}],hint?}`；`result{visible,label,rows[{i,state,text,note,time,warn,owned,editing,canEdit,canUseOriginal,error}],editText}`；`footer{mic{recording,aria},status{text,tone},copyEnabled,commit{label,enabled,armed,written,keyCap,aria}}`；`layout{wide}`；`options{animations,commitKey}`；`menus{target[],more[]}`。
+信封统一为 `{"v":1,"type":"…","data":…}`；另有 `openMenu{id:"target"}`（`RetargetRequested` 要求打开目标菜单）。静态文案键见 `ComposerTexts.WebStrings()`。
+
+`ComposerViewState` 字段（以 `src/LiveLingo.Desktop/Web/ComposerViewState.cs` 与 `tests/LiveLingo.Web.Tests/Fixtures/*.json` 为准）：`rev`；`dest{text,kind:"target"|"copyOnly"|"lost"}`；`privacy{text,cloud,aria}`；`output{value,pill,globe,menu[{id,label,checked,enabled}],swap}`；`banner{kind,tone,message,progress,actions[{id,label}]}|null`；`source{mode:"edit"|"live",text,sourceRev,editable,label,routeChip,hint,lines[{time,text,tail}]}`；`result{visible,label,rows[{i,state:"pending"|"ready"|"failed"|"empty",text,note,time,warn,owned,editing,canEdit,canUseOriginal,useOriginalAria,editAria}],editText}`（失败行的错误文案就在 `text`）；`footer{mic{recording,aria},status{text,tone:"muted"|"warn"},copyEnabled,commit{label,enabled,armed,written,aria}}`；`layout{wide}`；`options{animations,commitKey:"enter"|"ctrlEnter",commitKeyCap,newlineKeyCap}`；`menus{target[],more[]}`（菜单项 id：`target|copyOnly`；`new|recent|import|export|wide|whole|settings`）；`dialogs{recent[{index,label}],canRestore,export{txt,markdown,srt}}`。`editText` 只在某句开始编辑时被页面采用一次。`sourceRev` 起始为 1（新页面发出的 `rev` 从 0 起算，因此能显示已恢复的草稿）；模型侧改动文本（语音、导入、恢复）时自增，页面发出的文本不会自增。黄金文件里的键帽固定为 macOS 值。
 
 ### 5.3 原话框的双向同步
 

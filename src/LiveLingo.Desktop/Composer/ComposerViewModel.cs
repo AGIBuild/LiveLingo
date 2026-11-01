@@ -101,6 +101,9 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
     public bool HasTarget => _target is not null && !CopyOnly;
     public string TargetName => _target?.ProcessName ?? "";
 
+    /// <summary>The window the composer was opened for still exists, so writing into it can be chosen (again).</summary>
+    public bool HasOriginalTarget => _target is not null && !IsTargetLost;
+
     partial void OnSourceTextChanged(string value) => ResyncSource();
 
     /// <summary>Hands the source text to the draft as sentences, or as one document (long or structured text, or when forced).</summary>

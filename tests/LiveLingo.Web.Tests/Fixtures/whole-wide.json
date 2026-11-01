@@ -1,0 +1,166 @@
+{
+  "rev": 1,
+  "dest": {
+    "text": "Slack",
+    "kind": "target"
+  },
+  "privacy": {
+    "text": "本地",
+    "cloud": false,
+    "aria": "全部本地处理"
+  },
+  "output": {
+    "value": "translate",
+    "pill": "→ English",
+    "globe": true,
+    "menu": [
+      {
+        "id": "clean",
+        "label": "保持中文（整理）",
+        "checked": false,
+        "enabled": true
+      },
+      {
+        "id": "translate",
+        "label": "翻译成 English",
+        "checked": true,
+        "enabled": true
+      },
+      {
+        "id": "original",
+        "label": "原话（不整理）",
+        "checked": false,
+        "enabled": true
+      }
+    ],
+    "swap": "语言：中文 → English\u3000⇄ 互换"
+  },
+  "banner": null,
+  "source": {
+    "mode": "edit",
+    "text": "# Release notes\n\n- 修复缓存\n- 更新索引\n",
+    "sourceRev": 1,
+    "editable": true,
+    "label": "原话",
+    "routeChip": true,
+    "hint": false,
+    "lines": []
+  },
+  "result": {
+    "visible": true,
+    "label": "将写入 · English",
+    "rows": [
+      {
+        "i": 0,
+        "state": "ready",
+        "text": "T:# Release notes\n\n- 修复缓存\n- 更新索引",
+        "note": "",
+        "time": "",
+        "warn": false,
+        "owned": false,
+        "editing": false,
+        "canEdit": true,
+        "canUseOriginal": false,
+        "useOriginalAria": "第 1 句改用原话",
+        "editAria": "编辑第 1 句"
+      }
+    ],
+    "editText": ""
+  },
+  "footer": {
+    "mic": {
+      "recording": false,
+      "aria": "开始听写，长按为按住说话"
+    },
+    "status": {
+      "text": "1 句 · 本地处理",
+      "tone": "muted"
+    },
+    "copyEnabled": true,
+    "commit": {
+      "label": "写入 Slack",
+      "enabled": true,
+      "armed": false,
+      "written": false,
+      "aria": "写入"
+    }
+  },
+  "layout": {
+    "wide": true
+  },
+  "options": {
+    "animations": true,
+    "commitKey": "enter",
+    "commitKeyCap": "↵",
+    "newlineKeyCap": "⇧↵"
+  },
+  "menus": {
+    "target": [
+      {
+        "id": "target",
+        "label": "Slack 输入框",
+        "checked": true,
+        "enabled": true
+      },
+      {
+        "id": "copyOnly",
+        "label": "没有输入框 · 仅复制",
+        "checked": false,
+        "enabled": true
+      }
+    ],
+    "more": [
+      {
+        "id": "new",
+        "label": "新草稿",
+        "checked": false,
+        "enabled": true
+      },
+      {
+        "id": "recent",
+        "label": "最近草稿",
+        "checked": false,
+        "enabled": true
+      },
+      {
+        "id": "import",
+        "label": "导入录音…",
+        "checked": false,
+        "enabled": false
+      },
+      {
+        "id": "export",
+        "label": "导出…",
+        "checked": false,
+        "enabled": true
+      },
+      {
+        "id": "wide",
+        "label": "宽屏对照",
+        "checked": false,
+        "enabled": true
+      },
+      {
+        "id": "whole",
+        "label": "整段处理（保留格式）",
+        "checked": true,
+        "enabled": true
+      },
+      {
+        "id": "settings",
+        "label": "设置",
+        "checked": false,
+        "enabled": true
+      }
+    ]
+  },
+  "dialogs": {
+    "recent": [],
+    "canRestore": false,
+    "export": {
+      "txt": true,
+      "markdown": true,
+      "srt": false
+    }
+  }
+}

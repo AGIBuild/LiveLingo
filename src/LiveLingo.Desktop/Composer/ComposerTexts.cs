@@ -218,4 +218,38 @@ public sealed class ComposerTexts(ILocalizationService loc)
     public string ImportFileType => loc.T("composer.import.fileType");
     public string ExportTitle => loc.T("composer.export.title");
     public string ExportHint => loc.T("composer.export.hint");
+
+    /// <summary>
+    /// The labels that do not depend on state, sent once per page load and language change. Text that depends on state
+    /// (status, banners, row notes, menus) arrives inside each snapshot instead.
+    /// </summary>
+    public IReadOnlyDictionary<string, string> WebStrings() => new Dictionary<string, string>
+    {
+        ["placeholder"] = Placeholder,
+        ["hintMic"] = HintMic,
+        ["hintWrite"] = HintWrite,
+        ["hintNewline"] = HintNewline,
+        ["hintHide"] = HintHide,
+        ["destAria"] = DestAria,
+        ["outputAria"] = OutputAria,
+        ["moreAria"] = MoreAria,
+        ["closeAria"] = CloseAria,
+        ["copyAria"] = CopyAria,
+        ["resultAria"] = ResultAria,
+        ["routeChip"] = RouteChip,
+        ["rowRetry"] = RowRetry,
+        ["rowManual"] = RowManual,
+        ["rowSave"] = RowSave,
+        ["rowCancel"] = RowCancel,
+        ["rowProcessing"] = RowProcessing,
+        ["rowUseOriginal"] = RowUseOriginal,
+        ["rowEdit"] = RowEdit,
+        ["progressAria"] = BannerProgressAria,
+        ["recentTitle"] = MoreRecent,
+        ["recentClear"] = RecentClear,
+        ["recentEmpty"] = RecentEmpty,
+        ["recentRestore"] = RecentRestore,
+        ["exportTitle"] = MoreExport,
+        ["exportHint"] = ExportHint
+    };
 }
