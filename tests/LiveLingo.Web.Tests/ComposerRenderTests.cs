@@ -18,7 +18,8 @@ public sealed class ComposerRenderTests(BrowserFixture browsers)
 
     private static string[] AllFixtures() =>
         [.. Directory.GetFiles(Path.Combine(AppContext.BaseDirectory, "Fixtures"), "*.json")
-            .Select(Path.GetFileNameWithoutExtension).Where(n => n != "strings").Order(StringComparer.Ordinal)!];
+            .Select(Path.GetFileNameWithoutExtension).Where(n => n != "strings" && !n!.StartsWith("settings-", StringComparison.Ordinal))
+            .Order(StringComparer.Ordinal)!];
 
     [Theory]
     [MemberData(nameof(Engines))]

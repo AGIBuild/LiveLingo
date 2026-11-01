@@ -1,5 +1,6 @@
 using LiveLingo.Desktop.Composer;
 using LiveLingo.Desktop.Services.Localization;
+using LiveLingo.Desktop.Settings;
 using LiveLingo.Desktop.Web;
 using Microsoft.Extensions.Logging;
 
@@ -66,5 +67,12 @@ internal static class Texts
         var loc = new LocalizationService();
         loc.SetCulture("zh-CN");
         return new ComposerTexts(loc);
+    }
+
+    public static SettingsTexts ChineseSettings()
+    {
+        var loc = new LocalizationService();
+        loc.SetCulture("zh-CN");
+        return new SettingsTexts(loc);
     }
 }

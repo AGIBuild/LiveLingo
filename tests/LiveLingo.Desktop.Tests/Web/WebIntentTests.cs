@@ -34,6 +34,14 @@ public sealed class WebIntentTests
     [InlineData("""{"v":1,"name":"copyOnly","on":true}""", typeof(CopyOnlyIntent))]
     [InlineData("""{"v":1,"name":"banner","action":"openMicrophoneSettings"}""", typeof(BannerIntent))]
     [InlineData("""{"v":1,"name":"openSettings","section":"voice"}""", typeof(OpenSettingsIntent))]
+    [InlineData("""{"v":1,"name":"setting","key":"theme","value":"Dark"}""", typeof(SettingIntent))]
+    [InlineData("""{"v":1,"name":"addTerm","source":"Redis","target":""}""", typeof(AddTermIntent))]
+    [InlineData("""{"v":1,"name":"removeTerm","index":1}""", typeof(RemoveTermIntent))]
+    [InlineData("""{"v":1,"name":"cloudToggle","step":"clean","on":true}""", typeof(CloudToggleIntent))]
+    [InlineData("""{"v":1,"name":"consent","allow":false}""", typeof(ConsentIntent))]
+    [InlineData("""{"v":1,"name":"saveKey","value":"sk-1"}""", typeof(SaveKeyIntent))]
+    [InlineData("""{"v":1,"name":"forgetKey"}""", typeof(ForgetKeyIntent))]
+    [InlineData("""{"v":1,"name":"removeLegacyModels"}""", typeof(RemoveLegacyModelsIntent))]
     public void Parse_AcceptsEveryIntentOfTheClosedSet(string json, Type expected)
     {
         var intent = WebIntent.Parse(json, out var reason);
@@ -75,6 +83,15 @@ public sealed class WebIntentTests
     [InlineData("""{"v":1,"name":"size","width":656,"height":99999}""", "invalid")]
     [InlineData("""{"v":1,"name":"openSettings","section":"../etc"}""", "invalid")]
     [InlineData("""{"v":1,"name":"source","text":"x","rev":-1}""", "invalid")]
+    [InlineData("""{"v":1,"name":"setting","key":"formatDisk","value":"1"}""", "invalid")]
+    [InlineData("""{"v":1,"name":"setting","key":"theme","value":"Neon"}""", "invalid")]
+    [InlineData("""{"v":1,"name":"setting","key":"commitKey","value":"enter"}""", "invalid")]
+    [InlineData("""{"v":1,"name":"setting","key":"reduceMotion","value":"yes"}""", "invalid")]
+    [InlineData("""{"v":1,"name":"setting","key":"tier","value":"Cloud"}""", "invalid")]
+    [InlineData("""{"v":1,"name":"setting","key":"theme"}""", "JsonException")]
+    [InlineData("""{"v":1,"name":"removeTerm","index":-1}""", "invalid")]
+    [InlineData("""{"v":1,"name":"cloudToggle","step":"everything","on":true}""", "JsonException")]
+    [InlineData("""{"v":1,"name":"saveKey","value":""}""", "invalid")]
     public void Parse_RejectsAnythingOutsideTheClosedSet(string json, string expectedReason)
     {
         var intent = WebIntent.Parse(json, out var reason);
@@ -90,6 +107,36 @@ public sealed class WebIntentTests
 
         Assert.Null(WebIntent.Parse(json, out var reason));
         Assert.Equal("too large", reason);
+    }
+
+    [Theory]
+    [InlineData("hotkey", 65)]
+    [InlineData("microphone", 257)]
+    [InlineData("cloudBaseUrl", 2_049)]
+    [InlineData("cloudModel", 257)]
+    public void Parse_BoundsTheFreeTextOfASetting(string key, int length)
+    {
+        var json = $$"""{"v":1,"name":"setting","key":"{{key}}","value":"{{new string('a', length)}}"}""";
+
+        Assert.Null(WebIntent.Parse(json, out var reason));
+        Assert.Equal("invalid", reason);
+    }
+
+    [Fact]
+    public void Parse_BoundsTheGlossaryTermsAndTheKey()
+    {
+        var long200 = new string('a', 201);
+
+        Assert.Null(WebIntent.Parse($$"""{"v":1,"name":"addTerm","source":"{{long200}}","target":""}""", out _));
+        Assert.Null(WebIntent.Parse($$"""{"v":1,"name":"saveKey","value":"{{new string('k', 4_097)}}"}""", out _));
+    }
+
+    [Fact]
+    public void ASavedKey_NeverPrintsItself()
+    {
+        var intent = WebIntent.Parse("""{"v":1,"name":"saveKey","value":"sk-very-secret"}""", out _);
+
+        Assert.DoesNotContain("sk-very-secret", intent!.ToString());
     }
 
     [Fact]

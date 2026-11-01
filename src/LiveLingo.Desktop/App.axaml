@@ -4,6 +4,5 @@
 
     <Application.Styles>
         <FluentTheme />
-        <StyleInclude Source="avares://LiveLingo.Desktop/Styles/AppTheme.axaml"/>
     </Application.Styles>
 </Application>

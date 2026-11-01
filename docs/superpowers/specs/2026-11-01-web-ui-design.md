@@ -146,7 +146,7 @@ C# 控制宽度（窄 620 / 宽 940 + 36 px 边距，来自 `layout.wide`）；W
 ## 6. 安全
 
 1. 页面只来自内嵌资源（`NavigateToString`，单文件 `index.html`）；`NavigationStarting` 一律取消，`NewWindowRequested` 一律取消。
-2. CSP：`default-src 'none'; script-src 'nonce-…'; style-src 'nonce-…'; img-src data:; font-src 'none'; connect-src 'none'; base-uri 'none'; form-action 'none'`。nonce 由 C# 在每次加载时写入模板。页面**没有任何网络请求**；`connect-src 'none'` 使这一点由引擎强制，并与“默认没有出站请求”的隐私承诺一致。
+2. CSP：`default-src 'none'; script-src 'nonce-…'; style-src 'nonce-…'; style-src-attr 'unsafe-inline'; img-src data:; font-src 'none'; connect-src 'none'; base-uri 'none'; form-action 'none'`。nonce 由 C# 在每次加载时写入模板。`style-src-attr 'unsafe-inline'` 仅放行 style 属性：WebKit 原生 `<select>` 内部带 style 属性，不放行会被引擎拒绝并报 CSP 错误；样式表与脚本仍然只认 nonce。页面**没有任何网络请求**；`connect-src 'none'` 使这一点由引擎强制，并与“默认没有出站请求”的隐私承诺一致。
 3. 数据存储不落盘：macOS 设置 `NonPersistentDataStore = true`；Windows 用 `IsInPrivateModeEnabled = true` 并把 `UserDataFolder` 放在临时目录并在退出时清除。
 4. **模型输出与用户文本是不可信输入。** Web 只用文本节点渲染；禁止 `innerHTML`、`outerHTML`、`insertAdjacentHTML`、`document.write`、`dangerouslySetInnerHTML`、`eval`、`new Function`、动态 `<script>`；由一个 C# 测试扫描自有的 Web 源文件（不含 `vendor/`），出现即失败；CSP 的 `script-src 'nonce'` 在运行时再挡一道。
 5. 发布版禁用开发者工具；Debug 构建才允许开启开发者工具（`EnableDevTools`）。没有开发服务器：改 Web 文件后重启应用即可（它们是嵌入资源）。

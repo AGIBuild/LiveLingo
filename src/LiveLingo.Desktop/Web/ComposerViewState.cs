@@ -38,7 +38,8 @@ internal sealed record FooterState(MicState Mic, StatusState Status, bool CopyEn
 
 internal sealed record LayoutState(bool Wide);
 
-internal sealed record OptionsState(bool Animations, string CommitKey, string CommitKeyCap, string NewlineKeyCap);
+/// <param name="Theme">"Auto", "Light" or "Dark".</param>
+internal sealed record OptionsState(bool Animations, string Theme, string CommitKey, string CommitKeyCap, string NewlineKeyCap);
 
 internal sealed record MenusState(IReadOnlyList<MenuItemState> Target, IReadOnlyList<MenuItemState> More);
 
@@ -119,6 +120,7 @@ internal sealed record ComposerViewState(
             Layout: new LayoutState(vm.IsWide),
             Options: new OptionsState(
                 vm.Animations,
+                vm.Theme,
                 vm.CommitKey == CommitKey.Enter ? "enter" : "ctrlEnter",
                 ComposerTexts.CommitKeyLabel(vm.CommitKey),
                 ComposerTexts.NewlineKeyLabel),

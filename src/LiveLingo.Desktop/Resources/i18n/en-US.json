@@ -174,6 +174,8 @@
   "settings.terms.target": "Translation",
   "settings.terms.add": "Add",
   "settings.terms.remove": "Remove",
+  "settings.terms.sourceExample": "缓存穿透",
+  "settings.terms.targetExample": "cache penetration",
   "settings.terms.hint": "Identical term and translation means keep as written (speech recognition, cleanup and the fidelity check use it).",
   "settings.cloud.translate": "Cloud translation",
   "settings.cloud.translate.desc": "Off by default. Needs its own consent",

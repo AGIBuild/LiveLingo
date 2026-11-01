@@ -174,6 +174,8 @@
   "settings.terms.target": "译法",
   "settings.terms.add": "添加",
   "settings.terms.remove": "删除",
+  "settings.terms.sourceExample": "缓存穿透",
+  "settings.terms.targetExample": "cache penetration",
   "settings.terms.hint": "原词与译法相同，表示原样保留（语音识别、整理和保真检查都会用）。",
   "settings.cloud.translate": "云端翻译",
   "settings.cloud.translate.desc": "默认关闭。开启需单独同意",

@@ -13,6 +13,13 @@ namespace LiveLingo.Desktop.Settings;
 /// <summary>One line of the glossary list; a term whose translation equals it is kept as written.</summary>
 public sealed record TermEntry(string Source, string Target);
 
+/// <summary>The two steps that can run on the user's own cloud endpoint, each authorized on its own.</summary>
+public enum CloudStep
+{
+    Translate,
+    Clean
+}
+
 /// <summary>
 /// The settings page of the prototype: there is no save button, every change is applied at once. A value that is not
 /// usable yet (a hotkey being typed, a half-filled cloud endpoint) is flagged and not stored.
@@ -238,6 +245,29 @@ public sealed partial class SettingsViewModel : ObservableObject
         string.Join('\n', terms.Select(term => term.Source == term.Target ? term.Source : $"{term.Source}={term.Target}"));
 
     // ---- cloud ------------------------------------------------------------------------------
+
+    /// <summary>The step the user asked to turn on and has not consented to yet; the page shows its consent dialog meanwhile.</summary>
+    [ObservableProperty] private CloudStep? _pendingConsent;
+
+    /// <summary>Turning a step on needs the user's consent every time (<see cref="AnswerConsent"/>); turning it off is immediate.</summary>
+    public void SetCloud(CloudStep step, bool on)
+    {
+        var translation = step == CloudStep.Translate;
+        if (!on)
+            DisableCloud(translation);
+        else if (!(translation ? CloudTranslate : CloudClean))
+            PendingConsent = step;
+    }
+
+    public void AnswerConsent(bool allow)
+    {
+        if (PendingConsent is not { } step)
+            return;
+
+        PendingConsent = null;
+        if (allow)
+            TryEnableCloud(step == CloudStep.Translate);
+    }
 
     /// <summary>Turns a cloud step on after the user consented; refused while the endpoint, model or key is not set.</summary>
     public bool TryEnableCloud(bool translation)

@@ -32,21 +32,24 @@ public sealed class BrowserFixture : IAsyncLifetime
     }
 
     /// <summary>Opens the page without any snapshot: C# has not answered <c>ready</c> yet.</summary>
-    public async Task<ComposerPage> OpenBareAsync(string engine, int width = NarrowWidth, ColorScheme scheme = ColorScheme.Light)
+    public Task<ComposerPage> OpenBareAsync(string engine, int width = NarrowWidth, ColorScheme scheme = ColorScheme.Light) =>
+        OpenBareAsync(engine, WebPage.ComposerEntry, width, 900, scheme);
+
+    private async Task<ComposerPage> OpenBareAsync(string engine, string entry, int width, int height, ColorScheme scheme)
     {
         var page = await _browsers[engine].NewPageAsync(new BrowserNewPageOptions
         {
-            ViewportSize = new ViewportSize { Width = width, Height = 900 },
+            ViewportSize = new ViewportSize { Width = width, Height = height },
             ColorScheme = scheme,
         });
-        var session = new ComposerPage(page);
+        var session = new ComposerPage(page, entry == WebPage.ComposerEntry ? "composer" : "settings");
         // The host injects invokeCSharpAction into every page; here it records what the page would have sent.
         await page.AddInitScriptAsync("window.__raw = []; window.invokeCSharpAction = (s) => { window.__raw.push(s); };");
         // Served from the base URI the host uses, so the page runs with the same origin and the init script applies.
         await page.RouteAsync(ComposerPage.BaseUri, route => route.FulfillAsync(new RouteFulfillOptions
         {
             ContentType = "text/html; charset=utf-8",
-            Body = WebPage.Build(WebPageTests.Nonce),
+            Body = WebPage.Build(WebPageTests.Nonce, entry),
         }));
         await page.GotoAsync(ComposerPage.BaseUri);
         await session.WaitForIntentAsync("ready");
@@ -63,6 +66,19 @@ public sealed class BrowserFixture : IAsyncLifetime
         return session;
     }
 
+    /// <summary>The settings page without any snapshot.</summary>
+    public Task<ComposerPage> OpenBareSettingsAsync(string engine) =>
+        OpenBareAsync(engine, WebPage.SettingsEntry, 920, 660, ColorScheme.Light);
+
+    /// <summary>The settings window: 920 x 660, opened like the composer with the strings and a golden snapshot.</summary>
+    public async Task<ComposerPage> OpenSettingsAsync(string engine, string fixture = "settings-general", ColorScheme scheme = ColorScheme.Light)
+    {
+        var session = await OpenBareAsync(engine, WebPage.SettingsEntry, 920, 660, scheme);
+        await session.PushStringsAsync("settings-strings");
+        await session.PushAsync(fixture);
+        return session;
+    }
+
     public async ValueTask DisposeAsync()
     {
         foreach (var browser in _browsers.Values)
@@ -74,11 +90,14 @@ public sealed class BrowserFixture : IAsyncLifetime
 /// <summary>An open page, the host messages it receives and everything it reported while it ran.</summary>
 public sealed class ComposerPage : IAsyncDisposable
 {
+    private readonly string _stateType;
     private int _rev;
 
-    public ComposerPage(IPage page)
+    /// <param name="stateType">The message type of this page's snapshots: "composer" or "settings".</param>
+    public ComposerPage(IPage page, string stateType)
     {
         Page = page;
+        _stateType = stateType;
         page.Console += (_, m) =>
         {
             if (m.Type == "error")
@@ -102,11 +121,15 @@ public sealed class ComposerPage : IAsyncDisposable
         File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures", name + ".json"));
 
     /// <summary>A label of the strings message, so tests name controls the way the user sees them.</summary>
-    public static string Str(string key) => JsonNode.Parse(FixtureText("strings"))!["strings"]![key]!.GetValue<string>();
+    public static string Str(string key, string fixture = "strings") =>
+        JsonNode.Parse(FixtureText(fixture))!["strings"]![key]!.GetValue<string>();
 
-    public Task PushStringsAsync()
+    /// <summary>A label of the settings page.</summary>
+    public static string SettingsStr(string key) => Str(key, "settings-strings");
+
+    public Task PushStringsAsync(string fixture = "strings")
     {
-        var data = JsonNode.Parse(FixtureText("strings"))!;
+        var data = JsonNode.Parse(FixtureText(fixture))!;
         return ReceiveAsync("strings", data);
     }
 
@@ -116,7 +139,7 @@ public sealed class ComposerPage : IAsyncDisposable
         var snapshot = JsonNode.Parse(FixtureText(fixture))!.AsObject();
         edit?.Invoke(snapshot);
         snapshot["rev"] = ++_rev;
-        return ReceiveAsync("composer", snapshot);
+        return ReceiveAsync(_stateType, snapshot);
     }
 
     public Task ReceiveAsync(string type, JsonNode? data)

@@ -115,19 +115,5 @@ internal sealed class ComposerIntents : IIntentHandler
             await _vm.ExportAsync(path, format);
     }
 
-    /// <summary>Runs a command that is not awaited by the page; a failure is logged, never lost.</summary>
-    private void Run(Func<Task> action) => _ = Observe(action);
-
-    private async Task Observe(Func<Task> action)
-    {
-        try
-        {
-            await action().ConfigureAwait(true);
-        }
-        catch (Exception ex)
-        {
-            // The type only: an exception message can carry the user's text.
-            _logger.LogError("A composer action failed: {Exception}", ex.GetType().Name);
-        }
-    }
+    private void Run(Func<Task> action) => Observed.Run(action, _logger, "A composer action");
 }

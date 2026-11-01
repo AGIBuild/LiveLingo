@@ -17,10 +17,17 @@ internal static partial class WebPage
     [GeneratedRegex(@"^[A-Za-z0-9+/_-]{16,}={0,2}$")]
     private static partial Regex NoncePattern();
 
-    public static string Build(string nonce)
+    /// <summary>The pages of the one bundle: each window loads the same scripts and mounts its own screen.</summary>
+    public const string ComposerEntry = "composer";
+
+    public const string SettingsEntry = "settings";
+
+    public static string Build(string nonce, string entry)
     {
         if (!NoncePattern().IsMatch(nonce))
             throw new ArgumentException("The nonce must be at least 16 characters of the base64 alphabet.", nameof(nonce));
+        if (entry is not (ComposerEntry or SettingsEntry))
+            throw new ArgumentException("Unknown page entry.", nameof(entry));
 
         var styles = string.Join('\n', Names("styles").Select(Read));
         // Libraries first, then our own scripts in file-name order (00-, 10-, ...).
@@ -29,6 +36,7 @@ internal static partial class WebPage
 
         return Read(Prefix + "page.html")
             .Replace("__NONCE__", nonce)
+            .Replace("__ENTRY__", entry)
             .Replace("__STYLES__", styles)
             .Replace("__SCRIPTS__", scripts);
     }

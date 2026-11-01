@@ -9,7 +9,7 @@ namespace LiveLingo.Desktop.Tests.Settings;
 
 public class SettingsViewModelTests
 {
-    private sealed class Fixture
+    internal sealed class Fixture
     {
         public SettingsModel Current { get; }
         public List<SettingsModel> Saved { get; } = [];
@@ -402,5 +402,108 @@ public class SettingsViewModelTests
         await f.Vm.InitializeAsync();
 
         Assert.False(f.Vm.HasLegacyModels);
+    }
+
+    // ---- consent ------------------------------------------------------------------------
+
+    private static async Task<Fixture> ConfiguredCloudAsync()
+    {
+        var model = new SettingsModel();
+        model.Cloud.BaseUrl = "https://api.example.com/v1";
+        model.Cloud.Model = "m";
+        var f = new Fixture(model, storedKey: "sk");
+        await f.Vm.InitializeAsync();
+        return f;
+    }
+
+    [Fact]
+    public async Task TurningAStepOn_AsksForConsentAndChangesNothingYet()
+    {
+        var f = await ConfiguredCloudAsync();
+
+        f.Vm.SetCloud(CloudStep.Clean, on: true);
+
+        Assert.Equal(CloudStep.Clean, f.Vm.PendingConsent);
+        Assert.False(f.Vm.CloudClean);
+        Assert.Empty(f.Saved);
+    }
+
+    [Fact]
+    public async Task Consenting_TurnsOnlyThatStepOn()
+    {
+        var f = await ConfiguredCloudAsync();
+        f.Vm.SetCloud(CloudStep.Translate, on: true);
+
+        f.Vm.AnswerConsent(allow: true);
+
+        Assert.Null(f.Vm.PendingConsent);
+        Assert.True(f.Last.Cloud.Translate);
+        Assert.False(f.Last.Cloud.Clean);
+    }
+
+    [Fact]
+    public async Task RefusingTheConsent_LeavesTheStepOff()
+    {
+        var f = await ConfiguredCloudAsync();
+        f.Vm.SetCloud(CloudStep.Translate, on: true);
+
+        f.Vm.AnswerConsent(allow: false);
+
+        Assert.Null(f.Vm.PendingConsent);
+        Assert.False(f.Vm.CloudTranslate);
+        Assert.Empty(f.Saved);
+    }
+
+    [Fact]
+    public void ConsentWithoutAnEndpoint_IsRefusedAndFlagged()
+    {
+        var f = new Fixture();
+        f.Vm.SetCloud(CloudStep.Translate, on: true);
+
+        f.Vm.AnswerConsent(allow: true);
+
+        Assert.False(f.Vm.CloudTranslate);
+        Assert.True(f.Vm.CloudInvalid);
+    }
+
+    [Fact]
+    public async Task TurningAStepOff_NeedsNoConsent()
+    {
+        var model = new SettingsModel();
+        model.Cloud.BaseUrl = "https://api.example.com/v1";
+        model.Cloud.Model = "m";
+        model.Cloud.Clean = true;
+        var f = new Fixture(model, storedKey: "sk");
+        await f.Vm.InitializeAsync();
+
+        f.Vm.SetCloud(CloudStep.Clean, on: false);
+
+        Assert.Null(f.Vm.PendingConsent);
+        Assert.False(f.Last.Cloud.Clean);
+    }
+
+    [Fact]
+    public async Task AStepThatIsAlreadyOn_IsNotAskedAgain()
+    {
+        var model = new SettingsModel();
+        model.Cloud.BaseUrl = "https://api.example.com/v1";
+        model.Cloud.Model = "m";
+        model.Cloud.Translate = true;
+        var f = new Fixture(model, storedKey: "sk");
+        await f.Vm.InitializeAsync();
+
+        f.Vm.SetCloud(CloudStep.Translate, on: true);
+
+        Assert.Null(f.Vm.PendingConsent);
+    }
+
+    [Fact]
+    public async Task AnAnswerWithoutAQuestion_ChangesNothing()
+    {
+        var f = await ConfiguredCloudAsync();
+
+        f.Vm.AnswerConsent(allow: true);
+
+        Assert.Empty(f.Saved);
     }
 }
