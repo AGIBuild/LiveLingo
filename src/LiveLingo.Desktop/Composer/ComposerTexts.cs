@@ -214,6 +214,9 @@ public sealed class ComposerTexts(ILocalizationService loc)
         _ => throw new ArgumentOutOfRangeException(nameof(kind))
     });
 
+    /// <summary>The interface language, for the page's lang attribute.</summary>
+    public string Locale => loc.CurrentCulture.Name;
+
     public string ImportTitle => loc.T("composer.import.title");
     public string ImportFileType => loc.T("composer.import.fileType");
     public string ExportTitle => loc.T("composer.export.title");

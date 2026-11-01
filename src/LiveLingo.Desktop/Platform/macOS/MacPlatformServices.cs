@@ -18,7 +18,7 @@ internal sealed class MacPlatformServices : IPlatformServices
         Clipboard = new MacClipboardService();
         Hotkey = new MacHotkeyService();
         WindowTracker = new MacWindowTracker();
-        TextInjector = new MacTextInjector(Clipboard);
+        TextInjector = new MacTextInjector(Clipboard, WindowTracker);
     }
 
     public void OpenUrl(string url) => BrowserLauncher.OpenUrl(url);

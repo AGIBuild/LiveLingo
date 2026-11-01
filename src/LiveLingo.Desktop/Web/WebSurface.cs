@@ -25,7 +25,12 @@ internal sealed class WebSurface : IWebHost
         View = new NativeWebView { Background = Brushes.Transparent };
         View.EnvironmentRequested += (_, e) => Isolate(e);
         View.AdapterCreated += (_, _) => Load();
-        View.WebMessageReceived += (_, e) => MessageReceived?.Invoke(e.Body ?? "");
+        View.WebMessageReceived += (view, e) =>
+        {
+            var message = e.Body ?? "";
+            IsReady = IsReady || WebIntent.Parse(message, out _) is ReadyIntent;
+            MessageReceived?.Invoke(message);
+        };
         View.NavigationStarted += (_, e) =>
         {
             // The page is loaded once from a string; any other navigation (a link, a redirect, a script) is refused.
@@ -43,10 +48,14 @@ internal sealed class WebSurface : IWebHost
 
     public event Action<string>? MessageReceived;
 
+    /// <summary>The page announced itself with <c>ready</c> and has not been loaded again since.</summary>
+    public bool IsReady { get; private set; }
+
     /// <summary>Loads the page again with a fresh nonce; the page announces itself with <c>ready</c> and gets everything again.</summary>
     public void Load()
     {
         _navigated = false;
+        IsReady = false;
         View.NavigateToString(WebPage.Build(Nonce()), BaseUri);
     }
 

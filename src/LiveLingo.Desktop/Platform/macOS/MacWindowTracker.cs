@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
+using Serilog;
 using static LiveLingo.Desktop.Platform.macOS.MacNativeMethods;
 
 namespace LiveLingo.Desktop.Platform.macOS;
@@ -53,6 +54,35 @@ internal sealed class MacWindowTracker : IWindowTracker
             CFRelease(kWindowNumber);
             CFRelease(windowList);
         }
+    }
+
+    public void Activate(TargetWindowInfo target)
+    {
+        if (string.IsNullOrEmpty(target.ProcessName)) return;
+
+        var workspace = objc_msgSend(
+            objc_getClass("NSWorkspace"),
+            sel_registerName("sharedWorkspace"));
+        var apps = objc_msgSend(workspace, sel_registerName("runningApplications"));
+        var count = objc_msgSend_int(apps, sel_registerName("count"));
+
+        for (var i = 0; i < count; i++)
+        {
+            var app = objc_msgSend(apps, sel_registerName("objectAtIndex:"), (IntPtr)i);
+            var namePtr = objc_msgSend(app, sel_registerName("localizedName"));
+            var name = CFStringToString(namePtr);
+
+            if (name is not null && target.ProcessName.Contains(name, StringComparison.OrdinalIgnoreCase))
+            {
+                objc_msgSend(app,
+                    sel_registerName("activateWithOptions:"),
+                    (IntPtr)3); // NSApplicationActivateIgnoringOtherApps | NSApplicationActivateAllWindows
+                Log.Debug("Activated target process: {Name}", name);
+                return;
+            }
+        }
+
+        Log.Debug("Could not find target process to activate: {Name}", target.ProcessName);
     }
 
     private static (int pid, string name) GetFrontmostApp()

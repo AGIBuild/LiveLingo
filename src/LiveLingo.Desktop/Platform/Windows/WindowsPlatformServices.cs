@@ -18,7 +18,7 @@ internal sealed class WindowsPlatformServices : IPlatformServices
         Clipboard = new Win32ClipboardService();
         Hotkey = new Win32HotkeyService();
         WindowTracker = new Win32WindowTracker();
-        TextInjector = new Win32TextInjector(Clipboard);
+        TextInjector = new Win32TextInjector(Clipboard, WindowTracker);
     }
 
     public void OpenUrl(string url) => BrowserLauncher.OpenUrl(url);

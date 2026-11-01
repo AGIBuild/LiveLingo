@@ -337,7 +337,15 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
 
     /// <summary>Hides the composer and keeps the draft (the close button).</summary>
     [RelayCommand]
-    private void Hide() => CloseRequested?.Invoke();
+    private void Hide() => Close();
+
+    /// <summary>Closes without writing: the keyboard goes back to the application the user came from, which the closed window no longer holds.</summary>
+    private void Close()
+    {
+        if (_target is not null && HasOriginalTarget)
+            _platform.WindowTracker.Activate(_target);
+        CloseRequested?.Invoke();
+    }
 
     /// <summary>The window lost focus: a held microphone must not stay open without its button being held.</summary>
     public async Task WindowDeactivatedAsync()
@@ -360,7 +368,7 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
         else if (IsWriteQueued)
             CancelQueuedWrite();
         else
-            CloseRequested?.Invoke();
+            Close();
     }
 
     [RelayCommand]

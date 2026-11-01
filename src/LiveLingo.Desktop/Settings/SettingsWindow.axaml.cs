@@ -210,7 +210,7 @@ public partial class SettingsWindow : Window
                 buttons
             }
         };
-        var dialog = ComposerDialogs.Create(_loc.T(translation ? "settings.consent.translate" : "settings.consent.clean"), body);
+        var dialog = CreateDialog(_loc.T(translation ? "settings.consent.translate" : "settings.consent.clean"), body);
         keepLocal.Click += (_, _) => dialog.Close();
         allow.Click += (_, _) =>
         {
@@ -220,6 +220,52 @@ public partial class SettingsWindow : Window
         dialog.Closed += (_, _) => result.TrySetResult(false);
         dialog.ShowDialog(this);
         return result.Task;
+    }
+
+    /// <summary>A rounded panel with a title and a close button. ponytail: native dialog until the settings move to the web view (W5), which brings its own.</summary>
+    private static Window CreateDialog(string title, Control body)
+    {
+        var close = new Button { Classes = { "icon" }, Content = new Controls.Icon { Data = (Avalonia.Media.Geometry)Avalonia.Application.Current!.FindResource("IcClose")! } };
+        var header = new Grid { ColumnDefinitions = ColumnDefinitions.Parse("*,Auto"), Margin = new Avalonia.Thickness(0, 0, 0, 12) };
+        header.Children.Add(new TextBlock { Text = title, Classes = { "heading" }, VerticalAlignment = VerticalAlignment.Center });
+        Grid.SetColumn(close, 1);
+        header.Children.Add(close);
+
+        var content = new StackPanel();
+        content.Children.Add(header);
+        content.Children.Add(body);
+
+        var panel = new Border
+        {
+            Margin = new Avalonia.Thickness(18),
+            Padding = new Avalonia.Thickness(22),
+            CornerRadius = new Avalonia.CornerRadius(18),
+            BorderThickness = new Avalonia.Thickness(1),
+            Child = content
+        };
+        panel.Bind(Border.BackgroundProperty, panel.GetResourceObservable("Panel"));
+        panel.Bind(Border.BorderBrushProperty, panel.GetResourceObservable("Line"));
+        panel.Bind(Border.BoxShadowProperty, panel.GetResourceObservable("TkShadow"));
+
+        var window = new Window
+        {
+            Width = 596,
+            SizeToContent = SizeToContent.Height,
+            CanResize = false,
+            ShowInTaskbar = false,
+            WindowDecorations = WindowDecorations.None,
+            Background = Avalonia.Media.Brushes.Transparent,
+            TransparencyLevelHint = [WindowTransparencyLevel.Transparent],
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Content = panel
+        };
+        close.Click += (_, _) => window.Close();
+        window.KeyDown += (_, e) =>
+        {
+            if (e.Key == Key.Escape)
+                window.Close();
+        };
+        return window;
     }
 
     private void OnRemoveTermClick(object? sender, RoutedEventArgs e)
