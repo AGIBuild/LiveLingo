@@ -1,0 +1,19 @@
+docs/superpowers/specs/2026-11-01-web-ui-design.md
+  s_6d6e9175f38e45::t_fa2611db5fe01f 19-23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e8e3e65ab20cf9b7ce8226dbb923e496f5a42572",
+  "prompts": {},
+  "sessions": {
+    "s_6d6e9175f38e45": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "f74d37e5-1d96-4ddc-a3f9-5ae24ff39e38",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
