@@ -5,7 +5,7 @@ All notable changes to LiveLingo are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.0] - Unreleased
+## [2.0.0] - 2026-11-01
 
 Rewrite around a single composer window (branch `feat/composer-v3`). The 1.x translator overlay, its cloud and Ollama
 providers, wizard and model catalog were removed; see the design and plan under `docs/superpowers/`.
