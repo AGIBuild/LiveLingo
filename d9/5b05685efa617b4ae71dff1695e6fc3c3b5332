@@ -1,0 +1,80 @@
+src/LiveLingo.Desktop/Platform/macOS/MacPlatformServices.cs
+  s_6d6e9175f38e45::t_6eebf0a7eb49c1 15
+src/LiveLingo.Desktop/Platform/Windows/WindowsPlatformServices.cs
+  s_6d6e9175f38e45::t_4efefd078efc4f 15
+src/LiveLingo.Desktop/Web/WebIntent.cs
+  s_6d6e9175f38e45::t_aa8a988ea5ab7b 16,125,129
+  s_6d6e9175f38e45::t_8c6526b1f2a24e 126-128,130
+  s_6d6e9175f38e45::t_7b9d974e7511be 131
+src/LiveLingo.Desktop/Web/Assets/app/00-store.js
+  s_6d6e9175f38e45::t_519ba165da8eed 122-126
+src/LiveLingo.Desktop/Web/Assets/styles/composer.css
+  s_6d6e9175f38e45::t_7ad8fd9f105606 5,21-23
+src/LiveLingo.Desktop/Web/ComposerWebSession.cs
+  s_6d6e9175f38e45::t_a8c001ac17d03e 25,50
+  s_6d6e9175f38e45::t_b9a752fec85e9f 12-13,65-69
+  s_6d6e9175f38e45::t_c81b24fb461065 63-64
+  s_6d6e9175f38e45::t_834c04a8796f54 82-87
+  s_6d6e9175f38e45::t_ddd3e53d6d884c 53,61-62
+  s_6d6e9175f38e45::t_b3f5e4dd5e714f 70
+src/LiveLingo.Desktop/Web/ComposerIntents.cs
+  s_6d6e9175f38e45::t_dbd4655eaf56ef 55-56,66
+  s_6d6e9175f38e45::t_adcc71e22b4e5a 57
+tests/LiveLingo.Desktop.Tests/Web/WebIntentTests.cs
+  s_6d6e9175f38e45::t_92be33124b1d20 11,85
+src/LiveLingo.Desktop/Web/Assets/app/24-composer.js
+  s_6d6e9175f38e45::t_cb925514b55082 105,111-112,114,117-119,128-129,132
+  s_6d6e9175f38e45::t_b641a747d8ccf3 106-110,113,115-116,120-127,130-131,133-134
+CHANGELOG.md
+  s_6d6e9175f38e45::t_b9b65c27b5e2d6 24-25
+src/LiveLingo.Desktop/Platform/IPlatformServices.cs
+  s_6d6e9175f38e45::t_adfae7ddeebcc3 11
+src/LiveLingo.Desktop/Platform/Windows/Win32WindowMover.cs
+  s_6d6e9175f38e45::t_0332a7456fca5f 15,21-25
+  s_6d6e9175f38e45::t_8037fb6bee2c4b 1-14,16-20,26-31
+tests/LiveLingo.Desktop.Tests/Composer/ComposerPlacementTests.cs
+  s_6d6e9175f38e45::t_5ebec2458a4f7a 51-52,54,56-92,96-105
+  s_6d6e9175f38e45::t_4217a5bf7a2c50 53,55
+  s_6d6e9175f38e45::t_1252767c85ef94 93-95
+src/LiveLingo.Desktop/App.axaml.cs
+  s_6d6e9175f38e45::t_99e00dfa147d2d 119-120
+tests/LiveLingo.Desktop.Tests/Web/ComposerIntentsTests.cs
+  s_6d6e9175f38e45::t_c7391441799ecb 76-77,79,81
+  s_6d6e9175f38e45::t_c6aa3359a63fdd 73-75,78,80,82-83
+  s_6d6e9175f38e45::t_a85ea67ce48526 72
+src/LiveLingo.Desktop/Composer/ComposerWindow.cs
+  s_6d6e9175f38e45::t_946678a832aeeb 4
+  s_6d6e9175f38e45::t_fb049e1116d920 33-35,77,85,92,105,123,127,129,131-132,134-138,154,156-170,173-179,183-201
+  s_6d6e9175f38e45::t_0cc01d94915c99 26,36,39,124-126,128,130,133
+src/LiveLingo.Desktop/Platform/macOS/MacWindowMover.cs
+  s_6d6e9175f38e45::t_95341ffb6f4c68 14-16,21-26
+  s_6d6e9175f38e45::t_cfa3621d952698 1-13,17-20,27-35
+src/LiveLingo.Desktop/Platform/Windows/NativeMethods.cs
+  s_6d6e9175f38e45::t_17b7329eca7563 192-198
+src/LiveLingo.Desktop/Composer/ComposerPlacement.cs
+  s_6d6e9175f38e45::t_481a6df4e777f9 13-24,38-46,51-60
+tests/LiveLingo.Web.Tests/ComposerInteractionTests.cs
+  s_6d6e9175f38e45::t_d5076fc53216de 535,544-545,548,553-570,572-587,590,593-596
+  s_6d6e9175f38e45::t_6e6e93e513b4cf 531-534,536-543,546-547,549-552,571,588-589,591-592,597-616
+src/LiveLingo.Desktop/Platform/IWindowMover.cs
+  s_6d6e9175f38e45::t_3f53100903e479 1-17
+tests/LiveLingo.Desktop.Tests/Web/ComposerWebSessionTests.cs
+  s_6d6e9175f38e45::t_d03e55e39730b1 123-126,129,131,133-147
+  s_6d6e9175f38e45::t_3aa6b03e82b3b4 127-128,130,132
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d95b05685efa617b4ae71dff1695e6fc3c3b5332",
+  "prompts": {},
+  "sessions": {
+    "s_6d6e9175f38e45": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "f74d37e5-1d96-4ddc-a3f9-5ae24ff39e38",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
