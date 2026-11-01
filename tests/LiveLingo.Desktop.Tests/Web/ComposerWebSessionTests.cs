@@ -121,6 +121,31 @@ public sealed class ComposerWebSessionTests
     }
 
     [Fact]
+    public async Task ADragOfThePage_ReachesTheWindow()
+    {
+        await using var rig = new Rig();
+        var drags = 0;
+        rig.Session.Dragged += () => drags++;
+
+        rig.Host.FromPage(new DragIntent { V = 1 });
+
+        Assert.Equal(1, drags);
+    }
+
+    [Fact]
+    public async Task ThePanelLimit_IsSentToThePage()
+    {
+        await using var rig = new Rig();
+        rig.Session.Start();
+        rig.Host.Posted.Clear();
+
+        rig.Session.LimitPanelHeight(428);
+
+        var limit = rig.Host.Posted.Select(json => JsonDocument.Parse(json).RootElement).Single(m => m.GetProperty("type").GetString() == "limit");
+        Assert.Equal(428, limit.GetProperty("data").GetProperty("maxHeight").GetInt32());
+    }
+
+    [Fact]
     public async Task AMeasurementOfThePage_ReachesTheWindow()
     {
         await using var rig = new Rig();

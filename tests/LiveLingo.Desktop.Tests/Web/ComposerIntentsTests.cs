@@ -70,6 +70,18 @@ public sealed class ComposerIntentsTests
     }
 
     [Fact]
+    public async Task Drag_IsPassedOnToTheWindow()
+    {
+        await using var rig = new Rig();
+        var drags = 0;
+        rig.Sut.Dragged += () => drags++;
+
+        rig.Do(new DragIntent { V = 1 });
+
+        Assert.Equal(1, drags);
+    }
+
+    [Fact]
     public async Task Size_IsPassedOnToTheWindow()
     {
         await using var rig = new Rig();

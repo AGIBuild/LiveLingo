@@ -119,6 +119,11 @@
       case 'openMenu':
         LL.openMenu(message.data.id);
         return;
+      case 'limit':
+        // How tall the panel may get on this screen; the body scrolls beyond it (the host also caps the window).
+        document.documentElement.style.setProperty('--panel-max', message.data.maxHeight + 'px');
+        LL.measure?.();
+        return;
       default:
         throw new Error('Unknown message type: ' + message.type);
     }

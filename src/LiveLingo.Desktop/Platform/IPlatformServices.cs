@@ -8,6 +8,7 @@ public interface IPlatformServices : IDisposable
     IClipboardService Clipboard { get; }
     IMicrophone Microphone { get; }
     IMicrophonePermission MicrophonePermission { get; }
+    IWindowMover WindowMover { get; }
 
     /// <summary>
     /// Opens an https URL in the system default browser.

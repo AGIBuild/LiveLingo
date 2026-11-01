@@ -116,7 +116,8 @@ public partial class App : Application
             SetupTrayIcon(desktop, platform);
             if (platform is not null)
             {
-                _composer = new ComposerWindow(_serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<ComposerWindow>());
+                _composer = new ComposerWindow(
+                    _serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<ComposerWindow>(), platform.WindowMover);
                 _composer.Park();
                 RegisterHotkey(platform, settings.Hotkeys.Summon);
                 platform.Hotkey.HotkeyTriggered += _ => Dispatcher.UIThread.Post(async () => await SummonAsync(platform));

@@ -102,4 +102,34 @@
   document.addEventListener('pointerdown', (e) => {
     if (LL.state.menu && !e.target.closest('.menu, [aria-haspopup]')) LL.closeMenu();
   });
+
+  // The header is the window's handle. A native window cannot be moved by its page and the pointer's screen
+  // coordinates are not reliable across web engines, so the page only says the drag began (the button is held and the
+  // pointer moved a few pixels) and the system moves the window.
+  const DRAG_THRESHOLD = 4;
+  let press = null;
+
+  document.addEventListener('pointerdown', (e) => {
+    press = null;
+    if (e.button !== 0 || !(e.target instanceof Element)) return;
+    if (!e.target.closest('.c-head') || e.target.closest('button, .menu, [aria-haspopup]')) return;
+    press = { id: e.pointerId, x: e.clientX, y: e.clientY };
+  });
+
+  document.addEventListener('pointermove', (e) => {
+    if (press?.id !== e.pointerId) return;
+    if ((e.buttons & 1) === 0) {
+      press = null;
+      return;
+    }
+    if (Math.hypot(e.clientX - press.x, e.clientY - press.y) < DRAG_THRESHOLD) return;
+    press = null;
+    LL.send('drag');
+  });
+
+  const endPress = () => {
+    press = null;
+  };
+  document.addEventListener('pointerup', endPress);
+  document.addEventListener('pointercancel', endPress);
 })();

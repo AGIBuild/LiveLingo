@@ -13,6 +13,7 @@ namespace LiveLingo.Desktop.Web;
 [JsonPolymorphic(TypeDiscriminatorPropertyName = "name", UnknownDerivedTypeHandling = JsonUnknownDerivedTypeHandling.FailSerialization)]
 [JsonDerivedType(typeof(ReadyIntent), "ready")]
 [JsonDerivedType(typeof(SizeIntent), "size")]
+[JsonDerivedType(typeof(DragIntent), "drag")]
 [JsonDerivedType(typeof(SourceIntent), "source")]
 [JsonDerivedType(typeof(MicDownIntent), "micDown")]
 [JsonDerivedType(typeof(MicUpIntent), "micUp")]
@@ -120,6 +121,13 @@ internal sealed record SizeIntent(int Width, int Height) : WebIntent
 {
     protected override bool IsValid => IsExtent(Width) && IsExtent(Height);
 }
+
+/// <summary>
+/// The user started dragging the composer by its header. The page cannot move a native window, and the pointer's
+/// screen coordinates are not reliable across web engines, so the page only says the drag began (after a small
+/// threshold, while the button is held) and the system moves the window.
+/// </summary>
+internal sealed record DragIntent : WebIntent;
 
 /// <summary>The source text and the page's own revision of it (design 5.3).</summary>
 internal sealed record SourceIntent(string Text, int Rev) : WebIntent

@@ -12,6 +12,7 @@ internal sealed class MacPlatformServices : IPlatformServices
     public IClipboardService Clipboard { get; }
     public IMicrophone Microphone { get; } = new PortAudioMicrophone();
     public IMicrophonePermission MicrophonePermission { get; } = new MacMicrophonePermission();
+    public IWindowMover WindowMover { get; } = new MacWindowMover();
 
     public MacPlatformServices()
     {

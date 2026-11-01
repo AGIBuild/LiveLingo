@@ -12,6 +12,7 @@ internal sealed class WindowsPlatformServices : IPlatformServices
     public IClipboardService Clipboard { get; }
     public IMicrophone Microphone { get; } = new PortAudioMicrophone();
     public IMicrophonePermission MicrophonePermission { get; } = new WindowsMicrophonePermission();
+    public IWindowMover WindowMover { get; } = new Win32WindowMover();
 
     public WindowsPlatformServices()
     {

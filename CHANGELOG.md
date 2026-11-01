@@ -21,6 +21,8 @@ providers, wizard and model catalog were removed; see the design and plan under 
   API key in the system secret store.
 - Recent drafts (memory only), side-by-side layout for transcripts and whole documents, accessible names and live
   regions.
+- The composer can be moved by dragging its header, and it always stays inside the working area of its screen: the
+  window is re-placed whenever it grows, and the page scrolls inside its panel instead of growing past the screen.
 - Settings: hotkey, commit key (Enter or Ctrl+Enter), interface language, theme (light, dark, follow system), reduce
   motion, microphone, translation direction, glossary list, cloud model, translator tier, removal of models from
   earlier versions. Changes apply at once; there is no save button.
