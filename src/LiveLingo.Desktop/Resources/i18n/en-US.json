@@ -126,7 +126,7 @@
   "composer.banner.writeFailed": "Writing failed: {0}. The result is kept; you can copy it.",
   "composer.banner.micDenied": "Microphone access is off · you can still type.",
   "composer.banner.noMic": "The microphone cannot be used: {0}",
-  "composer.banner.noSound": "No sound was detected. Listening stopped and what was heard is kept.",
+  "composer.banner.noSound": "No sound for 5 minutes, so the microphone was turned off. What was heard is kept. If it stays silent, check the input device.",
   "composer.banner.fileFailed": "The file could not be used: {0}",
   "composer.banner.noSpeech": "No speech was found in this recording.",
   "composer.banner.slow": "This is slower than usual. Keep waiting, or use the original wording.",

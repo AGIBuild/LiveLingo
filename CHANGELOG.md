@@ -23,6 +23,8 @@ providers, wizard and model catalog were removed; see the design and plan under 
   regions.
 - Every summon starts with an empty composer. A draft that was closed without being written is offered as one click
   ("Continue last draft") in the empty state, and stays in the recent drafts menu; it is never put back by itself.
+- The microphone no longer closes when the user pauses: dictation goes on until it is stopped, and only 5 minutes of
+  complete silence turn it off, with a notice that what was heard is kept.
 - The composer remembers, per target application, the output (*Clean up* or *Translate*) and the translation direction
   last chosen there, and begins with them the next time. A one-line note says where a remembered choice came from and
   offers "Restore defaults"; *Original*, cloud switches and the microphone are never remembered. Stored in a separate

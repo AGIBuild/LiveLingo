@@ -23,7 +23,11 @@ public interface IVoiceInput : IAsyncDisposable
 
 public sealed class MicrophoneVoiceInput(IDictationSessionFactory factory, IMicrophone microphone) : IVoiceInput
 {
-    private static readonly TimeSpan SilenceTimeout = TimeSpan.FromSeconds(4);
+    /// <summary>
+    /// How long the microphone may deliver only silence before it is closed. A pause while thinking must not end the
+    /// recording, so this is long; it also catches a microphone that is muted or dead.
+    /// </summary>
+    public static readonly TimeSpan IdleTimeout = TimeSpan.FromMinutes(5);
 
     private DictationSession? _session;
     private SignalMonitor? _monitor;
@@ -37,7 +41,7 @@ public sealed class MicrophoneVoiceInput(IDictationSessionFactory factory, IMicr
 
         var session = await factory.CreateAsync(draft, glossary, ct).ConfigureAwait(false);
         session.Start();
-        var monitor = new SignalMonitor(SilenceTimeout);
+        var monitor = new SignalMonitor(IdleTimeout);
         _monitor = monitor;
         try
         {
