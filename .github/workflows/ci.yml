@@ -10,8 +10,9 @@ permissions:
   contents: read
 
 jobs:
+  # The product ships for Windows x64 and macOS arm64 (the only pinned llama.cpp runtimes), so its tests run on one of them.
   test:
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
 
     steps:
       - uses: actions/checkout@v4
@@ -34,14 +35,14 @@ jobs:
           chmod +x build.sh
           ./build.sh Build
 
-      # The web tests drive WebKit and Chromium; the browsers' system libraries need apt, which the test fixture cannot do.
+      # The web tests drive WebKit and Chromium.
       - uses: actions/cache@v4
         with:
-          path: ~/.cache/ms-playwright
+          path: ~/Library/Caches/ms-playwright
           key: ${{ runner.os }}-playwright-${{ hashFiles('tests/LiveLingo.Web.Tests/*.csproj') }}
 
       - name: Install browsers for the web tests
-        run: pwsh tests/LiveLingo.Web.Tests/bin/Release/net10.0/playwright.ps1 install --with-deps webkit chromium
+        run: pwsh tests/LiveLingo.Web.Tests/bin/Release/net10.0/playwright.ps1 install webkit chromium
 
       - name: Test + Coverage + Mutation
         run: ./build.sh Test

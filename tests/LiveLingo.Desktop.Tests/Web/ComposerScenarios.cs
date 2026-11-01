@@ -100,7 +100,7 @@ internal static class ComposerScenarios
     public static ComposerViewState State(Harness h, RecentDrafts? recent = null) =>
         Normalize(ComposerViewState.From(h.Vm, Texts.Chinese(), recent ?? new RecentDrafts(), sourceRev: 1));
 
-    /// <summary>Key caps differ per operating system; the fixtures are the macOS ones everywhere.</summary>
+    /// <summary>Key caps differ per operating system and the clock time of a draft per time zone; the fixtures are the macOS ones at 12:00.</summary>
     private static ComposerViewState Normalize(ComposerViewState state) => state with
     {
         Rev = 1,
@@ -108,6 +108,10 @@ internal static class ComposerScenarios
         {
             CommitKeyCap = state.Options.CommitKey == "enter" ? "↵" : "⌃↵",
             NewlineKeyCap = "⇧↵"
+        },
+        Dialogs = state.Dialogs with
+        {
+            Recent = [.. state.Dialogs.Recent.Select(item => item with { Label = System.Text.RegularExpressions.Regex.Replace(item.Label, @"^\d{2}:\d{2}", "12:00") })]
         }
     };
 
