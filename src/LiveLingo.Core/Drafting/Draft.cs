@@ -30,6 +30,9 @@ public sealed class Draft
     /// <summary>Increases whenever the source text changes (not when results arrive).</summary>
     public int SourceRevision { get; private set; }
 
+    /// <summary>Increases whenever the user edits the source text by hand (typing, pasting), not when speech adds a sentence.</summary>
+    public int EditRevision { get; private set; }
+
     /// <summary>The frozen result of a successful commit; the draft accepts no further changes once set.</summary>
     public CommitResult? Snapshot { get; private set; }
 
@@ -73,6 +76,7 @@ public sealed class Draft
     {
         EnsureEditable();
         SourceRevision++;
+        EditRevision++;
         var pool = new Dictionary<string, Queue<DraftUnit>>();
         foreach (var unit in _units)
         {

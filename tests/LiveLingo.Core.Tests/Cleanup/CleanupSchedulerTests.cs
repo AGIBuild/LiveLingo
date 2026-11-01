@@ -40,6 +40,7 @@ public class CleanupSchedulerTests
     private sealed class Harness : IAsyncDisposable
     {
         public static readonly TimeSpan Holdback = TimeSpan.FromSeconds(2);
+        public static readonly TimeSpan TypingPause = TimeSpan.FromMilliseconds(400);
 
         public DraftSession Session { get; } = new(hasTarget: true);
         public FakeCleaner Cleaner { get; } = new();
@@ -233,8 +234,27 @@ public class CleanupSchedulerTests
         h.Session.Mutate(draft => draft.SyncSource([new SourceUnit("新句子。")], DraftRoute.Units));
 
         await WaitUntil(() => stale.Token.IsCancellationRequested);
+        h.Time.Advance(Harness.TypingPause);
+        h.Time.Timer.Fire();
         var fresh = await h.NextCall(2);
         Assert.Equal("新句子。", fresh.Request.Target);
+    }
+
+    [Fact]
+    public async Task TypedText_IsCleanedAfterAPauseInTyping_NotOncePerKey()
+    {
+        await using var h = new Harness();
+
+        foreach (var typed in new[] { "你", "你好", "你好吗" })
+            h.Session.Mutate(draft => draft.SyncSource([new SourceUnit(typed)], DraftRoute.Units));
+        await Task.Delay(50);
+        Assert.Empty(h.Cleaner.Calls);
+
+        h.Time.Advance(Harness.TypingPause);
+        h.Time.Timer.Fire();
+        var call = await h.NextCall(1);
+        Assert.Equal("你好吗", call.Request.Target);
+        Assert.Single(h.Cleaner.Calls);
     }
 
     [Fact]
