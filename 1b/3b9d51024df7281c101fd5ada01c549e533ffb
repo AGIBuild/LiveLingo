@@ -1,0 +1,22 @@
+src/LiveLingo.Desktop/Composer/ComposerWindow.cs
+  s_821950ffe1bdcc::t_f3cb7a1a8c834b 81
+  s_821950ffe1bdcc::t_2c1cb3f46d0902 61,64
+  s_821950ffe1bdcc::t_1dc742106ff227 82
+  s_821950ffe1bdcc::t_d8e6bfc68d4504 84
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "1b3b9d51024df7281c101fd5ada01c549e533ffb",
+  "prompts": {},
+  "sessions": {
+    "s_821950ffe1bdcc": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "2e07dbc3-b49b-4806-8ef7-b85cd318bb36",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
