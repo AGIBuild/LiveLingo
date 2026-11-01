@@ -198,6 +198,8 @@ public partial class App : Application
             ToolTipText = loc.T("app.name"),
             Menu = menu
         };
+        // Avalonia 12 only shows a tray icon that belongs to the application.
+        TrayIcon.SetIcons(this, [_trayIcon]);
     }
 
     private static WindowIcon LoadTrayIcon()

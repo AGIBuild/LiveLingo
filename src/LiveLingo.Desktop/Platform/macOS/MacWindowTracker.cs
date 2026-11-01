@@ -12,7 +12,8 @@ internal sealed class MacWindowTracker : IWindowTracker
     public TargetWindowInfo? GetForegroundWindowInfo()
     {
         var (pid, processName) = GetFrontmostApp();
-        if (pid <= 0) return null;
+        // Our own parked composer is never a target: it would be placed relative to itself, off screen.
+        if (pid <= 0 || pid == Environment.ProcessId) return null;
 
         var windowList = CGWindowListCopyWindowInfo(
             kCGWindowListOptionOnScreenOnly | kCGWindowListExcludeDesktopElements, 0);
