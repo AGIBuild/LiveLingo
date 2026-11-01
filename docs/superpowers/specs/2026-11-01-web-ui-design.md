@@ -74,7 +74,7 @@
 ```
 ┌────────────────────────── Avalonia 外壳（C#）─────────────────────────┐
 │ ComposerWindow（透明、置顶、无边框；位置、激活、失焦、尺寸）            │
-│   └ WebSurface ── NativeWebView ── 页面 dist/index.html（Preact）       │
+│   └ WebSurface ── NativeWebView ── 页面（WebPage 拼装，Preact）         │
 │        │  ▲                                                             │
 │  intents │ │ state / strings / toast / focus                            │
 │        ▼  │                                                             │
@@ -90,7 +90,7 @@
 
 1. **单向数据流。** Web → C#：只发“意图”（用户做了什么）。C# → Web：只发“整份状态快照”。Web 不计算业务状态：没有草稿状态机、没有调度、没有计时（原型的 `draft.js` 与模拟管线**不进产品**，只留在原型目录）。
 2. **一份本地化来源。** `Resources/i18n/*.json` 仍是唯一来源。静态文案（标签、提示、可访问名）作为一份 `strings` 在语言确定时发给 Web 一次；带参数的文案（状态行、横幅、行内说明）由 `ComposerTexts` 在 C# 格式化后放进快照。Web 里没有 i18n 库、没有文案常量。
-3. **一份契约来源。** 消息类型只在 C# 里定义（`record` + `System.Text.Json` 多态），由 Nuke 目标 `WebContract` 用 `JsonSchemaExporter` 生成 `contract.generated.ts`；CI 校验生成物与提交一致。Web 不手写消息类型。
+3. **一份契约来源。** 消息类型只在 C# 里定义（`record` + `System.Text.Json` 多态）。Web 不手写类型，也没有 TypeScript（D20）；漂移由两道测试发现，而不是靠编译：① **快照黄金文件**：C# 测试把 `ComposerViewState.From(...)` 的各状态序列化成 `tests/LiveLingo.Web.Tests/Fixtures/*.json` 并与已提交文件逐字比对（不一致即失败）；Web 场景测试把**同一批文件**喂给页面。② **意图用真解析器验**：Web 场景测试截获页面发出的消息，交给 C# 的 `WebIntent` 解析器，解析失败即失败。
 4. **视图映射可测。** 今天 `ComposerWindow.axaml.cs` 里“状态→控件”的 495 行不可测；它变成纯函数 `ComposerViewState.From(vm, texts)`，由 C# 单测覆盖。
 
 ## 5. 契约（v1）
@@ -143,39 +143,43 @@ C# 控制宽度（窄 620 / 宽 940 + 36 px 边距，来自 `layout.wide`）；W
 1. 页面只来自内嵌资源（`NavigateToString`，单文件 `index.html`）；`NavigationStarting` 一律取消，`NewWindowRequested` 一律取消。
 2. CSP：`default-src 'none'; script-src 'nonce-…'; style-src 'nonce-…'; img-src data:; font-src 'none'; connect-src 'none'; base-uri 'none'; form-action 'none'`。nonce 由 C# 在每次加载时写入模板。页面**没有任何网络请求**；`connect-src 'none'` 使这一点由引擎强制，并与“默认没有出站请求”的隐私承诺一致。
 3. 数据存储不落盘：macOS 设置 `NonPersistentDataStore = true`；Windows 用 `IsInPrivateModeEnabled = true` 并把 `UserDataFolder` 放在临时目录并在退出时清除。
-4. **模型输出与用户文本是不可信输入。** Web 只用文本节点渲染；禁止 `innerHTML`、`dangerouslySetInnerHTML`、`eval`、`new Function`、动态 `<script>`；ESLint 规则强制，CI 失败即拒。
-5. 发布版禁用开发者工具；Debug 构建才允许 `LIVELINGO_WEB_DEV_URL` 指向 Vite 开发服务器（仅回环地址）。
+4. **模型输出与用户文本是不可信输入。** Web 只用文本节点渲染；禁止 `innerHTML`、`outerHTML`、`insertAdjacentHTML`、`document.write`、`dangerouslySetInnerHTML`、`eval`、`new Function`、动态 `<script>`；由一个 C# 测试扫描自有的 Web 源文件（不含 `vendor/`），出现即失败；CSP 的 `script-src 'nonce'` 在运行时再挡一道。
+5. 发布版禁用开发者工具；Debug 构建才允许开启开发者工具（`EnableDevTools`）。没有开发服务器：改 Web 文件后重启应用即可（它们是嵌入资源）。
 6. 消息桥只接受第 5 节的封闭意图；Web 无法调用任意 C# 方法；也没有文件、剪贴板、热键 API——这些都经 C# 意图完成。
 7. 日志不含正文、录音、密钥；消息体不入日志。
 
 ## 7. Web 工程
 
+**没有 Node、没有构建步骤。** Web 源文件就是 `LiveLingo.Desktop` 里的嵌入资源，C# 在每次加载时拼成一页（见 D20 的取舍）。
+
 ```
-src/LiveLingo.Web/
-  package.json  package-lock.json  .nvmrc  tsconfig.json  vite.config.ts  eslint.config.js
-  index.html                       入口（模板；含 nonce 占位）
-  src/
-    main.tsx                       读取入口（composer | settings），启动 store 与桥
-    bridge.ts                      唯一与宿主通信的模块；Debug 下可换成 mock
-    store.ts                       持有最新快照与瞬时 UI 状态（菜单开合、悬停）
-    contract.generated.ts          由 WebContract 生成，禁止手改
-    views/composer/*               头部、横幅、原话区、结果行、页脚、菜单、对话框
-    views/settings/*               四组设置
+src/LiveLingo.Desktop/Web/
+  WebPage.cs                       把嵌入资源按固定顺序拼成一页，写入 nonce（W2 起的 WebSurface 只调用它）
+  Assets/
+    page.html                      模板：CSP meta、__NONCE__、__STYLES__、__SCRIPTS__ 占位
     styles/tokens.css  base.css    由原型 style.css 拆分；令牌名不变
-  tests/                           Vitest（store、键盘语义）与 Playwright（场景、截图、a11y）
+    vendor/preact.min.js htm.js    UMD 单文件，固定版本，许可见 THIRD_PARTY_NOTICES.md
+    app/*.js                       经典脚本（不是 ES 模块，见下），文件名数字前缀决定顺序
+      00-store.js                  持有最新快照与瞬时 UI 状态（菜单开合、悬停）
+      10-bridge.js                 唯一与宿主通信的模块
+      20-composer-*.js             头部、横幅、原话区、结果行、页脚、菜单、对话框
+      30-settings-*.js             四组设置
+      99-main.js                   读取入口（composer | settings），挂载
+tests/LiveLingo.Web.Tests/         xUnit + Microsoft.Playwright（WebKit 与 Chromium）
+  Fixtures/*.json                  快照黄金文件（C# 生成并校验，Web 场景复用）
 ```
 
-- 技术：Vite + TypeScript（`strict`）+ **Preact**（运行时依赖只有这一个，约 4 KB）。备选 Svelte / Solid / 原生 DOM：Svelte 需要编译器运行时与更多概念；原生 DOM 重复原型 `app.js` 的命令式写法，状态与视图易漂移；Preact 的“快照 → 视图”函数最贴近本设计。
-- 产物：`vite-plugin-singlefile` 打成一个 `index.html`，嵌入 `LiveLingo.Desktop` 的 `EmbeddedResource`。预算：≤ 150 KB（gzip 前 ≤ 400 KB）。
+- 技术：**Preact + htm**（`htm` 用模板字符串写 JSX 风格视图，不需要编译器），均为 MIT，随源码提交到 `vendor/`；运行时依赖合计约 17 KB。备选原生 DOM：重复原型 `app.js` 的命令式写法，状态与视图易漂移；Preact 的“快照 → 视图”函数最贴近本设计。**Preact 固定在 10.x**，因为只有 10.x 提供可直接 `<script>` 加载的 UMD 构建（11.x 只有 ES 模块）。
+- 为什么是经典脚本：页面由 `NavigateToString` 加载，没有可供 `import` 解析的来源，且 CSP 是 `default-src 'none'`。所以脚本按顺序内联、共享一个全局命名空间 `LL`；不用 `import`。
+- 产物：运行时拼出的**一整页字符串**（样式与脚本都内联并带 nonce）。预算：拼好的页面 ≤ 400 KB，由 C# 测试检查。
 - 字体：系统字体栈，不打包字体（与原型一致）。
-- Nuke 新目标：`WebRestore`（`npm ci`）、`WebContract`（生成并校验契约）、`WebBuild`、`WebTest`；`Build` 依赖 `WebBuild`；`Run` 在 Debug 下可附带 `--WebDev`。CI 安装固定的 Node（`.nvmrc`）。
+- Nuke：不新增目标。Web 测试是普通的 .NET 测试项目，由现有 `Build` / `Test` 覆盖；Playwright 浏览器在测试夹具里首次使用时安装。
 - 测试金字塔：
-  1. C#：`ComposerViewState`、`WebIntent` 解析与拒绝、`WebBridge`（合并、丢弃、校验）、`ComposerIntents` → VM 的映射；沿用现有 VM 测试。
-  2. Web 单元：Vitest（`store`、`bridge` 的 rev 规则、键盘语义：Enter / Shift+Enter / Esc / 输入法组合）。
-  3. Web 场景：Playwright（**WebKit 与 Chromium**，对应 WKWebView 与 WebView2），宿主用 mock 桥回放“快照序列”；把原型 `browser.test.cjs` 的 28 个场景改写为“给定快照 → 断言 DOM 与发出的意图”。
-  4. 视觉：对原型截图（`translation-live`、`long-document`、`dark`、`settings` 等）做像素差阈值回归；axe 无障碍零违规；全页无小于 12 px 的文字；零控制台错误与零网络请求。
-  5. 真机：每个 OS 一份手工清单（S8 与 Composer 验收），因为 `NativeWebView` 不能无界面运行（S8g 另测）。
-- 门禁：Web 行覆盖 ≥ 80%；`tsc --noEmit`、`eslint`、`npm audit --omit=dev` 零问题；C# 门禁不变。
+  1. C#：`ComposerViewState`、`WebIntent` 解析与拒绝、`WebBridge`（合并、丢弃、校验）、`ComposerIntents` → VM 的映射；沿用现有 VM 测试；`WebPage` 拼装、页面预算、禁用 API 扫描。
+  2. Web 场景（含键盘语义与 `rev` 规则）：Playwright .NET（**WebKit 与 Chromium**，对应 WKWebView 与 WebView2），宿主用脚本注入“快照序列”（`Fixtures/*.json`）；把原型 `browser.test.cjs` 的 28 个场景改写为“给定快照 → 断言 DOM 与发出的意图”，意图交给 C# 的 `WebIntent` 解析。没有单独的 JS 单元测试层，因为逻辑只有“快照 → 视图”和少量键盘语义，场景测试已覆盖。
+  3. 视觉：对原型截图（`translation-live`、`long-document`、`dark`、`settings` 等）做像素差阈值回归；axe-core（测试资源，由 Playwright 注入）零违规；全页无小于 12 px 的文字；零控制台错误与零网络请求。
+  4. 真机：每个 OS 一份手工清单（S8 与 Composer 验收），因为 `NativeWebView` 不能无界面运行（S8g 已确认）。
+- 门禁：28 个原型场景各对应一个通过的用例；快照黄金文件与 C# 一致；禁用 API 扫描与页面预算通过；C# 门禁不变。**没有 JS 行覆盖率门禁**（已知上限：Playwright 只在 Chromium 提供 JS 覆盖率，WebKit 没有；改用“场景逐条对应原型”作为替代，若以后需要数字，再接 Chromium 的 `Coverage` API）。
 
 ## 8. 退路（S8 失败时）
 
@@ -197,15 +201,15 @@ src/LiveLingo.Web/
 |---|---|---|---|
 | D14 | Web 只做渲染与输入，状态留在 C# | 状态机放 Web（直接用 `draft.js`） | 两处状态机会漂移；C# 已有 359 个测试保护 |
 | D15 | 整份快照，不做增量补丁 | JSON Patch | 快照约数 KB，合并后 ≤ 60 次/s，足够；长文档超过预算再按行 `rev` 做增量（先测量） |
-| D16 | 契约由 C# 生成 TS 类型 | 手写两份 / 用 OpenAPI | 单一来源；漂移由 CI 发现 |
+| D16 | 契约只在 C# 定义；漂移由快照黄金文件与真解析器测试发现 | 由 C# 生成 TS 类型；手写两份 | 没有 TS 就没有编译期检查，换来零 Node；两道测试覆盖“状态形状”与“意图形状” |
 | D17 | `NavigateToString` 单文件 + CSP `connect-src 'none'` | 本地 HTTP 服务；`avares://` 自定义协议 | 无监听端口、无网络；已在 macOS 验证 `NavigateToString` 可用 |
-| D18 | Preact | Svelte / Solid / React / 原生 | 体积、概念少、快照渲染最直接 |
+| D18 | Preact 10.x + htm，UMD 单文件，随源码提交 | Svelte / Solid / React / 原生；Blazor WASM | 体积、概念少、快照渲染最直接。Blazor 实测比 Preact 多约 205 MB WebContent 内存（Preact 页 77 MB vs Blazor 274 MB，空白页 69 MB），要本地监听端口并放宽 CSP，已否决 |
 | D19 | 设置也用 Web，同一包不同入口 | 设置保持 XAML | 一套设计令牌与一种技术；省掉 HotkeyRecorder 等控件 |
-| D20 | Node 进入构建工具链 | 提交 `dist` 产物 | 提交产物会漂移且不可审；代价是开发者需装 Node（固定版本，`.nvmrc`），CI 缓存 |
+| D20 | **不引入 Node 与构建步骤**（负责人 2026-11-01 决定）：Web 源文件直接作为嵌入资源，C# 运行时拼页 | Vite + TypeScript + Node 工具链 | 放弃 TypeScript 的编译期检查与 ESLint，换来工具链只有 .NET；代价由 D16 的两道测试、禁用 API 扫描与 Playwright .NET 场景补上 |
 | D21 | 不做背景模糊（沿用 alpha 玻璃） | 系统 Acrylic / Mica | 圆角窗口 + 系统模糊在 Windows 上会有直角伪影；先不承诺 |
 
 ## 11. 开放问题
 
-1. Node 作为构建依赖是否可接受？（D20）
+1. ~~Node 作为构建依赖是否可接受？~~ 已决定：不引入 Node（D20）。
 2. Windows 10 上 WebView2 运行时：安装包随带 Evergreen Bootstrapper，还是首次运行检测并以横幅提示下载？建议随带（离线可装），决定权在发布负责人。
 3. `LICENSE` 文件缺失（见交接计划 §6）。

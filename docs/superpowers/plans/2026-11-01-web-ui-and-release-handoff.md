@@ -6,7 +6,7 @@
 
 **架构：** 状态与业务留在 C#（`ComposerViewModel`、`SettingsViewModel`、Core）；Web 只渲染 C# 推来的快照并回传“意图”。设计与契约见 [Web UI 外壳设计](../specs/2026-11-01-web-ui-design.md)。
 
-**技术栈：** .NET 10、Avalonia 12.1.4、Avalonia.Controls.WebView 12.1.1、Vite + TypeScript + Preact、Vitest、Playwright、Nuke。
+**技术栈：** .NET 10、Avalonia 12.1.4、Avalonia.Controls.WebView 12.1.1、Preact 10 + htm（无 Node、无构建步骤）、Playwright .NET、xUnit、Nuke。
 
 ---
 
@@ -74,7 +74,7 @@ LIVELINGO_ENABLE_VOICE_PROBE=1 ./build.sh ProbeVoice   # 语音探针（仅 macO
 | 级别 | 任务 | 说明 | 依赖 |
 |---|---|---|---|
 | **P0** | **W0** 可行性关口 | 透明 / 焦点 / 输入法 / 预热 / 内存，macOS 与 Windows | 无 |
-| P0 | W1 Web 工程脚手架 | Vite + Preact + 令牌 + Nuke 目标 + 嵌入 + 开发模式 | W0 通过 |
+| P0 | W1 Web 工程脚手架 | Preact + htm + 令牌 + `WebPage` 拼页 + 嵌入 + Playwright .NET 烟雾测试 | W0 通过 |
 | P0 | W2 契约与宿主 | `WebSurface`、`WebBridge`、DTO、意图、Schema → TS、安全策略 | W1 |
 | P0 | W3 Composer 视图 | 原型标记移植、状态渲染、Playwright 场景与截图 | W2 |
 | P0 | W4 Composer 窗口替换 | 外壳窗口、定位 / 尺寸 / 焦点 / 预热，删除旧 XAML 实现 | W3 |
@@ -110,43 +110,43 @@ LIVELINGO_ENABLE_VOICE_PROBE=1 ./build.sh ProbeVoice   # 语音探针（仅 macO
 
 ### W1：Web 工程脚手架
 
-**文件：** 新建 `src/LiveLingo.Web/*`（见设计 §7）；修改 `build/BuildTask.cs`、`LiveLingo.slnx`（不加入 Web 项目）、`.github/workflows/ci.yml`、`.gitignore`（`node_modules`、`dist`）、`src/LiveLingo.Desktop/LiveLingo.Desktop.csproj`（嵌入 `dist/index.html`）。
+**文件（无 Node，设计 §7 / D20）：** 新建 `src/LiveLingo.Desktop/Web/{WebPage.cs,Assets/page.html,Assets/styles/*,Assets/vendor/*,Assets/app/*}`、`tests/LiveLingo.Web.Tests/*`；修改 `LiveLingo.Desktop.csproj`（嵌入 `Web/Assets/**`，`InternalsVisibleTo` 加 `LiveLingo.Web.Tests`）、`LiveLingo.slnx`（加入测试项目）、`THIRD_PARTY_NOTICES.md`（preact、htm 的版本与 MIT 许可）、`.github/workflows/ci.yml`（无需 Node；仅在需要时安装 Playwright 浏览器依赖）。
 
-- [ ] **步骤 1：** 写失败的构建检查：`./build.sh WebBuild` 目标不存在 → 失败。
-- [ ] **步骤 2：** 脚手架：`package.json`（依赖只有 `preact`；开发依赖 vite、typescript、vite-plugin-singlefile、vitest、@playwright/test、eslint、axe-core）、`.nvmrc`、`tsconfig.json`（strict）、ESLint 规则禁止 `innerHTML` / `dangerouslySetInnerHTML` / `eval` / `new Function`。
-- [ ] **步骤 3：** 把原型 `style.css` 拆为 `styles/tokens.css`（令牌，名称不变）与 `styles/base.css`；`index.html` 带 `__NONCE__` 占位。
-- [ ] **步骤 4：** Nuke 目标 `WebRestore`、`WebBuild`、`WebTest`；`Build` 依赖 `WebBuild`；Debug 构建支持 `LIVELINGO_WEB_DEV_URL`（只接受 `http://127.0.0.1:*`，`#if DEBUG`）。
-- [ ] **步骤 5：** 单文件产物嵌入 Desktop；体积预算脚本（> 400 KB 失败）。
-- [ ] **步骤 6：** 运行 `./build.sh Build`（0 警告）与 `./build.sh WebTest`，提交：`build: add the web UI project and its build targets`。
+- [ ] **步骤 1（先写失败测试）：** `WebPage.Build(nonce)` 返回含 nonce 的单页；页面带 CSP meta（设计 §6.2）；预算 ≤ 400 KB；自有源文件无禁用 API；WebKit 与 Chromium 中页面加载后 `LL` 已定义、渲染出注入的快照、零控制台错误、零网络请求。
+- [ ] **步骤 2：** 固定版本放入 `vendor/`：`preact@10.29.8`（`dist/preact.min.js`）、`htm@3.1.1`（`dist/htm.js`），记录 SHA-256，随附 MIT 许可到 `THIRD_PARTY_NOTICES.md`。
+- [ ] **步骤 3：** 把原型 `style.css` 拆为 `styles/tokens.css`（令牌，名称不变）与 `styles/base.css`；`page.html` 带 `__NONCE__`、`__STYLES__`、`__SCRIPTS__` 占位。
+- [ ] **步骤 4：** `WebPage.cs` 按固定顺序拼接嵌入资源；`app/` 下只放最小占位（`99-main.js`：读取入口并渲染“最新快照的 rev”），W3 再替换。
+- [ ] **步骤 5：** 新测试项目接入 `LiveLingo.slnx`；夹具里首次使用时安装 Playwright 浏览器。
+- [ ] **步骤 6：** 运行 `./build.sh Build`（0 警告）与 `./build.sh Test`，提交：`build: add the web UI assets, page builder and browser tests`。
 
-验收：干净克隆 `./build.sh Build` 成功（含 Node 安装提示）；产物为单个 `index.html`；ESLint / tsc 零问题。
+验收：`./build.sh Build` 与 `Test` 在没有 Node 的机器上成功；`WebPage.Build` 产出单页字符串；WebKit 与 Chromium 烟雾用例通过；禁用 API 扫描与预算测试通过。
 
 ### W2：契约与宿主
 
-**文件：** 新建 `src/LiveLingo.Desktop/Web/{WebSurface.cs,WebBridge.cs,WebIntent.cs,ComposerViewState.cs,SettingsViewState.cs,ComposerIntents.cs,SettingsIntents.cs}`；`build/BuildTask.cs`（`WebContract`）；`src/LiveLingo.Web/src/contract.generated.ts`（生成）；测试 `tests/LiveLingo.Desktop.Tests/Web/*`。
+**文件：** 新建 `src/LiveLingo.Desktop/Web/{WebSurface.cs,WebBridge.cs,WebIntent.cs,ComposerViewState.cs,SettingsViewState.cs,ComposerIntents.cs,SettingsIntents.cs}`；测试 `tests/LiveLingo.Desktop.Tests/Web/*` 与快照黄金文件 `tests/LiveLingo.Web.Tests/Fixtures/*.json`。
 
 - [ ] **步骤 1（先写失败测试）：** `ComposerViewState.From(vm, texts)` 对原型的每种状态给出期望 DTO（空、听写中、翻译完成、整段宽屏、各横幅、编辑中、写入排队、已写入、目标丢失、仅复制）。
 - [ ] **步骤 2：** `WebIntent` 封闭联合与解析：未知名、缺字段、超长、错误类型一律拒绝并记不含正文的日志；测试覆盖。
 - [ ] **步骤 3：** `WebBridge`：16 ms 合并推送、`rev` 单调递增、`source{text,rev}` 规则（设计 §5.3）、`strings` 在 `ready` 与语言变化时发送；用假 `IWebHost` 测。
 - [ ] **步骤 4：** `WebSurface`：承载 `NativeWebView`；`NavigateToString` + nonce 模板；取消一切导航与新窗口；环境设置（macOS 非持久存储；Windows 私有模式 + 临时目录）；所有 `InvokeScript` 用 `void (...)`。
 - [ ] **步骤 5：** `ComposerIntents` / `SettingsIntents`：把意图映射到现有 VM 命令；`saveKey` 只经一次消息并立即写密钥库；测试断言快照与日志里没有密钥。
-- [ ] **步骤 6：** `WebContract` 目标：用 `JsonSchemaExporter` 生成 `contract.generated.ts`，CI 校验与提交一致。
+- [ ] **步骤 6：** 快照黄金文件：把步骤 1 的各状态序列化为 `Fixtures/*.json` 并逐字比对（设计 §4.3）；Web 场景测试复用同一批文件。
 - [ ] **步骤 7：** `./build.sh Test` 全绿且 0 警告；提交：`feat(web): add the bridge, the intents and the view state`。
 
-验收：新增 C# 代码行 / 分支覆盖不低于现有门禁；契约生成物与提交一致；日志里没有任何正文或密钥。
+验收：新增 C# 代码行 / 分支覆盖不低于现有门禁；快照黄金文件与 C# 一致；日志里没有任何正文或密钥。
 
 ### W3：Composer 视图（Web）
 
-**文件：** `src/LiveLingo.Web/src/views/composer/*`、`store.ts`、`bridge.ts`、`tests/*`。
+**文件：** `src/LiveLingo.Desktop/Web/Assets/app/{00-store,10-bridge,20-composer-*}.js`、`tests/LiveLingo.Web.Tests/*`。
 
-- [ ] **步骤 1（先写失败测试）：** 把原型 `browser.test.cjs` 的场景改写为“快照序列 → 断言 DOM 与发出的意图”，Playwright 跑 WebKit 与 Chromium。
+- [ ] **步骤 1（先写失败测试）：** 把原型 `browser.test.cjs` 的场景改写为“`Fixtures` 快照序列 → 断言 DOM 与发出的意图（交给 C# `WebIntent` 解析）”，Playwright .NET 跑 WebKit 与 Chromium。
 - [ ] **步骤 2：** 移植原型标记与样式：头部（目的地 / 隐私 / 输出胶囊 / 更多 / 关闭）、横幅、原话区（编辑 / 实时）、结果行（骨架、警告条、悬停工具、行内编辑）、页脚（麦克风 / 状态 / 复制 / 写入）、三个菜单、最近草稿与导出对话框、Toast。
 - [ ] **步骤 3：** 键盘语义（设计 §5）：Enter 写入（按设置也可 Ctrl+Enter）、Shift+Enter 换行、Esc 逐级、输入法组合中不触发（WebKit 里确认候选的回车是 `isComposing:false` 且 `keyCode:229`，必须同时判 `e.isComposing || e.keyCode === 229`，W3 用 WebKit 项目加用例）、麦克风 Space / Enter；麦克风只发 `micDown` / `micUp`，时序由 C# 决定；`pointer capture`。
 - [ ] **步骤 4：** `source{text,rev}` 规则与光标保持；`ResizeObserver` 上报高度。
 - [ ] **步骤 5：** 视觉回归（对原型 PNG 的像素差阈值）、axe 零违规、无小于 12 px 文字、零控制台错误、零网络请求；深浅色与减少动画。
-- [ ] **步骤 6：** `./build.sh WebTest` 全绿；提交：`feat(web): render the composer from view-state snapshots`。
+- [ ] **步骤 6：** `./build.sh Test` 全绿；提交：`feat(web): render the composer from view-state snapshots`。
 
-验收：28 个原型场景全部对应一个通过的用例；截图与原型差异在阈值内；Web 行覆盖 ≥ 80%。
+验收：28 个原型场景全部对应一个通过的用例；截图与原型差异在阈值内。没有 JS 行覆盖率门禁（设计 §7，已知上限）。
 
 ### W4：Composer 窗口替换
 
@@ -163,7 +163,7 @@ LIVELINGO_ENABLE_VOICE_PROBE=1 ./build.sh ProbeVoice   # 语音探针（仅 macO
 
 ### W5：设置迁移
 
-**文件：** `src/LiveLingo.Web/src/views/settings/*`；`Settings/SettingsWindow` 改为薄外壳；删除 `SettingsWindow.axaml(.cs)`、`Controls/HotkeyRecorder.cs`、多余的 `AppTheme.axaml` 样式及其测试。
+**文件：** `src/LiveLingo.Desktop/Web/Assets/app/30-settings-*.js`；`Settings/SettingsWindow` 改为薄外壳；删除 `SettingsWindow.axaml(.cs)`、`Controls/HotkeyRecorder.cs`、多余的 `AppTheme.axaml` 样式及其测试。
 
 - [ ] **步骤 1：** 四组设置（通用 / 语音与翻译 / 隐私与云端 / 模型与关于），即改即存；云端开关由 C# 决定是否弹同意（同意对话框在 Web 内）。
 - [ ] **步骤 2：** 热键录制：Web 采集 `event.code` + 修饰键，发 `setting{summonHotkey}`，由 C# `HotkeyParser` 校验并重新注册。
@@ -190,7 +190,7 @@ LIVELINGO_ENABLE_VOICE_PROBE=1 ./build.sh ProbeVoice   # 语音探针（仅 macO
 
 ## 6. 需要负责人决定
 
-1. **确认采用 Web UI 方案**（设计文档 §1），以及 Node 进入构建工具链（D20）。
+1. ~~确认采用 Web UI 方案，以及 Node 进入构建工具链~~ **已决定（2026-11-01）：采用 Web UI；不引入 Node，Web 源文件作为嵌入资源，Preact + htm 随源码提交（D20）。**
 2. 仓库没有 `LICENSE`（1.x README 的 MIT 徽章无依据）：选哪种许可。
 3. Windows 10 的 WebView2 运行时：随安装包带 Bootstrapper，还是首次运行检测。
 4. 默认翻译档位在 M2 / 16 GB 数据出来后确认（D13）。
