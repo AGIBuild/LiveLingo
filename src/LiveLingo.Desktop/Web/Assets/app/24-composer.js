@@ -39,6 +39,9 @@
         <${LL.Footer} c=${c}/>
         <${LL.Dialog} dialogs=${c.dialogs}/>
         ${toast && html`<div id="toast" class="toast" role="status">${toast}</div>`}
+        <div class="rz rz-r" data-edge="r"></div>
+        <div class="rz rz-b" data-edge="b"></div>
+        <div class="rz rz-br" data-edge="br"></div>
       </section>`;
     }
   }
@@ -83,6 +86,7 @@
       case 'recent': LL.openDialog('recent'); break;
       case 'import': if (c.menus.more.find((item) => item.id === 'import').enabled) LL.send('import'); break;
       case 'export': LL.openDialog('export'); break;
+      case 'zoom': LL.send('zoom'); break;
       case 'settings': LL.send('openSettings', { section: 'general' }); break;
       default: throw new Error('Unknown shortcut: ' + id);
     }
@@ -169,4 +173,48 @@
   };
   document.addEventListener('pointerup', endPress);
   document.addEventListener('pointercancel', endPress);
+
+  // The right edge, the bottom edge and the corner resize the window. The window's top left does not move while they
+  // are dragged, so the pointer's position in the page is the size the user asks for; the host limits it to the screen
+  // and the panel follows the window. Requests are sent at most once per frame.
+  let resizing = null;
+  let request = null;
+
+  const sendResize = () => {
+    if (request) LL.send('resize', request);
+    request = null;
+  };
+
+  document.addEventListener('pointerdown', (e) => {
+    const handle = e.target instanceof Element ? e.target.closest('.rz') : null;
+    if (!handle || e.button !== 0) return;
+    handle.setPointerCapture(e.pointerId);
+    resizing = { id: e.pointerId, edge: handle.dataset.edge, x: e.clientX, y: e.clientY, width: window.innerWidth, height: window.innerHeight };
+  });
+
+  document.addEventListener('pointermove', (e) => {
+    if (resizing?.id !== e.pointerId) return;
+    if ((e.buttons & 1) === 0) {
+      resizing = null;
+      return;
+    }
+    const fields = { width: null, height: null };
+    if (resizing.edge.includes('r')) fields.width = Math.round(resizing.width + e.clientX - resizing.x);
+    if (resizing.edge.includes('b')) fields.height = Math.round(resizing.height + e.clientY - resizing.y);
+    if (!request) requestAnimationFrame(sendResize);
+    request = fields;
+  });
+
+  const endResize = (e) => {
+    if (resizing?.id !== e.pointerId) return;
+    resizing = null;
+    sendResize();
+  };
+  document.addEventListener('pointerup', endResize);
+  document.addEventListener('pointercancel', endResize);
+
+  // Like a title bar: a double click on an edge enlarges the window, and restores it.
+  document.addEventListener('dblclick', (e) => {
+    if (e.target instanceof Element && e.target.closest('.rz')) LL.send('zoom');
+  });
 })();

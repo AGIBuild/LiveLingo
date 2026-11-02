@@ -5,6 +5,17 @@ body { padding: 18px; overflow: hidden; }
 .composer { position: relative; width: 100%; max-height: var(--panel-max, 470px); display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); border-radius: 22px; box-shadow: 0 4px 12px rgba(0, 0, 0, .28), 0 1px 2px rgba(0, 0, 0, .16); animation: rise .18s cubic-bezier(.2, .8, .3, 1); }
 @keyframes rise { from { opacity: 0; transform: translateY(10px) scale(.98); } }
 
+/* Once the user sized the window (or zoomed it) its height is theirs: the panel fills it and shows as much text as fits. */
+html.fixed-h .composer { height: calc(100vh - 36px); max-height: none; }
+html.fixed-h .src textarea, html.fixed-h .composer.wide .src textarea { max-height: 60vh; }
+html.fixed-h .src-live, html.fixed-h .composer.wide .src-live { max-height: 45vh; }
+
+/* Resize handles sit inside the panel: a transparent window lets clicks in its margin through to the windows behind it. */
+.rz { position: absolute; z-index: 4; touch-action: none; }
+.rz-r { top: 22px; right: 0; bottom: 22px; width: 5px; cursor: ew-resize; }
+.rz-b { left: 22px; right: 22px; bottom: 0; height: 5px; cursor: ns-resize; }
+.rz-br { right: 0; bottom: 0; width: 16px; height: 16px; cursor: nwse-resize; }
+
 .chip { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: 999px; background: var(--hover); color: var(--muted); font-size: 12px; white-space: nowrap; }
 .chip.mini { height: 22px; padding: 0 8px; }
 .chip.ok { color: var(--ok); } .chip.warn { color: var(--warn); background: var(--warn-bg); } .chip.bad { color: var(--danger); background: var(--danger-bg); }

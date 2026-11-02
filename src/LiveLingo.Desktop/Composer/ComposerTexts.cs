@@ -75,6 +75,7 @@ public sealed class ComposerTexts(ILocalizationService loc, bool? mac = null)
     public string MoreImport => loc.T("composer.menu.import");
     public string MoreExport => loc.T("composer.menu.export");
     public string MoreWide => loc.T("composer.menu.wide");
+    public string MoreZoom => loc.T("composer.menu.zoom");
     public string MoreWhole => loc.T("composer.menu.whole");
     public string MoreSettings => loc.T("composer.menu.settings");
     public string RecentClear => loc.T("composer.recent.clear");

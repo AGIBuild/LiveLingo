@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Cleanup works on whole passages instead of single sentences. The recognizer cuts speech at every pause, so a
+  sentence on its own is often half a thought; dictation now collects sentences into a passage (ended by a 1.5 s pause,
+  by length, or by stopping) and the cleaner joins fragments, drops repetitions, and fixes homophones from context.
+  The cleaning pause before the last sentence is gone with it.
+- A passage that fails the fidelity check is cleaned again sentence by sentence, so one bad sentence no longer costs the
+  rest of the passage its cleanup.
+- The fidelity check accepts a restated clause and a word the speaker corrected away, and still refuses lost numbers,
+  lost terms, and any deleted negation.
+- Editing the recognized text keeps the passages whose sentences did not change.
+
+### Added
+- The composer window can be resized: drag its right edge, bottom edge or corner. `⌘E` / `Ctrl+E`, the more menu, or a
+  double click on an edge enlarges it to show as much text as the screen allows and restores it. The panel then fills
+  the window. The size is not remembered between uses.
+
 ## [2.0.1] - 2026-11-02
 
 This is the first release that installed apps can update themselves from: it carries the update feeds. 2.0.0 does not,

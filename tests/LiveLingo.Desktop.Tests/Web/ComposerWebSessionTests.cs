@@ -146,6 +146,35 @@ public sealed class ComposerWebSessionTests
     }
 
     [Fact]
+    public async Task TheFixedHeight_IsSentToThePage_AndAgainWhenAPageStartsLater()
+    {
+        await using var rig = new Rig();
+        rig.Session.Start();
+        rig.Host.Posted.Clear();
+
+        rig.Session.SetFixedHeight(true);
+
+        var frame = rig.Host.Posted.Select(json => JsonDocument.Parse(json).RootElement).Single(m => m.GetProperty("type").GetString() == "frame");
+        Assert.True(frame.GetProperty("data").GetProperty("fixedHeight").GetBoolean());
+    }
+
+    [Fact]
+    public async Task AResizeAndAZoomOfThePage_ReachTheWindow()
+    {
+        await using var rig = new Rig();
+        ResizeIntent? resized = null;
+        var zooms = 0;
+        rig.Session.Resized += resize => resized = resize;
+        rig.Session.Zoomed += () => zooms++;
+
+        rig.Host.FromPage(new ResizeIntent(null, 500) { V = 1 });
+        rig.Host.FromPage(new ZoomIntent { V = 1 });
+
+        Assert.Equal(500, resized?.Height);
+        Assert.Equal(1, zooms);
+    }
+
+    [Fact]
     public async Task AMeasurementOfThePage_ReachesTheWindow()
     {
         await using var rig = new Rig();

@@ -14,6 +14,8 @@ namespace LiveLingo.Desktop.Web;
 [JsonDerivedType(typeof(ReadyIntent), "ready")]
 [JsonDerivedType(typeof(SizeIntent), "size")]
 [JsonDerivedType(typeof(DragIntent), "drag")]
+[JsonDerivedType(typeof(ResizeIntent), "resize")]
+[JsonDerivedType(typeof(ZoomIntent), "zoom")]
 [JsonDerivedType(typeof(SourceIntent), "source")]
 [JsonDerivedType(typeof(MicToggleIntent), "micToggle")]
 [JsonDerivedType(typeof(OutputIntent), "output")]
@@ -129,6 +131,22 @@ internal sealed record SizeIntent(int Width, int Height) : WebIntent
 /// threshold, while the button is held) and the system moves the window.
 /// </summary>
 internal sealed record DragIntent : WebIntent;
+
+/// <summary>
+/// The user is dragging an edge or the corner of the composer. It carries the window size the pointer asks for, in CSS
+/// pixels including the shadow margin; a dimension the dragged edge does not change is null. The window decides what it
+/// can be (the screen's working area, the smallest usable size).
+/// </summary>
+internal sealed record ResizeIntent(int? Width, int? Height) : WebIntent
+{
+    protected override bool IsValid =>
+        (Width is not null || Height is not null)
+        && (Width is null || IsExtent(Width.Value))
+        && (Height is null || IsExtent(Height.Value));
+}
+
+/// <summary>Toggles the window between the size that follows its content and a large one that shows as much text as the screen allows.</summary>
+internal sealed record ZoomIntent : WebIntent;
 
 /// <summary>The source text and the page's own revision of it (design 5.3).</summary>
 internal sealed record SourceIntent(string Text, int Rev) : WebIntent

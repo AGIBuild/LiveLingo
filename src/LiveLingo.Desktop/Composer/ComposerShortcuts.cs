@@ -25,6 +25,7 @@ public static class ComposerShortcuts
         new("recent", "KeyR", "R", false),
         new("import", "KeyO", "O", false),
         new("export", "KeyS", "S", false),
+        new("zoom", "KeyE", "E", false),
         new("settings", "Comma", ",", false)
     ];
 

@@ -30,8 +30,14 @@ internal sealed class ComposerWindow : Window
     private TaskCompletionSource? _dismissed;
     private bool _placed;
 
-    // The user moved the window by its header: it stays where they put it (kept on screen) until the next summon.
+    // The user moved the window by its header or sized it: it stays where it is (kept on screen) until the next summon.
     private bool _moved;
+
+    // The size the user chose by dragging an edge or zooming; null while the window follows the page's content (height)
+    // or the layout (width). The last height the page asked for is kept so the window can go back to it.
+    private double? _userWidth;
+    private double? _userHeight;
+    private double _contentHeight;
 
     public ComposerWindow(ILogger logger, IWindowMover mover)
     {
@@ -70,6 +76,8 @@ internal sealed class ComposerWindow : Window
     {
         _target = target;
         _moved = false;
+        _userWidth = null;
+        _userHeight = null;
         _dismissed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         _session = new ComposerWebSession(
             vm, texts, recent, new StorageFileDialogs(StorageProvider, texts), _web,
@@ -78,6 +86,8 @@ internal sealed class ComposerWindow : Window
         _session.SizeChanged += OnSize;
         _session.WideChanged += ApplyWidth;
         _session.Dragged += OnDrag;
+        _session.Resized += OnResize;
+        _session.Zoomed += OnZoom;
         vm.Completed += Dismiss;
         vm.CloseRequested += Dismiss;
 
@@ -96,7 +106,9 @@ internal sealed class ComposerWindow : Window
 
     private void OnSize(SizeIntent size)
     {
-        Height = size.Height;
+        _contentHeight = size.Height;
+        if (_userHeight is null)
+            Height = size.Height;
         Place();
         if (_placed)
             return;
@@ -110,9 +122,65 @@ internal sealed class ComposerWindow : Window
 
     private void ApplyWidth()
     {
-        Width = _session!.Wide ? WideWidth : NarrowWidth;
+        Width = _userWidth ?? (_session!.Wide ? WideWidth : NarrowWidth);
         if (_placed)
             Place();
+    }
+
+    /// <summary>
+    /// An edge or the corner is being dragged. The window keeps its top left (the page measures the pointer from it),
+    /// so it is pinned where it is and the size is limited to the room left on screen instead of being pushed back.
+    /// </summary>
+    private void OnResize(ResizeIntent resize)
+    {
+        if (_session is null || CurrentScreen() is not { } screen)
+            return;
+
+        _moved = true;
+        var work = screen.WorkingArea;
+        var (width, height) = ComposerPlacement.Resize(
+            (Width, Height), resize.Width, resize.Height, _session.Wide, Position.X, Position.Y,
+            new PixelBounds(work.X, work.Y, work.Width, work.Height), screen.Scaling);
+        if (resize.Width is not null)
+        {
+            _userWidth = width;
+            Width = width;
+        }
+        if (resize.Height is not null)
+        {
+            _userHeight = height;
+            Height = height;
+            _session.SetFixedHeight(true);
+        }
+    }
+
+    /// <summary>Like zooming a window by its title bar: a large window that shows much text, and back to the size that fits the content.</summary>
+    private void OnZoom()
+    {
+        if (_session is null || CurrentScreen() is not { } screen)
+            return;
+
+        if (_userWidth is not null || _userHeight is not null)
+        {
+            _userWidth = null;
+            _userHeight = null;
+            _moved = false;
+            _session.SetFixedHeight(false);
+            ApplyWidth();
+            Height = _contentHeight;
+            Place();
+            return;
+        }
+
+        var work = screen.WorkingArea;
+        var zoomed = ComposerPlacement.Zoomed(new PixelBounds(work.X, work.Y, work.Width, work.Height), screen.Scaling);
+        _moved = true;
+        _userWidth = zoomed.Width;
+        _userHeight = zoomed.Height;
+        Width = zoomed.Width;
+        Height = zoomed.Height;
+        Position = new PixelPoint(zoomed.X, zoomed.Y);
+        _session.SetFixedHeight(true);
     }
 
     /// <summary>

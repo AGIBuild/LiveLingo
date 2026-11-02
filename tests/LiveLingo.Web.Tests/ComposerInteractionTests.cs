@@ -210,6 +210,7 @@ public sealed class ComposerInteractionTests(BrowserFixture browsers)
             data.Add(engine, "Meta+L", nameof(SwapLanguageIntent));
             data.Add(engine, "Meta+Shift+C", nameof(CopyIntent));
             data.Add(engine, "Meta+N", nameof(NewDraftIntent));
+            data.Add(engine, "Meta+E", nameof(ZoomIntent));
             data.Add(engine, "Meta+,", nameof(OpenSettingsIntent));
         }
 
@@ -781,6 +782,96 @@ public sealed class ComposerInteractionTests(BrowserFixture browsers)
         await page.Page.Mouse.UpAsync();
 
         Assert.Equal(0, await page.CountAsync<DragIntent>());
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public async Task DraggingTheRightEdge_AsksForTheWindowWidthOnly(string engine)
+    {
+        await using var page = await browsers.OpenAsync(engine, "translate-ready");
+        var width = await page.Page.EvaluateAsync<int>("window.innerWidth");
+        var edge = (await page.Page.Locator(".rz-r").BoundingBoxAsync())!;
+        var (x, y) = (edge.X + edge.Width / 2, edge.Y + edge.Height / 2);
+        await page.ClearIntentsAsync();
+
+        await page.Page.Mouse.MoveAsync(x, y);
+        await page.Page.Mouse.DownAsync();
+        await page.Page.Mouse.MoveAsync(x + 40, y, new() { Steps = 4 });
+        await page.Page.Mouse.MoveAsync(x + 90, y + 30, new() { Steps = 4 });
+        await page.Page.Mouse.UpAsync();
+
+        var asked = await page.LastIntentAsync<ResizeIntent>();
+        Assert.Equal(width + 90, asked.Width);
+        Assert.Null(asked.Height);
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public async Task DraggingTheCorner_AsksForTheWidthAndTheHeight(string engine)
+    {
+        await using var page = await browsers.OpenAsync(engine, "translate-ready");
+        var size = await page.Page.EvaluateAsync<int[]>("[window.innerWidth, window.innerHeight]");
+        var corner = (await page.Page.Locator(".rz-br").BoundingBoxAsync())!;
+        var (x, y) = (corner.X + corner.Width / 2, corner.Y + corner.Height / 2);
+        await page.ClearIntentsAsync();
+
+        await page.Page.Mouse.MoveAsync(x, y);
+        await page.Page.Mouse.DownAsync();
+        await page.Page.Mouse.MoveAsync(x + 50, y + 70, new() { Steps = 5 });
+        await page.Page.Mouse.UpAsync();
+
+        var asked = await page.LastIntentAsync<ResizeIntent>();
+        Assert.Equal(size[0] + 50, asked.Width);
+        Assert.Equal(size[1] + 70, asked.Height);
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public async Task AfterTheDragEnds_MovingThePointerResizesNothing(string engine)
+    {
+        await using var page = await browsers.OpenAsync(engine, "translate-ready");
+        var edge = (await page.Page.Locator(".rz-b").BoundingBoxAsync())!;
+        var (x, y) = (edge.X + edge.Width / 2, edge.Y + edge.Height / 2);
+
+        await page.Page.Mouse.MoveAsync(x, y);
+        await page.Page.Mouse.DownAsync();
+        await page.Page.Mouse.MoveAsync(x, y + 30, new() { Steps = 3 });
+        await page.Page.Mouse.UpAsync();
+        await page.ClearIntentsAsync();
+        await page.Page.Mouse.MoveAsync(x + 100, y + 100, new() { Steps = 3 });
+
+        Assert.Equal(0, await page.CountAsync<ResizeIntent>());
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public async Task DoubleClickingAnEdge_AsksToEnlargeOrRestoreTheWindow(string engine)
+    {
+        await using var page = await browsers.OpenAsync(engine, "translate-ready");
+        var edge = (await page.Page.Locator(".rz-br").BoundingBoxAsync())!;
+        await page.ClearIntentsAsync();
+
+        await page.Page.Mouse.DblClickAsync(edge.X + edge.Width / 2, edge.Y + edge.Height / 2);
+
+        Assert.Equal(1, await page.CountAsync<ZoomIntent>());
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public async Task ThePanelFillsTheWindow_WhenTheHostFixedTheHeight(string engine)
+    {
+        await using var page = await browsers.OpenAsync(engine, "translate-ready");
+        const string height = "document.getElementById('composer').offsetHeight";
+        var natural = await page.Page.EvaluateAsync<int>(height);
+
+        await page.ReceiveAsync("frame", new JsonObject { ["fixedHeight"] = true });
+
+        var viewport = await page.Page.EvaluateAsync<int>("window.innerHeight");
+        var panel = await page.Page.EvaluateAsync<int>(height);
+        Assert.True(Math.Abs(panel - (viewport - 36)) <= 1, $"The panel is {panel} px tall in a {viewport} px window (it was {natural} px).");
+
+        await page.ReceiveAsync("frame", new JsonObject { ["fixedHeight"] = false });
+        Assert.Equal(natural, await page.Page.EvaluateAsync<int>(height));
     }
 
     [Theory]
