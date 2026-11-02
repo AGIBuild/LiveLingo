@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.1] - 2026-11-02
+
+This is the first release that installed apps can update themselves from: it carries the update feeds. 2.0.0 does not,
+so it has to be replaced by hand once.
+
 ### Changed
 
 - Speech is ready when you are. The speech models are now loaded in the background a few seconds after the app
@@ -308,6 +313,7 @@ process-wide task with shared progress and dedup across every UI surface.
 
 See `git log v0.1.4` for the pre-CHANGELOG history.
 
+[2.0.1]: https://github.com/AGIBuild/LiveLingo/releases/tag/v2.0.1
 [2.0.0]: https://github.com/AGIBuild/LiveLingo/releases/tag/v2.0.0
 [1.4.0]: https://github.com/AGIBuild/LiveLingo/releases/tag/v1.4.0
 [0.1.4]: https://github.com/AGIBuild/LiveLingo/releases/tag/v0.1.4
