@@ -99,6 +99,7 @@
   "composer.gate.TooLong": "结果过长，是原话的 {0}",
   "composer.gate.Added": "多出 {0} 个字",
   "composer.gate.Deleted": "无故删去「{0}」",
+  "composer.gate.Incomplete": "模型的回答被截断",
 
   "composer.mic.start": "开始听写（{0}）",
   "composer.mic.stop": "结束听写（{0}）",

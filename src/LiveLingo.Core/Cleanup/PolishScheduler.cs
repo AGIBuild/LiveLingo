@@ -1,5 +1,6 @@
 using LiveLingo.Core.Dictation;
 using LiveLingo.Core.Drafting;
+using LiveLingo.Core.Inference;
 
 namespace LiveLingo.Core.Cleanup;
 
@@ -7,13 +8,16 @@ namespace LiveLingo.Core.Cleanup;
 /// The polish of a finished dictation. While the user speaks, each passage is cleaned on its own, so a thought that
 /// the recognizer cut at a pause stays cut at the passage seam. When recording stops, runs of neighbouring passages
 /// are given to the cleaner as one larger text, and a result that passes the <see cref="FidelityGate"/> replaces them
-/// with a single unit (its original text is the passages' joined). Until then the per-passage results are what the user
-/// sees and may write; a polish that fails, is refused, or arrives after the draft was frozen changes nothing.
+/// with a single unit (its original text is the passages' joined, so the user can still go back to it).
+/// A run the gate refuses is split in halves and each half is tried on its own: one misheard word costs only the half
+/// it is in, not the polish of the whole dictation. Until the polish is done the draft counts as processing
+/// (<see cref="Draft.Polishing"/>), so writing waits for it; a polish that fails, or arrives after the draft was
+/// frozen, changes nothing.
 /// </summary>
 public sealed class PolishScheduler : IAsyncDisposable
 {
-    /// <summary>The most original text one polish handles: what the cleaner answers within its token limit.</summary>
-    public const int MaxGroupChars = 400;
+    /// <summary>The most original text one polish handles; it still fits the cleaner's context and output limit.</summary>
+    public const int MaxGroupChars = 800;
 
     private readonly DraftSession _session;
     private readonly ITextCleaner _cleaner;
@@ -23,7 +27,7 @@ public sealed class PolishScheduler : IAsyncDisposable
     private readonly object _gate = new();
     private readonly CancellationTokenSource _stop = new();
     private readonly HashSet<int> _polished = [];
-    private readonly HashSet<string> _given = [];
+    private readonly HashSet<string> _tried = [];
 
     private bool _wasRecording;
     private bool _pending;
@@ -48,8 +52,7 @@ public sealed class PolishScheduler : IAsyncDisposable
             if (_disposed)
                 return;
 
-            var recording = _session.Read(draft => draft.Recording);
-            if (recording)
+            if (_session.Read(draft => draft.Recording))
                 _wasRecording = true;
             else if (_wasRecording)
             {
@@ -57,11 +60,14 @@ public sealed class PolishScheduler : IAsyncDisposable
                 _pending = true;
             }
 
-            if (_pending && !_running)
-            {
-                _running = true;
-                _worker = Task.Run(RunAsync);
-            }
+            if (!_pending || _running || _session.Read(Find) is null)
+                return;
+
+            // Before the worker starts, so writing never gets a moment in which the dictation looks finished.
+            // Marked running first: telling the draft calls this handler again (inline when no context is set).
+            _running = true;
+            _session.Mutate(draft => draft.Polishing = true);
+            _worker = Task.Run(RunAsync);
         }
     }
 
@@ -75,11 +81,12 @@ public sealed class PolishScheduler : IAsyncDisposable
                 next = _disposed ? null : _session.Read(Find);
                 if (next is null)
                 {
+                    _session.Mutate(draft => draft.Polishing = false);
                     _running = false;
                     return;
                 }
 
-                _given.Add(Key(next.Value.Ids));
+                _tried.Add(Key(next.Value.Ids));
             }
 
             try
@@ -90,38 +97,58 @@ public sealed class PolishScheduler : IAsyncDisposable
             }
             catch (OperationCanceledException) when (_stop.IsCancellationRequested)
             {
-                lock (_gate)
-                    _running = false;
+                Finish();
                 return;
             }
-            catch (Exception ex) when (ex is HttpRequestException or InvalidDataException)
+            catch (Exception ex) when (ServiceFailure.IsUnavailable(ex))
             {
-                // The polish is an improvement on a result the user already has; the passages stay as they are.
+                // Nothing is going to answer; the passages stay as they are.
+                Finish();
+                return;
             }
+            catch (InvalidDataException)
+            {
+                // A truncated answer: a smaller run may still fit.
+            }
+        }
+    }
+
+    /// <summary>Ends the polish for good: the draft is no longer waiting for it.</summary>
+    private void Finish()
+    {
+        lock (_gate)
+        {
+            _pending = false;
+            _session.Mutate(draft => draft.Polishing = false);
+            _running = false;
         }
     }
 
     private void ApplyPolish(List<int> ids, string text)
     {
-        var polished = 0;
-        _session.Mutate(draft => polished = draft.Collapse(ids, text) ?? 0);
+        var polished = _session.Mutate(draft => draft.Collapse(ids, text)) ?? 0;
         if (polished != 0)
             lock (_gate)
                 _polished.Add(polished);
     }
 
     /// <summary>
-    /// The first run of at least two cleaned passages, up to <see cref="MaxGroupChars"/> of original text, that was not
-    /// polished or tried yet. Passages that are still being cleaned, edited by hand, or carry layout end a run.
+    /// The next run to polish. Neighbouring passages that are cleaned, not edited by hand, without layout and not polished
+    /// yet form runs of up to <see cref="MaxGroupChars"/> of original text; within a run that was already tried (and
+    /// refused) the halves are tried instead, down to two passages.
     /// </summary>
     private (List<int> Ids, CleanupRequest Request)? Find(Draft draft)
     {
         if (draft.Snapshot is not null || draft.Recording || draft.Output != OutputKind.Clean)
             return null;
 
+        var units = draft.Units;
+        // The whole dictation is polished together, so wait until every passage has its own cleanup.
+        if (units.Any(unit => unit.Clean.Text is null && unit.Clean.Error.Length == 0))
+            return null;
+
         var run = new List<int>();
         var length = 0;
-        var units = draft.Units;
         for (var i = 0; i <= units.Count; i++)
         {
             var unit = i < units.Count ? units[i] : null;
@@ -133,12 +160,8 @@ public sealed class PolishScheduler : IAsyncDisposable
                 continue;
             }
 
-            if (run.Count >= 2 && !_given.Contains(Key(run)))
-            {
-                var first = i - run.Count;
-                var target = TextUnits.Join(units.Skip(first).Take(run.Count).Select(u => ("", u.Raw, "")));
-                return (run, new CleanupRequest(target, draft.PrecedingText(first, _contextChars), false, _glossary));
-            }
+            if (Untried(draft, i - run.Count, run.Count) is { } found)
+                return found;
 
             run.Clear();
             length = 0;
@@ -150,6 +173,26 @@ public sealed class PolishScheduler : IAsyncDisposable
         }
 
         return null;
+    }
+
+    /// <summary>The run at <paramref name="first"/>, or the first untried half of it when it was tried already.</summary>
+    private (List<int> Ids, CleanupRequest Request)? Untried(Draft draft, int first, int count)
+    {
+        if (count < 2)
+            return null;
+
+        var ids = draft.Units.Skip(first).Take(count).Select(unit => unit.Id).ToList();
+        if (!_tried.Contains(Key(ids)))
+        {
+            var target = TextUnits.Join(draft.Units.Skip(first).Take(count).Select(unit => ("", unit.Raw, "")));
+            return (ids, new CleanupRequest(target, draft.PrecedingText(first, _contextChars), false, _glossary));
+        }
+
+        if (count < 4)
+            return null;
+
+        var half = count / 2;
+        return Untried(draft, first, half) ?? Untried(draft, first + half, count - half);
     }
 
     private bool IsPolishable(DraftUnit unit) =>

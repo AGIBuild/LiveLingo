@@ -25,9 +25,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   areas scale with it.
 
 ### Added
-- When recording stops, neighbouring cleaned passages are polished together as one text (up to 400 characters each,
-  with the text before as context). A polish that passes the fidelity check replaces them with one row whose original
-  text is theirs joined; otherwise nothing changes.
+- When recording stops, the whole dictation is polished as one text (in runs of up to 800 characters, with the text
+  before as context), so the result reads as connected prose instead of separate fragments. A polish that passes the
+  fidelity check replaces the passages with one row whose original text is theirs joined; a run the check refuses is
+  split in halves and each half is tried alone. Writing waits for the polish ("Cleaning up…").
+- A cleanup answer that was cut off by the model's output limit no longer shows a red error that blocks writing; the
+  words are kept like any refused cleanup. The output limit leaves room for a model that copies the read-only context,
+  and a copied context is removed from the answer.
+- Passages end after a 3 s pause or 200 characters (was 1.5 s / 120).
 - The composer window can be resized: drag its right edge, bottom edge or corner. The enlarge / restore button in the
   title bar (next to close), `⌘E` / `Ctrl+E`, or a double click on an edge enlarges it to show as much text as the
   screen allows and restores it. The panel then fills the window and, side by side, each column scrolls on its own.

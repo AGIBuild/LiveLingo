@@ -279,7 +279,7 @@ public class CleanupSchedulerTests
 
         foreach (var typed in new[] { "你", "你好", "你好吗" })
             h.Session.Mutate(draft => draft.SyncSource([new SourceUnit(typed)], DraftRoute.Units));
-        await Task.Delay(50);
+        await WaitUntil(() => h.Time.Timer.Due == Harness.TypingPause);
         Assert.Empty(h.Cleaner.Calls);
 
         h.Time.Advance(Harness.TypingPause);
@@ -336,7 +336,7 @@ public class CleanupSchedulerTests
         await using var h = new Harness();
         h.Speak("一。", "二。");
 
-        (await h.NextCall(1)).Result.SetException(new InvalidDataException("empty output"));
+        (await h.NextCall(1)).Result.SetException(new InvalidOperationException("empty output"));
         var second = await h.NextCall(2);
 
         Assert.Equal("empty output", h.ErrorOf(0));
@@ -345,11 +345,28 @@ public class CleanupSchedulerTests
     }
 
     [Fact]
+    public async Task ATruncatedAnswer_KeepsTheOriginal_InsteadOfFailingTheUnit()
+    {
+        await using var h = new Harness();
+        h.Speak("一。", "二。");
+
+        (await h.NextCall(1)).Result.SetException(new InvalidDataException("Incomplete completion stream: finish=length"));
+        var second = await h.NextCall(2);
+        second.Result.SetResult("二。");
+
+        await WaitUntil(() => h.CleanOf(1) is not null);
+        Assert.Equal("一。", h.CleanOf(0));
+        Assert.Equal(new GateRejection(GateReason.Incomplete), h.RejectionOf(0));
+        Assert.Equal("", h.ErrorOf(0));
+        Assert.True(h.Session.Read(d => d.ContentReadiness().IsReady));
+    }
+
+    [Fact]
     public async Task RetryingAFailedSentence_CleansItAgain()
     {
         await using var h = new Harness();
         h.Speak("一。");
-        (await h.NextCall(1)).Result.SetException(new InvalidDataException("bad"));
+        (await h.NextCall(1)).Result.SetException(new InvalidOperationException("bad"));
         await WaitUntil(() => h.ErrorOf(0).Length > 0);
 
         h.Session.Mutate(draft => draft.Retry(0, UnitKind.Clean));
