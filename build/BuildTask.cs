@@ -333,8 +333,10 @@ class BuildTask : NukeBuild
 
             if (!windows)
             {
+                // The bundle version has no pre-release suffix; the update feed carries the full semantic version.
+                var bundleVersion = Version.Split('-')[0];
                 var plist = tempDir / "Info.plist";
-                File.WriteAllText(plist, File.ReadAllText(RootDirectory / "build" / "macos" / "Info.plist").Replace("__VERSION__", Version));
+                File.WriteAllText(plist, File.ReadAllText(RootDirectory / "build" / "macos" / "Info.plist").Replace("__VERSION__", bundleVersion));
                 arguments += $" --plist {plist}";
             }
 
