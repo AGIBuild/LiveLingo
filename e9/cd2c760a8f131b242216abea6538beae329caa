@@ -1,0 +1,32 @@
+src/LiveLingo.Desktop/Program.cs
+  s_6d6e9175f38e45::t_859a0ce707324e 14-17
+CHANGELOG.md
+  s_6d6e9175f38e45::t_2d10e4f94f78ed 28-32
+src/LiveLingo.Desktop/Services/Configuration/SettingsModel.cs
+  s_6d6e9175f38e45::t_a8dbe8ffe74915 126-129
+src/LiveLingo.Desktop/Composer/ComposerViewModel.cs
+  s_6d6e9175f38e45::t_e5e6191525d8c5 557-560
+src/LiveLingo.Desktop/Services/Configuration/JsonSettingsService.cs
+  s_6d6e9175f38e45::t_8ef417e08e7879 78-80
+src/LiveLingo.Desktop/Composer/ComposerViewModel.Session.cs
+  s_6d6e9175f38e45::t_2f7af7494c20bc 146,148
+tests/LiveLingo.Desktop.Tests/Services/Configuration/JsonSettingsServiceTests.cs
+  s_6d6e9175f38e45::t_567ea0856e74c8 42-72
+  s_6d6e9175f38e45::t_eabd844d28cf6d 41
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e9cd2c760a8f131b242216abea6538beae329caa",
+  "prompts": {},
+  "sessions": {
+    "s_6d6e9175f38e45": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "f74d37e5-1d96-4ddc-a3f9-5ae24ff39e38",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
