@@ -75,6 +75,7 @@ internal static class ComposerScenarios
             await using var h = new Harness(output: ComposerOutput.Clean);
             await h.Vm.StartListeningAsync();
             h.Voice.Say(Chat);
+            await Wait.Until(() => h.Vm.Lines.Count > 0 && h.Vm.Lines.All(l => l.State == LineState.Ready));
             h.Voice.StopGate = new TaskCompletionSource();
             var clear = h.Vm.NewDraftCommand.ExecuteAsync(null);
             var state = State(h);
