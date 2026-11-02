@@ -1,6 +1,7 @@
 {
   "tray.openComposer": "Open Composer",
   "tray.checkUpdates": "Check for Updates",
+  "tray.restartToUpdate": "Restart to Update ({0})",
   "tray.settings": "Settings",
   "tray.quit": "Quit",
   "app.name": "LiveLingo",
@@ -13,10 +14,10 @@
   "dialog.update.title": "Check for Updates",
   "dialog.update.notConfigured": "Update URL is not configured.",
   "dialog.update.latest": "You are on the latest version.",
-  "dialog.update.available.title": "Update Available",
-  "dialog.update.available.body": "A new version ({0}) is available.\nDownload and restart now?",
-  "dialog.update.available.download": "Download & Restart",
-  "dialog.update.available.later": "Later",
+  "dialog.update.ready.title": "Update Ready",
+  "dialog.update.ready.body": "Version {0} has been downloaded.\nRestart now to finish updating?",
+  "dialog.update.ready.restart": "Restart Now",
+  "dialog.update.ready.later": "Later",
   "dialog.update.failed": "Failed to check/apply updates.\n{0}",
   "dialog.ok": "OK",
 

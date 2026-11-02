@@ -1,6 +1,7 @@
 {
   "tray.openComposer": "打开浮窗",
   "tray.checkUpdates": "检查更新",
+  "tray.restartToUpdate": "重启以更新（{0}）",
   "tray.settings": "设置",
   "tray.quit": "退出",
   "app.name": "LiveLingo",
@@ -13,10 +14,10 @@
   "dialog.update.title": "检查更新",
   "dialog.update.notConfigured": "未配置更新地址。",
   "dialog.update.latest": "已是最新版本。",
-  "dialog.update.available.title": "有可用更新",
-  "dialog.update.available.body": "新版本 ({0}) 可用。\n是否下载并重启？",
-  "dialog.update.available.download": "下载并重启",
-  "dialog.update.available.later": "稍后",
+  "dialog.update.ready.title": "更新已就绪",
+  "dialog.update.ready.body": "新版本 {0} 已下载完成。\n现在重启以完成更新？",
+  "dialog.update.ready.restart": "立即重启",
+  "dialog.update.ready.later": "稍后",
   "dialog.update.failed": "检查/应用更新失败。\n{0}",
   "dialog.ok": "确定",
 

@@ -125,9 +125,9 @@ LiveLingo uses [Nuke](https://nuke.build/) for build automation. All targets are
 # Packaging
 ./build.sh Publish --Runtime osx-arm64               # Publish for macOS
 ./build.ps1 Publish --Runtime win-x64                # Publish for Windows
-./build.ps1 Pack --Runtime win-x64 --Version 1.0.0   # Velopack .exe installer
-./build.ps1 PackMsi --Runtime win-x64 --Version 1.0.0 # WiX .msi installer
-./build.sh PackMac --Runtime osx-arm64 --Version 1.0.0 # macOS .pkg installer
+./build.sh Pack --Runtime osx-arm64 --Version 1.0.0  # macOS: .pkg installer + update package and feed
+./build.ps1 Pack --Runtime win-x64 --Version 1.0.0   # Windows: Setup.exe installer + update package and feed
+./build.ps1 PackMsi --Runtime win-x64 --Version 1.0.0 # WiX .msi installer (does not update itself)
 ```
 
 End-to-end probes download the pinned models (SHA256-verified) and use real inference; they are not part of the unit-test gate:
@@ -244,13 +244,34 @@ The CI pipeline (`.github/workflows/release.yml`) runs on tag push (`v*`) with f
 ```
 compile  →  test  →  pack  →  release
    │          │        │         │
-   │          │        │         └─ Create GitHub Release with installers
-   │          │        └─ Matrix build: win-x64 (.exe + .msi) / osx-arm64 (.pkg)
-   │          └─ Unit tests + coverage + mutation gates
-   └─ Build verification (all platforms)
+   │          │        │         └─ Check the update feeds, then create the GitHub Release
+   │          │        └─ Matrix build: win-x64 (Setup.exe + .msi) / osx-arm64 (.pkg), each with its update package and feed
+   │          └─ Unit tests + coverage gates (on macOS, where the web tests run both browsers)
+   └─ Build verification
 ```
 
-Only final installer artifacts (`.exe`, `.msi`, `.pkg`) are published — no source archives or debug files.
+To release: push a tag `v<semver>` (or run *Create Tag*; a version with a suffix such as `2.1.0-rc.1` is published as a
+pre-release). The version is the tag; nothing in the source needs editing.
+
+### Automatic updates
+
+Installed applications update themselves from the GitHub releases of the repository
+(`Update.UpdateUrl` in the settings, default `https://github.com/AGIBuild/LiveLingo`) through
+[Velopack](https://velopack.io/):
+
+- Every release carries, per platform, the full package (`LiveLingo-<version>-<channel>-full.nupkg`) and its feed
+  (`releases.win.json` / `releases.osx.json`). The channel (`win`, `osx`) is Velopack's default for the platform, and the
+  feeds of the platforms do not collide. The *release* job refuses to publish a release whose feed does not name a
+  package that is in it.
+- The application checks at start and every `Update.CheckIntervalHours`, downloads a newer version in the background,
+  and then offers *Restart to Update* in the tray menu; quitting also installs it. Pre-releases are not offered.
+- Only an application installed by the Setup.exe or the .pkg can update itself. A development build and the .msi cannot;
+  they skip the check.
+- A release without a feed (the 1.x releases) is skipped. The application reads the latest 10 releases.
+- Installers are not signed, so Windows SmartScreen and macOS Gatekeeper warn on the first install; updates run from the
+  installed application. Signing (`--signAppIdentity`, `--notaryProfile`) is not set up.
+
+Only the installers, the update packages and the feeds are published — no source archives or debug files.
 
 ---
 

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Automatic updates work. Releases now carry the Velopack update packages and feeds
+  (`releases.win.json`, `releases.osx.json`) next to the installers, and the release is not published unless each feed
+  names a package that is in it. Before, only installers were uploaded, so no installed application could find an update.
+- The installed app downloads a newer version in the background and offers *Restart to Update* in the tray menu;
+  quitting installs it too. The macOS installer is now built by Velopack (it replaces the hand-built `.pkg`, which the
+  updater could not manage) and carries the app icon. The `.msi` does not update itself.
+
 ### Fixed
 
 - The default update URL pointed at a placeholder repository; it is now `https://github.com/AGIBuild/LiveLingo`.
