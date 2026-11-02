@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-11-02
+
+Stopping a dictation now polishes the whole text (summary first), with editable polish requirements, a Clear button,
+and brief notices about which models are actually in use.
+
 ### Changed
 - Clear the complete current draft from a visible source-header button (also `Cmd/Ctrl+N`), stopping dictation and
   retaining the insertion target and preferences. Pending startup, queued writes and late transcription results cannot
@@ -370,6 +375,8 @@ process-wide task with shared progress and dedup across every UI surface.
 
 See `git log v0.1.4` for the pre-CHANGELOG history.
 
+[2.1.0]: https://github.com/AGIBuild/LiveLingo/releases/tag/v2.1.0
+[2.0.2]: https://github.com/AGIBuild/LiveLingo/releases/tag/v2.0.2
 [2.0.1]: https://github.com/AGIBuild/LiveLingo/releases/tag/v2.0.1
 [2.0.0]: https://github.com/AGIBuild/LiveLingo/releases/tag/v2.0.0
 [1.4.0]: https://github.com/AGIBuild/LiveLingo/releases/tag/v1.4.0
