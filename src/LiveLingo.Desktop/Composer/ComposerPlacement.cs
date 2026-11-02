@@ -19,8 +19,51 @@ public static class ComposerPlacement
     /// <summary>Below this the footer and one line of text no longer fit.</summary>
     public const int MinPanelHeight = 160;
 
+    /// <summary>The narrowest the panel may be dragged to (CSS pixels); with the side-by-side layout, <see cref="MinWidePanelWidth"/>.</summary>
+    public const int MinPanelWidth = 520;
+
+    public const int MinWidePanelWidth = 760;
+
+    /// <summary>The panel width of the large window; on a smaller screen the working area limits it.</summary>
+    public const int ZoomedPanelWidth = 1100;
+
     /// <summary>Space kept between the window and the screen edges, in DIPs.</summary>
     private const int ScreenGap = 8;
+
+    /// <summary>The smallest window (shadow margin included) the user may drag to, in DIPs.</summary>
+    public static (double Width, double Height) MinWindow(bool wide) =>
+        ((wide ? MinWidePanelWidth : MinPanelWidth) + ShadowMargin, MinPanelHeight + ShadowMargin);
+
+    /// <summary>
+    /// The largest window whose top left stays at (<paramref name="x"/>, <paramref name="y"/>): it reaches the right
+    /// and bottom edge of the working area, less a gap. Dragging an edge must never move the window, so it is limited
+    /// to this instead of being pushed back on screen.
+    /// </summary>
+    public static (double Width, double Height) MaxWindowFrom(int x, int y, PixelBounds work, double scaling) =>
+        ((work.X + work.Width - x) / scaling - ScreenGap, (work.Y + work.Height - y) / scaling - ScreenGap);
+
+    /// <summary>The window size a drag asks for, kept between the smallest usable size and the room left on screen.</summary>
+    public static (double Width, double Height) Resize(
+        (double Width, double Height) current, int? width, int? height, bool wide, int x, int y, PixelBounds work, double scaling)
+    {
+        var min = MinWindow(wide);
+        var max = MaxWindowFrom(x, y, work, scaling);
+        return (
+            width is { } w ? Math.Clamp(w, min.Width, Math.Max(min.Width, max.Width)) : current.Width,
+            height is { } h ? Math.Clamp(h, min.Height, Math.Max(min.Height, max.Height)) : current.Height);
+    }
+
+    /// <summary>The large window: wide enough for two columns of text and as tall as the working area allows, centered.</summary>
+    public static (double Width, double Height, int X, int Y) Zoomed(PixelBounds work, double scaling)
+    {
+        var width = Math.Min(ZoomedPanelWidth + ShadowMargin, work.Width / scaling - 2 * ScreenGap);
+        var height = work.Height / scaling - 2 * ScreenGap;
+        return (
+            width,
+            height,
+            work.X + (int)Math.Round((work.Width - width * scaling) / 2),
+            work.Y + (int)Math.Round((work.Height - height * scaling) / 2));
+    }
 
     public static (int X, int Y) For(
         TargetWindowInfo target,

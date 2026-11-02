@@ -145,6 +145,12 @@
         "cap": "⌘S"
       },
       {
+        "id": "zoom",
+        "code": "KeyE",
+        "shift": false,
+        "cap": "⌘E"
+      },
+      {
         "id": "settings",
         "code": "Comma",
         "shift": false,
@@ -201,6 +207,12 @@
       {
         "id": "whole",
         "label": "整段处理（保留格式）",
+        "checked": false,
+        "enabled": true
+      },
+      {
+        "id": "zoom",
+        "label": "放大 / 还原窗口",
         "checked": false,
         "enabled": true
       },

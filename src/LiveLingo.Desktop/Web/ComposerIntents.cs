@@ -55,6 +55,12 @@ internal sealed class ComposerIntents : IIntentHandler
     /// <summary>The user started dragging the composer by its header; the window is moved by the system.</summary>
     public event Action? Dragged;
 
+    /// <summary>The user is dragging an edge or the corner: the window size the page asks for.</summary>
+    public event Action<ResizeIntent>? Resized;
+
+    /// <summary>The user asked for the large window, or for the size that follows the content again.</summary>
+    public event Action? Zoomed;
+
     /// <summary>State that is not on the view model changed (the recent drafts).</summary>
     public event Action? Changed;
 
@@ -64,6 +70,8 @@ internal sealed class ComposerIntents : IIntentHandler
         {
             case SizeIntent size: SizeChanged?.Invoke(size); break;
             case DragIntent: Dragged?.Invoke(); break;
+            case ResizeIntent resize: Resized?.Invoke(resize); break;
+            case ZoomIntent: Zoomed?.Invoke(); break;
             case SourceIntent source:
                 _pageText = source.Text;
                 SourceRev = source.Rev;

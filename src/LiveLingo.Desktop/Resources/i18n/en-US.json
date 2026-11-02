@@ -50,6 +50,7 @@
   "composer.menu.import": "Import recording…",
   "composer.menu.export": "Export…",
   "composer.menu.wide": "Side by side",
+  "composer.menu.zoom": "Enlarge / restore window",
   "composer.menu.whole": "Process as one document (keep layout)",
   "composer.menu.settings": "Settings",
   "composer.recent.clear": "Clear recent drafts",

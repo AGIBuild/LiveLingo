@@ -14,7 +14,8 @@ release is tag `v1.4.2`.
 2. **Say it or type it.** Press `⌘D` (`Ctrl+D` on Windows) or click the microphone to start talking, and press it again to
    stop; there is nothing to hold. You can also paste text or import a WAV recording. The other actions have shortcuts
    too, shown next to them in the menus: `⌘1` / `⌘2` / `⌘3` pick the output, `⌘L` swaps the language, `⇧⌘C` copies,
-   `⌘N` starts a new draft, `⌘R` recent drafts, `⌘O` import, `⌘S` export, `⌘,` settings.
+   `⌘N` starts a new draft, `⌘R` recent drafts, `⌘O` import, `⌘S` export, `⌘E` enlarges or restores the window, `⌘,` settings.
+   Drag the right edge, the bottom edge or the corner to resize the window; double-click an edge to enlarge it.
 3. **Pick what is written**, with one control: *Clean up* (fillers, repetitions and homophone errors removed, meaning
    untouched), *Translate to English / Chinese*, or *Original*. Your original words stay visible and can be restored for
    any sentence.

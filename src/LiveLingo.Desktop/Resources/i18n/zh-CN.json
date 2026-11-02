@@ -50,6 +50,7 @@
   "composer.menu.import": "导入录音…",
   "composer.menu.export": "导出…",
   "composer.menu.wide": "宽屏对照",
+  "composer.menu.zoom": "放大 / 还原窗口",
   "composer.menu.whole": "整段处理（保留格式）",
   "composer.menu.settings": "设置",
   "composer.recent.clear": "清除最近草稿",

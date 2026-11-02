@@ -82,6 +82,30 @@ public sealed class ComposerIntentsTests
     }
 
     [Fact]
+    public async Task Resize_IsPassedOnToTheWindow()
+    {
+        await using var rig = new Rig();
+        ResizeIntent? seen = null;
+        rig.Sut.Resized += resize => seen = resize;
+
+        rig.Do(new ResizeIntent(900, null) { V = 1 });
+
+        Assert.Equal(new ResizeIntent(900, null) { V = 1 }, seen);
+    }
+
+    [Fact]
+    public async Task Zoom_IsPassedOnToTheWindow()
+    {
+        await using var rig = new Rig();
+        var zooms = 0;
+        rig.Sut.Zoomed += () => zooms++;
+
+        rig.Do(new ZoomIntent { V = 1 });
+
+        Assert.Equal(1, zooms);
+    }
+
+    [Fact]
     public async Task Size_IsPassedOnToTheWindow()
     {
         await using var rig = new Rig();
