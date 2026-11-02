@@ -15,7 +15,7 @@ public sealed class CleanupScheduler : IAsyncDisposable
     private readonly DraftSession _session;
     private readonly ITextCleaner _cleaner;
     private readonly IReadOnlyList<string> _glossary;
-    private readonly int _contextUnits;
+    private readonly int _contextChars;
     private readonly TimeProvider _time;
     /// <summary>How long the source must be still before typed text is cleaned: shorter than a sentence, longer than a keystroke.</summary>
     private static readonly TimeSpan TypingPause = TimeSpan.FromMilliseconds(400);
@@ -35,13 +35,13 @@ public sealed class CleanupScheduler : IAsyncDisposable
         DraftSession session,
         ITextCleaner cleaner,
         IReadOnlyList<string> glossary,
-        int contextUnits,
+        int contextChars,
         TimeProvider? time = null)
     {
         _session = session;
         _cleaner = cleaner;
         _glossary = glossary;
-        _contextUnits = contextUnits;
+        _contextChars = contextChars;
         _time = time ?? TimeProvider.System;
         _typingTimer = _time.CreateTimer(_ => Wake(), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
         _session.Changed += OnChanged;
@@ -212,11 +212,20 @@ public sealed class CleanupScheduler : IAsyncDisposable
         return (null, null);
     }
 
+    /// <summary>
+    /// The text before the unit, as far back as the budget allows: whole units, nearest first, and always at least the
+    /// nearest one, so a thought that continues across a pause is never cut off from its beginning.
+    /// </summary>
     private string PrecedingOf(Draft draft, int index)
     {
         var parts = new List<(string, string, string)>();
-        for (var i = Math.Max(0, index - _contextUnits); i < index; i++)
-            parts.Add(("", draft.Units[i].Clean.Text ?? draft.Units[i].Raw, ""));
+        var length = 0;
+        for (var i = index - 1; i >= 0 && (parts.Count == 0 || length < _contextChars); i--)
+        {
+            var text = draft.Units[i].Clean.Text ?? draft.Units[i].Raw;
+            parts.Insert(0, ("", text, ""));
+            length += text.Length;
+        }
         return TextUnits.Join(parts);
     }
 

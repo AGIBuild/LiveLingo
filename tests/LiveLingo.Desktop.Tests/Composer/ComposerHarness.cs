@@ -212,7 +212,7 @@ internal sealed class Harness : IAsyncDisposable
     {
         Session = new DraftSession(hasTarget, notifyOn);
         Scheduler = new TranslationScheduler(Session, Translator, TargetLanguage.English, TimeSpan.FromHours(1));
-        Cleanup = new CleanupScheduler(Session, Cleaner, [], contextUnits: 2);
+        Cleanup = new CleanupScheduler(Session, Cleaner, [], contextChars: 300);
         Models.HasAllExpectedLocalAssets(Arg.Any<ModelDescriptor>()).Returns(modelsInstalled);
         Platform.TextInjector.Returns(Injector);
         Platform.Clipboard.Returns(Clipboard);

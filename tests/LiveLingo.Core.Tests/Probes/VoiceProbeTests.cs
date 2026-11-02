@@ -55,7 +55,7 @@ public class VoiceProbeTests(ITestOutputHelper output)
             var samples = ReadMono16k(Path.Combine(corpus, "audio", id + ".wav"));
             var draft = new DraftSession(hasTarget: true);
             draft.Mutate(d => d.Output = OutputKind.Clean);
-            await using var cleanup = new CleanupScheduler(draft, cleaner, [], contextUnits: 2);
+            await using var cleanup = new CleanupScheduler(draft, cleaner, [], contextChars: 300);
 
             var loading = Stopwatch.StartNew();
             var session = await factory.CreateAsync(draft, [], CancellationToken.None);
