@@ -156,7 +156,15 @@ public sealed class ComposerPage : IAsyncDisposable
             WebIntent.Parse(json, out var reason) ?? throw new InvalidOperationException($"The host would reject {json}: {reason}"))];
     }
 
-    public Task ClearIntentsAsync() => Page.EvaluateAsync("window.__raw.length = 0");
+    /// <summary>
+    /// Forgets what the page sent so far. The page measures its size in an animation frame, so a report that a render
+    /// has queued would otherwise arrive after the clearing and look like the reaction to the next thing a test does.
+    /// </summary>
+    public async Task ClearIntentsAsync()
+    {
+        await Page.EvaluateAsync("() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done)))");
+        await Page.EvaluateAsync("window.__raw.length = 0");
+    }
 
     internal async Task<T> LastIntentAsync<T>() where T : WebIntent => (await IntentsAsync()).OfType<T>().Last();
 
