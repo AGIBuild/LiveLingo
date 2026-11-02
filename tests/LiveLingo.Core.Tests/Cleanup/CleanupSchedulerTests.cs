@@ -49,7 +49,7 @@ public class CleanupSchedulerTests
         public Harness(IReadOnlyList<string>? glossary = null)
         {
             Session.Mutate(draft => draft.Output = OutputKind.Clean);
-            Scheduler = new CleanupScheduler(Session, Cleaner, glossary ?? [], contextUnits: 2, Time);
+            Scheduler = new CleanupScheduler(Session, Cleaner, glossary ?? [], contextChars: 4, Time);
         }
 
         public void Speak(params string[] sentences) =>
@@ -358,7 +358,7 @@ public class CleanupSchedulerTests
     }
 
     [Fact]
-    public async Task OnlyTheLastContextUnits_AreGivenAsPreceding()
+    public async Task Preceding_ReachesBackAsFarAsTheCharacterBudget_WithWholeUnits()
     {
         await using var h = new Harness();
         h.Speak("一。", "二。", "三。", "四。");
@@ -370,6 +370,19 @@ public class CleanupSchedulerTests
         }
 
         Assert.Equal("二。三。", h.Cleaner.Calls[3].Request.Preceding);
+    }
+
+    [Fact]
+    public async Task Preceding_AlwaysIncludesTheNearestUnit_EvenWhenItExceedsTheBudget()
+    {
+        await using var h = new Harness();
+        h.Speak("这是一个比预算长得多的上一段。", "下一段。");
+
+        var first = await h.NextCall(1);
+        first.Result.SetResult(first.Request.Target);
+        var second = await h.NextCall(2);
+
+        Assert.Equal("这是一个比预算长得多的上一段。", second.Request.Preceding);
     }
 
     [Fact]

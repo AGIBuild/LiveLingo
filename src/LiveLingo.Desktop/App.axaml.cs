@@ -254,7 +254,7 @@ public partial class App : Application
             glossary: glossary);
         // With cleanup off no scheduler listens to the draft, so nothing is ever sent to a cleaner.
         var cleanup = settings.Composer.CleanupEnabled
-            ? new CleanupScheduler(session, services.GetRequiredService<ITextCleaner>(), glossary.Terms, contextUnits: 2)
+            ? new CleanupScheduler(session, services.GetRequiredService<ITextCleaner>(), glossary.Terms, contextChars: 300)
             : null;
         platform.Microphone.PreferredDevice = settings.Composer.Microphone;
         // Before the voice input is made: the models that are not in memory start loading now, and the composer shows that.

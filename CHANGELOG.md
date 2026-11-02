@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The fidelity check accepts a restated clause and a word the speaker corrected away, and still refuses lost numbers,
   lost terms, and any deleted negation.
 - Editing the recognized text keeps the passages whose sentences did not change.
+- The cleaner gets about 300 characters of the cleaned text before a passage as context (at least the whole previous
+  passage), instead of the previous two units.
 
 ### Added
 - The composer window can be resized: drag its right edge, bottom edge or corner. `⌘E` / `Ctrl+E`, the more menu, or a
