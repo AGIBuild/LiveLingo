@@ -25,6 +25,7 @@ public class ComposerTextsTests
     [Theory]
     [InlineData(ComposerStatus.Empty, "")]
     [InlineData(ComposerStatus.Starting, "[composer.status.starting]")]
+    [InlineData(ComposerStatus.Preparing, "[composer.status.preparing]")]
     [InlineData(ComposerStatus.Failed, "[composer.status.unavailable]")]
     public void Status_IsLocalized(ComposerStatus status, string expected)
     {

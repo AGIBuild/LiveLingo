@@ -21,6 +21,7 @@
     "cleanup": false,
     "defaultOutput": "Clean",
     "autoDictate": false,
+    "preloadSpeech": true,
     "terms": [
       {
         "i": 0,

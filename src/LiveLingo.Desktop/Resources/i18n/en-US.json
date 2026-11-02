@@ -111,6 +111,7 @@
 
   "composer.status.written": "Written",
   "composer.status.starting": "Loading speech models…",
+  "composer.status.preparing": "Speech models are getting ready…",
   "composer.status.listening": "Listening · {0} · click the microphone or press {1} to stop",
   "composer.status.transcribing": "Transcribing · {0}% · Esc to cancel",
   "composer.status.armed": "Writes automatically when done · Esc to cancel",
@@ -194,6 +195,8 @@
   "settings.output.original": "Original (no cleanup)",
   "settings.autoDictate": "Start dictating when summoned",
   "settings.autoDictate.desc": "Speak right after the summon shortcut; when off, press the dictation shortcut in the window to start",
+  "settings.preload": "Get speech ready at startup",
+  "settings.preload.desc": "Loads the speech models in the background so the first dictation does not wait. They take about 1.5 GB of memory while loaded and are released after 30 idle minutes; when off, they start loading each time you summon the composer",
   "settings.remember": "Remember the last choice for each app",
   "settings.remember.desc": "Stores only the app identifier, the output and the translation direction — never titles, text or recordings. Kept on this device; see and clear it under Privacy & cloud",
   "settings.terms": "Glossary",

@@ -105,7 +105,7 @@
 
 - 均衡：翻译 1.8B，整理 4B（16 GB 默认，直到 S1 证明 7B 可行）；
 - 质量：翻译 7B；
-- 按需驻留：整理与翻译模型在对应输出首次使用时才加载，闲置超时卸载（单一 `ModelResidencyPolicy`）。
+- 按需驻留：整理与翻译模型在对应输出首次使用时才加载，闲置超时卸载；语音模型常驻在内存并闲置卸载。何时预热、留多久见 [模型预热设计](./2026-11-02-model-warmup-design.md)（取代原设想的单一 `ModelResidencyPolicy`：“何时”由 `ModelWarmup` 决定，“留多久”由 `ResidentModel` / `LlamaServerHost` 决定）。
 
 **哈希与修订**：模型、llama.cpp 压缩包、sherpa 模型包的 URL、修订、大小、SHA256 写入目录；下载器校验失败即删除并报错。许可信息随目录显示（S5）。
 

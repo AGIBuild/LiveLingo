@@ -85,6 +85,40 @@ public class ComposerVoiceTests
     }
 
     [Fact]
+    public async Task WhileTheSpeechModelsLoadInTheBackground_AnEmptyComposerSaysSo_AndOnlyThen()
+    {
+        await using var h = Create();
+        Assert.Equal(ComposerStatus.Empty, h.Vm.Status);
+
+        h.Voice.SetPreparing(true);
+        Assert.Equal(ComposerStatus.Preparing, h.Vm.Status);
+
+        h.Vm.SourceText = "先检查缓存。";
+        await Wait.Until(() => h.Vm.Status != ComposerStatus.Preparing);
+
+        await h.Vm.NewDraftCommand.ExecuteAsync(null);
+        Assert.Equal(ComposerStatus.Preparing, h.Vm.Status);
+
+        h.Voice.SetPreparing(false);
+        Assert.Equal(ComposerStatus.Empty, h.Vm.Status);
+    }
+
+    [Fact]
+    public async Task APressWhileTheModelsAreStillLoading_ShowsTheStartingStatusInsteadOfThePreparingOne()
+    {
+        await using var h = Create();
+        h.Voice.SetPreparing(true);
+        h.Voice.StartGate = new TaskCompletionSource();
+
+        var start = h.Vm.ToggleListeningCommand.ExecuteAsync(null);
+
+        Assert.Equal(ComposerStatus.Starting, h.Vm.Status);
+        h.Voice.StartGate.SetResult();
+        await start;
+        Assert.Equal(ComposerStatus.Listening, h.Vm.Status);
+    }
+
+    [Fact]
     public async Task TogglingWhileTheModelsAreStillLoading_CancelsTheStart()
     {
         await using var h = Create();

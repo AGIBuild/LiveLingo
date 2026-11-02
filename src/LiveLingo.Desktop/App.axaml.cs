@@ -23,6 +23,7 @@ using LiveLingo.Desktop.Services.Configuration;
 using LiveLingo.Desktop.Services.Localization;
 using LiveLingo.Desktop.Services.Preferences;
 using LiveLingo.Desktop.Services.Update;
+using LiveLingo.Desktop.Services.Warmup;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Serilog;
@@ -91,6 +92,7 @@ public partial class App : Application
         services.AddSingleton<IPreferencesStore>(sp =>
             new JsonPreferencesStore(Path.Combine(GetUserDataDirectory(), "preferences.json"), sp.GetService<ILogger<JsonPreferencesStore>>()));
         services.AddSingleton<ComposerPreferences>();
+        services.AddSingleton<ModelWarmup>();
 
         // Registered after AddLiveLingoCore so it replaces the local-only default: roles go to the cloud only when the user enabled them.
         services.AddSingleton<ICloudRoutes, SettingsCloudRoutes>();
@@ -129,6 +131,7 @@ public partial class App : Application
                 _composer = new ComposerWindow(
                     _serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<ComposerWindow>(), platform.WindowMover);
                 _composer.Park();
+                _serviceProvider.GetRequiredService<ModelWarmup>().AtStartup();
                 RegisterHotkey(platform, settings.Hotkeys.Summon);
                 platform.Hotkey.HotkeyTriggered += _ => Dispatcher.UIThread.Post(async () => await SummonAsync(platform));
                 settingsService.SettingsChanged += () => Dispatcher.UIThread.Post(() =>
@@ -256,7 +259,11 @@ public partial class App : Application
                 session, services.GetRequiredService<ITextCleaner>(), glossary.Terms, CleanupHoldback, contextUnits: 2)
             : null;
         platform.Microphone.PreferredDevice = settings.Composer.Microphone;
-        var voice = new MicrophoneVoiceInput(services.GetRequiredService<IDictationSessionFactory>(), platform.Microphone);
+        // Before the voice input is made: the models that are not in memory start loading now, and the composer shows that.
+        var warmup = services.GetRequiredService<ModelWarmup>();
+        warmup.OnSummon(start.Output);
+        var voice = new MicrophoneVoiceInput(
+            services.GetRequiredService<IDictationSessionFactory>(), platform.Microphone, services.GetRequiredService<ISpeechWarmup>());
         var vm = new ComposerViewModel(
             session,
             scheduler,
@@ -275,6 +282,11 @@ public partial class App : Application
             context);
         vm.SettingsRequested += section => ShowSettings(section);
         vm.Begin(start);
+        vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(ComposerViewModel.Output))
+                warmup.OnOutputChanged(vm.Output);
+        };
         vm.ChoiceMade += choice => preferences.Remember(target, choice.Output, choice.Target);
         vm.DefaultsRestored += () => preferences.Forget(start.Remember!.AppId);
         vm.Exported += preferences.RememberExportFormat;

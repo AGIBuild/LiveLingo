@@ -1,5 +1,6 @@
 using LiveLingo.Core.Dictation;
 using LiveLingo.Core.Drafting;
+using LiveLingo.Core.Models;
 using LiveLingo.Desktop.Composer;
 using LiveLingo.Desktop.Platform;
 using NSubstitute;
@@ -30,14 +31,39 @@ public class MicrophoneVoiceInputTests
         public void Dispose() { }
     }
 
-    private static (MicrophoneVoiceInput Input, IMicrophone Mic, DraftSession Draft, IDictationSessionFactory Factory) Create()
+    private static (MicrophoneVoiceInput Input, IMicrophone Mic, DraftSession Draft, IDictationSessionFactory Factory) Create(ISpeechWarmup? warmup = null)
     {
         var draft = new DraftSession(hasTarget: true);
         var factory = Substitute.For<IDictationSessionFactory>();
         factory.CreateAsync(draft, Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>())
             .Returns(_ => new DictationSession(new SilentLive(), new SilentVad(), null, draft));
         var mic = Substitute.For<IMicrophone>();
-        return (new MicrophoneVoiceInput(factory, mic), mic, draft, factory);
+        return (new MicrophoneVoiceInput(factory, mic, warmup ?? Substitute.For<ISpeechWarmup>()), mic, draft, factory);
+    }
+
+    [Fact]
+    public async Task ItIsPreparing_WhileTheSpeechModelsLoad_AndSaysWhenThatChanges()
+    {
+        var warmup = Substitute.For<ISpeechWarmup>();
+        warmup.State.Returns(ModelResidency.Unloaded);
+        var (input, _, _, _) = Create(warmup);
+        var changes = new List<bool>();
+        input.PreparingChanged += changes.Add;
+        Assert.False(input.IsPreparing);
+
+        warmup.State.Returns(ModelResidency.Loading);
+        warmup.StateChanged += Raise.Event<Action<ModelResidency>>(ModelResidency.Loading);
+        Assert.True(input.IsPreparing);
+
+        warmup.State.Returns(ModelResidency.Ready);
+        warmup.StateChanged += Raise.Event<Action<ModelResidency>>(ModelResidency.Ready);
+
+        Assert.False(input.IsPreparing);
+        Assert.Equal([true, false], changes);
+
+        await input.DisposeAsync();
+        warmup.StateChanged += Raise.Event<Action<ModelResidency>>(ModelResidency.Loading);
+        Assert.Equal([true, false], changes);
     }
 
     [Fact]

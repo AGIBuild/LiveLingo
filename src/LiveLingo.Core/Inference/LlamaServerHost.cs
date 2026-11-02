@@ -135,6 +135,15 @@ public sealed class LlamaServerHost : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// Starts the server of the role (when it is not running) and gives it back at once, so it is ready for the next
+    /// request and unloads when it stays idle.
+    /// </summary>
+    public async Task WarmAsync(InferenceRole role, ModelDescriptor model, CancellationToken ct)
+    {
+        using var lease = await AcquireAsync(role, model, ct).ConfigureAwait(false);
+    }
+
     public async ValueTask DisposeAsync()
     {
         List<InferenceRole> roles;

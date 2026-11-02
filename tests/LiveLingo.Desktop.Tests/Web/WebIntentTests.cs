@@ -46,6 +46,7 @@ public sealed class WebIntentTests
     [InlineData("""{"v":1,"name":"clearApps"}""", typeof(ClearAppsIntent))]
     [InlineData("""{"v":1,"name":"setting","key":"defaultOutput","value":"Translate"}""", typeof(SettingIntent))]
     [InlineData("""{"v":1,"name":"setting","key":"autoDictate","value":"true"}""", typeof(SettingIntent))]
+    [InlineData("""{"v":1,"name":"setting","key":"preloadSpeech","value":"false"}""", typeof(SettingIntent))]
     [InlineData("""{"v":1,"name":"setting","key":"rememberChoices","value":"false"}""", typeof(SettingIntent))]
     public void Parse_AcceptsEveryIntentOfTheClosedSet(string json, Type expected)
     {
@@ -97,6 +98,7 @@ public sealed class WebIntentTests
     [InlineData("""{"v":1,"name":"setting","key":"tier","value":"Cloud"}""", "invalid")]
     [InlineData("""{"v":1,"name":"setting","key":"defaultOutput","value":"Cloud"}""", "invalid")]
     [InlineData("""{"v":1,"name":"setting","key":"autoDictate","value":"1"}""", "invalid")]
+    [InlineData("""{"v":1,"name":"setting","key":"preloadSpeech","value":"yes"}""", "invalid")]
     [InlineData("""{"v":1,"name":"setting","key":"rememberChoices","value":"maybe"}""", "invalid")]
     [InlineData("""{"v":1,"name":"forgetApp","appId":""}""", "invalid")]
     [InlineData("""{"v":1,"name":"setting","key":"theme"}""", "JsonException")]

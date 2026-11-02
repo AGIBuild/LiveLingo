@@ -1,25 +1,34 @@
 using LiveLingo.Core.Dictation;
+using LiveLingo.Core.Models;
 using SherpaOnnx;
 
 namespace LiveLingo.Core.Speech.Native;
 
 /// <summary>
 /// Streaming zipformer transducer (X-ASR). One stream per acoustic segment: closing a segment pads the tail with
-/// silence, so the final right-context is flushed, and starts a fresh stream.
+/// silence, so the final right-context is flushed, and starts a fresh stream. The loaded model is lent by
+/// <see cref="SherpaSpeechEngine"/> and given back when this recognizer is disposed.
 /// </summary>
 public sealed class SherpaLiveRecognizer : ILiveRecognizer
 {
+    private readonly ResidentModel<OnlineRecognizer>.Lease _model;
     private readonly OnlineRecognizer _recognizer;
     private readonly int _tailPaddingMs;
     private OnlineStream _stream;
     private string _text = "";
 
-    /// <param name="modelDir">Directory of the extracted <see cref="Models.ModelCatalog.SpeechLive"/> model.</param>
     /// <param name="tailPaddingMs">Silence appended on close; the 480 ms model needs 800 ms to flush its right context.</param>
-    public SherpaLiveRecognizer(string modelDir, int threads = 2, int tailPaddingMs = 800)
+    public SherpaLiveRecognizer(ResidentModel<OnlineRecognizer>.Lease model, int tailPaddingMs = 800)
     {
+        _model = model;
+        _recognizer = model.Value;
         _tailPaddingMs = tailPaddingMs;
+        _stream = _recognizer.CreateStream();
+    }
 
+    /// <param name="modelDir">Directory of the extracted <see cref="Models.ModelCatalog.SpeechLive"/> model.</param>
+    public static OnlineRecognizer Load(string modelDir, int threads = 2)
+    {
         var config = new OnlineRecognizerConfig();
         config.FeatConfig.SampleRate = AudioFormat.SampleRate;
         config.FeatConfig.FeatureDim = 80;
@@ -32,8 +41,7 @@ public sealed class SherpaLiveRecognizer : ILiveRecognizer
         config.DecodingMethod = "greedy_search";
         config.EnableEndpoint = 0; // segment boundaries come from the voice activity detector, not from the recognizer
 
-        _recognizer = new OnlineRecognizer(config);
-        _stream = _recognizer.CreateStream();
+        return new OnlineRecognizer(config);
     }
 
     public string CurrentText => _text;
@@ -67,6 +75,6 @@ public sealed class SherpaLiveRecognizer : ILiveRecognizer
     public void Dispose()
     {
         _stream.Dispose();
-        _recognizer.Dispose();
+        _model.Dispose();
     }
 }

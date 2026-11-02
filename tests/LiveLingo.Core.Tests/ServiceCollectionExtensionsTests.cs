@@ -24,6 +24,21 @@ public class ServiceCollectionExtensionsTests
         Assert.IsType<LlmTranslator>(sp.GetService<ITranslator>());
         Assert.IsType<LlmTextCleaner>(sp.GetService<ITextCleaner>());
         Assert.NotNull(sp.GetService<IDictationSessionFactory>());
+        Assert.NotNull(sp.GetService<IInferenceWarmup>());
+    }
+
+    [Fact]
+    public async Task TheSpeechModels_HaveOneOwner_ForDictationImportAndPreparation()
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddLiveLingoCore();
+        await using var sp = services.BuildServiceProvider();
+
+        var engine = sp.GetRequiredService<LiveLingo.Core.Speech.Native.SherpaSpeechEngine>();
+        Assert.Same(engine, sp.GetRequiredService<IDictationSessionFactory>());
+        Assert.Same(engine, sp.GetRequiredService<ISpeechWarmup>());
+        Assert.Same(engine, sp.GetRequiredService<LiveLingo.Core.Transcription.IAudioFileTranscriber>());
     }
 
     [Fact]

@@ -111,6 +111,7 @@
 
   "composer.status.written": "已写入",
   "composer.status.starting": "正在加载语音模型…",
+  "composer.status.preparing": "语音模型准备中，稍后可用…",
   "composer.status.listening": "正在听 · {0} · 点麦克风或按 {1} 结束",
   "composer.status.transcribing": "转录中 · {0}% · Esc 取消",
   "composer.status.armed": "处理完成后自动写入 · Esc 取消",
@@ -194,6 +195,8 @@
   "settings.output.original": "原话（不整理）",
   "settings.autoDictate": "唤起后自动开始听写",
   "settings.autoDictate.desc": "按下唤起快捷键就能直接说话；关闭时在窗口里再按一次听写快捷键开始",
+  "settings.preload": "启动时准备语音模型",
+  "settings.preload.desc": "在后台提前加载，之后第一次听写不用等待。加载后约占用 1.5 GB 内存，30 分钟不用会自动释放；关闭后改为每次唤起时才开始加载",
   "settings.remember": "记住每个应用的上次选择",
   "settings.remember.desc": "只记应用标识、输出与翻译方向，不记标题、文字和录音；仅保存在本机，可在「隐私与云端」里查看和清除",
   "settings.terms": "术语表",

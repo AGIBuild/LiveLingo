@@ -110,15 +110,18 @@ public class SettingsViewModelTests
         var model = new SettingsModel();
         Assert.True(model.Composer.RememberChoices);
         Assert.False(model.Composer.AutoDictate);
+        Assert.True(model.Composer.PreloadSpeech);
         Assert.Equal("Clean", model.Composer.DefaultOutput);
 
         var f = new Fixture();
         f.Vm.RememberChoices = false;
         f.Vm.AutoDictate = true;
+        f.Vm.PreloadSpeech = false;
         f.Vm.DefaultOutputIndex = SettingsViewModel.DefaultOutputs.ToList().IndexOf("Translate");
 
         Assert.False(f.Last.Composer.RememberChoices);
         Assert.True(f.Last.Composer.AutoDictate);
+        Assert.False(f.Last.Composer.PreloadSpeech);
         Assert.Equal("Translate", f.Last.Composer.DefaultOutput);
     }
 

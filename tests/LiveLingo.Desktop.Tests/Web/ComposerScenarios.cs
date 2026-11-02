@@ -19,6 +19,12 @@ internal static class ComposerScenarios
     public static IReadOnlyDictionary<string, Func<Task<ComposerViewState>>> All { get; } = new SortedDictionary<string, Func<Task<ComposerViewState>>>
     {
         ["empty"] = async () => { await using var h = new Harness(output: ComposerOutput.Clean); return State(h); },
+        ["speech-preparing"] = async () =>
+        {
+            await using var h = new Harness(output: ComposerOutput.Clean);
+            h.Voice.SetPreparing(true);
+            return State(h);
+        },
         ["remembered"] = async () =>
         {
             await using var h = new Harness(output: ComposerOutput.Clean);

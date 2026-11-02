@@ -124,6 +124,16 @@ internal sealed class FakeVoiceInput : IVoiceInput
 
     public event Action<bool>? NoSignalChanged;
 
+    public event Action<bool>? PreparingChanged;
+
+    public bool IsPreparing { get; private set; }
+
+    public void SetPreparing(bool preparing)
+    {
+        IsPreparing = preparing;
+        PreparingChanged?.Invoke(preparing);
+    }
+
     public void RaiseNoSignal(bool silent) => NoSignalChanged?.Invoke(silent);
 
     public int Starts { get; private set; }
