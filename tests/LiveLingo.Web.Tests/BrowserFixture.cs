@@ -63,6 +63,8 @@ public sealed class BrowserFixture : IAsyncLifetime
         var session = await OpenBareAsync(engine, width, scheme);
         await session.PushStringsAsync();
         await session.PushAsync(fixture);
+        // The panel rises into place for a moment; a test that aims at a thin target must not measure it on the way.
+        await session.Page.WaitForFunctionAsync("() => !document.getAnimations().some(a => a.animationName === 'rise')");
         return session;
     }
 

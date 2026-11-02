@@ -160,7 +160,7 @@ internal sealed class ComposerWindow : Window
         if (_session is null || CurrentScreen() is not { } screen)
             return;
 
-        if (_userWidth is not null || _userHeight is not null)
+        if (_userHeight is not null)
         {
             _userWidth = null;
             _userHeight = null;

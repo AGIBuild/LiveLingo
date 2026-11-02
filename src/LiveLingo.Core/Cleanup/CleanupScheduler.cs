@@ -206,27 +206,10 @@ public sealed class CleanupScheduler : IAsyncDisposable
             if (!continues && typing > TimeSpan.Zero)
                 return (null, typing);
 
-            return ((draft.TicketFor(i), new CleanupRequest(unit.Raw, PrecedingOf(draft, i), continues, _glossary)), null);
+            return ((draft.TicketFor(i), new CleanupRequest(unit.Raw, draft.PrecedingText(i, _contextChars), continues, _glossary)), null);
         }
 
         return (null, null);
-    }
-
-    /// <summary>
-    /// The text before the unit, as far back as the budget allows: whole units, nearest first, and always at least the
-    /// nearest one, so a thought that continues across a pause is never cut off from its beginning.
-    /// </summary>
-    private string PrecedingOf(Draft draft, int index)
-    {
-        var parts = new List<(string, string, string)>();
-        var length = 0;
-        for (var i = index - 1; i >= 0 && (parts.Count == 0 || length < _contextChars); i--)
-        {
-            var text = draft.Units[i].Clean.Text ?? draft.Units[i].Raw;
-            parts.Insert(0, ("", text, ""));
-            length += text.Length;
-        }
-        return TextUnits.Join(parts);
     }
 
     public async ValueTask DisposeAsync()

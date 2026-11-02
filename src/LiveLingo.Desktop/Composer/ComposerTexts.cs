@@ -22,6 +22,8 @@ public sealed class ComposerTexts(ILocalizationService loc, bool? mac = null)
     public string OutputAria => loc.T("composer.out.aria");
     public string MoreAria => loc.T("composer.more");
     public string CloseAria => loc.T("composer.close");
+    public string ZoomAria => loc.T("composer.zoom");
+    public string UnzoomAria => loc.T("composer.unzoom");
 
     /// <summary>The destination chip: the app that receives the text, a lost window, or copy only.</summary>
     public string Dest(bool hasTarget, bool targetLost, string targetName) =>
@@ -75,7 +77,6 @@ public sealed class ComposerTexts(ILocalizationService loc, bool? mac = null)
     public string MoreImport => loc.T("composer.menu.import");
     public string MoreExport => loc.T("composer.menu.export");
     public string MoreWide => loc.T("composer.menu.wide");
-    public string MoreZoom => loc.T("composer.menu.zoom");
     public string MoreWhole => loc.T("composer.menu.whole");
     public string MoreSettings => loc.T("composer.menu.settings");
     public string RecentClear => loc.T("composer.recent.clear");
@@ -264,6 +265,8 @@ public sealed class ComposerTexts(ILocalizationService loc, bool? mac = null)
         ["outputAria"] = OutputAria,
         ["moreAria"] = MoreAria,
         ["closeAria"] = CloseAria,
+        ["zoomAria"] = ZoomAria,
+        ["unzoomAria"] = UnzoomAria,
         ["copyAria"] = CopyAria,
         ["resultAria"] = ResultAria,
         ["routeChip"] = RouteChip,

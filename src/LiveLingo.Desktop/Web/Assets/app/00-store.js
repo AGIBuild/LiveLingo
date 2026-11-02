@@ -18,6 +18,8 @@
     dialog: null,
     toast: '',
     focus: null,
+    // The host fixed the window height (the user sized or enlarged it).
+    fixed: false,
   };
 
   let root = null;
@@ -121,9 +123,10 @@
         return;
       case 'frame':
         // The window height was fixed by the user (or zoomed): the panel fills it instead of following its content.
-        document.documentElement.classList.toggle('fixed-h', message.data.fixedHeight);
+        s.fixed = message.data.fixedHeight;
+        document.documentElement.classList.toggle('fixed-h', s.fixed);
         LL.measure?.();
-        return;
+        break;
       case 'limit':
         // How tall the panel may get on this screen; the body scrolls beyond it (the host also caps the window).
         document.documentElement.style.setProperty('--panel-max', message.data.maxHeight + 'px');

@@ -226,6 +226,9 @@ public partial class App : Application
 
     private static readonly TimeSpan TailIdleDelay = TimeSpan.FromSeconds(1.5);
 
+    /// <summary>How much of the text before a passage the cleaner reads as context.</summary>
+    private const int CleanupContextChars = 300;
+
     private async Task SummonAsync(IPlatformServices platform)
     {
         var window = _composer!;
@@ -253,8 +256,12 @@ public partial class App : Application
             session, services.GetRequiredService<ITranslator>(), start.Target, TailIdleDelay,
             glossary: glossary);
         // With cleanup off no scheduler listens to the draft, so nothing is ever sent to a cleaner.
+        var cleaner = services.GetRequiredService<ITextCleaner>();
         var cleanup = settings.Composer.CleanupEnabled
-            ? new CleanupScheduler(session, services.GetRequiredService<ITextCleaner>(), glossary.Terms, contextChars: 300)
+            ? new CleanupScheduler(session, cleaner, glossary.Terms, contextChars: CleanupContextChars)
+            : null;
+        var polish = settings.Composer.CleanupEnabled
+            ? new PolishScheduler(session, cleaner, glossary.Terms, CleanupContextChars)
             : null;
         platform.Microphone.PreferredDevice = settings.Composer.Microphone;
         // Before the voice input is made: the models that are not in memory start loading now, and the composer shows that.
@@ -301,6 +308,8 @@ public partial class App : Application
         await vm.DisposeAsync();
         if (cleanup is not null)
             await cleanup.DisposeAsync();
+        if (polish is not null)
+            await polish.DisposeAsync();
         await scheduler.DisposeAsync();
     }
 

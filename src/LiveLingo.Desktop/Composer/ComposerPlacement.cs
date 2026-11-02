@@ -13,8 +13,8 @@ public static class ComposerPlacement
     /// <summary>The page keeps an 18 px margin on every side of the panel for its shadow.</summary>
     public const int ShadowMargin = 36;
 
-    /// <summary>The tallest the panel gets on a large screen (CSS pixels); the page scrolls inside it.</summary>
-    public const int MaxPanelHeightLimit = 470;
+    /// <summary>How much of the screen's working height the panel may take before it scrolls.</summary>
+    public const double PanelShare = 0.7;
 
     /// <summary>Below this the footer and one line of text no longer fit.</summary>
     public const int MinPanelHeight = 160;
@@ -93,12 +93,14 @@ public static class ComposerPlacement
     }
 
     /// <summary>
-    /// The tallest the panel may be on this screen, in CSS pixels: the working area less the shadow margin and a gap at
-    /// both edges, so its buttons never end up behind the dock, the menu bar or the screen edge.
+    /// The tallest the panel may be on this screen, in CSS pixels: <see cref="PanelShare"/> of the working area, and never
+    /// more than the working area less the shadow margin and a gap at both edges, so its buttons never end up behind the
+    /// dock, the menu bar or the screen edge. The page scrolls inside it; a taller window is the user's to ask for.
     /// </summary>
     public static int MaxPanelHeight(int workHeightPx, double scaling)
     {
-        var available = (int)(workHeightPx / scaling) - ShadowMargin - 2 * ScreenGap;
-        return Math.Clamp(available, MinPanelHeight, MaxPanelHeightLimit);
+        var work = (int)(workHeightPx / scaling);
+        var available = work - ShadowMargin - 2 * ScreenGap;
+        return Math.Clamp(Math.Min(available, (int)Math.Round(work * PanelShare)), MinPanelHeight, Math.Max(MinPanelHeight, available));
     }
 }

@@ -162,7 +162,6 @@ internal sealed record ComposerViewState(
                     new MenuItemState("export", texts.MoreExport, false, true),
                     new MenuItemState("wide", texts.MoreWide, vm.ForceWide, true),
                     new MenuItemState("whole", texts.MoreWhole, vm.ForceWhole, true),
-                    new MenuItemState("zoom", texts.MoreZoom, false, true),
                     new MenuItemState("settings", texts.MoreSettings, false, true)
                 ]),
             Dialogs: new DialogsState(

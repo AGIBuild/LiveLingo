@@ -40,6 +40,32 @@ public class FidelityGateTests
     }
 
     [Fact]
+    public void Accepts_light_words_trimmed_around_fillers()
+    {
+        var gate = FidelityGate.Check(
+            "如果说AI能预测股市，选择股票的话。那么，我的生活就轻松多了呀。行业大牛是怎么平衡他们的这个工作的？再清理一下现有的历史输入。",
+            "如果说 AI 能预测股市、选择股票，我的生活就轻松多了。行业大牛是怎么平衡工作的？再清理现有的历史输入。");
+        Assert.True(gate.Accepted, gate.Rejection?.ToString());
+    }
+
+    [Fact]
+    public void Rejects_too_many_small_drops()
+    {
+        var gate = FidelityGate.Check(
+            "我们把接口这边的鉴权改成令牌，再把缓存那边的过期改成半小时，把日志这边的级别调到警告。",
+            "我们把接口的鉴权改成令牌，再把缓存的过期改成半小时，把日志的级别调到警告。");
+        Assert.Equal(GateReason.Deleted, gate.Rejection?.Reason);
+    }
+
+    [Fact]
+    public void Rejects_a_dropped_lone_negation() =>
+        Assert.Equal(GateReason.Deleted, FidelityGate.Check("这个接口不要加重试，其他保持不变。", "这个接口要加重试，其他保持不变。").Rejection?.Reason);
+
+    [Fact]
+    public void Rejects_a_dropped_negated_word_even_though_it_is_short() =>
+        Assert.Equal(GateReason.Deleted, FidelityGate.Check("发布之前没有评审，我们需要先补上。", "发布之前，我们需要先补上。").Rejection?.Reason);
+
+    [Fact]
     public void Accepts_a_restated_clause_removed_from_a_passage()
     {
         var gate = FidelityGate.Check(
