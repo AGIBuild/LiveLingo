@@ -25,6 +25,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Installed apps could never find an update: every settings file of 1.x and 2.0.0 stores the placeholder update address
+  `https://github.com/user/LiveLingo`, which the new default did not replace. It is now replaced on load; an address you
+  set yourself is kept, and an empty one turns updates off (it used to be filled in again at every start).
+- The Velopack install and update hooks are handled first thing in `Main`, before the single-instance lock, so a running
+  instance can no longer turn the installer or updater away.
 - The default update URL pointed at a placeholder repository; it is now `https://github.com/AGIBuild/LiveLingo`.
 
 ### Removed

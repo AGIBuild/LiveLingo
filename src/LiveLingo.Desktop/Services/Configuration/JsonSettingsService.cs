@@ -75,10 +75,9 @@ public sealed class JsonSettingsService : ISettingsService
             if (shouldPersistDefaults)
                 SaveCurrentUnsafe();
 
-            // Backfill: existing settings files may have an empty UpdateUrl from the
-            // pre-default era.  Apply the compiled default so the auto-update service
-            // is always created at startup.
-            if (string.IsNullOrEmpty(_current.Update.UpdateUrl))
+            // Every settings file written before 2.0.1 holds the placeholder address that was the default then, so the
+            // installed app could never find an update. An address the user typed, or an empty one (updates off), is kept.
+            if (string.Equals(_current.Update.UpdateUrl, UpdateSettings.PlaceholderUpdateUrl, StringComparison.OrdinalIgnoreCase))
             {
                 _current.Update.UpdateUrl = UpdateSettings.DefaultUpdateUrl;
                 SaveCurrentUnsafe();
