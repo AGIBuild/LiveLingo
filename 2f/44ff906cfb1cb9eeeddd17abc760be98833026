@@ -1,0 +1,72 @@
+tests/LiveLingo.Core.Tests/Dictation/DictationSessionTests.cs
+  s_6d6e9175f38e45::t_a8c183b003bfe0 326-400
+  s_6d6e9175f38e45::t_cc9d1c42740ce3 26-27,39-40
+src/LiveLingo.Desktop/App.axaml.cs
+  s_6d6e9175f38e45::t_366cc9a6b1e8da 255,257
+src/LiveLingo.Core/Dictation/DictationOptions.cs
+  s_6d6e9175f38e45::t_a287377c0beddc 19-26
+  s_6d6e9175f38e45::t_b7c1815c92bc8d 18
+tests/LiveLingo.Core.Tests/Dictation/FidelityGateTests.cs
+  s_6d6e9175f38e45::t_b90ef009220c9f 42-71
+src/LiveLingo.Core/Cleanup/LlmTextCleaner.cs
+  s_6d6e9175f38e45::t_53e2ff9a47f728 6-11,14,17-19,21-22,29,31
+src/LiveLingo.Core/Dictation/DictationSession.cs
+  s_6d6e9175f38e45::t_31bea8e19f7263 9-10
+  s_6d6e9175f38e45::t_72407352ef5f3c 393,395,401-402,407,410,437
+  s_6d6e9175f38e45::t_392a56ea170c3a 21
+  s_6d6e9175f38e45::t_8bc809987a0033 178-202
+  s_6d6e9175f38e45::t_64b35a4169ab87 22,47,147
+  s_6d6e9175f38e45::t_1eafa7244d7aa3 311,313-317,321,333,339-341,343-346,350,354-361,365,367-376,379
+  s_6d6e9175f38e45::t_3de689faceb5d2 380
+src/LiveLingo.Core/Drafting/Draft.cs
+  s_6d6e9175f38e45::t_7b991756ec4eb8 73-74,89,92,94-95,97,99,103,106,115-137
+  s_6d6e9175f38e45::t_f3c69d8fd2a2ef 138-139
+tests/LiveLingo.Core.Tests/Drafting/DraftTests.cs
+  s_6d6e9175f38e45::t_8182cf487bcbce 192-232
+tests/LiveLingo.Core.Tests/Cleanup/LlmTextCleanerTests.cs
+  s_6d6e9175f38e45::t_7e9bd163aadff8 65,73
+src/LiveLingo.Core/Dictation/FidelityGate.cs
+  s_6d6e9175f38e45::t_4eba2341878319 24,26,42-49,79,81
+  s_6d6e9175f38e45::t_e42728a35450f7 55
+  s_6d6e9175f38e45::t_e6c439f5dc30da 127,132-133,135-136,139,142-168
+  s_6d6e9175f38e45::t_6cffb4ee245d54 110
+tests/LiveLingo.Desktop.Tests/Composer/ComposerHarness.cs
+  s_6d6e9175f38e45::t_0d95356e46a367 215
+tests/LiveLingo.Core.Tests/Cleanup/CleanupSchedulerTests.cs
+  s_6d6e9175f38e45::t_24f7e70227923d 110,114
+  s_6d6e9175f38e45::t_e54c0ea969be2e 175-217,221-228
+  s_6d6e9175f38e45::t_13270a109e5b71 126
+  s_6d6e9175f38e45::t_7dbacc7980e39f 52,93
+  s_6d6e9175f38e45::t_f06fc829d4d90f 218-220
+  s_6d6e9175f38e45::t_eb89b37d284885 137,141,144,146
+docs/superpowers/specs/2026-10-29-voice-dictation-design.md
+  s_6d6e9175f38e45::t_1faa8faf4f6eaf 12,36-38,122,127-128
+  s_6d6e9175f38e45::t_96317e530a8aed 129
+src/LiveLingo.Core/Cleanup/CleanupScheduler.cs
+  s_6d6e9175f38e45::t_0d37a885c5fb25 164-167
+  s_6d6e9175f38e45::t_8bf73c6583f3c2 234
+  s_6d6e9175f38e45::t_e63382d96b8ad6 203-204
+  s_6d6e9175f38e45::t_7e690386d6735d 8-11,25,46,67
+  s_6d6e9175f38e45::t_c854a1ade872c6 127-128,151-163,168-186
+  s_6d6e9175f38e45::t_8d8a74f19f5963 115,189,202
+  s_6d6e9175f38e45::t_24f6da1d1e4491 187-188
+tests/LiveLingo.Core.Tests/Probes/VoiceProbeTests.cs
+  s_6d6e9175f38e45::t_1466fff06e915e 58
+  s_6d6e9175f38e45::t_08a0d781b490cf 81,86-87
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2f44ff906cfb1cb9eeeddd17abc760be98833026",
+  "prompts": {},
+  "sessions": {
+    "s_6d6e9175f38e45": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "f74d37e5-1d96-4ddc-a3f9-5ae24ff39e38",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
