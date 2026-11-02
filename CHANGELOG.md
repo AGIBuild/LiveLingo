@@ -7,10 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.2] - 2026-11-02
+
+Dictation now reads as connected text: it is cleaned passage by passage while you speak, and the whole dictation is
+polished as one text when you stop.
+
 ### Changed
-- Cleanup works on whole passages instead of single sentences. The recognizer cuts speech at every pause, so a
-  sentence on its own is often half a thought; dictation now collects sentences into a passage (ended by a 1.5 s pause,
-  by length, or by stopping) and the cleaner joins fragments, drops repetitions, and fixes homophones from context.
+- Cleanup works on passages instead of single sentences. The recognizer cuts speech at every pause, so a sentence on
+  its own is often half a thought; dictation now collects sentences into a passage (ended by a 3 s pause, 200
+  characters, or stopping) and the cleaner joins fragments, drops repetitions, and fixes homophones from context.
   The cleaning pause before the last sentence is gone with it.
 - A passage that fails the fidelity check is cleaned again sentence by sentence, so one bad sentence no longer costs the
   rest of the passage its cleanup.
