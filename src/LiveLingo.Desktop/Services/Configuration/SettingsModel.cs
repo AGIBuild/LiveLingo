@@ -123,6 +123,10 @@ public partial class UpdateSettings : ObservableObject
 {
     public const string DefaultUpdateUrl = "https://github.com/AGIBuild/LiveLingo";
 
+    /// <summary>The default of 1.x and 2.0.0, which pointed at no repository; it was saved into every settings file.</summary>
+    public const string PlaceholderUpdateUrl = "https://github.com/user/LiveLingo";
+
+    /// <summary>Where updates are looked for; empty turns updates off.</summary>
     [ObservableProperty] private string _updateUrl = DefaultUpdateUrl;
     [ObservableProperty] private int _checkIntervalHours = 4;
 

@@ -143,9 +143,9 @@ public sealed partial class ComposerViewModel
     }
 
     /// <summary>Starts or stops the slow-processing countdown as the status enters or leaves "working".</summary>
-    private void UpdateSlowTimer()
+    private void UpdateSlowTimer(ComposerStatus status)
     {
-        if (Status == ComposerStatus.Working)
+        if (status == ComposerStatus.Working)
         {
             if (_slowTimer is null)
                 RestartSlowTimer();

@@ -39,6 +39,38 @@ public class JsonSettingsServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task LoadAsync_ReplacesThePlaceholderUpdateUrlOfEarlierVersions_AndStoresTheFix()
+    {
+        var saved = new SettingsModel();
+        saved.Update.UpdateUrl = UpdateSettings.PlaceholderUpdateUrl;
+        saved.Hotkeys.Summon = "Alt+X";
+        await File.WriteAllTextAsync(_settingsPath, System.Text.Json.JsonSerializer.Serialize(saved, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)), TestContext.Current.CancellationToken);
+
+        var svc = new JsonSettingsService(_settingsPath);
+        await svc.LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(UpdateSettings.DefaultUpdateUrl, svc.Current.Update.UpdateUrl);
+        Assert.Equal("Alt+X", svc.Current.Hotkeys.Summon);
+        Assert.Contains(UpdateSettings.DefaultUpdateUrl, await File.ReadAllTextAsync(_settingsPath, TestContext.Current.CancellationToken));
+        Assert.DoesNotContain(UpdateSettings.PlaceholderUpdateUrl, await File.ReadAllTextAsync(_settingsPath, TestContext.Current.CancellationToken));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("https://example.com/releases")]
+    public async Task LoadAsync_KeepsAnUpdateUrlTheUserSet_AndAnEmptyOneTurnsUpdatesOff(string url)
+    {
+        var saved = new SettingsModel();
+        saved.Update.UpdateUrl = url;
+        await File.WriteAllTextAsync(_settingsPath, System.Text.Json.JsonSerializer.Serialize(saved, new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)), TestContext.Current.CancellationToken);
+
+        var svc = new JsonSettingsService(_settingsPath);
+        await svc.LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(url, svc.Current.Update.UpdateUrl);
+    }
+
+    [Fact]
     public async Task LoadAsync_HandlesCorruptJson()
     {
         await File.WriteAllTextAsync(_settingsPath, "{{{{corrupt json!!", TestContext.Current.CancellationToken);

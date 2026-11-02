@@ -554,12 +554,14 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
         IsWholeRoute = snapshot.Whole;
         IsTargetLost = snapshot.TargetLost;
         IsWide = ForceWide || HasTimeline || snapshot.Whole;
-        Status = StatusOf(snapshot.Count + (snapshot.HasPending ? 1 : 0), snapshot.Content);
+        var status = StatusOf(snapshot.Count + (snapshot.HasPending ? 1 : 0), snapshot.Content);
+        // The countdown exists before "working" is published, so whoever sees the status can rely on it.
+        UpdateSlowTimer(status);
+        Status = status;
         CanCopy = _committed is not null || Status == ComposerStatus.Ready;
         CanWrite = CanCopy && _committed is null;
         OnPropertyChanged(nameof(CanReplaceDraft));
         OnPropertyChanged(nameof(CanEditRows));
-        UpdateSlowTimer();
 
         var needsModels = !ModelsReady && Output != ComposerOutput.Original;
         if (needsModels && Banner.Kind is BannerKind.None)
