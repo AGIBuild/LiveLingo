@@ -3,9 +3,8 @@ using Microsoft.Extensions.Logging;
 namespace LiveLingo.Core.Models.Installations;
 
 /// <summary>
-/// Read/inspect/delete operations against the on-disk install layout.
-/// Reads <c>manifest.json</c> per model directory to enumerate installed models;
-/// computes total disk usage; deletes a model's directory tree.
+/// Read/inspect operations against the on-disk install layout.
+/// Reads <c>manifest.json</c> per model directory to enumerate installed models.
 /// </summary>
 internal sealed class InstalledModelStore
 {
@@ -64,25 +63,5 @@ internal sealed class InstalledModelStore
         }
 
         return true;
-    }
-
-    public async Task DeleteAsync(string modelId, CancellationToken ct)
-    {
-        var modelDir = GetModelDirectory(modelId);
-        if (Directory.Exists(modelDir))
-        {
-            await Task.Run(() => Directory.Delete(modelDir, true), ct).ConfigureAwait(false);
-            _logger.LogDebug("Model {Id} deleted", modelId);
-        }
-    }
-
-    public long GetTotalDiskUsage()
-    {
-        var storagePath = _options.ModelStoragePath;
-        if (!Directory.Exists(storagePath))
-            return 0;
-
-        return Directory.EnumerateFiles(storagePath, "*", SearchOption.AllDirectories)
-            .Sum(f => new FileInfo(f).Length);
     }
 }

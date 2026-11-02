@@ -5,6 +5,105 @@ All notable changes to LiveLingo are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- Speech is ready when you are. The speech models are now loaded in the background a few seconds after the app
+  starts (Settings → Voice → *Get speech ready at startup*, on by default), after they are downloaded, and whenever the
+  composer opens, and they stay in memory for 30 idle minutes. Starting dictation after that takes milliseconds instead
+  of 3–5 seconds. The cleanup or translation model of the output the composer starts with is loaded when it opens, and
+  when you switch output, so the first sentence no longer waits for it (the first cleanup took about 10 seconds).
+  While the speech models are still loading, the empty composer says so. The preloaded speech models take about 1.5 GB
+  of memory; see `docs/superpowers/specs/2026-11-02-model-warmup-design.md`.
+- Automatic updates work. Releases now carry the Velopack update packages and feeds
+  (`releases.win.json`, `releases.osx.json`) next to the installers, and the release is not published unless each feed
+  names a package that is in it. Before, only installers were uploaded, so no installed application could find an update.
+- The installed app downloads a newer version in the background and offers *Restart to Update* in the tray menu;
+  quitting installs it too. The macOS installer is now built by Velopack (it replaces the hand-built `.pkg`, which the
+  updater could not manage) and carries the app icon. The `.msi` does not update itself.
+
+### Fixed
+
+- Installed apps could never find an update: every settings file of 1.x and 2.0.0 stores the placeholder update address
+  `https://github.com/user/LiveLingo`, which the new default did not replace. It is now replaced on load; an address you
+  set yourself is kept, and an empty one turns updates off (it used to be filled in again at every start).
+- The Velopack install and update hooks are handled first thing in `Main`, before the single-instance lock, so a running
+  instance can no longer turn the installer or updater away.
+- The default update URL pointed at a placeholder repository; it is now `https://github.com/AGIBuild/LiveLingo`.
+
+### Removed
+
+- Code that nothing in 2.0 uses: model deletion, disk-usage and storage-relocation operations of `IModelManager`, the
+  stub model manager and null download coordinator, Hugging Face repository listing and quantization choosing (and the
+  `LiveLingo.HfGguf.Cli` tool that used them), unused native declarations, and tests that only checked record equality.
+- The 1.x product design, proposals, roadmap and demo images, the WebView feasibility spike (`tools/WebViewSpike`) and
+  stray scratch files.
+
+## [2.0.0] - 2026-11-01
+
+Rewrite around a single composer window (branch `feat/composer-v3`). The 1.x translator overlay, its cloud and Ollama
+providers, wizard and model catalog were removed; see the design and plan under `docs/superpowers/`.
+
+### Added
+
+- Composer: summon with a global hotkey, type, paste or speak, choose *Clean up*, *Translate* or *Original*, press
+  Enter to write into the app you came from. Banners replace dialogs for missing models, permissions and silence.
+- Voice dictation with live text (X-ASR), settled text (Qwen3-ASR) and a fidelity-checked cleanup (Qwen3.5 4B).
+- Translation with Hy-MT2 on a pinned `llama-server`; glossary of keep-as-written terms and fixed translations.
+- Import a WAV recording as a timeline; export SRT in the chosen output.
+- Optional cloud translation and cleanup through an OpenAI-compatible endpoint, per feature, text only, off by default;
+  API key in the system secret store.
+- Recent drafts (memory only), side-by-side layout for transcripts and whole documents, accessible names and live
+  regions.
+- Every summon starts with an empty composer. A draft that was closed without being written is offered as one click
+  ("Continue last draft") in the empty state, and stays in the recent drafts menu; it is never put back by itself.
+- The microphone no longer closes when the user pauses: dictation goes on until it is stopped, and only 5 minutes of
+  complete silence turn it off, with a notice that what was heard is kept.
+- The composer remembers, per target application, the output (*Clean up* or *Translate*) and the translation direction
+  last chosen there, and begins with them the next time. A one-line note says where a remembered choice came from and
+  offers "Restore defaults"; *Original*, cloud switches and the microphone are never remembered. Stored in a separate
+  `preferences.json` (app identifier, two choices, last export format; at most 50 apps, no expiry). Settings can turn
+  it off and list, forget or clear the remembered apps, and add a default output and "start dictating when summoned".
+- The composer can be moved by dragging its header, and it always stays inside the working area of its screen: the
+  window is re-placed whenever it grows, and the page scrolls inside its panel instead of growing past the screen.
+- Settings: hotkey, commit key (Enter or Ctrl+Enter), interface language, theme (light, dark, follow system), reduce
+  motion, microphone, translation direction, glossary list, cloud model, translator tier, removal of models from
+  earlier versions. Changes apply at once; there is no save button.
+- Settings migration from schema 2; `THIRD_PARTY_NOTICES.md`.
+- Settings: a switch to turn sentence cleanup off (the composer then offers only *Translate* and *Original* and starts on
+  *Original*), and a status dialog (version, system, switch states) that never contains text, terms, addresses or keys.
+
+### Changed
+
+- The composer and the settings are rendered by the system web view (WKWebView on macOS, WebView2 on Windows) inside
+  thin Avalonia windows. State and logic stay in C#; the page, built from embedded Preact + htm sources without a Node
+  build, draws whole snapshots and sends closed-set intents. The Avalonia XAML views, custom controls and theme were
+  removed. The composer window is kept parked off-screen between uses instead of hidden.
+- The note under a sentence whose cleanup was refused ("original wording kept") follows the interface language.
+
+- Dictation is a toggle: `⌘D` (`Ctrl+D`) or a click on the microphone starts it and the same key stops it. Hold-to-talk
+  is gone (nobody should have to keep the mouse button pressed), and dictation no longer stops when the window loses
+  focus. The composer's other actions have shortcuts as well (output `⌘1`–`⌘3`, swap language `⌘L`, copy `⇧⌘C`, new
+  draft `⌘N`, recent drafts `⌘R`, import `⌘O`, export `⌘S`, settings `⌘,`); they are defined once in C# and shown next
+  to the menu items.
+
+- The interface follows the v3 prototype (`docs/superpowers/prototypes/livelingo-ux-v3/`): destination, privacy and
+  output chips, per-sentence edit and "use original", microphone, light and dark themes,
+  system font.
+- All packages are on their latest stable versions; `xunit.v3` stays on 3.2.2 because 4.x only supports Microsoft
+  Testing Platform.
+- Model catalog pins revisions and SHA256 hashes and shows each model's license.
+- macOS bundle declares `NSMicrophoneUsageDescription` and the audio-input entitlement.
+
+### Known limits
+
+- Validated on an M3 Pro only; M2/16 GB and Windows runtime behaviour are unverified.
+- Recording import reads uncompressed WAV only.
+- The web UI has not been exercised in a real window on Windows, and WebView2 runtime distribution for Windows 10 is
+  not decided. There is no recognition-language option (the speech engine has none) and recordings are never kept.
+- The composer window is not blurred (alpha glass only); the prototype's backdrop blur is not reproduced.
+
 ## [1.4.0] - 2026-04-25
 
 ### Changed
@@ -34,7 +133,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Velopack NotInstalledException in dev mode**: `CheckForUpdateAsync` now
   returns early when `UpdateManager.IsInstalled` is false.
 
-## [Unreleased]
+## [1.4.1 – 1.4.2] - 2026-04-30
+
+Notes written while these versions were in progress; they belong to the 1.x line, which 2.0 replaces.
 
 The voice-input arc — replacing the legacy Whisper engine with a sherpa-onnx-based
 pipeline, surfacing model routing in the UI, and reclaiming disk used by the retired
@@ -207,5 +308,6 @@ process-wide task with shared progress and dedup across every UI surface.
 
 See `git log v0.1.4` for the pre-CHANGELOG history.
 
-[Unreleased]: https://github.com/user/LiveLingo/compare/v0.1.4...HEAD
-[0.1.4]: https://github.com/user/LiveLingo/releases/tag/v0.1.4
+[2.0.0]: https://github.com/AGIBuild/LiveLingo/releases/tag/v2.0.0
+[1.4.0]: https://github.com/AGIBuild/LiveLingo/releases/tag/v1.4.0
+[0.1.4]: https://github.com/AGIBuild/LiveLingo/releases/tag/v0.1.4

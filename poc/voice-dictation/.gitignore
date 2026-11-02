@@ -1,0 +1,6 @@
+corpus/.work/
+corpus/audio/
+**/bin/
+**/obj/
+results/
+corpus-dialect/

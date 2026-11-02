@@ -11,6 +11,10 @@ class Program
     [STAThread]
     public static void Main(string[] args)
     {
+        // Must run first: the installer and the updater start this executable with hook arguments, which Velopack
+        // handles here and exits. A running instance (holding the lock below) must not turn them away.
+        VelopackApp.Build().Run();
+
         if (!TryAcquireSingleInstanceLock())
             return;
 
@@ -28,7 +32,6 @@ class Program
 
         try
         {
-            VelopackApp.Build().Run();
             BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
         }
         finally
@@ -40,7 +43,6 @@ class Program
     public static AppBuilder BuildAvaloniaApp()
         => AppBuilder.Configure<App>()
             .UsePlatformDetect()
-            .WithInterFont()
             .LogToTrace();
 
     private static bool TryAcquireSingleInstanceLock()

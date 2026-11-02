@@ -7,18 +7,20 @@
       "progress"
     ],
     "thresholds": {
-      "high": 80,
-      "low": 60,
-      "break": 0
+      "high": 90,
+      "low": 80,
+      "break": 80
     },
     "mutate": [
+      "**/Drafting/**/*.cs",
       "**/Translation/**/*.cs",
-      "!**/Translation/ITranslationPipeline.cs",
-      "!**/Translation/GlossaryEntry.cs",
-      "!**/Translation/TranslationRequest.cs",
-      "!**/Translation/TranslationResult.cs",
-      "!**/Translation/TranslationLifecycleEvent.cs",
-      "!**/Translation/TranslationFailedException.cs"
+      "**/Dictation/**/*.cs",
+      "**/Cleanup/**/*.cs",
+      "**/Cloud/**/*.cs",
+      "**/Transcription/**/*.cs",
+      "**/Inference/**/*.cs",
+      "!**/Inference/LlamaProcessLauncher.cs",
+      "!**/Inference/LlamaServerAdapters.cs"
     ],
     "mutation-level": "Standard",
     "verbosity": "info",

@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
+using Serilog;
 using static LiveLingo.Desktop.Platform.macOS.MacNativeMethods;
 
 namespace LiveLingo.Desktop.Platform.macOS;
@@ -7,20 +8,22 @@ namespace LiveLingo.Desktop.Platform.macOS;
 [SupportedOSPlatform("macos")]
 internal sealed class MacWindowTracker : IWindowTracker
 {
+    /// <summary>The frontmost app's top window, or null when it has none: a target always has a real window number.</summary>
     public TargetWindowInfo? GetForegroundWindowInfo()
     {
-        var (pid, processName) = GetFrontmostApp();
-        if (pid <= 0) return null;
+        var (pid, processName, appId) = GetFrontmostApp();
+        // Our own parked composer is never a target: it would be placed relative to itself, off screen.
+        if (pid <= 0 || pid == Environment.ProcessId) return null;
 
         var windowList = CGWindowListCopyWindowInfo(
             kCGWindowListOptionOnScreenOnly | kCGWindowListExcludeDesktopElements, 0);
 
         if (windowList == IntPtr.Zero)
-            return new TargetWindowInfo((nint)pid, IntPtr.Zero, processName, "", 0, 0, 800, 600);
+            return null;
 
         try
         {
-            return FindWindowForPid(windowList, pid, processName);
+            return FindWindowForPid(windowList, pid, processName, appId);
         }
         finally
         {
@@ -28,27 +31,87 @@ internal sealed class MacWindowTracker : IWindowTracker
         }
     }
 
-    private static (int pid, string name) GetFrontmostApp()
+    public bool IsAlive(TargetWindowInfo target)
+    {
+        var windowList = CGWindowListCopyWindowInfo(kCGWindowListOptionAll, 0);
+        if (windowList == IntPtr.Zero)
+            return false;
+
+        var kWindowNumber = CreateCFString("kCGWindowNumber");
+        try
+        {
+            var count = CFArrayGetCount(windowList);
+            for (var i = 0; i < count; i++)
+            {
+                var number = CFDictionaryGetValue(CFArrayGetValueAtIndex(windowList, i), kWindowNumber);
+                if (number != IntPtr.Zero && CFNumberGetValue(number, kCFNumberSInt32Type, out int windowNumber)
+                    && windowNumber == (int)target.Handle)
+                    return true;
+            }
+            return false;
+        }
+        finally
+        {
+            CFRelease(kWindowNumber);
+            CFRelease(windowList);
+        }
+    }
+
+    public void Activate(TargetWindowInfo target)
+    {
+        if (string.IsNullOrEmpty(target.ProcessName)) return;
+
+        var workspace = objc_msgSend(
+            objc_getClass("NSWorkspace"),
+            sel_registerName("sharedWorkspace"));
+        var apps = objc_msgSend(workspace, sel_registerName("runningApplications"));
+        var count = objc_msgSend_int(apps, sel_registerName("count"));
+
+        for (var i = 0; i < count; i++)
+        {
+            var app = objc_msgSend(apps, sel_registerName("objectAtIndex:"), (IntPtr)i);
+            var namePtr = objc_msgSend(app, sel_registerName("localizedName"));
+            var name = CFStringToString(namePtr);
+
+            if (name is not null && target.ProcessName.Contains(name, StringComparison.OrdinalIgnoreCase))
+            {
+                objc_msgSend(app,
+                    sel_registerName("activateWithOptions:"),
+                    (IntPtr)3); // NSApplicationActivateIgnoringOtherApps | NSApplicationActivateAllWindows
+                Log.Debug("Activated target process: {Name}", name);
+                return;
+            }
+        }
+
+        Log.Debug("Could not find target process to activate: {Name}", target.ProcessName);
+    }
+
+    private static (int pid, string name, string appId) GetFrontmostApp()
     {
         var nsWorkspace = objc_getClass("NSWorkspace");
         var workspace = objc_msgSend(nsWorkspace, sel_registerName("sharedWorkspace"));
         var frontApp = objc_msgSend(workspace, sel_registerName("frontmostApplication"));
-        if (frontApp == IntPtr.Zero) return (0, "Unknown");
+        if (frontApp == IntPtr.Zero) return (0, "Unknown", "");
 
         var pid = objc_msgSend_int(frontApp, sel_registerName("processIdentifier"));
 
-        var nameObj = objc_msgSend(frontApp, sel_registerName("localizedName"));
-        var nameUtf8 = nameObj != IntPtr.Zero
-            ? objc_msgSend(nameObj, sel_registerName("UTF8String"))
-            : IntPtr.Zero;
-        var name = nameUtf8 != IntPtr.Zero
-            ? Marshal.PtrToStringUTF8(nameUtf8) ?? "Unknown"
-            : "Unknown";
+        var name = ObjCString(objc_msgSend(frontApp, sel_registerName("localizedName"))) ?? "Unknown";
+        // A process that is not an application bundle has no identifier; it is then known by its name.
+        var appId = ObjCString(objc_msgSend(frontApp, sel_registerName("bundleIdentifier"))) ?? name;
 
-        return (pid, name);
+        return (pid, name, appId);
     }
 
-    private static TargetWindowInfo FindWindowForPid(IntPtr windowList, int pid, string processName)
+    private static string? ObjCString(IntPtr nsString)
+    {
+        if (nsString == IntPtr.Zero)
+            return null;
+
+        var utf8 = objc_msgSend(nsString, sel_registerName("UTF8String"));
+        return utf8 != IntPtr.Zero ? Marshal.PtrToStringUTF8(utf8) : null;
+    }
+
+    private static TargetWindowInfo? FindWindowForPid(IntPtr windowList, int pid, string processName, string appId)
     {
         var count = CFArrayGetCount(windowList);
         var kOwnerPID = CreateCFString("kCGWindowOwnerPID");
@@ -83,12 +146,12 @@ internal sealed class MacWindowTracker : IWindowTracker
 
                 var windowNumRef = CFDictionaryGetValue(dict, kWindowNumber);
                 int windowNumber = 0;
-                if (windowNumRef != IntPtr.Zero)
-                    CFNumberGetValue(windowNumRef, kCFNumberSInt32Type, out windowNumber);
+                if (windowNumRef == IntPtr.Zero || !CFNumberGetValue(windowNumRef, kCFNumberSInt32Type, out windowNumber))
+                    continue;
 
                 return new TargetWindowInfo(
                     (nint)windowNumber, IntPtr.Zero, processName, title,
-                    x, y, w, h);
+                    x, y, w, h, appId);
             }
         }
         finally
@@ -99,6 +162,6 @@ internal sealed class MacWindowTracker : IWindowTracker
             CFRelease(kWindowNumber);
         }
 
-        return new TargetWindowInfo((nint)pid, IntPtr.Zero, processName, "", 0, 0, 800, 600);
+        return null;
     }
 }

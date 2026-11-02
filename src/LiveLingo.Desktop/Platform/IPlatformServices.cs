@@ -6,7 +6,9 @@ public interface IPlatformServices : IDisposable
     IWindowTracker WindowTracker { get; }
     ITextInjector TextInjector { get; }
     IClipboardService Clipboard { get; }
-    IAudioCaptureService AudioCapture { get; }
+    IMicrophone Microphone { get; }
+    IMicrophonePermission MicrophonePermission { get; }
+    IWindowMover WindowMover { get; }
 
     /// <summary>
     /// Opens an https URL in the system default browser.

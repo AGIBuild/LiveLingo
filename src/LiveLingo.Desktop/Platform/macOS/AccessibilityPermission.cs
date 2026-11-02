@@ -24,21 +24,4 @@ public static class AccessibilityPermission
             CFRelease(options);
         }
     }
-
-    /// <summary>
-    /// Tests Input Monitoring permission by attempting to create and immediately
-    /// release a listen-only CGEventTap. Returns false if macOS blocks the tap.
-    /// </summary>
-    public static bool IsInputMonitoringGranted()
-    {
-        CGEventTapCallBack cb = (_, _, ev, _) => ev;
-        var mask = 1UL << (int)kCGEventKeyDown;
-        var tap = CGEventTapCreate(
-            kCGSessionEventTap, kCGHeadInsertEventTap,
-            kCGEventTapOptionListenOnly, mask, cb, IntPtr.Zero);
-        GC.KeepAlive(cb);
-        if (tap == IntPtr.Zero) return false;
-        CFRelease(tap);
-        return true;
-    }
 }

@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>LiveLingo · 随处表达 / 产品原型 v2</title>
+  <link rel="stylesheet" href="style.css">
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="#experience"><span class="logo" aria-hidden="true">li</span> LiveLingo <span class="version">PROTOTYPE / 02</span></a>
+    <nav aria-label="原型导航">
+      <button type="button" class="nav-button active" data-page="experience" aria-current="page">交互体验</button>
+      <button type="button" class="nav-button" data-page="states">状态全景</button>
+      <button type="button" class="nav-button" data-page="settings">设置中心</button>
+      <button type="button" class="nav-button" data-page="design">设计与边界</button>
+    </nav>
+    <label class="platform-control">平台 <select id="platform"><option value="mac">macOS</option><option value="win">Windows</option></select></label>
+  </header>
+  <main>
+    <section id="experience" class="page">
+      <div class="page-heading">
+        <div><p class="eyebrow">A SMALL SPACE FOR BIG IDEAS</p><h1>思路不用停，表达不用切换。</h1><p class="lead">从任何输入框唤起。说话、打字或转录，再把你确认的那一版写回去。</p></div>
+        <button type="button" id="summon" class="primary">模拟全局呼出 <kbd class="summon-key">⌃⌥T</kbd></button>
+      </div>
+      <div class="simulation-notice"><span class="badge">设计演示</span> 不访问麦克风、不调用模型、不连接云端、不向真实应用写入。识别与译文使用预设语料；所有时间均为演示。</div>
+      <div class="experience-grid">
+        <div class="desktop" id="desktop">
+          <div class="desktop-top"><span id="desktop-platform">macOS</span><span>本地工作台 · 前台应用示意</span><button type="button" popovertarget="tray-menu" class="tray-button" aria-label="打开 LiveLingo 托盘菜单">li · LiveLingo ▾</button></div>
+          <section id="tray-menu" popover aria-label="LiveLingo 托盘菜单">
+            <p>LiveLingo <span>本地处理 · 原型</span></p>
+            <button type="button" data-tray-action="summon">打开输入浮窗 <small>Ctrl+Alt+T</small></button>
+            <button type="button" data-tray-action="history">最近草稿</button>
+            <button type="button" data-tray-action="translation">切换翻译输出</button>
+            <hr>
+            <button type="button" data-tray-action="settings">设置中心</button>
+            <button type="button" data-tray-action="diagnostics">本次状态 / 诊断</button>
+            <button type="button" data-tray-action="hide">隐藏并保留草稿</button>
+          </section>
+          <section class="target-app" aria-label="模拟前台应用">
+            <header><span class="window-dots" aria-hidden="true"><i></i><i></i><i></i></span><span id="target-title">VS Code / Agent</span><span class="target-privacy">输入目标已捕获</span></header>
+            <div class="agent-conversation">
+              <p class="message user">我们继续讨论缓存和错误处理。</p>
+              <p class="message agent"><span class="agent-avatar" aria-hidden="true">A</span>代码已读完。告诉我你的边界条件，我会先给出修改方案，不直接改业务代码。</p>
+            </div>
+            <div class="target-input"><label for="target-text">原应用输入框</label><textarea id="target-text" rows="2" placeholder="这里接收原型模拟的回填结果，不会自动发送。"></textarea><span class="target-input-tip">全局唤起 → 审阅 → 快捷键回填</span></div>
+          </section>
+          <section id="composer" class="composer" aria-label="LiveLingo 输入浮窗">
+            <header class="composer-header">
+              <div class="composer-name"><span class="small-logo" aria-hidden="true">li</span><b>LiveLingo</b><span id="destination" class="destination">回填 · Agent</span></div>
+              <div class="header-actions"><span id="privacy-state" class="privacy local">本地处理</span><button type="button" id="expand" class="icon-button" aria-label="展开长文工作台" title="展开 / 收起长文工作台">⤢</button><button type="button" id="close-composer" class="icon-button" aria-label="隐藏并保留草稿" title="隐藏并保留草稿">×</button></div>
+            </header>
+            <div class="intent-bar">
+              <div class="mode-buttons" role="group" aria-label="输入方式">
+                <button type="button" class="active" data-mode="voice" aria-pressed="true">听写</button>
+                <button type="button" data-mode="text" aria-pressed="false">文字</button>
+                <button type="button" data-mode="transcript" aria-pressed="false">转录</button>
+              </div>
+              <label class="translation-switch"><input id="translate-on" type="checkbox" role="switch"><span>翻译</span></label>
+              <label class="direction"><span class="sr-only">翻译方向</span><select id="direction"><option value="zh-en">中文 → English</option><option value="en-zh">English → 中文</option></select></label>
+            </div>
+            <div id="transcript-tools" class="transcript-tools" hidden>
+              <label class="file-button">选择本地录音 <input id="audio-file" type="file" accept="audio/*"></label>
+              <button type="button" id="transcript-demo" class="secondary">载入会议示例</button>
+              <span id="file-note">仅预览文件选择流程；不处理真实音频。</span>
+            </div>
+            <div class="draft-layout">
+              <section id="source-panel" class="source-panel" hidden aria-label="原文输入">
+                <div class="panel-label"><label for="source-input">原文 · 可编辑</label><span id="route-label">输入中 · 逐句路径</span></div>
+                <textarea id="source-input" rows="6" spellcheck="false" placeholder="直接输入，或粘贴已完成的文本。中文输入法确认候选不会触发回填。"></textarea>
+                <div class="source-actions"><button type="button" id="text-sample" class="text-button">填入技术文本</button><button type="button" id="paste-sample" class="text-button">模拟粘贴 Markdown</button><label>处理路径 <select id="route"><option value="units">输入中 · 逐句</option><option value="whole">完成文本 · 整段</option></select></label></div>
+              </section>
+              <section class="output-panel" aria-label="准备写入的文本">
+                <div class="panel-label"><span>准备写入</span><div class="output-selector" role="group" aria-label="选择回填内容"><button type="button" data-output="clean" class="active" aria-pressed="true">整理稿</button><button type="button" data-output="translation" aria-pressed="false">译文</button><button type="button" data-output="raw" aria-pressed="false">识别原文</button></div></div>
+                <div id="empty-draft" class="empty-draft"><span class="empty-symbol" aria-hidden="true">〰</span><h2>把脑海里的想法说出来。</h2><p>点击麦克风免按住听写，或按住「按住说话」。<br>松开只结束录音，不自动回填，也不自动发送。</p></div>
+                <div id="sentences" class="sentences"></div>
+                <div id="live-tail" class="live-tail" hidden></div>
+              </section>
+            </div>
+            <div id="warning" class="warning" role="status" hidden></div>
+            <div class="recording-bar">
+              <button type="button" id="record" class="record-button" aria-label="开始免按住听写"><span class="mic-shape" aria-hidden="true"></span></button>
+              <button type="button" id="hold-record" class="secondary">按住说话</button>
+              <button type="button" id="pause" class="text-button" hidden>暂停</button>
+              <span id="session-status" role="status" aria-live="polite">就绪 · 按 Tab 正常移动焦点</span>
+              <button type="button" id="use-raw-all" class="text-button">停止整理，用原文</button>
+            </div>
+            <footer class="composer-footer">
+              <div class="footer-left"><button type="button" id="reset" class="text-button">新草稿</button><button type="button" id="history" class="text-button">最近草稿</button><button type="button" id="export" class="text-button">导出</button></div>
+              <button type="button" id="copy" class="secondary">复制</button><button type="button" id="commit" class="primary" disabled>写入 Agent <kbd class="commit-key">↵</kbd></button>
+            </footer>
+            <div class="shortcut-footnote"><span id="output-hint">回填只写入当前选定的版本，不执行原应用的发送动作。</span><span>Shift↵ 换行 · Esc 隐藏</span></div>
+          </section>
+          <div id="toast" class="toast" role="status" hidden></div>
+        </div>
+        <aside class="scenario-sidebar" aria-label="场景体验">
+          <p class="eyebrow">TRY A REAL WORKFLOW</p><h2>从场景开始，而不是找功能。</h2>
+          <button type="button" class="scenario" data-scenario="pair"><span class="scenario-number">01</span><span><b>和 Agent 讨论</b><small>说几句，改一处，再继续说。</small></span><span aria-hidden="true">↗</span></button>
+          <button type="button" class="scenario" data-scenario="translate"><span class="scenario-number">02</span><span><b>说中文，写英文</b><small>边说边译，直接回填英文。</small></span><span aria-hidden="true">↗</span></button>
+          <button type="button" class="scenario" data-scenario="document"><span class="scenario-number">03</span><span><b>翻译技术文档</b><small>粘贴整段，保留代码和版式。</small></span><span aria-hidden="true">↗</span></button>
+          <button type="button" class="scenario" data-scenario="meeting"><span class="scenario-number">04</span><span><b>会议转录</b><small>时间轴、暂停、续录与导出。</small></span><span aria-hidden="true">↗</span></button>
+          <details class="edge-cases"><summary>试试不顺利的情况</summary><div>
+            <button type="button" data-scenario="gate">整理改错了单位</button><button type="button" data-scenario="slow">处理尚未结束</button><button type="button" data-scenario="failure">翻译失败</button><button type="button" data-scenario="lost">原输入框失效</button><button type="button" data-scenario="no-target">没有输入框</button><button type="button" data-scenario="no-audio">麦克风没有声音</button><button type="button" data-scenario="permission">权限尚未授予</button><button type="button" data-scenario="download">模型尚未就绪</button>
+          </div></details>
+          <div class="sidebar-note"><b>你的原文一直都在。</b><p>逐句展开对照，改用原文或直接编辑。人工编辑不会被迟到的模型结果覆盖。</p><p>翻译开关改变输出目标；只看原文对照不会让输出语言悄悄改变。</p></div>
+        </aside>
+      </div>
+    </section>
+    <section id="states" class="page" hidden>
+      <div class="page-heading"><div><p class="eyebrow">EVERY STATE HAS A WAY OUT</p><h1>完整路径，不只有成功画面。</h1><p class="lead">点击任意状态，回到交互体验。所有异常都保留可恢复的草稿。</p></div></div>
+      <div class="flow-strip"><span>唤起 + 捕获目标</span><i>→</i><span>输入 / 持续识别</span><i>→</i><span>整理 ∥ 翻译</span><i>→</i><span>审阅 / 修改</span><i>→</i><span>校验目标 + 回填</span></div>
+      <div id="state-grid" class="state-grid"></div>
+    </section>
+    <section id="settings" class="page" hidden>
+      <div class="page-heading"><div><p class="eyebrow">QUIET BY DEFAULT</p><h1>日常够简单，边界够明确。</h1><p class="lead">六个可切换设置页。设置只保存在本次原型内存中，刷新即恢复，不修改真实产品配置。</p></div></div>
+      <div class="settings-layout">
+        <nav class="settings-nav" aria-label="设置分类"><button type="button" class="active" data-settings="general">通用与快捷键</button><button type="button" data-settings="speech">语音与转录</button><button type="button" data-settings="language">整理、翻译与术语</button><button type="button" data-settings="privacy">隐私与云端</button><button type="button" data-settings="models">性能与模型</button><button type="button" data-settings="about">关于与诊断</button><div class="settings-nav-note">本地优先<br>由你确认后才写入</div></nav>
+        <div class="settings-content">
+          <section data-settings-panel="general">
+            <h2>通用与快捷键</h2><p class="section-intro">继承现有 LiveLingo 呼出组合键，不强制用户重新学习。</p>
+            <div class="setting-row"><div><label for="summon-binding">全局呼出</label><p>现有默认为 Ctrl + Alt + T。这里只演示，浏览器无法注册 OS 全局热键。</p></div><input id="summon-binding" value="Ctrl+Alt+T" aria-label="全局呼出组合键"></div>
+            <div class="setting-row"><div><label for="commit-binding">回填快捷键</label><p>Enter 回填时，Shift+Enter 换行；IME 候选确认优先。也可沿用现有 Ctrl+Enter。</p></div><select id="commit-binding"><option value="enter">Enter</option><option value="ctrl-enter">Ctrl + Enter</option></select></div>
+            <div class="setting-row"><div><b>录音启动手势</b><p>默认：呼出后点击麦克风，或按住按钮说话。双击热键仅为候选交互，不作为唯一入口。</p></div><span class="status-pill">无需记第二个热键</span></div>
+            <div class="setting-row"><div><b>回填与发送分离</b><p>回填只写入。发送由原应用处理；不做自动发送、不承诺跨应用撤销。</p></div><span class="status-pill">始终确认后回填</span></div>
+            <div class="setting-row"><div><label for="theme">外观</label><p>浅色 / 深色，保留足够对比度与可见焦点。</p></div><select id="theme"><option value="light">浅色</option><option value="dark">深色</option></select></div>
+            <div class="setting-row"><div><label for="reduce-motion">减少动画</label><p>停止声波与脉冲动画；同时遵守系统的减少动态效果偏好。</p></div><input id="reduce-motion" type="checkbox" role="switch"></div>
+          </section>
+          <section data-settings-panel="speech" hidden>
+            <h2>语音与转录</h2><p class="section-intro">短句输入和长录音共享识别核心，不创建第二套断句服务。</p>
+            <div class="setting-row"><div><label for="microphone">输入设备</label><p>设备列表为示意。实际产品须显示音量与断开状态。</p></div><select id="microphone"><option>内置麦克风（演示）</option><option>外接耳机（演示）</option></select></div>
+            <div class="setting-row"><div><label for="speech-language">识别语言</label><p>当前 POC 已验证中英；其他语言需独立评测。</p></div><select id="speech-language"><option>中文 / English 混说</option><option>中文</option><option>English</option></select></div>
+            <div class="setting-row"><div><label for="keep-audio">保留本次录音</label><p>产品默认关闭；授权后保存到用户目录，显示保存位置与删除入口。原型没有实际录音。</p></div><input id="keep-audio" type="checkbox" role="switch"></div>
+            <div class="setting-row"><div><b>长录音</b><p>暂停不丢草稿；续录追加，不清空此前内容。可导出 TXT / Markdown / SRT。</p></div><button type="button" class="secondary" data-scenario="meeting">体验转录</button></div>
+            <div class="callout">系统声音、说话人分离、实时语音合成不在已验证能力范围；不放在默认入口，不伪装成已支持。</div>
+          </section>
+          <section data-settings-panel="language" hidden>
+            <h2>整理、翻译与术语</h2><p class="section-intro">整理改善表达，翻译忠实于原文，两条任务独立运行。</p>
+            <div class="setting-row"><div><label for="cleanup">整理方式</label><p>保守整理去语气词和重复，不新增事实。保真检查是风险提示，不是语义正确保证。</p></div><select id="cleanup"><option value="conservative">保守整理</option><option value="off">仅原文</option></select></div>
+            <div class="setting-row"><div><b>翻译处理路径</b><p>打字 / 听写走完整句单元；粘贴完成文本走整段。输入来源决定，不靠 JSON 嗅探；可显式切换。</p></div><span class="status-pill">原文 → 翻译</span></div>
+            <div class="setting-row"><div><b>支持方向</b><p>POC 已验证中文 ↔ 英文；多语言扩展先评测、再展示。</p></div><span class="status-pill">中文 ↔ English</span></div>
+            <div class="terms-heading"><h3>术语表</h3><span>仅在原文命中时使用；不是翻译成功保证。</span></div>
+            <form id="term-form" class="term-form"><label>原词 <input id="term-source" required placeholder="缓存穿透"></label><label>目标表达 <input id="term-target" required placeholder="cache penetration"></label><button type="submit" class="primary">添加</button></form>
+            <div id="terms-list" class="terms-list"></div>
+          </section>
+          <section data-settings-panel="privacy" hidden>
+            <h2>隐私与云端</h2><p class="section-intro">默认本地。下载模型、保留录音、发送文本是独立权限。</p>
+            <div class="setting-row"><div><b>草稿留存</b><p>取消只隐藏。本次原型内存保留最近 5 份；刷新即清除。正式产品默认不落盘，持久保存另行授权。</p></div><button type="button" id="clear-history" class="secondary">清除最近草稿</button></div>
+            <div class="setting-row"><div><label for="cloud-translation">允许云端翻译</label><p>需明确同意发送原文至指定服务商。原型仅变更状态标签，不发送任何网络请求。</p></div><input id="cloud-translation" type="checkbox" role="switch"></div>
+            <div class="setting-row"><div><label for="cloud-cleanup">允许云端整理</label><p>独立授权；不会因为翻译开启而自动开启。</p></div><input id="cloud-cleanup" type="checkbox" role="switch"></div>
+            <div class="setting-row"><div><label for="provider">可选服务商</label><p>云端后端是产品接入设计，尚未与本地 POC 同条件验证。</p></div><select id="provider"><option>Microsoft Foundry</option><option>OpenAI-compatible endpoint</option></select></div>
+            <label class="stacked-label">连接地址（示意，不存凭据）<input id="endpoint" type="url" placeholder="https://your-endpoint.example"></label>
+            <div class="callout">不要在原型中输入 API Key。产品凭据应存 macOS Keychain / Windows Credential Manager，UI 只显示“已配置”，不得写入日志。</div>
+          </section>
+          <section data-settings-panel="models" hidden>
+            <h2>性能与模型</h2><p class="section-intro">验证目标 M2+ / 16 GB+。Windows 同档设备需单独实测。</p>
+            <div class="model-cards"><article><span>持续识别</span><h3>X-ASR</h3><p>提供说话时的文本反馈</p></article><article><span>二遍原文</span><h3>Qwen3-ASR 0.6B</h3><p>同一音频范围再识别</p></article><article><span>整理 / 翻译</span><h3>Qwen3.5 / Hy-MT2</h3><p>4B 整理 · 7B 翻译候选</p></article></div>
+            <div class="setting-row"><div><label for="translation-model">翻译模型候选</label><p>7B 质量优先；1.8B 更快。不因 16 GB 自动降低质量，也不静默切到云端。</p></div><select id="translation-model"><option>Hy-MT2-7B · 质量优先</option><option>Hy-MT2-1.8B · 速度候选</option></select></div>
+            <div class="setting-row"><div><b>下载与加载状态</b><p>缺模型不阻塞纯文本编辑。失败可重试，磁盘不足明确提示，不无限等待。</p></div><button type="button" class="secondary" data-scenario="download">查看准备流程</button></div>
+            <div class="callout">语音 + 整理 + 翻译同时运行的 GPU / 内存调度尚未联合验证。不得把单独 POC 的速度合并成产品承诺。</div>
+          </section>
+          <section data-settings-panel="about" hidden>
+            <h2>关于与诊断</h2><p class="section-intro">LiveLingo 产品原型 v2 · 2026-10-31</p>
+            <div class="setting-row"><div><b>使用范围</b><p>此页面是设计原型，不是可用的 OS 语音输入工具。没有模型、真实录音或系统写入权限。</p></div><span class="status-pill">交互可体验</span></div>
+            <div class="setting-row"><div><b>诊断记录</b><p>状态变化、回填版本、错误类型可以查看。正式日志默认不包含录音和完整文本。</p></div><button type="button" id="show-diagnostics" class="secondary">查看本次状态</button></div>
+            <div class="setting-row"><div><b>版本与更新</b><p>正式产品需校验更新、保留升级失败出口。原型不联网检查更新。</p></div><span class="status-pill">无网络请求</span></div>
+            <div class="callout">“最佳体验”需用真人任务验证：首次完成率、误回填率、修改成本、长口述恢复、键盘可达性及目标机延迟。原型不预设已达成。</div>
+          </section>
+        </div>
+      </div>
+    </section>
+    <section id="design" class="page" hidden>
+      <div class="page-heading"><div><p class="eyebrow">SIMPLE DOES NOT MEAN INCOMPLETE</p><h1>一份草稿，两条处理路径。</h1><p class="lead">轻浮窗处理短输入；同一浮窗展开为长文工作台，不另造一套会话核心。</p></div></div>
+      <div class="design-grid">
+        <article class="design-card"><span>01 / 不改变习惯</span><h2>唤起 → 输入 → 回填</h2><p>保留已有全局唤起机制和配置。捕获原输入目标；审阅后用指定键回填。不是自动发送，不“猜”新的输入框。</p></article>
+        <article class="design-card"><span>02 / 输出目标明确</span><h2>看原文，不等于改输出。</h2><p>回填版本有显式选择器。开启翻译即选择译文，录音期间也能看译文；原文对照只展开，不切换回填语言。</p></article>
+        <article class="design-card"><span>03 / 最少处理链</span><h2>整理与翻译并行。</h2><p>流式 ASR 先反馈，二遍原文逐句稳定；整理和翻译分别消费原文。译文对照显示识别原文，不把整理稿冒充翻译来源。</p></article>
+        <article class="design-card"><span>04 / 人始终拥有最后一笔</span><h2>能编辑，也能改回去。</h2><p>每句可编辑、可用原文。手动编辑拥有优先权；模型只更新仍属于当前版本的结果。前文改动会使依赖结果失效，不覆盖人工稿。</p></article>
+        <article class="design-card"><span>05 / 异常不是死路</span><h2>失败保留证据与出口。</h2><p>处理未完成不写入半截译文；明确显示失败，可编辑、重新请求或改用原文。目标失效时由用户重新绑定，不向新前台应用自动注入。</p></article>
+        <article class="design-card"><span>06 / 输入法与无障碍</span><h2>快捷，但不抢按键。</h2><p>中文候选确认优先。Tab 保留焦点导航，Shift+Enter 换行，按钮都有文本或可读名称。减少动画、深色和窄视口均有设计。</p></article>
+      </div>
+      <article class="scope-card"><h2>覆盖范围与验证边界</h2><table><thead><tr><th>能力</th><th>原型表达</th><th>产品验证状态</th></tr></thead><tbody>
+        <tr><td>全局唤起、回填</td><td>原目标、版本提示、复制 / 回填分离、失效重绑定</td><td>继承产品交互，跨应用可靠性需实机测试</td></tr>
+        <tr><td>听写 / 二遍 / 整理</td><td>实时尾部、逐句完成、拒绝原因、人工编辑、追加</td><td>各语音核心 POC 已验证；产品迁移未完成</td></tr>
+        <tr><td>文本与实时翻译</td><td>可编辑文本、粘贴整段、实时译文、语言互换</td><td>文本 POC 已测；语音 + 翻译联合调度仍需验证</td></tr>
+        <tr><td>长录音与文件转录</td><td>长文展开、时间轴、暂停续录、文件选择、TXT / MD / SRT</td><td>文件任务、资源有界、导出对齐需单独验证</td></tr>
+        <tr><td>隐私、云端、模型</td><td>独立授权、逐能力本地 / 云端标签、下载与超时出口</td><td>云端不是隐式降级；目标机 M2 / 16 GB 未完成联合实测</td></tr>
+        <tr><td>系统声音 / 说话人分离 / TTS</td><td>只标注范围，不制造可用入口</td><td>没有已验证方案，不承诺支持</td></tr>
+      </tbody></table></article>
+      <div class="design-bottom"><h2>为什么不是其他布局？</h2><p><b>始终双栏：</b>适合长文对照，但短听写占屏过多。<b>全部放进胶囊：</b>漂亮，但长录音难审阅。<b>推荐轻浮窗 + 展开工作台：</b>高频输入短路径，复杂任务按需展开。</p><p>没有自动写入、自动发送或强制双击热键。保真检查无法保证语义完全正确；术语和格式检查亦不能替代人工审阅。</p></div>
+    </section>
+  </main>
+  <dialog id="modal" aria-labelledby="modal-title"><header><h2 id="modal-title"></h2><button type="button" id="modal-close" class="icon-button" aria-label="关闭对话框">×</button></header><div id="modal-body"></div></dialog>
+  <div id="announcement" class="global-announcement" role="status" aria-live="polite" hidden></div>
+</body>
+</html>

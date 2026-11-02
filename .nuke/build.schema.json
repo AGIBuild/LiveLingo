@@ -28,11 +28,9 @@
         "Clean",
         "Mutate",
         "Pack",
-        "PackMac",
         "PackMsi",
-        "ProbeStt",
         "ProbeTranslation",
-        "ProbeTranslationAll",
+        "ProbeVoice",
         "Publish",
         "Restore",
         "Run",
@@ -128,46 +126,18 @@
           "description": "Minimum line coverage percentage",
           "format": "int32"
         },
-        "EnableSttProbe": {
-          "type": "boolean",
-          "description": "Enable sherpa-onnx STT regression probe target"
-        },
-        "EnableTranslationProbe": {
-          "type": "boolean",
-          "description": "Enable translation regression probe target"
-        },
         "MutationThreshold": {
           "type": "integer",
           "description": "Minimum mutation score percentage",
           "format": "int32"
         },
-        "ProbeCases": {
+        "ProbeCorpus": {
           "type": "string",
-          "description": "Batch probe cases: source=>expected;source=>expected"
-        },
-        "ProbeExpectedContains": {
-          "type": "string",
-          "description": "Expected substring in translation result"
+          "description": "Directory with scenarios.json and audio/<id>.wav used by ProbeVoice (see poc/voice-dictation/corpus)"
         },
         "ProbeModelPath": {
           "type": "string",
-          "description": "Model path used by translation probe"
-        },
-        "ProbeSourceText": {
-          "type": "string",
-          "description": "Source text used by translation probe"
-        },
-        "ProbeSttExpected": {
-          "type": "string",
-          "description": "Expected substring in the STT probe transcription result"
-        },
-        "ProbeSttLang": {
-          "type": "string",
-          "description": "Optional language hint (ISO-639-1) for the STT probe, e.g. en / zh / ja"
-        },
-        "ProbeWavPath": {
-          "type": "string",
-          "description": "Path to a 16 kHz mono wav file used by the STT probe"
+          "description": "Model storage directory used by end-to-end probes (defaults to the app's model directory)"
         },
         "Runtime": {
           "type": "string",

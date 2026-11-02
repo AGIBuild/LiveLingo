@@ -49,23 +49,9 @@ internal sealed class HfResolveAssetDownloader
         var hub = _mirror.GetEffectiveHubBase(asset.DownloadUrl);
         try
         {
-            try
-            {
-                await _downloader
-                    .DownloadAsync(repoId!, revision, filePath!, finalPath, token, forceRestart: false, BufferSize, hfProgress, ct, hubResolveBaseOverride: hub)
-                    .ConfigureAwait(false);
-            }
-            catch (Exception ex) when (_mirror.ShouldFallbackToMirror(asset.DownloadUrl, ex))
-            {
-                _logger.LogWarning(ex,
-                    "HF asset download unreachable via primary hub, retrying fallback mirror for model={ModelId} asset={AssetPath}",
-                    modelId,
-                    relativePath);
-                _mirror.EngageFallbackMirror();
-                await _downloader
-                    .DownloadAsync(repoId!, revision, filePath!, finalPath, token, forceRestart: false, BufferSize, hfProgress, ct, hubResolveBaseOverride: HuggingFaceMirrorPolicy.DefaultFallbackMirror)
-                    .ConfigureAwait(false);
-            }
+            await _downloader
+                .DownloadAsync(repoId!, revision, filePath!, finalPath, token, forceRestart: false, BufferSize, hfProgress, ct, hubResolveBaseOverride: hub)
+                .ConfigureAwait(false);
 
             _logger.LogInformation("Completed HF resolve download: model={ModelId}, asset={AssetPath}", modelId, relativePath);
             var len = new FileInfo(finalPath).Length;

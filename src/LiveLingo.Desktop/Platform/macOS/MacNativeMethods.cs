@@ -61,9 +61,6 @@ internal static class MacNativeMethods
     [DllImport(CG)]
     public static extern void CGEventPost(int tap, IntPtr @event);
 
-    [DllImport(CG)]
-    public static extern IntPtr CGEventCreate(IntPtr source);
-
     [StructLayout(LayoutKind.Sequential)]
     public struct CGPoint { public double X, Y; }
 
@@ -72,9 +69,6 @@ internal static class MacNativeMethods
 
     [StructLayout(LayoutKind.Sequential)]
     public struct CGRect { public CGPoint Origin; public CGSize Size; }
-
-    [DllImport(CG)]
-    public static extern CGPoint CGEventGetLocation(IntPtr @event);
 
     #endregion
 
@@ -102,9 +96,6 @@ internal static class MacNativeMethods
 
     [DllImport(CF)]
     public static extern void CFRunLoopStop(IntPtr runLoop);
-
-    [DllImport(CF)]
-    public static extern void CFRunLoopWakeUp(IntPtr runLoop);
 
     [DllImport(CF)]
     public static extern IntPtr CFRunLoopGetCurrent();
@@ -166,10 +157,14 @@ internal static class MacNativeMethods
     [DllImport(ObjC, EntryPoint = "objc_msgSend")]
     public static extern int objc_msgSend_int(IntPtr receiver, IntPtr selector);
 
+    [DllImport(ObjC, EntryPoint = "objc_msgSend")]
+    public static extern long objc_msgSend_long(IntPtr receiver, IntPtr selector, IntPtr arg1);
+
     #endregion
 
     #region CGWindowList
 
+    public const int kCGWindowListOptionAll = 0;
     public const int kCGWindowListOptionOnScreenOnly = 1;
     public const int kCGWindowListExcludeDesktopElements = 16;
 
@@ -307,7 +302,6 @@ internal static class MacNativeMethods
         _ => 0xFFFF
     };
 
-    public const ushort kVK_Command = 0x37;
     public const ushort kVK_V = 0x09;
     public const ushort kVK_Return = 0x24;
 

@@ -1,0 +1,120 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="Dictation.TestApp.MainWindow"
+        Title="LiveLingo POC Workbench — Voice Dictation &amp; Text Translation"
+        Width="1180" Height="860" MinWidth="860" MinHeight="620">
+  <TabControl x:Name="MainTabs" Margin="8">
+
+    <TabItem Header="1. 语音识别与整理 (Voice Dictation)">
+      <Grid RowDefinitions="Auto,Auto,Auto,*,Auto,Auto,Auto" Margin="8" RowSpacing="10">
+
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="12">
+          <Button x:Name="RecordButton" Content="Loading models..." IsEnabled="False" MinWidth="170" Padding="14,8" />
+          <ProgressBar x:Name="LevelBar" Minimum="0" Maximum="1" Width="160" Height="10" VerticalAlignment="Center" />
+          <TextBlock x:Name="StatusText" VerticalAlignment="Center" TextWrapping="Wrap" />
+        </StackPanel>
+
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="12">
+          <CheckBox x:Name="SaveAudio" IsChecked="True" Content="Save audio" VerticalAlignment="Center" />
+          <TextBox x:Name="GlossaryBox" Width="480" PlaceholderText="Glossary: terms to restore, comma separated (e.g. Avalonia, Redis)" />
+        </StackPanel>
+
+        <DockPanel Grid.Row="2" Margin="0,0,0,0">
+          <TextBlock Text="Second pass" VerticalAlignment="Center" Margin="0,0,8,0" />
+          <ComboBox x:Name="SecondPassBox" Width="140" Margin="0,0,16,0" />
+          <TextBlock Text="Recordings folder" VerticalAlignment="Center" Margin="0,0,8,0" />
+          <Button x:Name="OpenFolderButton" DockPanel.Dock="Right" Content="Open" Margin="6,0,0,0" />
+          <Button x:Name="BrowseButton" DockPanel.Dock="Right" Content="Browse..." Margin="6,0,0,0" />
+          <TextBox x:Name="FolderBox" />
+        </DockPanel>
+
+        <Grid Grid.Row="3" ColumnDefinitions="*,*" ColumnSpacing="12">
+          <DockPanel Grid.Column="0">
+            <TextBlock DockPanel.Dock="Top" Text="Raw: what was recognized (original)" FontWeight="SemiBold" Margin="0,0,0,4" />
+            <TextBox x:Name="RawBox" IsReadOnly="True" TextWrapping="Wrap" AcceptsReturn="True" FontSize="15" />
+          </DockPanel>
+          <DockPanel Grid.Column="1">
+            <TextBlock x:Name="CleanedHeader" DockPanel.Dock="Top" Text="Cleaned draft (becomes the final text on stop)" FontWeight="SemiBold" Margin="0,0,0,4" />
+            <TextBox x:Name="CleanedBox" IsReadOnly="True" TextWrapping="Wrap" AcceptsReturn="True" FontSize="15" />
+          </DockPanel>
+        </Grid>
+
+        <StackPanel Grid.Row="4" Orientation="Horizontal" Spacing="12">
+          <Button x:Name="CopyFinalButton" Content="Copy final" IsEnabled="False" />
+          <Button x:Name="CopyRawButton" Content="Copy raw" IsEnabled="False" />
+          <Button x:Name="SendToTranslationButton" Content="Send to Translation →" IsEnabled="False" />
+          <TextBlock x:Name="ResultText" VerticalAlignment="Center" Opacity="0.7" />
+        </StackPanel>
+
+        <DockPanel Grid.Row="5">
+          <Button x:Name="SaveReferenceButton" DockPanel.Dock="Right" Content="Save reference" IsEnabled="False" Margin="12,0,0,0" VerticalAlignment="Top" />
+          <TextBox x:Name="ReferenceBox" IsEnabled="False" AcceptsReturn="True" TextWrapping="Wrap" Height="64"
+                   PlaceholderText="What you actually said (optional). Saved with the audio so mistakes can be reproduced and measured." />
+        </DockPanel>
+
+        <TextBox Grid.Row="6" x:Name="SentenceLogBox" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" Height="150" FontSize="12"
+                 PlaceholderText="Per-sentence log: raw, cleaned, rejected reason" />
+      </Grid>
+    </TabItem>
+
+    <TabItem Header="2. 实时文本翻译 (Text Translation)">
+      <Grid RowDefinitions="Auto,Auto,Auto,*,Auto,Auto,Auto" Margin="8" RowSpacing="10">
+
+        <DockPanel Grid.Row="0">
+          <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" Spacing="10" Margin="0,0,12,0">
+            <TextBlock Text="Model" VerticalAlignment="Center" />
+            <ComboBox x:Name="TranslationModelBox" Width="135" />
+            <TextBlock Text="Direction" VerticalAlignment="Center" />
+            <ComboBox x:Name="TranslationDirectionBox" Width="115" />
+            <Button x:Name="TranslateNowButton" Content="Loading server..." IsEnabled="False" Padding="12,6" />
+            <Button x:Name="TranslateWholeButton" Content="Translate whole text" IsEnabled="False" Padding="12,6"
+                    ToolTip.Tip="One call for finished documents and structured data. The live path (sentence units) is for dictation." />
+            <Button x:Name="ClearTranslationButton" Content="Clear / Reset" IsEnabled="False" Padding="10,6" />
+          </StackPanel>
+          <TextBlock x:Name="TranslationStatusText" VerticalAlignment="Center" TextWrapping="Wrap" />
+        </DockPanel>
+
+        <DockPanel Grid.Row="1">
+          <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" Spacing="10" Margin="0,0,12,0">
+            <TextBlock Text="Preset" VerticalAlignment="Center" />
+            <ComboBox x:Name="TranslationPresetBox" Width="340" PlaceholderText="Choose a verification preset..." />
+            <CheckBox x:Name="AutoFlushTailCheck" IsChecked="True" Content="Auto-flush tail (600ms)" VerticalAlignment="Center" />
+          </StackPanel>
+          <TextBox x:Name="TranslationGlossaryBox" PlaceholderText="Glossary: 缓存穿透=cache penetration, 接口=endpoint" />
+        </DockPanel>
+
+        <TextBlock Grid.Row="2" x:Name="PresetHintText" Opacity="0.75" TextWrapping="Wrap"
+                   Text="Core design: completed sentences translate immediately and stay cached when appending; code/URLs/placeholders are protected as exact tokens; JSON schema prevents prompt-in-source omissions." />
+
+        <Grid Grid.Row="3" ColumnDefinitions="*,*" ColumnSpacing="12">
+          <DockPanel Grid.Column="0">
+            <TextBlock DockPanel.Dock="Top" Text="Source text (type, paste, or pick a preset; completed sentences translate immediately)" FontWeight="SemiBold" Margin="0,0,0,4" />
+            <TextBox x:Name="TranslationSourceBox" TextWrapping="Wrap" AcceptsReturn="True" FontSize="15"
+                     PlaceholderText="输入或粘贴原文。以句号/问号/感叹号结尾的完整句会立即增量翻译且前缀复用；未完结的尾部在停顿或按 Cmd/Ctrl+Enter 时翻译。" />
+          </DockPanel>
+          <DockPanel Grid.Column="1">
+            <TextBlock DockPanel.Dock="Top" Text="Translated output (unit-assembled, literal-restored)" FontWeight="SemiBold" Margin="0,0,0,4" />
+            <TextBox x:Name="TranslationOutputBox" IsReadOnly="True" TextWrapping="Wrap" AcceptsReturn="True" FontSize="15" />
+          </DockPanel>
+        </Grid>
+
+        <StackPanel Grid.Row="4" Orientation="Horizontal" Spacing="12">
+          <Button x:Name="CopyTranslationButton" Content="Copy translation" IsEnabled="False" />
+          <Button x:Name="AppendDemoSentenceButton" Content="+ Append sentence (测前缀复用)" IsEnabled="False" />
+          <TextBlock x:Name="TranslationMetricsText" VerticalAlignment="Center" Opacity="0.8" />
+        </StackPanel>
+
+        <DockPanel Grid.Row="5">
+          <Button x:Name="OpenTranslationFolderButton" DockPanel.Dock="Right" Content="Open folder" Margin="8,0,0,0" VerticalAlignment="Top" />
+          <Button x:Name="SaveTranslationCaseButton" DockPanel.Dock="Right" Content="Save case" IsEnabled="False" Margin="12,0,0,0" VerticalAlignment="Top" />
+          <TextBox x:Name="TranslationReferenceBox" AcceptsReturn="True" TextWrapping="Wrap" Height="56"
+                   PlaceholderText="Expected reference translation or review note (optional). Saved to ~/VoicePoc/translation-records outside the repo." />
+        </DockPanel>
+
+        <TextBox Grid.Row="6" x:Name="TranslationUnitLogBox" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" Height="150" FontSize="12"
+                 PlaceholderText="Per-unit inspector: #id [Complete/ActiveTail | Final/Translating/Error | first/total ms | literals]" />
+      </Grid>
+    </TabItem>
+
+  </TabControl>
+</Window>
