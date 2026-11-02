@@ -6,8 +6,8 @@ namespace LiveLingo.Core.Dictation;
 
 /// <summary>
 /// Turns a continuous audio stream into the units of a <see cref="DraftSession"/>: live text while speaking
-/// (<see cref="Draft.Pending"/>), segments closed at pauses, optional second-pass settling, and sentences appended in
-/// speech order. Cleanup and translation are separate schedulers that observe the same draft.
+/// (<see cref="Draft.Pending"/>), segments closed at pauses, optional second-pass settling, and passages (a few
+/// sentences said together) appended in speech order. Cleanup and translation are separate schedulers that observe the same draft.
 /// Capture is never blocked by recognition: <see cref="Push"/> only queues the frame.
 /// </summary>
 public sealed class DictationSession : IAsyncDisposable
@@ -18,6 +18,8 @@ public sealed class DictationSession : IAsyncDisposable
         public SpeechSpan Speech { get; init; }
         public SpeechSpan Audio { get; init; }
         public bool EndsSentence { get; init; }
+        /// <summary>Set when the speaker stayed silent after this segment long enough to end the passage.</summary>
+        public bool EndsPassage { get; set; }
         public string LiveFinal { get; init; } = "";
         public string? SettledText { get; set; }
         public bool SecondPassFailed { get; set; }
@@ -42,6 +44,7 @@ public sealed class DictationSession : IAsyncDisposable
 
     private readonly List<Segment> _segments = [];
     private readonly List<SpeechSpan> _pending = [];
+    private readonly List<string> _passage = [];
     private string _tail = "";
     private string _openText = "";
     private string _publishedPending = "";
@@ -141,6 +144,7 @@ public sealed class DictationSession : IAsyncDisposable
                 while (_vad.TryTake(out var span))
                     _pending.Add(span);
                 CloseUtteranceIfEnded();
+                EndPassageIfSilent();
             }
         }
 
@@ -169,6 +173,31 @@ public sealed class DictationSession : IAsyncDisposable
         var hard = !_vad.IsSpeechActive && silenceMs >= _options.HardPauseMs;
         if (hard || lengthMs >= _options.SoftMaxUtteranceMs)
             CloseUtterance(endsSentence: hard);
+    }
+
+    /// <summary>
+    /// A long silence after the last segment ends the passage, so what was said so far is cleaned while the speaker thinks.
+    /// The break is recorded on the segment, so it applies in order even when that segment is still being decoded.
+    /// </summary>
+    private void EndPassageIfSilent()
+    {
+        if (_pending.Count > 0 || _vad.IsSpeechActive)
+            return;
+
+        lock (_gate)
+        {
+            if (_openText.Length > 0 || _segments.Count == 0)
+                return;
+
+            var last = _segments[^1];
+            var silenceMs = AudioFormat.SamplesToMs(_audio.TotalSamples - last.Speech.EndSample);
+            if (last.EndsPassage || silenceMs < _options.PassagePauseMs)
+                return;
+
+            last.EndsPassage = true;
+        }
+
+        Settle();
     }
 
     private void OnLiveText(string text)
@@ -279,14 +308,17 @@ public sealed class DictationSession : IAsyncDisposable
         }
     }
 
-    // ---- settling and sentence building ------------------------------------
+    // ---- settling, sentence and passage building ----------------------------
 
-    /// <summary>Segments settle strictly in order, so units are append-only.</summary>
-    private void Settle(bool flushTail = false)
+    /// <summary>
+    /// Segments settle strictly in order, so units are append-only. Settled sentences wait in the open passage;
+    /// a passage becomes one unit when the speaker paused long enough, when it is long enough, or when stopping.
+    /// </summary>
+    private void Settle(bool endPassage = false)
     {
         lock (_outputGate)
         {
-            List<string> sentences = [];
+            List<string> passages = [];
             string pending;
             lock (_gate)
             {
@@ -298,30 +330,53 @@ public sealed class DictationSession : IAsyncDisposable
                     foreach (var unit in units)
                     {
                         if (unit.IsComplete)
-                            sentences.Add(unit.Body);
+                            AddSentence(passages, unit.Body);
                         else
                             remainder = unit.Body;
                     }
                     _tail = remainder;
                     if (segment.EndsSentence || _tail.Length >= _options.MaxTailChars)
-                        FlushTail(sentences);
+                        FlushTail(passages);
+                    if (segment.EndsPassage)
+                        EndPassage(passages);
                 }
-                if (flushTail)
-                    FlushTail(sentences);
+
+                // The break may be recorded after its segment settled.
+                if (endPassage || (_nextToSettle > 0 && _segments[_nextToSettle - 1].EndsPassage))
+                    EndPassage(passages);
                 pending = PendingText();
             }
 
-            Write(sentences, pending);
+            Write(passages, pending);
         }
     }
 
-    private void FlushTail(List<string> sentences)
+    private void AddSentence(List<string> passages, string sentence)
+    {
+        _passage.Add(sentence);
+        if (PassageText().Length >= _options.PassageMaxChars)
+            EndPassage(passages);
+    }
+
+    private void FlushTail(List<string> passages)
     {
         if (_tail.Length == 0)
             return;
-        sentences.Add(_tail);
+        var tail = _tail;
         _tail = "";
+        AddSentence(passages, tail);
     }
+
+    private void EndPassage(List<string> passages)
+    {
+        FlushTail(passages);
+        if (_passage.Count == 0)
+            return;
+        passages.Add(PassageText());
+        _passage.Clear();
+    }
+
+    private string PassageText() => TextUnits.Join(_passage.Select(sentence => ("", sentence, "")));
 
     private void Publish()
     {
@@ -335,24 +390,24 @@ public sealed class DictationSession : IAsyncDisposable
         }
     }
 
-    private void Write(List<string> sentences, string pending)
+    private void Write(List<string> passages, string pending)
     {
-        if (sentences.Count == 0 && pending == _publishedPending)
+        if (passages.Count == 0 && pending == _publishedPending)
             return;
 
         _publishedPending = pending;
         _draft.Mutate(draft =>
         {
-            foreach (var sentence in sentences)
-                draft.Append(sentence);
+            foreach (var passage in passages)
+                draft.Append(passage);
             draft.SetPending(pending);
         });
     }
 
-    /// <summary>Recognized but not yet settled speech, in time order: the unfinished tail, unsettled segments, the open segment.</summary>
+    /// <summary>Recognized but not yet written as a unit, in time order: the open passage, the unfinished tail, unsettled segments, the open segment.</summary>
     private string PendingText()
     {
-        var text = _tail;
+        var text = JoinText(PassageText(), _tail);
         for (var i = _nextToSettle; i < _segments.Count; i++)
             text = JoinText(text, _segments[i].SettledText ?? _segments[i].LiveFinal);
         return JoinText(text, _openText);
@@ -379,7 +434,7 @@ public sealed class DictationSession : IAsyncDisposable
             }
         }
 
-        Settle(flushTail: true);
+        Settle(endPassage: true);
         _draft.Mutate(draft => draft.Recording = false);
     }
 

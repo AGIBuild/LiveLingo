@@ -39,7 +39,6 @@ public class CleanupSchedulerTests
 
     private sealed class Harness : IAsyncDisposable
     {
-        public static readonly TimeSpan Holdback = TimeSpan.FromSeconds(2);
         public static readonly TimeSpan TypingPause = TimeSpan.FromMilliseconds(400);
 
         public DraftSession Session { get; } = new(hasTarget: true);
@@ -50,7 +49,7 @@ public class CleanupSchedulerTests
         public Harness(IReadOnlyList<string>? glossary = null)
         {
             Session.Mutate(draft => draft.Output = OutputKind.Clean);
-            Scheduler = new CleanupScheduler(Session, Cleaner, glossary ?? [], Holdback, contextUnits: 2, Time);
+            Scheduler = new CleanupScheduler(Session, Cleaner, glossary ?? [], contextUnits: 2, Time);
         }
 
         public void Speak(params string[] sentences) =>
@@ -91,7 +90,7 @@ public class CleanupSchedulerTests
     }
 
     [Fact]
-    public async Task ASentence_IsCleanedOnceSomethingFollowsIt_OneAtATimeInOrder()
+    public async Task Units_AreCleanedOneAtATimeInOrder()
     {
         await using var h = new Harness();
         h.Recording(true);
@@ -105,28 +104,32 @@ public class CleanupSchedulerTests
         Assert.Single(h.Cleaner.Calls);
 
         first.Result.SetResult("先改接口。");
-        h.Time.Advance(Harness.Holdback);
-        h.Time.Timer.Fire();
         var second = await h.NextCall(2);
         Assert.Equal("然后补测试。", second.Request.Target);
         Assert.Equal("先改接口。", second.Request.Preceding);
-        Assert.False(second.Request.Continues);
+        Assert.True(second.Request.Continues); // still recording
     }
 
     [Fact]
-    public async Task TheLastSentence_WaitsForTheHoldback_WhileTheSpeakerMayStillContinue()
+    public async Task TheLastUnit_IsCleanedAtOnce_AndTheSpeakerMayStillContinueWhileRecording()
     {
         await using var h = new Harness();
         h.Recording(true);
         h.Speak("先改接口。");
-        await WaitUntil(() => h.Time.Timer.Due == Harness.Holdback);
-        Assert.Empty(h.Cleaner.Calls);
-        Assert.Equal(Harness.Holdback, h.Time.Timer.Due);
-
-        h.Time.Advance(Harness.Holdback);
-        h.Time.Timer.Fire();
 
         var call = await h.NextCall(1);
+
+        Assert.True(call.Request.Continues);
+    }
+
+    [Fact]
+    public async Task WhenRecordingHasStopped_TheLastUnitIsTheEndOfTheSpeech()
+    {
+        await using var h = new Harness();
+        h.Speak("先改接口。");
+
+        var call = await h.NextCall(1);
+
         Assert.False(call.Request.Continues);
     }
 
@@ -135,37 +138,12 @@ public class CleanupSchedulerTests
     {
         await using var h = new Harness();
         h.Recording(true);
-        h.Speak("先改接口。");
         h.Pending("然后");
+        h.Speak("先改接口。");
 
         var call = await h.NextCall(1);
 
         Assert.True(call.Request.Continues);
-    }
-
-    [Fact]
-    public async Task WhenRecordingHasStopped_TheLastSentenceIsCleanedImmediately()
-    {
-        await using var h = new Harness();
-        h.Speak("先改接口。");
-
-        var call = await h.NextCall(1);
-
-        Assert.False(call.Request.Continues);
-    }
-
-    [Fact]
-    public async Task StoppingRecording_ReleasesTheHeldBackSentence()
-    {
-        await using var h = new Harness();
-        h.Recording(true);
-        h.Speak("先改接口。");
-        await Task.Delay(50);
-        Assert.Empty(h.Cleaner.Calls);
-
-        h.Recording(false);
-
-        await h.NextCall(1);
     }
 
     [Fact]
@@ -192,6 +170,60 @@ public class CleanupSchedulerTests
         await WaitUntil(() => h.CleanOf(0) is not null);
         Assert.Equal("端口改成 8080。", h.CleanOf(0));
         Assert.Equal(new GateRejection(GateReason.NumberLost, "8080"), h.RejectionOf(0));
+    }
+
+    [Fact]
+    public async Task ARefusedPassage_IsCleanedSentenceBySentence_SoOneBadSentenceDoesNotCostTheRest()
+    {
+        await using var h = new Harness();
+        h.Speak("呃，先改接口。然后补测试。");
+
+        (await h.NextCall(1)).Result.SetResult("");
+        var first = await h.NextCall(2);
+        Assert.Equal("呃，先改接口。", first.Request.Target);
+        Assert.Equal("", first.Request.Preceding);
+        Assert.True(first.Request.Continues);
+        first.Result.SetResult("先改接口。");
+        var second = await h.NextCall(3);
+        Assert.Equal("然后补测试。", second.Request.Target);
+        Assert.Equal("先改接口。", second.Request.Preceding);
+        Assert.False(second.Request.Continues);
+        second.Result.SetResult("补一个新测试，并且重构整个下载模块。");
+
+        await WaitUntil(() => h.CleanOf(0) is not null);
+        Assert.Equal("先改接口。然后补测试。", h.CleanOf(0));
+        Assert.Null(h.RejectionOf(0));
+    }
+
+    [Fact]
+    public async Task ARefusedPassage_KeepsTheOriginal_WhenNoSentenceOfItPasses()
+    {
+        await using var h = new Harness();
+        h.Speak("端口改成 8080。超时设成三十秒。");
+
+        (await h.NextCall(1)).Result.SetResult("端口改一下。超时改一下。");
+        (await h.NextCall(2)).Result.SetResult("端口改一下。");
+        (await h.NextCall(3)).Result.SetResult("");
+
+        await WaitUntil(() => h.CleanOf(0) is not null);
+        Assert.Equal("端口改成 8080。超时设成三十秒。", h.CleanOf(0));
+        Assert.Equal(GateReason.NumberLost, h.RejectionOf(0)?.Reason);
+    }
+
+    [Fact]
+    public async Task ARefusedMultiLineText_IsNotSplitIntoSentences()
+    {
+        await using var h = new Harness();
+        h.Session.Mutate(draft => draft.SyncSource([new SourceUnit("第一行，端口 8080。\n第二行。")], DraftRoute.Whole));
+        await Task.Delay(50);
+        h.Time.Advance(Harness.TypingPause);
+        h.Time.Timer.Fire();
+
+        (await h.NextCall(1)).Result.SetResult("全删了。");
+
+        await WaitUntil(() => h.CleanOf(0) is not null);
+        Assert.Single(h.Cleaner.Calls);
+        Assert.NotNull(h.RejectionOf(0));
     }
 
     [Fact]

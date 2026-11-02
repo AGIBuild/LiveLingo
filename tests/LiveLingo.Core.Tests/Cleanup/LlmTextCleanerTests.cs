@@ -62,7 +62,7 @@ public class LlmTextCleanerTests
     }
 
     [Fact]
-    public async Task CleanAsync_BoundsTheOutputBySentenceLength()
+    public async Task CleanAsync_BoundsTheOutputByTextLength()
     {
         var (cleaner, seen) = Create("ok");
 
@@ -70,6 +70,6 @@ public class LlmTextCleanerTests
         await cleaner.CleanAsync(new CleanupRequest(new string('字', 500), "", false, []), CancellationToken.None);
 
         Assert.Equal(1 * 2 + 48, seen[0].MaxTokens);
-        Assert.Equal(320, seen[1].MaxTokens);
+        Assert.Equal(900, seen[1].MaxTokens);
     }
 }

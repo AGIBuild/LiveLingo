@@ -190,6 +190,47 @@ public class DraftTests
     }
 
     [Fact]
+    public void SyncSource_KeepsAPassageWhileItsSentencesAreUnchanged()
+    {
+        var draft = new Draft(hasTarget: true);
+        var ticket = draft.Append("先改接口。然后补测试。");
+        draft.Append("最后更新文档。");
+        draft.Complete(ticket, UnitKind.Clean, "先改接口，再补测试。");
+
+        var created = draft.SyncSource(
+            [new SourceUnit("先改接口。"), new SourceUnit("然后补测试。"), new SourceUnit("最后更新文档。"), new SourceUnit("发布。")],
+            DraftRoute.Units);
+
+        Assert.Single(created);
+        Assert.Equal(["先改接口。然后补测试。", "最后更新文档。", "发布。"], draft.Units.Select(unit => unit.Raw));
+        Assert.Equal("先改接口，再补测试。", draft.Units[0].Clean.Text);
+    }
+
+    [Fact]
+    public void SyncSource_FallsBackToSentences_WhenAPassageIsEdited()
+    {
+        var draft = new Draft(hasTarget: true);
+        draft.Append("先改接口。然后补测试。");
+
+        var created = draft.SyncSource([new SourceUnit("先改接口。"), new SourceUnit("然后补单测。")], DraftRoute.Units);
+
+        Assert.Equal(2, created.Count);
+        Assert.Equal(["先改接口。", "然后补单测。"], draft.Units.Select(unit => unit.Raw));
+    }
+
+    [Fact]
+    public void SyncSource_DoesNotJoinSentencesAcrossALineBreak()
+    {
+        var draft = new Draft(hasTarget: true);
+        draft.Append("先改接口。然后补测试。");
+
+        var created = draft.SyncSource(
+            [new SourceUnit("先改接口。", Trail: "\n"), new SourceUnit("然后补测试。")], DraftRoute.Units);
+
+        Assert.Equal(2, created.Count);
+    }
+
+    [Fact]
     public void LateResult_ForRemovedSentence_CannotLandOnAnotherSentence()
     {
         var draft = new Draft(hasTarget: true);

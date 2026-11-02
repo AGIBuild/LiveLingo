@@ -16,6 +16,15 @@ public sealed class DictationOptions
     public int MaxTailChars { get; init; } = 90;
 
     /// <summary>
+    /// Silence after speech that ends a passage. Sentences are collected into passages because the recognizer cuts
+    /// speech at every pause, so a single sentence is often half a thought and cannot be cleaned or translated well.
+    /// </summary>
+    public int PassagePauseMs { get; init; } = 1500;
+
+    /// <summary>A passage this long ends at its next sentence boundary, so cleanup of a long monologue is not postponed.</summary>
+    public int PassageMaxChars { get; init; } = 120;
+
+    /// <summary>
     /// The live text appears this long after the speech it recognizes. Audio this far before the first text is kept
     /// for the second pass.
     /// </summary>

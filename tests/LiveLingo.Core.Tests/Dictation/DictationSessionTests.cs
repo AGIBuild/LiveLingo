@@ -23,6 +23,8 @@ public class DictationSessionTests
             int hardPauseMs = 300,
             int softMaxUtteranceMs = 60_000,
             int maxTailChars = 90,
+            int passagePauseMs = 1500,
+            int passageMaxChars = 1, // one sentence per unit, unless a test is about passages
             int stopTimeoutMs = 5000)
         {
             Live = new ScriptedLive(script);
@@ -34,6 +36,8 @@ public class DictationSessionTests
                     HardPauseMs = hardPauseMs,
                     SoftMaxUtteranceMs = softMaxUtteranceMs,
                     MaxTailChars = maxTailChars,
+                    PassagePauseMs = passagePauseMs,
+                    PassageMaxChars = passageMaxChars,
                     StopTimeoutMs = stopTimeoutMs
                 });
             Session.Start();
@@ -317,6 +321,81 @@ public class DictationSessionTests
 
         Assert.Equal(2, h.Raws.Count);
         Assert.Equal("我改过的。", h.Draft.Read(d => d.Units[0].Clean.Text));
+    }
+
+    [Fact]
+    public async Task SentencesSaidTogether_BecomeOnePassage_AndWaitInThePendingTextMeanwhile()
+    {
+        var script = new[] { A, B };
+        await using var h = new Harness(script, hardPauseMs: 300, passageMaxChars: 120);
+
+        h.Push(3000);
+        Assert.True(await Until(() => h.Pending.Contains("三十秒")));
+        Assert.Empty(h.Raws);
+
+        h.Push(2400);
+        await h.Session.StopAsync();
+
+        Assert.Equal(["把下载超时设成三十秒。只改下载接口，其他请求不要动。"], h.Raws);
+        Assert.Equal("", h.Pending);
+    }
+
+    [Fact]
+    public async Task ALongSilence_EndsThePassage_WhileStillRecording()
+    {
+        var script = new[] { A, new ScriptedSegment(6000, 7500, "然后补测试。") };
+        await using var h = new Harness(script, hardPauseMs: 300, passagePauseMs: 1500, passageMaxChars: 120);
+
+        h.Push(3600); // 1.3 s after A ended: still the same passage
+        Assert.True(await Until(() => h.Session.Segments.Count == 1));
+        Assert.Empty(h.Raws);
+
+        h.Push(400);
+
+        Assert.True(await Until(() => h.Raws.Count == 1));
+        Assert.Equal("把下载超时设成三十秒。", h.Raws[0]);
+        Assert.True(h.Recording);
+
+        h.Push(4000);
+        await h.Session.StopAsync();
+        Assert.Equal(["把下载超时设成三十秒。", "然后补测试。"], h.Raws);
+    }
+
+    [Fact]
+    public async Task APassage_EndsAtTheSentenceThatMakesItLongEnough()
+    {
+        var script = new[] { A, B, new ScriptedSegment(5300, 7300, "第三句。") };
+        await using var h = new Harness(script, hardPauseMs: 300, passageMaxChars: 15);
+
+        h.Push(7800);
+        await h.Session.StopAsync();
+
+        Assert.Equal(["把下载超时设成三十秒。只改下载接口，其他请求不要动。", "第三句。"], h.Raws);
+    }
+
+    [Fact]
+    public async Task APassage_KeepsItsBreakWhenTheEndingSegmentIsStillBeingDecoded()
+    {
+        var release = new ManualResetEventSlim();
+        var calls = 0;
+        var script = new[] { A, new ScriptedSegment(6000, 7500, "然后补测试。") };
+        await using var h = new Harness(script, hardPauseMs: 300, passagePauseMs: 1500, passageMaxChars: 120,
+            secondPass: new ScriptedSegmentRecognizer(() =>
+            {
+                if (Interlocked.Increment(ref calls) == 1)
+                    release.Wait(5000);
+                return calls == 1 ? "把下载超时设成三十秒。" : "然后补测试。";
+            }));
+
+        h.Push(4200); // the silence outlasts the pause while the second pass has not answered
+        Assert.True(await Until(() => h.Session.Segments.Count == 1));
+        await Task.Delay(100);
+        Assert.Empty(h.Raws);
+
+        release.Set();
+
+        Assert.True(await Until(() => h.Raws.Count == 1));
+        Assert.Equal("把下载超时设成三十秒。", h.Raws[0]);
     }
 
     [Fact]

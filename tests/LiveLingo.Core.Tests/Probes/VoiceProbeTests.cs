@@ -55,7 +55,7 @@ public class VoiceProbeTests(ITestOutputHelper output)
             var samples = ReadMono16k(Path.Combine(corpus, "audio", id + ".wav"));
             var draft = new DraftSession(hasTarget: true);
             draft.Mutate(d => d.Output = OutputKind.Clean);
-            await using var cleanup = new CleanupScheduler(draft, cleaner, [], TimeSpan.FromSeconds(2), contextUnits: 2);
+            await using var cleanup = new CleanupScheduler(draft, cleaner, [], contextUnits: 2);
 
             var loading = Stopwatch.StartNew();
             var session = await factory.CreateAsync(draft, [], CancellationToken.None);
@@ -78,12 +78,13 @@ public class VoiceProbeTests(ITestOutputHelper output)
             var (raw, cleaned, warnings) = draft.Read(d => (
                 d.SourceText(),
                 TextUnits.Join(d.Units.Select(u => (u.Lead, u.Clean.Text ?? u.Raw, u.Trail))),
-                d.Units.Count(u => u.Clean.Rejection is not null)));
+                string.Join(", ", d.Units.Where(u => u.Clean.Rejection is not null).Select(u => u.Clean.Rejection!.ToString()))));
             var spoken = scenarios[id];
             output.WriteLine($"[{id}] stop settled in {settled} ms, cleanup drained in {stopping.ElapsedMilliseconds} ms, replay {clock.ElapsedMilliseconds} ms");
             output.WriteLine($"[{id}] spoken : {spoken}");
             output.WriteLine($"[{id}] raw    : {raw}  (CER {Cer(spoken, raw):0.000})");
-            output.WriteLine($"[{id}] cleaned: {cleaned}  (CER {Cer(spoken, cleaned):0.000}, {warnings} gate warnings)");
+            output.WriteLine($"[{id}] cleaned: {cleaned}  (CER {Cer(spoken, cleaned):0.000}, gate: {(warnings.Length == 0 ? "accepted" : warnings)})");
+            output.WriteLine($"[{id}] units  : {string.Join(" | ", draft.Read(d => d.Units.Select(u => u.Raw)))}");
 
             Assert.False(string.IsNullOrWhiteSpace(raw), $"{id}: nothing recognized");
             var maxCer = double.Parse(Environment.GetEnvironmentVariable("LIVELINGO_PROBE_MAX_CER") ?? "1");
