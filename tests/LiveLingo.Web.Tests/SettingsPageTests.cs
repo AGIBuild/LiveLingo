@@ -320,11 +320,13 @@ public sealed class SettingsPageTests(BrowserFixture browsers)
         await using var voice = await browsers.OpenSettingsAsync(engine, "settings-voice");
         Assert.Equal("Clean", await voice.Page.Locator("#output").InputValueAsync());
         Assert.False(await voice.Page.Locator("#auto-dictate").IsCheckedAsync());
+        Assert.True(await voice.Page.Locator("#preload").IsCheckedAsync());
         await voice.Page.Locator("#output").SelectOptionAsync("Translate");
         await voice.Page.Locator("#auto-dictate").ClickAsync();
+        await voice.Page.Locator("#preload").ClickAsync();
 
         Assert.Equal(
-            [("defaultOutput", "Translate"), ("autoDictate", "true")],
+            [("defaultOutput", "Translate"), ("autoDictate", "true"), ("preloadSpeech", "false")],
             (await voice.IntentsAsync()).OfType<SettingIntent>().Select(s => (s.Key, s.Value)));
     }
 

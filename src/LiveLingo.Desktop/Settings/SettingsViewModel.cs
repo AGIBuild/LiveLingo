@@ -65,6 +65,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         _cleanupEnabled = current.Composer.CleanupEnabled;
         _defaultOutputIndex = Math.Max(0, DefaultOutputs.ToList().IndexOf(current.Composer.DefaultOutput));
         _autoDictate = current.Composer.AutoDictate;
+        _preloadSpeech = current.Composer.PreloadSpeech;
         _rememberChoices = current.Composer.RememberChoices;
         _tierIndex = Math.Max(0, Tiers.ToList().IndexOf(current.Composer.TranslatorTier));
         _microphoneNames = [""];
@@ -105,6 +106,9 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     /// <summary>Whether the microphone starts listening as soon as the composer opens.</summary>
     [ObservableProperty] private bool _autoDictate;
+
+    /// <summary>Whether the speech models are loaded when the application starts (see <c>ModelWarmup</c>).</summary>
+    [ObservableProperty] private bool _preloadSpeech;
 
     /// <summary>Whether the output and direction last chosen for an application are used the next time it is the target.</summary>
     [ObservableProperty] private bool _rememberChoices;
@@ -169,6 +173,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     partial void OnCleanupEnabledChanged(bool value) => Apply();
     partial void OnDefaultOutputIndexChanged(int value) => ApplyIfSelected(value);
     partial void OnAutoDictateChanged(bool value) => Apply();
+    partial void OnPreloadSpeechChanged(bool value) => Apply();
     partial void OnRememberChoicesChanged(bool value) => Apply();
     partial void OnTierIndexChanged(int value) => ApplyIfSelected(value);
 
@@ -218,6 +223,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         model.Composer.CleanupEnabled = CleanupEnabled;
         model.Composer.DefaultOutput = DefaultOutputs[DefaultOutputIndex];
         model.Composer.AutoDictate = AutoDictate;
+        model.Composer.PreloadSpeech = PreloadSpeech;
         model.Composer.RememberChoices = RememberChoices;
         model.Composer.TranslatorTier = Tiers[TierIndex];
         if (_devicesLoaded)

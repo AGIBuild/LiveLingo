@@ -212,10 +212,12 @@ public sealed class SettingsIntentsTests
 
         rig.Set(SettingIntent.Names.DefaultOutput, "Original");
         rig.Set(SettingIntent.Names.AutoDictate, "true");
+        rig.Set(SettingIntent.Names.PreloadSpeech, "false");
         rig.Set(SettingIntent.Names.RememberChoices, "false");
 
         Assert.Equal("Original", rig.F.Last.Composer.DefaultOutput);
         Assert.True(rig.F.Last.Composer.AutoDictate);
+        Assert.False(rig.F.Last.Composer.PreloadSpeech);
         Assert.False(rig.F.Last.Composer.RememberChoices);
 
         rig.Do(new ForgetAppIntent("slack") { V = 1 });

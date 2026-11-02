@@ -70,8 +70,20 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
         _session.Changed += OnDraftChanged;
         _downloads.StateChanged += OnDownloadStateChanged;
         _voice.NoSignalChanged += OnNoSignalChanged;
+        _voice.PreparingChanged += OnPreparingChanged;
+        _speechPreparing = _voice.IsPreparing;
         Refresh();
     }
+
+    /// <summary>The speech models are being loaded in the background; the composer says so until they are ready.</summary>
+    private bool _speechPreparing;
+
+    private void OnPreparingChanged(bool preparing) =>
+        OnUiThread(() =>
+        {
+            _speechPreparing = preparing;
+            Refresh();
+        });
 
     /// <summary>Raised after the result was written (or copied when there is no target); the window should close.</summary>
     public event Action? Completed;
@@ -377,6 +389,7 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
         _session.Changed -= OnDraftChanged;
         _downloads.StateChanged -= OnDownloadStateChanged;
         _voice.NoSignalChanged -= OnNoSignalChanged;
+        _voice.PreparingChanged -= OnPreparingChanged;
         DisposeTimers();
         IsListening = false;
         await _voice.DisposeAsync().ConfigureAwait(false);
@@ -604,7 +617,7 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
         if (IsListening)
             return ComposerStatus.Listening;
         if (itemCount == 0)
-            return ComposerStatus.Empty;
+            return _speechPreparing ? ComposerStatus.Preparing : ComposerStatus.Empty;
         if (!ModelsReady && Output != ComposerOutput.Original)
             return ComposerStatus.Working;
         if (content.IsReady)

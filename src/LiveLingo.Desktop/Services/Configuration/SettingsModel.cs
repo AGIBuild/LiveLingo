@@ -82,6 +82,12 @@ public partial class ComposerSettings : ObservableObject
     [ObservableProperty] private bool _autoDictate;
 
     /// <summary>
+    /// The speech models are loaded in the background when the application starts, so the first dictation does not wait
+    /// for them (about 1.5 GB of memory while they are loaded). Off: they are loaded when the composer opens.
+    /// </summary>
+    [ObservableProperty] private bool _preloadSpeech = true;
+
+    /// <summary>
     /// The output and the translation direction last chosen for an application are used the next time the composer
     /// opens for it (see <c>ComposerPreferences</c>). On by default; nothing but the application's identity is kept.
     /// </summary>
@@ -92,6 +98,7 @@ public partial class ComposerSettings : ObservableObject
         CleanupEnabled = CleanupEnabled,
         DefaultOutput = DefaultOutput,
         AutoDictate = AutoDictate,
+        PreloadSpeech = PreloadSpeech,
         RememberChoices = RememberChoices,
         TranslatorTier = TranslatorTier,
         Glossary = Glossary,

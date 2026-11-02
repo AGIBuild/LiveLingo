@@ -30,7 +30,9 @@ exported as SRT.
 
 ## Privacy
 
-- Speech recognition, cleanup and translation run locally. Audio never leaves the machine.
+- Speech recognition, cleanup and translation run locally. Audio never leaves the machine. The speech models are
+  loaded in the background when the app starts, which takes about 1.5 GB of memory until they have been idle for 30
+  minutes; turn that off in *Settings → Voice* to load them only when you summon the composer.
 - Cloud models are **off by default**. In *Settings → Privacy and cloud* you can switch translation and cleanup to your own
   OpenAI-compatible endpoint (for example Microsoft Foundry) separately. Only the text of that step is sent; the
   endpoint must be `https`; the API key is kept in the system secret store, not in a file. A cloud failure is shown,

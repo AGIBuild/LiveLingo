@@ -217,6 +217,7 @@ internal sealed record SettingIntent(string Key, string Value) : WebIntent
         public const string Tier = "tier";
         public const string DefaultOutput = "defaultOutput";
         public const string AutoDictate = "autoDictate";
+        public const string PreloadSpeech = "preloadSpeech";
         public const string RememberChoices = "rememberChoices";
         public const string CloudBaseUrl = "cloudBaseUrl";
         public const string CloudModel = "cloudModel";
@@ -234,7 +235,7 @@ internal sealed record SettingIntent(string Key, string Value) : WebIntent
         Names.Direction => SettingsViewModel.Targets.Contains(Value),
         Names.Tier => SettingsViewModel.Tiers.Contains(Value),
         Names.DefaultOutput => SettingsViewModel.DefaultOutputs.Contains(Value),
-        Names.ReduceMotion or Names.Cleanup or Names.AutoDictate or Names.RememberChoices => Value is "true" or "false",
+        Names.ReduceMotion or Names.Cleanup or Names.AutoDictate or Names.PreloadSpeech or Names.RememberChoices => Value is "true" or "false",
         _ => false
     };
 }

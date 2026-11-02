@@ -1,5 +1,6 @@
 using LiveLingo.Core.Dictation;
 using LiveLingo.Core.Drafting;
+using LiveLingo.Core.Models;
 using LiveLingo.Desktop.Platform;
 
 namespace LiveLingo.Desktop.Composer;
@@ -13,6 +14,12 @@ public interface IVoiceInput : IAsyncDisposable
     /// </summary>
     event Action<bool>? NoSignalChanged;
 
+    /// <summary>True while the speech models are being loaded in the background, before anybody asked to dictate.</summary>
+    bool IsPreparing { get; }
+
+    /// <summary>Raised when <see cref="IsPreparing"/> changed, on whichever thread caused it.</summary>
+    event Action<bool>? PreparingChanged;
+
     /// <exception cref="LiveLingo.Core.Models.ModelNotReadyException">A speech model is not installed.</exception>
     /// <exception cref="InvalidOperationException">There is no input device or it could not be opened.</exception>
     Task StartAsync(DraftSession draft, IReadOnlyList<string> glossary, CancellationToken ct);
@@ -21,7 +28,7 @@ public interface IVoiceInput : IAsyncDisposable
     Task StopAsync();
 }
 
-public sealed class MicrophoneVoiceInput(IDictationSessionFactory factory, IMicrophone microphone) : IVoiceInput
+public sealed class MicrophoneVoiceInput : IVoiceInput
 {
     /// <summary>
     /// How long the microphone may deliver only silence before it is closed. A pause while thinking must not end the
@@ -29,23 +36,40 @@ public sealed class MicrophoneVoiceInput(IDictationSessionFactory factory, IMicr
     /// </summary>
     public static readonly TimeSpan IdleTimeout = TimeSpan.FromMinutes(5);
 
+    private readonly IDictationSessionFactory _factory;
+    private readonly IMicrophone _microphone;
+    private readonly ISpeechWarmup _warmup;
     private DictationSession? _session;
     private SignalMonitor? _monitor;
 
+    public MicrophoneVoiceInput(IDictationSessionFactory factory, IMicrophone microphone, ISpeechWarmup warmup)
+    {
+        _factory = factory;
+        _microphone = microphone;
+        _warmup = warmup;
+        _warmup.StateChanged += OnResidencyChanged;
+    }
+
     public event Action<bool>? NoSignalChanged;
+
+    public event Action<bool>? PreparingChanged;
+
+    public bool IsPreparing => _warmup.State == ModelResidency.Loading;
+
+    private void OnResidencyChanged(ModelResidency state) => PreparingChanged?.Invoke(state == ModelResidency.Loading);
 
     public async Task StartAsync(DraftSession draft, IReadOnlyList<string> glossary, CancellationToken ct)
     {
         if (_session is not null)
             throw new InvalidOperationException("Already listening.");
 
-        var session = await factory.CreateAsync(draft, glossary, ct).ConfigureAwait(false);
+        var session = await _factory.CreateAsync(draft, glossary, ct).ConfigureAwait(false);
         session.Start();
         var monitor = new SignalMonitor(IdleTimeout);
         _monitor = monitor;
         try
         {
-            microphone.Start(frame =>
+            _microphone.Start(frame =>
             {
                 if (monitor.Observe(frame) is { } silent)
                     NoSignalChanged?.Invoke(silent);
@@ -68,9 +92,13 @@ public sealed class MicrophoneVoiceInput(IDictationSessionFactory factory, IMicr
 
         _session = null;
         // The microphone stops first: a frame pushed after the session stopped is an error.
-        microphone.Stop();
+        _microphone.Stop();
         await session.DisposeAsync().ConfigureAwait(false);
     }
 
-    public async ValueTask DisposeAsync() => await StopAsync().ConfigureAwait(false);
+    public async ValueTask DisposeAsync()
+    {
+        _warmup.StateChanged -= OnResidencyChanged;
+        await StopAsync().ConfigureAwait(false);
+    }
 }

@@ -89,6 +89,9 @@
     <${Row} id="auto-dictate" title=${LL.t('autoDictate')} desc=${LL.t('autoDictate.desc')}>
       <${Switch} id="auto-dictate" checked=${v.autoDictate} onChange=${(on) => set('autoDictate')(String(on))}/>
     <//>
+    <${Row} id="preload" title=${LL.t('preload')} desc=${LL.t('preload.desc')}>
+      <${Switch} id="preload" checked=${v.preloadSpeech} onChange=${(on) => set('preloadSpeech')(String(on))}/>
+    <//>
     <${Terms} terms=${v.terms}/>
   </div>`;
 

@@ -233,6 +233,59 @@ public class LlamaServerHostTests
     }
 
     [Fact]
+    public async Task Warm_StartsTheServerAndLetsItGo_SoTheFirstRequestFindsItRunning()
+    {
+        await using var h = new Harness();
+
+        await h.Host.WarmAsync(InferenceRole.Cleaner, ModelCatalog.Cleaner, CancellationToken.None);
+
+        Assert.Single(h.Launcher.Started);
+        Assert.Equal(TimeSpan.FromMinutes(10), h.Time.Timer.Due);
+
+        using var lease = await h.Host.AcquireAsync(InferenceRole.Cleaner, ModelCatalog.Cleaner, CancellationToken.None);
+        Assert.Single(h.Launcher.Started);
+    }
+
+    [Fact]
+    public async Task AWarmServer_IsUnloadedWhenNobodyUsesIt()
+    {
+        await using var h = new Harness();
+        await h.Host.WarmAsync(InferenceRole.Cleaner, ModelCatalog.Cleaner, CancellationToken.None);
+
+        h.Time.Timer.Fire();
+
+        await WaitUntil(() => h.Launcher.Started[0].Process.Disposed);
+    }
+
+    [Fact]
+    public async Task TheWarmupOfARole_LoadsThePinnedModelOfThatRole_AndNothingWhenTheRoleRunsInTheCloud()
+    {
+        await using var h = new Harness();
+        var routes = Substitute.For<LiveLingo.Core.Cloud.ICloudRoutes>();
+        routes.GetAsync(InferenceRole.Translator, Arg.Any<CancellationToken>())
+            .Returns(LiveLingo.Core.Cloud.CloudRoute.Create("https://example.com/v1", "m", "k"));
+        routes.GetAsync(InferenceRole.Cleaner, Arg.Any<CancellationToken>()).Returns((LiveLingo.Core.Cloud.CloudRoute?)null);
+        h.Core.TranslatorTier = TranslatorTier.Quality;
+        var warmup = new LlamaWarmup(h.Host, routes, h.Core);
+
+        await warmup.WarmAsync(InferenceRole.Translator);
+        Assert.Empty(h.Launcher.Started);
+
+        await warmup.WarmAsync(InferenceRole.Cleaner);
+        var model = h.Launcher.Started.Single().Launch.Arguments[1];
+        Assert.Contains(ModelCatalog.Cleaner.Id, model);
+    }
+
+    [Theory]
+    [InlineData(TranslatorTier.Fast, "hy-mt2-1.8b-q4km")]
+    [InlineData(TranslatorTier.Quality, "hy-mt2-7b-q4km")]
+    public void TheTranslatorRole_FollowsTheTier_AndTheCleanerDoesNot(TranslatorTier tier, string translator)
+    {
+        Assert.Equal(translator, InferenceModels.For(InferenceRole.Translator, tier).Id);
+        Assert.Equal(ModelCatalog.Cleaner, InferenceModels.For(InferenceRole.Cleaner, tier));
+    }
+
+    [Fact]
     public async Task AfterTheLastLeaseIsReleased_TheServerIsUnloadedWhenIdle()
     {
         await using var h = new Harness();

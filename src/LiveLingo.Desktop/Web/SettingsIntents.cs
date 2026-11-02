@@ -70,6 +70,7 @@ internal sealed class SettingsIntents : IIntentHandler
             case SettingIntent.Names.Tier: _vm.TierIndex = IndexOf(SettingsViewModel.Tiers, value); break;
             case SettingIntent.Names.DefaultOutput: _vm.DefaultOutputIndex = IndexOf(SettingsViewModel.DefaultOutputs, value); break;
             case SettingIntent.Names.AutoDictate: _vm.AutoDictate = value == "true"; break;
+            case SettingIntent.Names.PreloadSpeech: _vm.PreloadSpeech = value == "true"; break;
             case SettingIntent.Names.RememberChoices: _vm.RememberChoices = value == "true"; break;
             case SettingIntent.Names.ReduceMotion: _vm.ReduceMotion = value == "true"; break;
             case SettingIntent.Names.Cleanup: _vm.CleanupEnabled = value == "true"; break;

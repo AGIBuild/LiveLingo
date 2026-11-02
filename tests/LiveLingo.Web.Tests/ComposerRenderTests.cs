@@ -42,6 +42,18 @@ public sealed class ComposerRenderTests(BrowserFixture browsers)
 
     [Theory]
     [MemberData(nameof(Engines))]
+    public async Task WhileTheSpeechModelsAreGettingReady_TheEmptyComposerSaysSo(string engine)
+    {
+        await using var ready = await browsers.OpenAsync(engine, "empty");
+        Assert.Equal("", (await ready.Page.Locator("#status").InnerTextAsync()).Trim());
+
+        await using var preparing = await browsers.OpenAsync(engine, "speech-preparing");
+
+        Assert.Contains("语音模型准备中", await preparing.Page.Locator("#status").InnerTextAsync());
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
     public async Task ARememberedChoice_IsSaidUnderTheHintWithOneClickBack_AndTheOutputMenuSaysWhoseChoicesAreKept(string engine)
     {
         await using var none = await browsers.OpenAsync(engine, "empty");

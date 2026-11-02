@@ -16,6 +16,9 @@ public enum ComposerStatus
     /// <summary>Nothing typed yet.</summary>
     Empty,
 
+    /// <summary>Nothing typed yet, and the speech models are being loaded in the background.</summary>
+    Preparing,
+
     /// <summary>The microphone was pressed and the speech models are loading.</summary>
     Starting,
 

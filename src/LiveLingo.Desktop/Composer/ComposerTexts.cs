@@ -172,6 +172,7 @@ public sealed class ComposerTexts(ILocalizationService loc, bool? mac = null)
         return info.Status switch
         {
             ComposerStatus.Empty => "",
+            ComposerStatus.Preparing => loc.T("composer.status.preparing"),
             ComposerStatus.Working => loc.T(info.Output == ComposerOutput.Translate ? "composer.status.working.translate" : "composer.status.working.clean"),
             ComposerStatus.Failed => loc.T("composer.status.unavailable"),
             ComposerStatus.Ready => loc.T(info.UsesCloud ? "composer.status.ready.cloud" : "composer.status.ready.local", info.Units),

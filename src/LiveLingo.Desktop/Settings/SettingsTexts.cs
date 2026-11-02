@@ -23,7 +23,7 @@ public sealed class SettingsTexts(ILocalizationService loc)
         "cleanup", "cleanup.desc",
         "direction", "direction.desc", "direction.zhEn", "direction.enZh",
         "output", "output.desc", "output.clean", "output.translate", "output.original",
-        "autoDictate", "autoDictate.desc", "remember", "remember.desc",
+        "autoDictate", "autoDictate.desc", "preload", "preload.desc", "remember", "remember.desc",
         "apps", "apps.desc", "apps.empty", "apps.forget", "apps.clear",
         "terms", "terms.source", "terms.target", "terms.sourceExample", "terms.targetExample", "terms.add", "terms.remove", "terms.hint",
         "cloud.translate", "cloud.translate.desc", "cloud.clean", "cloud.clean.desc",

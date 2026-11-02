@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Speech is ready when you are. The speech models are now loaded in the background a few seconds after the app
+  starts (Settings → Voice → *Get speech ready at startup*, on by default), after they are downloaded, and whenever the
+  composer opens, and they stay in memory for 30 idle minutes. Starting dictation after that takes milliseconds instead
+  of 3–5 seconds. The cleanup or translation model of the output the composer starts with is loaded when it opens, and
+  when you switch output, so the first sentence no longer waits for it (the first cleanup took about 10 seconds).
+  While the speech models are still loading, the empty composer says so. The preloaded speech models take about 1.5 GB
+  of memory; see `docs/superpowers/specs/2026-11-02-model-warmup-design.md`.
 - Automatic updates work. Releases now carry the Velopack update packages and feeds
   (`releases.win.json`, `releases.osx.json`) next to the installers, and the release is not published unless each feed
   names a package that is in it. Before, only installers were uploaded, so no installed application could find an update.
