@@ -1,0 +1,19 @@
+tests/LiveLingo.Desktop.Tests/Web/ComposerScenarios.cs
+  s_6d6e9175f38e45::t_a4c4b72602f634 78
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d12871bd3aa921ed145a5d755d98afdc480b5ff5",
+  "prompts": {},
+  "sessions": {
+    "s_6d6e9175f38e45": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "f74d37e5-1d96-4ddc-a3f9-5ae24ff39e38",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
