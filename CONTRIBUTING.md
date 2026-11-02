@@ -259,10 +259,10 @@ Installed applications update themselves from the GitHub releases of the reposit
 (`Update.UpdateUrl` in the settings, default `https://github.com/AGIBuild/LiveLingo`) through
 [Velopack](https://velopack.io/):
 
-- Every release carries, per platform, the full package (`LiveLingo-<version>-<channel>-full.nupkg`) and its feed
-  (`releases.win.json` / `releases.osx.json`). The channel (`win`, `osx`) is Velopack's default for the platform, and the
-  feeds of the platforms do not collide. The *release* job refuses to publish a release whose feed does not name a
-  package that is in it.
+- Every release carries, per platform, the full package (`LiveLingo-<version>-full.nupkg` on Windows,
+  `LiveLingo-<version>-osx-full.nupkg` on macOS) and its feed (`releases.win.json` / `releases.osx.json`). The channels
+  (`win`, `osx`) are Velopack's defaults for the platforms, so the feeds do not collide. The *release* job refuses to
+  publish a release whose feed does not name a package that is in it.
 - The application checks at start and every `Update.CheckIntervalHours`, downloads a newer version in the background,
   and then offers *Restart to Update* in the tray menu; quitting also installs it. Pre-releases are not offered.
 - Only an application installed by the Setup.exe or the .pkg can update itself. A development build and the .msi cannot;
