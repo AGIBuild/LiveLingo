@@ -1,0 +1,59 @@
+src/LiveLingo.Core/Dictation/DictationOptions.cs
+  s_6d6e9175f38e45::t_d19f00e9a8d7be 22,25
+src/LiveLingo.Core/Cleanup/CleanupScheduler.cs
+  s_6d6e9175f38e45::t_dfb21b3de0b979 138-142
+src/LiveLingo.Core/Cleanup/LlmTextCleaner.cs
+  s_6d6e9175f38e45::t_b6e71d6cf429e7 43-45,49,63-86
+  s_6d6e9175f38e45::t_09a1aef06f3017 2,15
+  s_6d6e9175f38e45::t_3e5db4a0e5806b 87
+tests/LiveLingo.Core.Tests/Cleanup/CleanupSchedulerTests.cs
+  s_6d6e9175f38e45::t_25e1613530bf28 339,347-363,369
+  s_6d6e9175f38e45::t_66ea6556b47022 282
+src/LiveLingo.Core/Cleanup/PolishScheduler.cs
+  s_6d6e9175f38e45::t_b0665475902300 67,69,146-149
+  s_6d6e9175f38e45::t_b295b5a481ef87 3,11-15,19-20,30,55,63-66,68,70,84,89,100-106,109,111,116-126,129,136-138,145,163-164,178-197
+src/LiveLingo.Desktop/Resources/i18n/en-US.json
+  s_6d6e9175f38e45::t_0d5d19fb3ce57b 102
+tests/LiveLingo.Core.Tests/Cleanup/PolishSchedulerTests.cs
+  s_6d6e9175f38e45::t_694293fa88a2fd 145-146,151,178,191-194,196-210,212-213,215-267
+  s_6d6e9175f38e45::t_1b737ab00c5d9c 121,124
+tests/LiveLingo.Desktop.Tests/Composer/ComposerVoiceTests.cs
+  s_6d6e9175f38e45::t_fc70191d930dea 299-309
+  s_6d6e9175f38e45::t_0ec03fd5e14911 316
+  s_6d6e9175f38e45::t_30c926d6a477fa 298
+docs/superpowers/specs/2026-11-02-passage-cleanup-and-resize-design.md
+  s_6d6e9175f38e45::t_fd6b04f01b9a74 29-30,60,62-65,67,69-74
+  s_6d6e9175f38e45::t_61314352a2b828 121
+  s_6d6e9175f38e45::t_b459ed3a36dcac 126
+tests/LiveLingo.Core.Tests/Cleanup/LlmTextCleanerTests.cs
+  s_6d6e9175f38e45::t_176254ca39c156 65,70-71,74-90,92,94-95
+  s_6d6e9175f38e45::t_80a169a40d5a22 91,93
+src/LiveLingo.Core/Drafting/Draft.cs
+  s_6d6e9175f38e45::t_88aa69e64e7fcc 25-29,56
+  s_6d6e9175f38e45::t_00c261c9e35ae5 303
+  s_6d6e9175f38e45::t_99df864288fd04 24
+src/LiveLingo.Desktop/Resources/i18n/zh-CN.json
+  s_6d6e9175f38e45::t_d6491e6fd7c816 102
+src/LiveLingo.Core/Drafting/GateRejection.cs
+  s_6d6e9175f38e45::t_489a5608741a7a 16-19
+docs/superpowers/specs/2026-10-29-voice-dictation-design.md
+  s_6d6e9175f38e45::t_8027dd0fa2a201 122,127-128
+CHANGELOG.md
+  s_6d6e9175f38e45::t_dcb8bebc6f8a09 28-35
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "03a47119adf9b464aa89930fc703b9e9f7bb0422",
+  "prompts": {},
+  "sessions": {
+    "s_6d6e9175f38e45": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "f74d37e5-1d96-4ddc-a3f9-5ae24ff39e38",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
