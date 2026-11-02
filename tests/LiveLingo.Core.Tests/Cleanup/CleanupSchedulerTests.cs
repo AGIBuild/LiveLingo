@@ -119,7 +119,7 @@ public class CleanupSchedulerTests
         await using var h = new Harness();
         h.Recording(true);
         h.Speak("先改接口。");
-        await Task.Delay(50);
+        await WaitUntil(() => h.Time.Timer.Due == Harness.Holdback);
         Assert.Empty(h.Cleaner.Calls);
         Assert.Equal(Harness.Holdback, h.Time.Timer.Due);
 
