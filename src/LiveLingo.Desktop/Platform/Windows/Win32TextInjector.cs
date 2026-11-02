@@ -9,19 +9,23 @@ internal sealed class Win32TextInjector : ITextInjector
     private const int VK_RETURN_SCAN = 0x1C;
 
     private readonly IClipboardService _clipboard;
+    private readonly IWindowTracker _windows;
 
-    public Win32TextInjector(IClipboardService clipboard)
+    public Win32TextInjector(IClipboardService clipboard, IWindowTracker windows)
     {
         _clipboard = clipboard;
+        _windows = windows;
     }
 
     public Task InjectAsync(TargetWindowInfo target, string text, bool autoSend, CancellationToken ct)
     {
-        return Task.Run(() => InjectText(target.Handle, target.InputChildHandle, text, autoSend, ct), ct);
+        return Task.Run(() => InjectText(target, text, autoSend, ct), ct);
     }
 
-    private void InjectText(nint mainWindow, nint inputChild, string text, bool autoSend, CancellationToken ct)
+    private void InjectText(TargetWindowInfo target, string text, bool autoSend, CancellationToken ct)
     {
+        var mainWindow = target.Handle;
+        var inputChild = target.InputChildHandle;
         ct.ThrowIfCancellationRequested();
         ReleaseAllModifiers();
         WaitWithCancellation(80, ct);
@@ -31,7 +35,7 @@ internal sealed class Win32TextInjector : ITextInjector
         WaitWithCancellation(50, ct);
 
         ct.ThrowIfCancellationRequested();
-        ForceForeground(mainWindow);
+        _windows.Activate(target);
         WaitWithCancellation(500, ct);
 
         ct.ThrowIfCancellationRequested();
@@ -46,14 +50,14 @@ internal sealed class Win32TextInjector : ITextInjector
             return;
         }
 
-        var target = inputChild != IntPtr.Zero && inputChild != mainWindow
+        var receiver = inputChild != IntPtr.Zero && inputChild != mainWindow
             ? inputChild
             : mainWindow;
 
         foreach (var ch in text)
         {
             ct.ThrowIfCancellationRequested();
-            PostMessageW(target, WM_CHAR, (IntPtr)ch, IntPtr.Zero);
+            PostMessageW(receiver, WM_CHAR, (IntPtr)ch, IntPtr.Zero);
             WaitWithCancellation(5, ct);
         }
 
@@ -62,9 +66,9 @@ internal sealed class Win32TextInjector : ITextInjector
             WaitWithCancellation(200, ct);
             var lDown = MakeKeyLParam(1, VK_RETURN_SCAN, false, false);
             var lUp = MakeKeyLParam(1, VK_RETURN_SCAN, true, true);
-            PostMessageW(target, (uint)WM_KEYDOWN, (IntPtr)VK_RETURN, (IntPtr)lDown);
+            PostMessageW(receiver, (uint)WM_KEYDOWN, (IntPtr)VK_RETURN, (IntPtr)lDown);
             WaitWithCancellation(30, ct);
-            PostMessageW(target, WM_KEYUP, (IntPtr)VK_RETURN, (IntPtr)lUp);
+            PostMessageW(receiver, WM_KEYUP, (IntPtr)VK_RETURN, (IntPtr)lUp);
         }
     }
 
@@ -79,25 +83,6 @@ internal sealed class Win32TextInjector : ITextInjector
             Thread.Sleep(current);
             remaining -= current;
         }
-    }
-
-    private static void ForceForeground(nint hwnd)
-    {
-        AllowSetForegroundWindow(ASFW_ANY);
-        ShowWindow(hwnd, SW_SHOW);
-        BringWindowToTop(hwnd);
-
-        var myThread = GetCurrentThreadId();
-        var fgHwnd = GetForegroundWindow();
-        var fgThread = GetWindowThreadProcessId(fgHwnd, out _);
-
-        if (myThread != fgThread)
-            AttachThreadInput(myThread, fgThread, true);
-
-        SetForegroundWindow(hwnd);
-
-        if (myThread != fgThread)
-            AttachThreadInput(myThread, fgThread, false);
     }
 
     private static long MakeKeyLParam(int repeat, int scan, bool isUp, bool wasDown)

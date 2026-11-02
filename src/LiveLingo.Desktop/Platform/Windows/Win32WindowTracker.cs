@@ -13,7 +13,8 @@ internal sealed class Win32WindowTracker : IWindowTracker
             return null;
 
         var threadId = GetWindowThreadProcessId(hwnd, out var pid);
-        if (pid == 0)
+        // Our own parked composer is never a target.
+        if (pid == 0 || pid == Environment.ProcessId)
             return null;
 
         try
@@ -32,12 +33,35 @@ internal sealed class Win32WindowTracker : IWindowTracker
                 rect.Left,
                 rect.Top,
                 rect.Right - rect.Left,
-                rect.Bottom - rect.Top);
+                rect.Bottom - rect.Top,
+                process.ProcessName.ToLowerInvariant());
         }
         catch
         {
             return null;
         }
+    }
+
+    public bool IsAlive(TargetWindowInfo target) => IsWindow(target.Handle);
+
+    public void Activate(TargetWindowInfo target)
+    {
+        var hwnd = target.Handle;
+        AllowSetForegroundWindow(ASFW_ANY);
+        ShowWindow(hwnd, SW_SHOW);
+        BringWindowToTop(hwnd);
+
+        var myThread = GetCurrentThreadId();
+        var fgHwnd = GetForegroundWindow();
+        var fgThread = GetWindowThreadProcessId(fgHwnd, out _);
+
+        if (myThread != fgThread)
+            AttachThreadInput(myThread, fgThread, true);
+
+        SetForegroundWindow(hwnd);
+
+        if (myThread != fgThread)
+            AttachThreadInput(myThread, fgThread, false);
     }
 
     private static nint FindInputChild(nint mainWindow, uint threadId)

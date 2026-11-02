@@ -7,7 +7,7 @@ public class ModelManifestTests
     [Fact]
     public void FromDescriptor_CopiesFields()
     {
-        var desc = new ModelDescriptor("m1", "Test Model", "http://x", 1000, ModelType.Translation);
+        var desc = TestModel.Create("m1", "Test Model", "http://x", 1000, ModelType.Translation);
         var manifest = ModelManifest.FromDescriptor(desc);
 
         Assert.Equal("m1", manifest.Id);

@@ -116,8 +116,8 @@ public class LocalizationServiceTests
     public void DefaultConstructor_LoadsEmbeddedResources()
     {
         var sut = new LocalizationService();
-        var result = sut.T("tray.settings");
-        Assert.Equal("Settings", result);
+        var result = sut.T("tray.quit");
+        Assert.Equal("Quit", result);
     }
 
     [Fact]
@@ -125,8 +125,8 @@ public class LocalizationServiceTests
     {
         var sut = new LocalizationService();
         sut.SetCulture("zh-CN");
-        var result = sut.T("tray.settings");
-        Assert.Equal("设置", result);
+        var result = sut.T("tray.quit");
+        Assert.Equal("退出", result);
     }
 
     [Fact]
@@ -158,52 +158,31 @@ public class LocalizationServiceTests
     }
 
     [Fact]
-    public void AllKnownSettingsKeys_AreCoveredByDefaultResources()
+    public void ShellKeys_AreCoveredByBothLanguages()
     {
-        // Guards against regressions where SettingsViewModel adds a new T("settings.xxx")
-        // without populating the matching entry in en-US.json / zh-CN.json.
+        // Guards against shell code adding a T("...") call without entries in en-US.json and zh-CN.json.
         var sut = new LocalizationService();
-        string[] criticalKeys =
-        [
-            "settings.translation.routing",
-            "settings.translation.routingMode",
-            "settings.translation.routeUnsupportedPairs",
-            "settings.routing.localOnly",
-            "settings.routing.preferLocal",
-            "settings.routing.preferCloud",
-            "settings.routing.cloudOnly",
-            "settings.ai.cloudProvider",
-            "settings.ai.cloudEnabled",
-            "settings.ai.cloudPreset",
-            "settings.ai.cloudPreset.custom",
-            "settings.ai.cloudPreset.openai",
-            "settings.ai.cloudPreset.openrouter",
-            "settings.ai.cloudPreset.groq",
-            "settings.ai.cloudProviderType",
-            "settings.ai.cloudProviderValue",
-            "settings.ai.cloudBaseUrl",
-            "settings.ai.cloudApiKey",
-            "settings.ai.cloudTranslationModel",
-            "settings.ai.cloudPostModel",
-            "settings.ai.cloudTestConnection",
-            "settings.ai.cloudFetchModels",
-            "settings.ai.cloudDiscoveredModels",
-            "settings.ai.cloudUseTranslation",
-            "settings.ai.cloudUsePost",
-            "settings.ai.cloudRoutePost",
-            "settings.ai.cloudHint"
-        ];
-        foreach (var key in criticalKeys)
-        {
-            Assert.True(sut.TryT(key, out var value), $"en-US missing key: {key}");
-            Assert.NotEqual(string.Empty, value);
-        }
+        var enKeys = EmbeddedKeys("en-US");
+        var zhKeys = EmbeddedKeys("zh-CN");
 
-        sut.SetCulture("zh-CN");
-        foreach (var key in criticalKeys)
+        Assert.Equal(enKeys.Order(), zhKeys.Order());
+        Assert.Contains("composer.commit.write", enKeys);
+        Assert.Contains("settings.cloud.apiKey", enKeys);
+        foreach (var culture in new[] { "en-US", "zh-CN" })
         {
-            Assert.True(sut.TryT(key, out var value), $"zh-CN missing key: {key}");
-            Assert.NotEqual(string.Empty, value);
+            sut.SetCulture(culture);
+            foreach (var key in enKeys)
+            {
+                Assert.True(sut.TryT(key, out var value), $"{culture} missing key: {key}");
+                Assert.NotEqual(string.Empty, value);
+            }
         }
+    }
+
+    private static string[] EmbeddedKeys(string culture)
+    {
+        var assembly = typeof(LocalizationService).Assembly;
+        using var stream = assembly.GetManifestResourceStream($"LiveLingo.Desktop.Resources.i18n.{culture}.json")!;
+        return System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(stream)!.Keys.ToArray();
     }
 }

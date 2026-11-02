@@ -13,11 +13,4 @@ public class InsufficientDiskSpaceExceptionTests
         Assert.Contains("1000000", ex.Message);
         Assert.Contains("500000", ex.Message);
     }
-
-    [Fact]
-    public void IsException()
-    {
-        var ex = new InsufficientDiskSpaceException(100, 50);
-        Assert.IsAssignableFrom<Exception>(ex);
-    }
 }

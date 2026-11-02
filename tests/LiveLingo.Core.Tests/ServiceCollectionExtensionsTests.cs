@@ -1,7 +1,7 @@
-using LiveLingo.Core.Engines;
-using LiveLingo.Core.LanguageDetection;
+using LiveLingo.Core.Cleanup;
+using LiveLingo.Core.Dictation;
+using LiveLingo.Core.Inference;
 using LiveLingo.Core.Models;
-using LiveLingo.Core.Processing;
 using LiveLingo.Core.Translation;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -11,110 +11,45 @@ namespace LiveLingo.Core.Tests;
 public class ServiceCollectionExtensionsTests
 {
     [Fact]
-    public void AddLiveLingoCore_RegistersAllServices()
+    public async Task AddLiveLingoCore_RegistersModelServices()
     {
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddLiveLingoCore();
-        var sp = services.BuildServiceProvider();
+        await using var sp = services.BuildServiceProvider();
 
-        Assert.NotNull(sp.GetService<ITranslationPipeline>());
         Assert.NotNull(sp.GetService<IModelManager>());
-        Assert.NotNull(sp.GetService<IModelCatalog>());
-        Assert.NotNull(sp.GetService<ICloudProviderRuntimeState>());
-        Assert.NotNull(sp.GetService<IModelSelector>());
-        Assert.NotNull(sp.GetService<IModelReadinessService>());
-        Assert.NotNull(sp.GetService<IModelInvocationService>());
-        Assert.NotNull(sp.GetService<ICloudProviderProbeService>());
-        Assert.NotNull(sp.GetService<ITranslationEngine>());
-        Assert.NotNull(sp.GetService<ILanguageDetector>());
-        Assert.Contains(sp.GetServices<IModelRuntime>(), runtime => runtime.RuntimeKind == ModelRuntimeKind.LlamaServer);
-        Assert.Contains(sp.GetServices<IModelRuntime>(), runtime => runtime.RuntimeKind == ModelRuntimeKind.RemoteHttp);
-        Assert.Contains(sp.GetServices<IModelProvider>(), provider => provider.ProviderKind == ModelProviderKind.LlamaServer);
-        Assert.Contains(sp.GetServices<IModelProvider>(), provider => provider.ProviderKind == ModelProviderKind.OpenAICompatible);
-        Assert.IsType<LocalLlamaModelHost>(sp.GetRequiredService<ILlmModelLoadCoordinator>());
+        Assert.NotNull(sp.GetService<IModelDownloadCoordinator>());
+        Assert.NotNull(sp.GetService<LlamaServerHost>());
+        Assert.IsType<LlmTranslator>(sp.GetService<ITranslator>());
+        Assert.IsType<LlmTextCleaner>(sp.GetService<ITextCleaner>());
+        Assert.NotNull(sp.GetService<IDictationSessionFactory>());
+        Assert.NotNull(sp.GetService<IInferenceWarmup>());
     }
 
     [Fact]
-    public void AddLiveLingoCore_AcceptsConfiguration()
-    {
-        var services = new ServiceCollection();
-        services.AddLogging();
-        services.AddLiveLingoCore(o =>
-        {
-            o.DefaultTargetLanguage = "ja";
-            o.ModelStoragePath = "/tmp/models";
-        });
-        var sp = services.BuildServiceProvider();
-
-        var opts = sp.GetRequiredService<IOptions<CoreOptions>>().Value;
-        Assert.Equal("ja", opts.DefaultTargetLanguage);
-        Assert.Equal("/tmp/models", opts.ModelStoragePath);
-    }
-
-    [Fact]
-    public void AddLiveLingoCore_CoreOptionsSingletonMatchesIOptionsValue()
-    {
-        var services = new ServiceCollection();
-        services.AddLogging();
-        services.AddLiveLingoCore(o => o.HuggingFaceToken = "t0");
-        var sp = services.BuildServiceProvider();
-
-        var direct = sp.GetRequiredService<CoreOptions>();
-        var wrapped = sp.GetRequiredService<IOptions<CoreOptions>>().Value;
-        Assert.Same(direct, wrapped);
-        direct.HuggingFaceToken = "t1";
-        Assert.Equal("t1", wrapped.HuggingFaceToken);
-    }
-
-    [Fact]
-    public void AddLiveLingoCore_UsesHybridLanguageDetector()
+    public async Task TheSpeechModels_HaveOneOwner_ForDictationImportAndPreparation()
     {
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddLiveLingoCore();
-        var sp = services.BuildServiceProvider();
+        await using var sp = services.BuildServiceProvider();
 
-        Assert.IsType<HybridLanguageDetector>(sp.GetService<ILanguageDetector>());
-        Assert.NotNull(sp.GetService<ScriptBasedDetector>());
-        Assert.NotNull(sp.GetService<LinguaLanguageDetector>());
+        var engine = sp.GetRequiredService<LiveLingo.Core.Speech.Native.SherpaSpeechEngine>();
+        Assert.Same(engine, sp.GetRequiredService<IDictationSessionFactory>());
+        Assert.Same(engine, sp.GetRequiredService<ISpeechWarmup>());
+        Assert.Same(engine, sp.GetRequiredService<LiveLingo.Core.Transcription.IAudioFileTranscriber>());
     }
 
     [Fact]
-    public void AddLiveLingoCore_RegistersModelManager()
+    public async Task AddLiveLingoCore_AppliesConfiguration()
     {
         var services = new ServiceCollection();
         services.AddLogging();
-        services.AddLiveLingoCore();
-        var sp = services.BuildServiceProvider();
+        services.AddLiveLingoCore(o => o.ModelStoragePath = "/tmp/models");
+        await using var sp = services.BuildServiceProvider();
 
-        Assert.IsType<ModelManager>(sp.GetService<IModelManager>());
-    }
-
-    [Fact]
-    public void AddLiveLingoCore_UsesHybridTranslationEngine()
-    {
-        var services = new ServiceCollection();
-        services.AddLogging();
-        services.AddLiveLingoCore();
-        var sp = services.BuildServiceProvider();
-
-        // Hybrid routes fast-path (Marian ONNX) and chat-path (Llama/Gemma) internally.
-        Assert.IsType<HybridTranslationEngine>(sp.GetService<ITranslationEngine>());
-        Assert.IsType<LlamaTranslationEngine>(sp.GetService<IChatPathTranslationEngine>());
-        Assert.IsType<MarianOnnxEngine>(sp.GetService<IFastPathTranslationEngine>());
-    }
-
-    [Fact]
-    public void AddLiveLingoCore_PipelineIsSingleton()
-    {
-        var services = new ServiceCollection();
-        services.AddLogging();
-        services.AddLiveLingoCore();
-        var sp = services.BuildServiceProvider();
-
-        var p1 = sp.GetService<ITranslationPipeline>();
-        var p2 = sp.GetService<ITranslationPipeline>();
-        Assert.Same(p1, p2);
+        Assert.Equal("/tmp/models", sp.GetRequiredService<IOptions<CoreOptions>>().Value.ModelStoragePath);
+        Assert.Same(sp.GetRequiredService<CoreOptions>(), sp.GetRequiredService<IOptions<CoreOptions>>().Value);
     }
 }

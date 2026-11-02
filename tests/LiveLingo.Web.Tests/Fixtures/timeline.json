@@ -1,0 +1,284 @@
+{
+  "rev": 1,
+  "dest": {
+    "text": "Slack",
+    "kind": "target"
+  },
+  "privacy": {
+    "text": "本地",
+    "cloud": false,
+    "aria": "全部本地处理"
+  },
+  "output": {
+    "value": "translate",
+    "pill": "→ English",
+    "globe": true,
+    "menu": [
+      {
+        "id": "clean",
+        "label": "保持中文（整理）",
+        "checked": false,
+        "enabled": true
+      },
+      {
+        "id": "translate",
+        "label": "翻译成 English",
+        "checked": true,
+        "enabled": true
+      },
+      {
+        "id": "original",
+        "label": "原话（不整理）",
+        "checked": false,
+        "enabled": true
+      }
+    ],
+    "swap": "语言：中文 → English\u3000⇄ 互换",
+    "note": null
+  },
+  "banner": null,
+  "source": {
+    "mode": "live",
+    "text": "今天的周会\n下周发布\n风险有两个",
+    "sourceRev": 1,
+    "editable": false,
+    "label": "转录 · weekly.wav",
+    "routeChip": false,
+    "hint": false,
+    "lines": [
+      {
+        "time": "0:00",
+        "text": "今天的周会",
+        "tail": false
+      },
+      {
+        "time": "1:05",
+        "text": "下周发布",
+        "tail": false
+      },
+      {
+        "time": "2:10",
+        "text": "风险有两个",
+        "tail": false
+      }
+    ],
+    "resume": null,
+    "remembered": null
+  },
+  "result": {
+    "visible": true,
+    "label": "将写入 · English",
+    "rows": [
+      {
+        "i": 0,
+        "state": "ready",
+        "text": "T:今天的周会",
+        "note": "",
+        "time": "0:00",
+        "warn": false,
+        "owned": false,
+        "editing": false,
+        "canEdit": true,
+        "canUseOriginal": false,
+        "useOriginalAria": "第 1 句改用原话",
+        "editAria": "编辑第 1 句"
+      },
+      {
+        "i": 1,
+        "state": "ready",
+        "text": "T:下周发布",
+        "note": "",
+        "time": "1:05",
+        "warn": false,
+        "owned": false,
+        "editing": false,
+        "canEdit": true,
+        "canUseOriginal": false,
+        "useOriginalAria": "第 2 句改用原话",
+        "editAria": "编辑第 2 句"
+      },
+      {
+        "i": 2,
+        "state": "ready",
+        "text": "T:风险有两个",
+        "note": "",
+        "time": "2:10",
+        "warn": false,
+        "owned": false,
+        "editing": false,
+        "canEdit": true,
+        "canUseOriginal": false,
+        "useOriginalAria": "第 3 句改用原话",
+        "editAria": "编辑第 3 句"
+      }
+    ],
+    "editText": ""
+  },
+  "footer": {
+    "mic": {
+      "recording": false,
+      "aria": "开始听写（⌘D）"
+    },
+    "status": {
+      "text": "3 句 · 本地处理",
+      "tone": "muted"
+    },
+    "copyEnabled": true,
+    "commit": {
+      "label": "写入 Slack",
+      "enabled": true,
+      "armed": false,
+      "written": false,
+      "aria": "写入"
+    }
+  },
+  "layout": {
+    "wide": true
+  },
+  "options": {
+    "animations": true,
+    "theme": "Auto",
+    "commitKey": "enter",
+    "commitKeyCap": "↵",
+    "newlineKeyCap": "⇧↵",
+    "modifier": "meta",
+    "shortcuts": [
+      {
+        "id": "dictate",
+        "code": "KeyD",
+        "shift": false,
+        "cap": "⌘D"
+      },
+      {
+        "id": "clean",
+        "code": "Digit1",
+        "shift": false,
+        "cap": "⌘1"
+      },
+      {
+        "id": "translate",
+        "code": "Digit2",
+        "shift": false,
+        "cap": "⌘2"
+      },
+      {
+        "id": "original",
+        "code": "Digit3",
+        "shift": false,
+        "cap": "⌘3"
+      },
+      {
+        "id": "swap",
+        "code": "KeyL",
+        "shift": false,
+        "cap": "⌘L"
+      },
+      {
+        "id": "copy",
+        "code": "KeyC",
+        "shift": true,
+        "cap": "⇧⌘C"
+      },
+      {
+        "id": "new",
+        "code": "KeyN",
+        "shift": false,
+        "cap": "⌘N"
+      },
+      {
+        "id": "recent",
+        "code": "KeyR",
+        "shift": false,
+        "cap": "⌘R"
+      },
+      {
+        "id": "import",
+        "code": "KeyO",
+        "shift": false,
+        "cap": "⌘O"
+      },
+      {
+        "id": "export",
+        "code": "KeyS",
+        "shift": false,
+        "cap": "⌘S"
+      },
+      {
+        "id": "settings",
+        "code": "Comma",
+        "shift": false,
+        "cap": "⌘,"
+      }
+    ]
+  },
+  "menus": {
+    "target": [
+      {
+        "id": "target",
+        "label": "Slack 输入框",
+        "checked": true,
+        "enabled": true
+      },
+      {
+        "id": "copyOnly",
+        "label": "没有输入框 · 仅复制",
+        "checked": false,
+        "enabled": true
+      }
+    ],
+    "more": [
+      {
+        "id": "new",
+        "label": "新草稿",
+        "checked": false,
+        "enabled": true
+      },
+      {
+        "id": "recent",
+        "label": "最近草稿",
+        "checked": false,
+        "enabled": true
+      },
+      {
+        "id": "import",
+        "label": "导入录音…",
+        "checked": false,
+        "enabled": false
+      },
+      {
+        "id": "export",
+        "label": "导出…",
+        "checked": false,
+        "enabled": true
+      },
+      {
+        "id": "wide",
+        "label": "宽屏对照",
+        "checked": false,
+        "enabled": true
+      },
+      {
+        "id": "whole",
+        "label": "整段处理（保留格式）",
+        "checked": false,
+        "enabled": true
+      },
+      {
+        "id": "settings",
+        "label": "设置",
+        "checked": false,
+        "enabled": true
+      }
+    ]
+  },
+  "dialogs": {
+    "recent": [],
+    "canRestore": false,
+    "export": {
+      "txt": true,
+      "markdown": true,
+      "srt": true,
+      "last": null
+    }
+  }
+}

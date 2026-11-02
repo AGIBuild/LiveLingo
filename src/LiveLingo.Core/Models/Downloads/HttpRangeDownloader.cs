@@ -222,23 +222,8 @@ internal sealed class HttpRangeDownloader
         }
     }
 
-    private async Task<HttpResponseMessage> SendAssetRequestAsync(string url, long resumeBytes, CancellationToken ct)
-    {
-        var effectiveUrl = _mirror.ApplyMirror(url);
-        try
-        {
-            return await SendHttpGetAsync(effectiveUrl, resumeBytes, ct).ConfigureAwait(false);
-        }
-        catch (HttpRequestException ex) when (_mirror.ShouldFallbackToMirror(url, ex))
-        {
-            _logger.LogWarning(ex,
-                "HuggingFace is unreachable, retrying with fallback mirror {Mirror}",
-                HuggingFaceMirrorPolicy.DefaultFallbackMirror);
-            _mirror.EngageFallbackMirror();
-            var mirrorUrl = _mirror.RewriteToFallbackMirror(url);
-            return await SendHttpGetAsync(mirrorUrl, resumeBytes, ct).ConfigureAwait(false);
-        }
-    }
+    private Task<HttpResponseMessage> SendAssetRequestAsync(string url, long resumeBytes, CancellationToken ct) =>
+        SendHttpGetAsync(_mirror.ApplyMirror(url), resumeBytes, ct);
 
     private async Task<HttpResponseMessage> SendHttpGetAsync(string url, long resumeBytes, CancellationToken ct)
     {

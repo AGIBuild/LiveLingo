@@ -38,32 +38,11 @@ class BuildTask : NukeBuild
     [Parameter("Minimum mutation score percentage")]
     readonly int MutationThreshold = 80;
 
-    [Parameter("Enable translation regression probe target")]
-    readonly bool EnableTranslationProbe = true;
-
-    [Parameter("Model path used by translation probe")]
+    [Parameter("Model storage directory used by end-to-end probes (defaults to the app's model directory)")]
     readonly string ProbeModelPath = string.Empty;
 
-    [Parameter("Source text used by translation probe")]
-    readonly string ProbeSourceText = "你好";
-
-    [Parameter("Expected substring in translation result")]
-    readonly string ProbeExpectedContains = "hello";
-
-    [Parameter("Batch probe cases: source=>expected;source=>expected")]
-    readonly string ProbeCases = "你好=>hello;谢谢=>thank;早上好=>morning";
-
-    [Parameter("Enable sherpa-onnx STT regression probe target")]
-    readonly bool EnableSttProbe = true;
-
-    [Parameter("Path to a 16 kHz mono wav file used by the STT probe")]
-    readonly string ProbeWavPath = string.Empty;
-
-    [Parameter("Optional language hint (ISO-639-1) for the STT probe, e.g. en / zh / ja")]
-    readonly string ProbeSttLang = string.Empty;
-
-    [Parameter("Expected substring in the STT probe transcription result")]
-    readonly string ProbeSttExpected = string.Empty;
+    [Parameter("Directory with scenarios.json and audio/<id>.wav used by ProbeVoice (see poc/voice-dictation/corpus)")]
+    readonly string ProbeCorpus = string.Empty;
 
     AbsolutePath SourceDir => RootDirectory / "src";
     AbsolutePath TestsDir => RootDirectory / "tests";
@@ -226,99 +205,45 @@ class BuildTask : NukeBuild
                 .SetProcessLogger(RunProcessLogger));
         });
 
+    // End-to-end probe: real download (SHA256-verified), real llama-server, real translation. Not part of the unit-test gate.
     Target ProbeTranslation => _ => _
         .DependsOn(Build)
-        .OnlyWhenDynamic(() => EnableTranslationProbe)
         .Executes(() =>
         {
-            var probeProject = TestsDir / "LiveLingo.Core.Tests" / "LiveLingo.Core.Tests.csproj";
-            var modelPath = string.IsNullOrWhiteSpace(ProbeModelPath)
-                ? Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "LiveLingo",
-                    "models")
-                : ProbeModelPath;
             var env = new Dictionary<string, string>
             {
                 ["LIVELINGO_ENABLE_TRANSLATION_PROBE"] = "1",
-                ["LIVELINGO_PROBE_SOURCE_TEXT"] = ProbeSourceText,
-                ["LIVELINGO_PROBE_EXPECTED_CONTAINS"] = ProbeExpectedContains,
-                ["LIVELINGO_PROBE_MODEL_PATH"] = modelPath
+                ["LIVELINGO_PROBE_MODEL_PATH"] = ProbeModelPath
             }.AsReadOnly();
 
-            Log.Information("Running translation probe with source text: {Text}", ProbeSourceText);
-            Log.Information("Probe model path: {ModelPath}", modelPath);
-
             DotNet(
-                $"test \"{probeProject}\" " +
+                $"test \"{TestsDir / "LiveLingo.Core.Tests" / "LiveLingo.Core.Tests.csproj"}\" " +
                 $"--configuration {Configuration} " +
                 $"--no-build " +
-                $"--filter \"FullyQualifiedName~MarianTranslationProbeTests\" " +
+                $"--filter \"FullyQualifiedName~TranslationProbeTests\" " +
+                $"--logger \"console;verbosity=detailed\" " +
                 $"--nologo",
                 environmentVariables: env);
         });
 
-    Target ProbeTranslationAll => _ => _
+    // End-to-end probe of the voice chain: speech models, dictation session and cleanup on recorded audio.
+    Target ProbeVoice => _ => _
         .DependsOn(Build)
-        .OnlyWhenDynamic(() => EnableTranslationProbe)
+        .Requires(() => ProbeCorpus)
         .Executes(() =>
         {
-            var probeProject = TestsDir / "LiveLingo.Core.Tests" / "LiveLingo.Core.Tests.csproj";
-            var modelPath = string.IsNullOrWhiteSpace(ProbeModelPath)
-                ? Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "LiveLingo",
-                    "models")
-                : ProbeModelPath;
             var env = new Dictionary<string, string>
             {
-                ["LIVELINGO_ENABLE_TRANSLATION_PROBE"] = "1",
-                ["LIVELINGO_PROBE_CASES"] = ProbeCases,
-                ["LIVELINGO_PROBE_MODEL_PATH"] = modelPath
+                ["LIVELINGO_ENABLE_VOICE_PROBE"] = "1",
+                ["LIVELINGO_PROBE_CORPUS"] = ProbeCorpus,
+                ["LIVELINGO_PROBE_MODEL_PATH"] = ProbeModelPath
             }.AsReadOnly();
 
-            Log.Information("Running translation batch probe with cases: {Cases}", ProbeCases);
-            Log.Information("Probe model path: {ModelPath}", modelPath);
-
             DotNet(
-                $"test \"{probeProject}\" " +
+                $"test \"{TestsDir / "LiveLingo.Core.Tests" / "LiveLingo.Core.Tests.csproj"}\" " +
                 $"--configuration {Configuration} " +
                 $"--no-build " +
-                $"--filter \"FullyQualifiedName~Translate_ZhToEn_BatchCases_ProducesExpectedText\" " +
-                $"--nologo",
-                environmentVariables: env);
-        });
-
-    Target ProbeStt => _ => _
-        .DependsOn(Build)
-        .OnlyWhenDynamic(() => EnableSttProbe)
-        .Executes(() =>
-        {
-            var probeProject = TestsDir / "LiveLingo.Core.Tests" / "LiveLingo.Core.Tests.csproj";
-            var modelPath = string.IsNullOrWhiteSpace(ProbeModelPath)
-                ? Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "LiveLingo",
-                    "models")
-                : ProbeModelPath;
-
-            var env = new Dictionary<string, string>
-            {
-                ["LIVELINGO_ENABLE_STT_PROBE"] = "1",
-                ["LIVELINGO_PROBE_WAV_PATH"] = ProbeWavPath,
-                ["LIVELINGO_PROBE_LANG"] = ProbeSttLang,
-                ["LIVELINGO_PROBE_EXPECTED_CONTAINS"] = ProbeSttExpected,
-                ["LIVELINGO_PROBE_MODEL_PATH"] = modelPath
-            }.AsReadOnly();
-
-            Log.Information("Running STT probe with wav: {Wav}", ProbeWavPath);
-            Log.Information("Probe model path: {ModelPath}", modelPath);
-
-            DotNet(
-                $"test \"{probeProject}\" " +
-                $"--configuration {Configuration} " +
-                $"--no-build " +
-                $"--filter \"FullyQualifiedName~SherpaSttProbeTests\" " +
+                $"--filter \"FullyQualifiedName~VoiceProbeTests\" " +
                 $"--logger \"console;verbosity=detailed\" " +
                 $"--nologo",
                 environmentVariables: env);
@@ -348,14 +273,7 @@ class BuildTask : NukeBuild
             $"stryker " +
             $"--project LiveLingo.Core.csproj " +
             $"--break-at {MutationThreshold} " +
-            $"--reporter progress --reporter json " +
-            $"--mutate \"!**/Engines/MarianOnnxEngine*\" " +
-            $"--mutate \"!**/Processing/QwenModelHost.cs\" " +
-            $"--mutate \"!**/Processing/QwenTextProcessor.cs\" " +
-            $"--mutate \"!**/Processing/SummarizeProcessor.cs\" " +
-            $"--mutate \"!**/Processing/OptimizeProcessor.cs\" " +
-            $"--mutate \"!**/Processing/ColloquializeProcessor.cs\" " +
-            $"--mutate \"!**/ServiceCollectionExtensions.cs\"",
+            $"--reporter progress --reporter json",
             workingDirectory: coreTestDir);
 
         var reportFile = coreTestDir.GlobFiles("**/StrykerOutput/**/mutation-report.json")
@@ -384,43 +302,60 @@ class BuildTask : NukeBuild
         return total > 0 ? detected * 100.0 / total : 0;
     }
 
+    // One Velopack package per platform: the installer, the full package, and the feed (releases.<channel>.json) that
+    // installed applications read to update themselves. The feed and the package must be released together.
     Target Pack => _ => _
         .DependsOn(Publish)
         .Executes(() =>
         {
             DotNetToolRestore();
 
-            var mainExe = Runtime.StartsWith("win") ? "LiveLingo.Desktop.exe" : "LiveLingo.Desktop";
+            var windows = Runtime.StartsWith("win");
+            var mainExe = windows ? "LiveLingo.Desktop.exe" : "LiveLingo.Desktop";
+            var icon = windows
+                ? SourceDir / "LiveLingo.Desktop" / "Assets" / "app-icon.ico"
+                : RootDirectory / "build" / "macos" / "app-icon.icns";
 
             var tempDir = RootDirectory / ".nuke" / "temp" / "vpk";
             tempDir.CreateDirectory();
 
-            var vpkEnv = new Dictionary<string, string>
-            {
-                ["DOTNET_ROLL_FORWARD"] = "LatestMajor",
-                ["TEMP"] = tempDir,
-                ["TMP"] = tempDir
-            }.AsReadOnly();
-
-            DotNet(
+            var arguments =
                 $"vpk pack " +
                 $"--packId LiveLingo " +
+                $"--packTitle LiveLingo " +
+                $"--packAuthors AGIBuild " +
                 $"--packVersion {Version} " +
                 $"--packDir {PublishDir / Runtime} " +
                 $"--mainExe {mainExe} " +
-                $"--outputDir {ReleasesDir}",
-                environmentVariables: vpkEnv);
+                $"--icon {icon} " +
+                $"--outputDir {ReleasesDir} " +
+                $"--noPortable";
 
-            if (Runtime.StartsWith("win"))
+            if (!windows)
             {
-                var setupExe = ReleasesDir.GlobFiles("*Setup*.exe").FirstOrDefault();
-                if (setupExe is not null)
-                {
-                    var renamed = ReleasesDir / $"LiveLingo-{Version}-{Runtime}-Setup.exe";
-                    File.Move(setupExe, renamed, overwrite: true);
-                    Log.Information("Renamed installer: {Path}", renamed);
-                }
+                // The bundle version has no pre-release suffix; the update feed carries the full semantic version.
+                var bundleVersion = Version.Split('-')[0];
+                var plist = tempDir / "Info.plist";
+                File.WriteAllText(plist, File.ReadAllText(RootDirectory / "build" / "macos" / "Info.plist").Replace("__VERSION__", bundleVersion));
+                arguments += $" --plist {plist}";
             }
+
+            // Replaces the process environment, so the rest of it (PATH: vpk calls cp, codesign) is carried over.
+            var vpkEnv = EnvironmentInfo.Variables
+                .ToDictionary(variable => variable.Key, variable => variable.Value);
+            vpkEnv["DOTNET_ROLL_FORWARD"] = "LatestMajor";
+            vpkEnv["TEMP"] = tempDir;
+            vpkEnv["TMP"] = tempDir;
+
+            DotNet(arguments, environmentVariables: vpkEnv.AsReadOnly());
+
+            // The installer keeps the file name of earlier releases.
+            var installer = ReleasesDir.GlobFiles(windows ? "*Setup.exe" : "*Setup.pkg").Single();
+            var renamed = ReleasesDir / (windows
+                ? $"LiveLingo-{Version}-{Runtime}-Setup.exe"
+                : $"LiveLingo-{Version}-{Runtime}.pkg");
+            File.Move(installer, renamed, overwrite: true);
+            Log.Information("Installer: {Path}", renamed);
         });
 
     Target PackMsi => _ => _
@@ -443,85 +378,6 @@ class BuildTask : NukeBuild
 
             Log.Information("Windows MSI created: {Path}", msiOutput);
         });
-
-    Target PackMac => _ => _
-        .DependsOn(Publish)
-        .Requires(() => Runtime.StartsWith("osx"))
-        .Executes(() =>
-        {
-            var macosDir = RootDirectory / "build" / "macos";
-            var appBundle = PublishDir / "LiveLingo.app";
-            var contentsDir = appBundle / "Contents";
-            var macOsDir = contentsDir / "MacOS";
-            var resourcesDir = contentsDir / "Resources";
-
-            appBundle.DeleteDirectory();
-            macOsDir.CreateDirectory();
-            resourcesDir.CreateDirectory();
-
-            var infoPlist = File.ReadAllText(macosDir / "Info.plist");
-            infoPlist = infoPlist.Replace("__VERSION__", Version);
-            File.WriteAllText(contentsDir / "Info.plist", infoPlist);
-
-            File.Copy(macosDir / "entitlements.plist", contentsDir / "entitlements.plist", overwrite: true);
-
-            var publishedFiles = PublishDir / Runtime;
-            foreach (var file in Directory.GetFiles(publishedFiles, "*", SearchOption.AllDirectories))
-            {
-                var relative = Path.GetRelativePath(publishedFiles, file);
-                var dest = macOsDir / relative;
-                Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
-                File.Copy(file, dest, overwrite: true);
-            }
-
-            var mainExe = macOsDir / "LiveLingo.Desktop";
-            if (File.Exists(mainExe))
-                Chmod(mainExe, "755");
-
-            var svgIcon = RootDirectory / "src" / "LiveLingo.Desktop" / "Assets" / "app-icon.svg";
-            if (File.Exists(svgIcon))
-                File.Copy(svgIcon, resourcesDir / "app-icon.svg", overwrite: true);
-
-            ReleasesDir.CreateDirectory();
-
-            var componentPkg = PublishDir / "LiveLingo-component.pkg";
-            RunProcess("pkgbuild",
-                $"--root \"{appBundle}\" " +
-                $"--identifier com.livelingo.app " +
-                $"--version {Version} " +
-                $"--install-location /Applications/LiveLingo.app " +
-                $"\"{componentPkg}\"");
-
-            var finalPkg = ReleasesDir / $"LiveLingo-{Version}-{Runtime}.pkg";
-            RunProcess("productbuild",
-                $"--package \"{componentPkg}\" " +
-                $"\"{finalPkg}\"");
-
-            componentPkg.DeleteFile();
-            Log.Information("macOS PKG created: {Path}", finalPkg);
-        });
-
-    static void Chmod(string path, string mode)
-    {
-        RunProcess("chmod", $"{mode} \"{path}\"");
-    }
-
-    static void RunProcess(string tool, string arguments)
-    {
-        var psi = new System.Diagnostics.ProcessStartInfo(tool, arguments)
-        {
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false
-        };
-        using var proc = System.Diagnostics.Process.Start(psi)!;
-        proc.WaitForExit();
-        if (proc.ExitCode != 0)
-        {
-            var stderr = proc.StandardError.ReadToEnd();
-            throw new Exception($"{tool} failed (exit {proc.ExitCode}): {stderr}");
-        }
-    }
 
     static bool IsCoverageClassIncluded(string packageName, string className)
     {

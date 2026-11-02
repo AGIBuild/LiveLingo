@@ -52,10 +52,10 @@ jobs:
       - name: Compile
         run: dotnet build LiveLingo.slnx -c Release --nologo
 
-  # Stage 2: Run tests
+  # Stage 2: Run tests (on macOS: the product ships for Windows x64 and macOS arm64, the pinned llama.cpp runtimes)
   test:
     needs: compile
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
 
     steps:
       - uses: actions/checkout@v4
@@ -75,10 +75,22 @@ jobs:
       - name: Restore tools
         run: dotnet tool restore
 
-      - name: Test
+      - name: Build
         run: |
           chmod +x build.sh
-          ./build.sh Test
+          ./build.sh Build
+
+      # The web tests drive WebKit and Chromium.
+      - uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('tests/LiveLingo.Web.Tests/*.csproj') }}
+
+      - name: Install browsers for the web tests
+        run: pwsh tests/LiveLingo.Web.Tests/bin/Release/net10.0/playwright.ps1 install webkit chromium
+
+      - name: Test
+        run: ./build.sh Test
 
   # Stage 3: Build platform-specific installers
   pack:
@@ -123,9 +135,10 @@ jobs:
         shell: bash
         run: |
           chmod +x build.sh
-          ./build.sh PackMac --skip Test --Runtime ${{ matrix.runtime }} --Version ${{ needs.compile.outputs.version }}
+          ./build.sh Pack --skip Test --Runtime ${{ matrix.runtime }} --Version ${{ needs.compile.outputs.version }}
 
-      - name: Upload installers
+      # The installers and what installed applications update from: the full package and its feed (releases.<channel>.json).
+      - name: Upload release files
         uses: actions/upload-artifact@v4
         with:
           name: installers-${{ matrix.runtime }}
@@ -133,15 +146,18 @@ jobs:
             releases/*.exe
             releases/*.msi
             releases/*.pkg
+            releases/*.nupkg
+            releases/releases.*.json
+            releases/RELEASES*
           if-no-files-found: error
 
-  # Stage 4: Create GitHub Release with only installer files
+  # Stage 4: Create the GitHub Release with the installers and the update feeds
   release:
     needs: [compile, pack]
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download all installer artifacts
+      - name: Download all release files
         uses: actions/download-artifact@v4
         with:
           path: installers
@@ -151,13 +167,31 @@ jobs:
       - name: List release files
         run: ls -la installers/
 
+      # An application only updates from a release whose feed names a package that is in it, so a release without one is not published.
+      - name: Check the update feeds
+        run: |
+          for channel in win osx; do
+            feed="installers/releases.${channel}.json"
+            test -f "$feed" || { echo "Missing $feed"; exit 1; }
+            jq -e --arg v "${{ needs.compile.outputs.version }}" \
+              '[.Assets[] | select(.Version == $v and .Type == "Full")] | length == 1' "$feed" > /dev/null \
+              || { echo "$feed has no full package for ${{ needs.compile.outputs.version }}"; exit 1; }
+            for file in $(jq -r '.Assets[].FileName' "$feed"); do
+              test -f "installers/$file" || { echo "$feed names $file, which was not built"; exit 1; }
+            done
+          done
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.compile.outputs.tag }}
           name: LiveLingo ${{ needs.compile.outputs.tag }}
+          prerelease: ${{ contains(needs.compile.outputs.version, '-') }}
           files: |
             installers/*.exe
             installers/*.msi
             installers/*.pkg
+            installers/*.nupkg
+            installers/releases.*.json
+            installers/RELEASES*
           generate_release_notes: true

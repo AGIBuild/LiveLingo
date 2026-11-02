@@ -1,0 +1,17 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Dictation.Asr.Sherpa/Dictation.Asr.Sherpa.csproj" />
+    <Project Path="src/Dictation.Audio/Dictation.Audio.csproj" />
+    <Project Path="src/Dictation.Cleanup.Llama/Dictation.Cleanup.Llama.csproj" />
+    <Project Path="src/Dictation.Core/Dictation.Core.csproj" />
+    <Project Path="src/Dictation.Harness/Dictation.Harness.csproj" />
+    <Project Path="src/Dictation.Models/Dictation.Models.csproj" />
+    <Project Path="src/Dictation.TestApp/Dictation.TestApp.csproj" />
+    <Project Path="../text-translation/TranslationPoc.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Dictation.Core.Tests/Dictation.Core.Tests.csproj" />
+    <Project Path="tests/Dictation.TestApp.Tests/Dictation.TestApp.Tests.csproj" />
+    <Project Path="../text-translation/tests/TranslationPoc.Tests.csproj" />
+  </Folder>
+</Solution>

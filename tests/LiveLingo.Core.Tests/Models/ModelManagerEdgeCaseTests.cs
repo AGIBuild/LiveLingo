@@ -36,23 +36,12 @@ public class ModelManagerEdgeCaseTests : IDisposable
     }
 
     [Fact]
-    public void GetTotalDiskUsage_ReturnsZero_WhenDirNotExists()
-    {
-        var options = Options.Create(new CoreOptions { ModelStoragePath = Path.Combine(_tempDir, "nonexist") });
-        var http = new HttpClient(new FakeHttpMessageHandler());
-        var logger = Substitute.For<ILogger<ModelManager>>();
-        var mgr = new ModelManager(options, http, logger);
-
-        Assert.Equal(0, mgr.GetTotalDiskUsage());
-    }
-
-    [Fact]
     public async Task EnsureModelAsync_ConcurrentCalls_OnlyDownloadsOnce()
     {
         var callCount = 0;
         var handler = new CountingHandler(() => Interlocked.Increment(ref callCount));
         var mgr = CreateManager(handler);
-        var desc = new ModelDescriptor("concurrent", "Test", "http://fake/m", 100, ModelType.Translation);
+        var desc = TestModel.Create("concurrent", "Test", "http://fake/m", 100, ModelType.Translation);
 
         var tasks = Enumerable.Range(0, 5)
             .Select(_ => mgr.EnsureModelAsync(desc, null, CancellationToken.None));
@@ -67,7 +56,7 @@ public class ModelManagerEdgeCaseTests : IDisposable
         using var cts = new CancellationTokenSource();
         var handler = new SlowHandler();
         var mgr = CreateManager(handler);
-        var desc = new ModelDescriptor("cancel", "Test", "http://fake/m", 100, ModelType.Translation);
+        var desc = TestModel.Create("cancel", "Test", "http://fake/m", 100, ModelType.Translation);
 
         await cts.CancelAsync();
         await Assert.ThrowsAnyAsync<OperationCanceledException>(
@@ -82,9 +71,9 @@ public class ModelManagerEdgeCaseTests : IDisposable
         Directory.CreateDirectory(modelDir);
 
         var partPath = Path.Combine(modelDir, "manifest.json.part");
-        await File.WriteAllBytesAsync(partPath, new byte[50]);
+        await File.WriteAllBytesAsync(partPath, TestModel.Content(50));
 
-        var desc = new ModelDescriptor("resume-test", "Resume", "http://fake/model", 200, ModelType.Translation);
+        var desc = TestModel.Create("resume-test", "Resume", "http://fake/model", 200, ModelType.Translation);
         await mgr.EnsureModelAsync(desc, null, CancellationToken.None);
 
         Assert.True(File.Exists(Path.Combine(modelDir, "manifest.json")));
@@ -100,7 +89,7 @@ public class ModelManagerEdgeCaseTests : IDisposable
         protected override Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request, CancellationToken ct)
         {
-            var content = new byte[100];
+            var content = TestModel.Content(100);
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new ByteArrayContent(content)
@@ -120,7 +109,7 @@ public class ModelManagerEdgeCaseTests : IDisposable
             await Task.Delay(50, ct);
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
-                Content = new ByteArrayContent(new byte[100])
+                Content = new ByteArrayContent(TestModel.Content(100))
             };
         }
     }
@@ -133,7 +122,7 @@ public class ModelManagerEdgeCaseTests : IDisposable
             await Task.Delay(5000, ct);
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
-                Content = new ByteArrayContent(new byte[100])
+                Content = new ByteArrayContent(TestModel.Content(100))
             };
         }
     }

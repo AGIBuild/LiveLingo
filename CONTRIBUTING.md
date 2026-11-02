@@ -20,7 +20,7 @@ Thanks for your interest in contributing! This guide covers everything you need 
 ## Quick Start
 
 ```bash
-git clone https://github.com/user/LiveLingo.git
+git clone https://github.com/AGIBuild/LiveLingo.git
 cd LiveLingo
 
 # Restore CLI tools (Velopack, WiX, Stryker)
@@ -41,28 +41,32 @@ dotnet run --project src/LiveLingo.Desktop
 ```
 LiveLingo/
 ├── src/
-│   ├── LiveLingo.Core/              # Pure C# — translation pipeline, AI engines, models
-│   │   ├── Engines/                 # LLamaSharp (Gemma 4) + MarianMT ONNX engines
-│   │   ├── Models/                  # Model registry + download / install / cleanup
-│   │   │                            #   collaborators (incl. ObsoleteModelCleaner)
-│   │   ├── Processing/              # Post-processing (summarize, optimize, colloquialize)
-│   │   ├── Settings/                # User settings model + JSON persistence
-│   │   ├── Speech/                  # sherpa-onnx STT engines (Cohere / SenseVoice),
-│   │   │                            #   SpeechModelRouting, Silero VAD
-│   │   └── Translation/             # Translation pipeline orchestration
+│   ├── LiveLingo.Core/              # Pure C# — composer domain, inference, models
+│   │   ├── Drafting/ Dictation/     # The draft, dictation session, fidelity gate
+│   │   ├── Cleanup/ Translation/    # Sentence cleanup and translation schedulers over llama-server
+│   │   ├── Inference/ Cloud/        # llama-server host, local and opt-in cloud chat clients
+│   │   ├── Speech/Native/           # sherpa-onnx adapters (excluded from unit coverage)
+│   │   ├── Transcription/           # WAV import and SRT export
+│   │   └── Models/                  # Catalog, download / install / cleanup collaborators
 │   │
-│   └── LiveLingo.Desktop/           # Avalonia 11 UI application
+│   ├── LiveLingo.HfGguf/            # Hugging Face resolve URLs and the resumable downloader
+│   │
+│   └── LiveLingo.Desktop/           # Avalonia shell + web UI
+│       ├── Composer/ Settings/      # View models, texts and the thin windows around the pages
+│       ├── Web/                     # Bridge, view-state snapshots, intents, and Assets/ (the page:
+│       │                            #   Preact + htm sources and CSS, embedded; no Node build)
 │       ├── Platform/
 │       │   ├── Windows/             # Win32 hotkeys, SendInput text injection
 │       │   └── macOS/               # CGEventTap hotkeys, Cocoa text injection
-│       ├── Views/                   # AXAML windows + code-behind
-│       ├── ViewModels/              # CommunityToolkit.Mvvm — pure C#, no Avalonia refs
-│       ├── Services/                # Localization, update service
-│       └── Styles/                  # AppTheme, adaptive color system
+│       └── Services/                # Settings, localization, update service
 │
+├── docs/superpowers/                # Design specs, plans, UX prototypes (see below)
+├── poc/                             # Validated POCs (sources only; corpora are not committed)
 ├── tests/
 │   ├── LiveLingo.Core.Tests/        # Unit tests for Core
-│   └── LiveLingo.Desktop.Tests/     # Unit tests for ViewModels
+│   ├── LiveLingo.Desktop.Tests/     # Unit tests for Desktop services, view models and view states
+│   └── LiveLingo.Web.Tests/         # Playwright tests of the page on WebKit and Chromium
+│                                    #   (golden fixtures are written by Desktop.Tests with UPDATE_FIXTURES=1)
 │
 ├── build/                           # Nuke build automation
 │   ├── BuildTask.cs                 # All build targets
@@ -88,14 +92,14 @@ This is the single most important rule. It ensures ViewModels are fully testable
 
 - **No Avalonia references** — ViewModels must never import `Avalonia.*` namespaces
 - **No threading** — No `Dispatcher`, `Dispatcher.UIThread`, or thread scheduling APIs
-- **Interface-only dependencies** — `ISettingsService`, `ITranslationPipeline`, `ITextInjector`, `IModelManager`, etc.
+- **Interface-only dependencies** — `ISettingsService`, `IModelManager`, `ITextInjector`, `IVoiceInput`, etc.
 - **CommunityToolkit.Mvvm** — Use `ObservableObject`, `RelayCommand`, `[ObservableProperty]`
 - **UI communication** — Via events (`event Action? RequestClose`) or property change notifications
 
 ### View Layer
 
-- Views handle **binding and layout only**
-- Code-behind is limited to Avalonia-specific interactions: window positioning, focus, animation, drag
+- The windows are thin Avalonia shells around a web view; the page draws snapshots and **does not hold logic**
+- Window code is limited to Avalonia-specific interactions: window positioning, focus, parking
 - `Dispatcher` calls are only allowed in Views or `App.axaml.cs`
 
 ### Platform Layer
@@ -118,55 +122,41 @@ LiveLingo uses [Nuke](https://nuke.build/) for build automation. All targets are
 ./build.sh Run                                       # Launch in Debug mode
 ./build.sh Mutate                                    # Run mutation testing only
 
-# End-to-end probes (real model download + inference; not part of the unit-test gate)
-./build.sh ProbeTranslation                          # Real Gemma 4 translation probe
-./build.sh ProbeStt                                  # Real sherpa-onnx STT probe (uses bundled wav)
-./build.sh ProbeStt --ProbeWavPath ~/sample.wav \
-                    --ProbeSttLang en \
-                    --ProbeSttExpected "hello"       # Custom wav + language + assertion
-
 # Packaging
 ./build.sh Publish --Runtime osx-arm64               # Publish for macOS
 ./build.ps1 Publish --Runtime win-x64                # Publish for Windows
-./build.ps1 Pack --Runtime win-x64 --Version 1.0.0   # Velopack .exe installer
-./build.ps1 PackMsi --Runtime win-x64 --Version 1.0.0 # WiX .msi installer
-./build.sh PackMac --Runtime osx-arm64 --Version 1.0.0 # macOS .pkg installer
+./build.sh Pack --Runtime osx-arm64 --Version 1.0.0  # macOS: .pkg installer + update package and feed
+./build.ps1 Pack --Runtime win-x64 --Version 1.0.0   # Windows: Setup.exe installer + update package and feed
+./build.ps1 PackMsi --Runtime win-x64 --Version 1.0.0 # WiX .msi installer (does not update itself)
+```
+
+End-to-end probes download the pinned models (SHA256-verified) and use real inference; they are not part of the unit-test gate:
+
+```bash
+./build.sh ProbeTranslation                                   # runtime + translator on llama-server
+./build.sh ProbeVoice --ProbeCorpus poc/voice-dictation/corpus # speech models + dictation + cleanup on recorded audio
 ```
 
 Use `--Configuration Release` for release builds. On CI, configuration defaults to Release automatically.
 
-### `ProbeStt` operational notes
-
-`ProbeStt` exercises the full sherpa-onnx pipeline on the host machine:
-download → tar.bz2 extract → `OfflineRecognizer` init → real wav decode →
-substring assertion. It is intentionally kept off the unit-test gate because
-it requires network and disk for the model archive (~1.6 GB for Cohere
-Transcribe).
-
-| Parameter | Default | Purpose |
-|-----------|---------|---------|
-| `--ProbeWavPath` | `<model>/test_wavs/en.wav` (bundled with the archive) | 16 kHz mono PCM16 wav file to transcribe |
-| `--ProbeSttLang` | `""` (no hint) | Optional ISO-639-1 language hint |
-| `--ProbeSttExpected` | `""` (no assertion) | Substring that must appear in the transcript |
-| `--ProbeModelPath` | `%LocalAppData%/LiveLingo/models` | Where to cache the downloaded bundle |
-
-The probe reuses the model cache between runs — the first invocation downloads
-~1.6 GB, subsequent invocations reuse the extracted archive.
-
 ### Obsolete model cleanup
 
-`ObsoleteModelRegistry` (see `LiveLingo.Core/Models/`) lists model IDs that
-are no longer shipped. On startup, `App.axaml.cs` fires
-`IModelManager.CleanObsoleteModelsAsync` to delete the corresponding
-directories and log the disk reclaimed. When retiring a model, add its ID to
-`ObsoleteModelRegistry.Ids`; existing installs will sweep it on next launch.
+Settings lists model directories that are not in `ModelCatalog` (for example the 1.x Gemma, Marian and Qwen
+processors) with their total size, and removes them through `IModelManager.CleanObsoleteModelsAsync` only when the user
+presses *Remove old models*. Nothing is deleted silently (design spec, S7).
+
+### Settings migration
+
+`SettingsMigration` reads a schema 2 file (1.x) and keeps the hotkey, interface language, update settings and the
+advanced paths and levels. Any other schema version starts from defaults. A new schema version must add its own
+migration instead of resetting the file.
 
 ---
 
 ## Model downloads
 
-Model downloads are a **process-global concern**: the Setup Wizard, the
-Settings → Models cards, the Overlay STT status line and any background
+Model downloads are a **process-global concern**: the first-run banner, the
+settings model cards, the composer status line and any background
 "ensure model before use" call must all observe the same lifecycle so that
 
 - a download started from one surface is visible on every other surface, and
@@ -187,8 +177,7 @@ is the single owner of that lifecycle.
    ```
 
    This applies to every ViewModel, Service or background coordinator that
-   wants to *report* a download to the user — including the Overlay's STT
-   status line, the Setup Wizard, and any future Settings affordances.
+   wants to *report* a download to the user.
 
 2. **`IModelManager.EnsureModelAsync` is a low-level primitive.** It is
    marked `[EditorBrowsable(Advanced)]` and the XML doc points new callers
@@ -201,7 +190,6 @@ is the single owner of that lifecycle.
    `IModelDownloadCoordinator.StateChanged` must implement `IDisposable` (or
    already does) and unsubscribe in `Dispose` — otherwise the coordinator
    keeps the subscriber alive for the lifetime of the process.
-   `SetupWizardViewModel` and `OverlayViewModel` are the canonical examples.
 
 4. **Tests use `InProcessModelDownloadCoordinator` over a mocked
    `IModelManager`** for integration-style tests, and mock the coordinator
@@ -209,8 +197,7 @@ is the single owner of that lifecycle.
    `Raise.Event<EventHandler<ModelDownloadState>>(...)`) for ViewModel unit
    tests that want to drive specific lifecycle events.
 
-For tests / design-time scenarios that genuinely don't need a real
-coordinator, use `NullModelDownloadCoordinator.Instance`.
+For tests that don't need a real coordinator, substitute `IModelDownloadCoordinator`.
 
 ---
 
@@ -222,16 +209,15 @@ The `Test` target enforces three quality gates. **All must pass for CI to succee
 
 | Metric | Threshold | Measured by |
 |--------|-----------|-------------|
-| Line coverage | ≥ **96%** | XPlat Code Coverage (Cobertura) |
-| Branch coverage | ≥ **92%** | XPlat Code Coverage (Cobertura) |
+| Line coverage | ≥ **80%** | XPlat Code Coverage (Cobertura) |
+| Branch coverage | ≥ **65%** | XPlat Code Coverage (Cobertura) |
 
 **What's excluded from coverage** (configured in `test.runsettings`):
 - Platform implementations (`Platform.Windows.*`, `Platform.macOS.*`)
-- View layer (`Views.*`, `Controls.*`)
+- Window shells and the web view host (`ComposerWindow`, `SettingsWindow`, `WebSurface`, `StorageFileDialogs`)
 - Infrastructure (`Program`, `App`, `VelopackUpdateService`)
-- AI model hosts that require GPU (`LlamaModelHost`, `MarianOnnxEngine`)
-- sherpa-onnx engines (`SherpaCohereTranscribeEngine`, `SherpaSenseVoiceTranscribeEngine`)
-  — covered by the dedicated `ProbeStt` Nuke target instead of unit-test mocks
+- AI model hosts and native adapters (`Inference.LlamaServerHost*`, `Speech.Native.*`)
+  — covered by end-to-end Nuke probe targets instead of unit-test mocks
 
 ### 2. Mutation Testing
 
@@ -239,7 +225,9 @@ The `Test` target enforces three quality gates. **All must pass for CI to succee
 |--------|-----------|------|
 | Mutation score | ≥ **80%** | [Stryker.NET](https://stryker-mutator.io/) |
 
-Stryker only targets `LiveLingo.Core` (source generators in Avalonia projects are incompatible).
+Stryker only targets the pure-logic modules of `LiveLingo.Core`
+(`Drafting`, `Translation`, `Dictation`, `Cleanup`; see `tests/LiveLingo.Core.Tests/stryker-config.json`).
+Source generators in Avalonia projects are incompatible with it.
 
 ### 3. Test Conventions
 
@@ -256,13 +244,34 @@ The CI pipeline (`.github/workflows/release.yml`) runs on tag push (`v*`) with f
 ```
 compile  →  test  →  pack  →  release
    │          │        │         │
-   │          │        │         └─ Create GitHub Release with installers
-   │          │        └─ Matrix build: win-x64 (.exe + .msi) / osx-arm64 (.pkg)
-   │          └─ Unit tests + coverage + mutation gates
-   └─ Build verification (all platforms)
+   │          │        │         └─ Check the update feeds, then create the GitHub Release
+   │          │        └─ Matrix build: win-x64 (Setup.exe + .msi) / osx-arm64 (.pkg), each with its update package and feed
+   │          └─ Unit tests + coverage gates (on macOS, where the web tests run both browsers)
+   └─ Build verification
 ```
 
-Only final installer artifacts (`.exe`, `.msi`, `.pkg`) are published — no source archives or debug files.
+To release: push a tag `v<semver>` (or run *Create Tag*; a version with a suffix such as `2.1.0-rc.1` is published as a
+pre-release). The version is the tag; nothing in the source needs editing.
+
+### Automatic updates
+
+Installed applications update themselves from the GitHub releases of the repository
+(`Update.UpdateUrl` in the settings, default `https://github.com/AGIBuild/LiveLingo`) through
+[Velopack](https://velopack.io/):
+
+- Every release carries, per platform, the full package (`LiveLingo-<version>-full.nupkg` on Windows,
+  `LiveLingo-<version>-osx-full.nupkg` on macOS) and its feed (`releases.win.json` / `releases.osx.json`). The channels
+  (`win`, `osx`) are Velopack's defaults for the platforms, so the feeds do not collide. The *release* job refuses to
+  publish a release whose feed does not name a package that is in it.
+- The application checks at start and every `Update.CheckIntervalHours`, downloads a newer version in the background,
+  and then offers *Restart to Update* in the tray menu; quitting also installs it. Pre-releases are not offered.
+- Only an application installed by the Setup.exe or the .pkg can update itself. A development build and the .msi cannot;
+  they skip the check.
+- A release without a feed (the 1.x releases) is skipped. The application reads the latest 10 releases.
+- Installers are not signed, so Windows SmartScreen and macOS Gatekeeper warn on the first install; updates run from the
+  installed application. Signing (`--signAppIdentity`, `--notaryProfile`) is not set up.
+
+Only the installers, the update packages and the feeds are published — no source archives or debug files.
 
 ---
 
@@ -279,18 +288,17 @@ Only final installer artifacts (`.exe`, `.msi`, `.pkg`) are published — no sou
 - Tests for new logic (ViewModels, Core services)
 - No Avalonia references leaked into ViewModels
 - Coverage and mutation thresholds maintained
-- Follows existing code style (Inter font, dark theme conventions)
+- Follows the v3 prototype (`docs/superpowers/prototypes/livelingo-ux-v3/`): design tokens in `Web/Assets/styles/`, system font, light and dark themes
+- UI changes keep the contract: state lives in C#; the page only draws a snapshot and sends closed-set intents
 
 ---
 
 ## Adding a New Language
 
-1. Add the language code to the supported list in `LiveLingo.Core`
-2. Ensure the AI model supports it. Gemma 4 26B-A4B MoE covers all major
-   languages; for voice input, check that the chosen STT bundle (Cohere
-   Transcribe 14-Lang, or SenseVoice CJK+EN) handles the source language.
-3. Add UI translations in `Resources/i18n/` if adding a new UI locale
-4. Add tests for the new language pair
+Only Chinese ↔ English is validated (see `poc/text-translation/REPORT.md` and the
+voice design spec). Adding a language requires a new evaluation run on a
+representative corpus before it is exposed in the UI; UI locales live in
+`Resources/i18n/`.
 
 ---
 

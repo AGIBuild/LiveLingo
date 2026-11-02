@@ -1,3 +1,5 @@
+using System.Formats.Tar;
+using System.IO.Compression;
 using Microsoft.Extensions.Logging;
 using SharpCompress.Common;
 using SharpCompress.Readers;
@@ -5,99 +7,84 @@ using SharpCompress.Readers;
 namespace LiveLingo.Core.Models.Downloads;
 
 /// <summary>
-/// Unpacks an archive payload that was just downloaded for a model.
-/// Currently supports <see cref="ModelArchiveType.TarBz2"/> (the format used by all
-/// sherpa-onnx pretrained model bundles). Always flattens the archive's single
-/// top-level directory so callers can address files relative to the model directory
-/// without knowing the archive's internal layout.
+/// Unpacks the archive payload of a model into its model directory. The archive's single top-level
+/// directory (if any) is flattened so files are addressed relative to the model directory, and the
+/// archive is removed afterwards. tar.gz and zip use the .NET readers (symbolic links and Unix file modes
+/// are preserved); tar.bz2, which .NET cannot read, uses SharpCompress.
 /// </summary>
-internal sealed class ModelArchiveExtractor
+internal sealed class ModelArchiveExtractor(ILogger logger)
 {
-    private readonly ILogger _logger;
-
-    public ModelArchiveExtractor(ILogger logger)
-    {
-        _logger = logger;
-    }
+    private const string StagingPrefix = ".extract-";
 
     public void Extract(ModelDescriptor descriptor, string archivePath, string targetDirectory)
     {
         if (descriptor.ArchiveType == ModelArchiveType.None)
-            return;
-
+            throw new InvalidOperationException($"Model '{descriptor.Id}' does not declare an archive format.");
         if (!File.Exists(archivePath))
             throw new FileNotFoundException($"Archive file not found at {archivePath}", archivePath);
 
         Directory.CreateDirectory(targetDirectory);
-
-        _logger.LogInformation(
+        logger.LogInformation(
             "Extracting model archive {ModelId}: format={ArchiveType}, source={Archive}, target={Target}",
             descriptor.Id, descriptor.ArchiveType, archivePath, targetDirectory);
 
-        var topLevelPrefix = ResolveTopLevelPrefix(descriptor);
-
-        using (var stream = File.OpenRead(archivePath))
-        using (var reader = ReaderFactory.Open(stream))
+        var staging = Path.Combine(targetDirectory, StagingPrefix + Guid.NewGuid().ToString("N"));
+        try
         {
-            while (reader.MoveToNextEntry())
-            {
-                if (reader.Entry.IsDirectory)
-                    continue;
-
-                var entryPath = NormalizeEntryPath(reader.Entry.Key ?? string.Empty, topLevelPrefix);
-                if (string.IsNullOrEmpty(entryPath))
-                    continue;
-
-                var destinationPath = Path.GetFullPath(Path.Combine(targetDirectory, entryPath));
-                EnsureWithinTarget(targetDirectory, destinationPath);
-
-                var destDir = Path.GetDirectoryName(destinationPath);
-                if (!string.IsNullOrEmpty(destDir))
-                    Directory.CreateDirectory(destDir);
-
-                reader.WriteEntryToFile(destinationPath, new ExtractionOptions
-                {
-                    Overwrite = true,
-                    PreserveFileTime = false,
-                    ExtractFullPath = false
-                });
-            }
+            ExtractTo(descriptor.ArchiveType, archivePath, staging);
+            MoveContents(staging, targetDirectory);
+        }
+        finally
+        {
+            if (Directory.Exists(staging))
+                Directory.Delete(staging, recursive: true);
         }
 
         File.Delete(archivePath);
-        _logger.LogDebug("Model archive {ModelId} extracted; archive payload removed", descriptor.Id);
+        logger.LogDebug("Model archive {ModelId} extracted; archive payload removed", descriptor.Id);
     }
 
-    /// <summary>
-    /// Sherpa-onnx archives wrap their files inside a single top-level directory
-    /// (e.g. <c>sherpa-onnx-cohere-transcribe-14-lang-int8-2026-04-01/encoder.int8.onnx</c>).
-    /// Strip that prefix so descriptor.ExtractedFiles can stay format-agnostic.
-    /// </summary>
-    private static string ResolveTopLevelPrefix(ModelDescriptor descriptor)
+    private static void ExtractTo(ModelArchiveType type, string archivePath, string destination)
     {
-        var fileName = Path.GetFileName(new Uri(descriptor.DownloadUrl).AbsolutePath);
-        var dot = fileName.IndexOf('.');
-        return dot > 0 ? fileName[..dot] : fileName;
-    }
-
-    private static string NormalizeEntryPath(string entryKey, string topLevelPrefix)
-    {
-        var normalized = entryKey.Replace('\\', '/').TrimStart('/');
-        if (!string.IsNullOrEmpty(topLevelPrefix) &&
-            normalized.StartsWith(topLevelPrefix + "/", StringComparison.OrdinalIgnoreCase))
+        Directory.CreateDirectory(destination);
+        switch (type)
         {
-            normalized = normalized[(topLevelPrefix.Length + 1)..];
-        }
-        return normalized.Replace('/', Path.DirectorySeparatorChar);
-    }
-
-    private static void EnsureWithinTarget(string targetDirectory, string destinationPath)
-    {
-        var fullTarget = Path.GetFullPath(targetDirectory);
-        if (!destinationPath.StartsWith(fullTarget, StringComparison.Ordinal))
-        {
-            throw new InvalidOperationException(
-                $"Archive entry escapes target directory: {destinationPath}");
+            case ModelArchiveType.TarGz:
+                using (var file = File.OpenRead(archivePath))
+                using (var gzip = new GZipStream(file, CompressionMode.Decompress))
+                    TarFile.ExtractToDirectory(gzip, destination, overwriteFiles: true);
+                break;
+            case ModelArchiveType.Zip:
+                ZipFile.ExtractToDirectory(archivePath, destination, overwriteFiles: true);
+                break;
+            case ModelArchiveType.TarBz2:
+                using (var file = File.OpenRead(archivePath))
+                using (var reader = ReaderFactory.Open(file))
+                    reader.WriteAllToDirectory(destination, new ExtractionOptions { ExtractFullPath = true, Overwrite = true });
+                break;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(type));
         }
     }
+
+    private static void MoveContents(string staging, string targetDirectory)
+    {
+        var directories = Directory.GetDirectories(staging);
+        var source = directories.Length == 1 && Directory.GetFiles(staging).Length == 0 ? directories[0] : staging;
+        foreach (var entry in Directory.GetFileSystemEntries(source))
+        {
+            var destination = Path.Combine(targetDirectory, Path.GetFileName(entry));
+            if (Directory.Exists(destination))
+                Directory.Delete(destination, recursive: true);
+            else if (File.Exists(destination))
+                File.Delete(destination);
+
+            if (Directory.Exists(entry) && !IsSymbolicLink(entry))
+                Directory.Move(entry, destination);
+            else
+                File.Move(entry, destination);
+        }
+    }
+
+    private static bool IsSymbolicLink(string path) => new FileInfo(path).LinkTarget is not null;
 }

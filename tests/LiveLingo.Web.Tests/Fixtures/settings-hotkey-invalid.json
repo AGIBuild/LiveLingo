@@ -1,0 +1,87 @@
+{
+  "rev": 1,
+  "section": "general",
+  "general": {
+    "hotkey": "Ctrl+",
+    "hotkeyInvalid": true,
+    "commitKey": "Enter",
+    "language": "en-US",
+    "theme": "Auto",
+    "reduceMotion": false,
+    "rememberChoices": true
+  },
+  "voice": {
+    "microphones": [
+      "",
+      "USB Mic",
+      "Built-in"
+    ],
+    "microphone": "",
+    "direction": "English",
+    "cleanup": true,
+    "defaultOutput": "Clean",
+    "autoDictate": false,
+    "preloadSpeech": true,
+    "terms": []
+  },
+  "privacy": {
+    "cloudTranslate": false,
+    "cloudClean": false,
+    "baseUrl": "",
+    "model": "",
+    "hasKey": false,
+    "invalid": false,
+    "consent": null,
+    "apps": []
+  },
+  "models": {
+    "tier": "Fast",
+    "legacy": {
+      "count": 0,
+      "text": ""
+    },
+    "version": "2.0.0",
+    "diagnostics": [
+      {
+        "label": "版本",
+        "value": "2.0.0"
+      },
+      {
+        "label": "系统",
+        "value": "macOS 15.0 Arm64"
+      },
+      {
+        "label": "界面语言",
+        "value": "en-US"
+      },
+      {
+        "label": "翻译模型",
+        "value": "Fast"
+      },
+      {
+        "label": "整理句子",
+        "value": "开"
+      },
+      {
+        "label": "云端翻译",
+        "value": "关"
+      },
+      {
+        "label": "云端整理",
+        "value": "关"
+      },
+      {
+        "label": "API 密钥",
+        "value": "未保存"
+      },
+      {
+        "label": "旧版本模型",
+        "value": "0"
+      }
+    ]
+  },
+  "options": {
+    "animations": true,
+    "theme": "Auto"
+  }
+}

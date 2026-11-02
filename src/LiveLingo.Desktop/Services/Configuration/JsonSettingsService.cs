@@ -39,11 +39,16 @@ public sealed class JsonSettingsService : ISettingsService
                 {
                     var json = await File.ReadAllTextAsync(_filePath, ct).ConfigureAwait(false);
                     using var document = JsonDocument.Parse(json);
-                    if (!document.RootElement.TryGetProperty("schemaVersion", out var schemaNode) ||
-                        !schemaNode.TryGetInt32(out var schemaVersion) ||
-                        schemaVersion != SettingsModel.CurrentSchemaVersion)
+                    var schemaVersion = document.RootElement.TryGetProperty("schemaVersion", out var schemaNode) &&
+                                        schemaNode.ValueKind == JsonValueKind.Number &&
+                                        schemaNode.TryGetInt32(out var found)
+                        ? found
+                        : (int?)null;
+                    if (schemaVersion != SettingsModel.CurrentSchemaVersion)
                     {
-                        _current = SettingsModel.CreateDefault();
+                        _current = schemaVersion == SettingsMigration.LegacySchemaVersion
+                            ? SettingsMigration.FromLegacy(document.RootElement)
+                            : SettingsModel.CreateDefault();
                         shouldPersistDefaults = true;
                     }
                     else
@@ -70,10 +75,9 @@ public sealed class JsonSettingsService : ISettingsService
             if (shouldPersistDefaults)
                 SaveCurrentUnsafe();
 
-            // Backfill: existing settings files may have an empty UpdateUrl from the
-            // pre-default era.  Apply the compiled default so the auto-update service
-            // is always created at startup.
-            if (string.IsNullOrEmpty(_current.Update.UpdateUrl))
+            // Every settings file written before 2.0.1 holds the placeholder address that was the default then, so the
+            // installed app could never find an update. An address the user typed, or an empty one (updates off), is kept.
+            if (string.Equals(_current.Update.UpdateUrl, UpdateSettings.PlaceholderUpdateUrl, StringComparison.OrdinalIgnoreCase))
             {
                 _current.Update.UpdateUrl = UpdateSettings.DefaultUpdateUrl;
                 SaveCurrentUnsafe();
@@ -161,7 +165,7 @@ public sealed class JsonSettingsService : ISettingsService
         if (!string.IsNullOrEmpty(dir))
             Directory.CreateDirectory(dir);
 
-        var json = JsonSerializer.Serialize(SettingsSecretCoordinator.CreatePersistableSnapshot(_current), JsonOptions);
+        var json = JsonSerializer.Serialize(_current, JsonOptions);
         var tempPath = $"{_filePath}.tmp";
         File.WriteAllText(tempPath, json);
         File.Move(tempPath, _filePath, true);

@@ -16,6 +16,8 @@
     <string>APPL</string>
     <key>CFBundleExecutable</key>
     <string>LiveLingo.Desktop</string>
+    <key>CFBundleIconFile</key>
+    <string>app-icon</string>
     <key>LSMinimumSystemVersion</key>
     <string>12.0</string>
     <key>NSHighResolutionCapable</key>
@@ -24,5 +26,7 @@
     <true/>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>LiveLingo listens to your voice only while you dictate. Audio is recognized on this Mac and is never sent anywhere.</string>
 </dict>
 </plist>
