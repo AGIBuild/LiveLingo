@@ -135,6 +135,11 @@ public sealed class CleanupScheduler : IAsyncDisposable
             {
                 _session.Mutate(draft => draft.FailPending(ticket, UnitKind.Clean, ex.Message));
             }
+            catch (InvalidDataException)
+            {
+                // A truncated answer says nothing about the user's words: keep them and write on, like any refused cleanup.
+                _session.Mutate(draft => draft.Complete(ticket, UnitKind.Clean, request.Target, new GateRejection(GateReason.Incomplete)));
+            }
             catch (Exception ex)
             {
                 _session.Mutate(draft => draft.Fail(ticket, UnitKind.Clean, ex.Message));

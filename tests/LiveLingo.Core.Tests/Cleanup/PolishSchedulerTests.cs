@@ -118,10 +118,10 @@ public class PolishSchedulerTests
         await using var polish = new PolishScheduler(session, cleaner, [], 300);
 
         session.Mutate(d => d.Recording = false);
-        await WaitUntil(() => cleaner.Requests.Count == 1);
-        await Task.Delay(50);
+        await WaitUntil(() => cleaner.Requests.Count == 1 && !session.Read(d => d.Polishing));
 
         Assert.Equal(3, Raws(session).Length);
+        Assert.Single(cleaner.Requests);
     }
 
     [Fact]
@@ -142,13 +142,13 @@ public class PolishSchedulerTests
     [Fact]
     public async Task LongDictation_IsPolishedInBoundedGroups_AndLaterGroupsReadTheEarlierPolish()
     {
-        var body = new string('字', 150);
-        var session = Dictated(Enumerable.Range(0, 4).Select(i => ($"呃，{body}{i}。", $"{body}{i}。")));
+        var body = new string('字', 300);
+        var session = Dictated(Enumerable.Range(0, 5).Select(i => ($"呃，{body}{i}。", $"{body}{i}。")));
         var cleaner = new FakeCleaner(request => Strip(request.Target));
         await using var polish = new PolishScheduler(session, cleaner, [], 300);
 
         session.Mutate(d => d.Recording = false);
-        await WaitUntil(() => Raws(session).Length == 2);
+        await WaitUntil(() => Raws(session).Length == 3 && !session.Read(d => d.Polishing));
 
         Assert.Equal(2, cleaner.Requests.Count);
         Assert.All(cleaner.Requests, request => Assert.True(request.Target.Length <= PolishScheduler.MaxGroupChars));
@@ -175,7 +175,7 @@ public class PolishSchedulerTests
     }
 
     [Fact]
-    public async Task AFrozenDraft_IsNeverChanged()
+    public async Task WritingWaitsForThePolish_BecauseTheDraftIsStillProcessing()
     {
         var session = Dictated(Steps);
         var release = new ManualResetEventSlim();
@@ -188,11 +188,83 @@ public class PolishSchedulerTests
 
         session.Mutate(d => d.Recording = false);
         await WaitUntil(() => cleaner.Requests.Count == 1);
-        session.Mutate(d => d.RequestCommit());
+
+        Assert.True(session.Read(d => d.Polishing));
+        Assert.Equal(BlockReason.Processing, session.Read(d => d.InsertionReadiness().Reason));
+
         release.Set();
+        await WaitUntil(() => !session.Read(d => d.Polishing));
+
+        Assert.True(session.Read(d => d.InsertionReadiness().IsReady));
+        Assert.Single(Raws(session));
+    }
+
+    [Fact]
+    public async Task ThePolishWaitsUntilEveryPassageIsCleaned_SoTheWholeDictationIsPolishedTogether()
+    {
+        var session = Dictated(Steps);
+        var last = session.Mutate(d => d.Append("呃，再发布。"));
+        var cleaner = new FakeCleaner(request => Strip(request.Target));
+        await using var polish = new PolishScheduler(session, cleaner, [], 300);
+
+        session.Mutate(d => d.Recording = false);
+        await Task.Delay(100);
+        Assert.Empty(cleaner.Requests);
+        Assert.False(session.Read(d => d.Polishing));
+
+        session.Mutate(d => d.Complete(last, UnitKind.Clean, "再发布。"));
+        await WaitUntil(() => Raws(session).Length == 1);
+
+        Assert.Equal("呃，先改接口。嗯，然后补测试。那个，最后更新文档。呃，再发布。", Raws(session)[0]);
+        Assert.Single(cleaner.Requests);
+    }
+
+    [Fact]
+    public async Task ARefusedRun_IsSplitInHalves_SoOneBadPassageOnlyCostsItsHalf()
+    {
+        var session = Dictated(
+        [
+            ("呃，先改接口。", "先改接口。"), ("嗯，然后补测试。", "补测试。"),
+            ("呃，端口改成 8080。", "端口改成 8080。"), ("嗯，再发布。", "再发布。")
+        ]);
+        var cleaner = new FakeCleaner(request => request.Target.Contains("8080") ? "端口改一下。" : Strip(request.Target));
+        await using var polish = new PolishScheduler(session, cleaner, [], 300);
+
+        session.Mutate(d => d.Recording = false);
+        await WaitUntil(() => cleaner.Requests.Count == 3 && !session.Read(d => d.Polishing));
+
+        Assert.Equal(["呃，先改接口。嗯，然后补测试。", "呃，端口改成 8080。", "嗯，再发布。"], Raws(session));
+    }
+
+    [Fact]
+    public async Task ATruncatedAnswer_IsRetriedWithSmallerRuns()
+    {
+        var session = Dictated([.. Steps, ("嗯，再发布。", "再发布。")]);
+        var cleaner = new FakeCleaner(request =>
+            request.Target.Contains("先改接口") && request.Target.Contains("再发布")
+                ? throw new InvalidDataException("finish=length")
+                : Strip(request.Target));
+        await using var polish = new PolishScheduler(session, cleaner, [], 300);
+
+        session.Mutate(d => d.Recording = false);
+        await WaitUntil(() => Raws(session).Length == 2 && !session.Read(d => d.Polishing));
+
+        Assert.Equal(3, cleaner.Requests.Count);
+    }
+
+    [Fact]
+    public async Task ADraftWithAnotherOutput_IsNotHeldBackByThePolish()
+    {
+        var session = Dictated(Steps);
+        var cleaner = new FakeCleaner(request => Strip(request.Target));
+        await using var polish = new PolishScheduler(session, cleaner, [], 300);
+        session.Mutate(d => d.Output = OutputKind.Translation);
+
+        session.Mutate(d => d.Recording = false);
         await Task.Delay(100);
 
-        Assert.Equal(3, Raws(session).Length);
+        Assert.False(session.Read(d => d.Polishing));
+        Assert.Empty(cleaner.Requests);
     }
 
     [Fact]

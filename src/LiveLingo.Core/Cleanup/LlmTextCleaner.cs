@@ -1,4 +1,5 @@
 using System.Text;
+using LiveLingo.Core.Dictation;
 using LiveLingo.Core.Inference;
 
 namespace LiveLingo.Core.Cleanup;
@@ -11,7 +12,7 @@ namespace LiveLingo.Core.Cleanup;
 /// </summary>
 public sealed class LlmTextCleaner(IChatCompletionClient client) : ITextCleaner
 {
-    private const int MaxOutputTokens = 900;
+    private const int MaxOutputTokens = 1700;
 
     internal const string SystemPrompt = """
         你是语音输入法的文字整理器。输入是语音识别的原文，你只整理“目标”部分，它可能包含多个句子。识别器按停顿把话切碎，所以目标里常有半句话、重复、口头语和同音错字。请整理成通顺、可以直接发送的文字：
@@ -39,11 +40,13 @@ public sealed class LlmTextCleaner(IChatCompletionClient client) : ITextCleaner
 
     public async Task<string> CleanAsync(CleanupRequest request, CancellationToken ct)
     {
-        var maxTokens = Math.Min(MaxOutputTokens, request.Target.Length * 2 + 48);
+        // A small model sometimes writes the read-only context before its answer; the budget leaves room for that
+        // (the echo is removed below) so the answer is not cut off.
+        var maxTokens = Math.Min(MaxOutputTokens, (request.Target.Length + request.Preceding.Length) * 2 + 48);
         var completion = await client
             .CompleteAsync(new ChatRequest(BuildUserMessage(request), maxTokens, 0, Sampling, SystemPrompt), ct)
             .ConfigureAwait(false);
-        return Tidy(completion.Text);
+        return WithoutEchoedContext(Tidy(completion.Text), request.Preceding);
     }
 
     internal static string BuildUserMessage(CleanupRequest request)
@@ -56,6 +59,31 @@ public sealed class LlmTextCleaner(IChatCompletionClient client) : ITextCleaner
         user.Append("后文：").Append(request.Continues ? "（说话人还在继续说下去）" : "（无，说话已经结束）");
         return user.ToString();
     }
+
+    /// <summary>
+    /// Removes the start of <paramref name="text"/> that repeats the end of the read-only context (the model copied it
+    /// before, or into, its answer). Compared by letters and digits only, since the model also changes punctuation.
+    /// </summary>
+    internal static string WithoutEchoedContext(string text, string preceding)
+    {
+        var context = FidelityGate.Normalize(preceding);
+        var seen = new StringBuilder();
+        var cut = 0;
+        for (var i = 0; i < text.Length; i++)
+        {
+            if (!char.IsLetterOrDigit(text[i]))
+                continue;
+            seen.Append(char.ToLowerInvariant(text[i]));
+            if (seen.Length >= MinEchoLetters && context.EndsWith(seen.ToString(), StringComparison.Ordinal))
+                cut = i + 1;
+        }
+
+        return cut == 0 ? text : text[cut..].TrimStart(EchoSeparators);
+    }
+
+    private const int MinEchoLetters = 6;
+
+    private static readonly char[] EchoSeparators = [' ', '\n', '，', ',', '。', '！', '？', '；', '、', '.', '!', '?', ';'];
 
     internal static string Tidy(string output)
     {

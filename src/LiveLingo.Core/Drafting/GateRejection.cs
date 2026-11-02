@@ -13,7 +13,10 @@ public enum GateReason
     TooShort,
     TooLong,
     Added,
-    Deleted
+    Deleted,
+
+    /// <summary>The model's answer was cut off (it ran past its output limit), so it cannot be trusted as a whole.</summary>
+    Incomplete
 }
 
 /// <summary>

@@ -296,12 +296,24 @@ public class ComposerVoiceTests
     }
 
     [Fact]
+    public async Task ATruncatedCleanupAnswer_KeepsTheWords_AndDoesNotBlockWriting()
+    {
+        await using var h = Create(output: ComposerOutput.Clean);
+        h.Cleaner.Handler = (_, _) => Task.FromException<string>(new InvalidDataException("finish=length"));
+        h.Vm.SourceText = "先改接口。";
+
+        await Wait.Until(() => h.Vm.Status == ComposerStatus.Ready);
+
+        Assert.Equal("先改接口。", h.Vm.Lines[0].Text);
+    }
+
+    [Fact]
     public async Task Retry_RetriesTheCleanupOfAFailedSentence_WhenCleanIsSelected()
     {
         await using var h = Create(output: ComposerOutput.Clean);
         var calls = 0;
         h.Cleaner.Handler = (request, _) => ++calls == 1
-            ? Task.FromException<string>(new InvalidDataException("bad"))
+            ? Task.FromException<string>(new InvalidOperationException("bad"))
             : Task.FromResult("C:" + request.Target);
         h.Vm.SourceText = "先改接口。";
         await Wait.Until(() => h.Vm.Status == ComposerStatus.Failed);

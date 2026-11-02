@@ -62,14 +62,36 @@ public class LlmTextCleanerTests
     }
 
     [Fact]
-    public async Task CleanAsync_BoundsTheOutputByTextLength()
+    public async Task CleanAsync_BoundsTheOutputByTextLength_AndLeavesRoomForAnEchoedContext()
     {
         var (cleaner, seen) = Create("ok");
 
         await cleaner.CleanAsync(new CleanupRequest("好", "", false, []), CancellationToken.None);
-        await cleaner.CleanAsync(new CleanupRequest(new string('字', 500), "", false, []), CancellationToken.None);
+        await cleaner.CleanAsync(new CleanupRequest("好", new string('前', 100), false, []), CancellationToken.None);
+        await cleaner.CleanAsync(new CleanupRequest(new string('字', 1500), "", false, []), CancellationToken.None);
 
         Assert.Equal(1 * 2 + 48, seen[0].MaxTokens);
-        Assert.Equal(900, seen[1].MaxTokens);
+        Assert.Equal(101 * 2 + 48, seen[1].MaxTokens);
+        Assert.Equal(1700, seen[2].MaxTokens);
+    }
+
+    [Theory]
+    [InlineData("我觉得现在这个原文的识别和整理出来的文本。", "我觉得现在这个原文的识别和整理出来的文本都没有什么变化。", "都没有什么变化。")]
+    [InlineData("你好吗。我觉得现在这个原文的识别。", "我觉得现在这个原文的识别，都没有什么变化。", "都没有什么变化。")]
+    [InlineData("我觉得现在这个原文的识别。", "都没有什么变化。", "都没有什么变化。")]
+    [InlineData("我觉得现在这个原文的识别。", "都没有什么变化，我觉得现在这个原文的识别。", "都没有什么变化，我觉得现在这个原文的识别。")]
+    [InlineData("", "都没有什么变化。", "都没有什么变化。")]
+    [InlineData("我觉得现在这个原文的识别。", "我觉得现在这个原文的识别。", "")]
+    public void WithoutEchoedContext_RemovesWhatTheModelCopiedFromTheContext(string preceding, string output, string expected) =>
+        Assert.Equal(expected, LlmTextCleaner.WithoutEchoedContext(output, preceding));
+
+    [Fact]
+    public async Task CleanAsync_DropsTheContextTheModelWroteBeforeItsAnswer()
+    {
+        var (cleaner, _) = Create("我们先把下载接口改掉。然后补测试。");
+
+        var text = await cleaner.CleanAsync(new CleanupRequest("补测试。", "我们先把下载接口改掉。", true, []), CancellationToken.None);
+
+        Assert.Equal("然后补测试。", text);
     }
 }

@@ -22,6 +22,12 @@ public sealed class Draft
     public bool Recording { get; set; }
 
     /// <summary>
+    /// The whole dictation is being polished after recording stopped. What is written then would be the unpolished
+    /// text, so with cleanup as the output the draft counts as still processing until the polish is done.
+    /// </summary>
+    public bool Polishing { get; set; }
+
+    /// <summary>
     /// Speech that has been recognized but not settled into units yet (the live hypothesis). It is shown after the
     /// units and is never part of <see cref="Text"/>; the dictation session replaces it as recognition advances.
     /// </summary>
@@ -47,6 +53,7 @@ public sealed class Draft
         HasTarget = hasTarget;
         TargetLost = false;
         Recording = false;
+        Polishing = false;
         Pending = "";
         Snapshot = null;
     }
@@ -293,7 +300,7 @@ public sealed class Draft
             var states = _units.Select(unit => StateOf(unit, Output)).ToList();
             if (states.Any(state => state is UnitState.Error or UnitState.Empty))
                 return Readiness.Blocked(BlockReason.Unavailable);
-            if (states.Contains(UnitState.Pending))
+            if (states.Contains(UnitState.Pending) || (Polishing && Output == OutputKind.Clean))
                 return Readiness.Blocked(BlockReason.Processing);
         }
 
