@@ -35,8 +35,8 @@ public partial class App : Application
 
     private ServiceProvider? _serviceProvider;
     private TrayIcon? _trayIcon;
-    private Timer? _updateCheckTimer;
-    private IUpdateService? _updateService;
+    private UpdateChecks? _updates;
+    private NativeMenuItem? _updateItem;
     private string? _registeredGesture;
     private ComposerWindow? _composer;
     private readonly RecentDrafts _recentDrafts = new();
@@ -100,10 +100,14 @@ public partial class App : Application
 
         if (!string.IsNullOrEmpty(settings.Update.UpdateUrl))
         {
-            _updateService = new VelopackUpdateService(
-                settings.Update.UpdateUrl,
-                _serviceProvider.GetRequiredService<ILogger<VelopackUpdateService>>());
-            StartUpdateChecks(_updateService, settings.Update.CheckIntervalHours);
+            _updates = new UpdateChecks(
+                new VelopackUpdateService(
+                    settings.Update.UpdateUrl,
+                    _serviceProvider.GetRequiredService<ILogger<VelopackUpdateService>>()),
+                TimeSpan.FromHours(Math.Max(1, settings.Update.CheckIntervalHours)),
+                _serviceProvider.GetRequiredService<ILogger<UpdateChecks>>());
+            _updates.Ready += _ => Dispatcher.UIThread.Post(ShowUpdateReady);
+            _updates.Start();
         }
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
@@ -111,7 +115,8 @@ public partial class App : Application
             desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
             desktop.Exit += (_, _) =>
             {
-                _updateCheckTimer?.Dispose();
+                _updates?.ApplyOnExit();
+                _updates?.Dispose();
                 _serviceProvider?.DisposeAsync().AsTask().GetAwaiter().GetResult();
                 Log.CloseAndFlush();
             };
@@ -185,8 +190,8 @@ public partial class App : Application
         var settingsItem = new NativeMenuItem(loc.T("tray.settings"));
         settingsItem.Click += (_, _) => Dispatcher.UIThread.Post(() => ShowSettings());
 
-        var checkUpdateItem = new NativeMenuItem(loc.T("tray.checkUpdates"));
-        checkUpdateItem.Click += (_, _) => Dispatcher.UIThread.Post(async () => await CheckForUpdatesFromMenuAsync());
+        _updateItem = new NativeMenuItem(loc.T("tray.checkUpdates"));
+        _updateItem.Click += (_, _) => Dispatcher.UIThread.Post(async () => await UpdateFromMenuAsync());
 
         var quitItem = new NativeMenuItem(loc.T("tray.quit"));
         quitItem.Click += (_, _) => desktop.Shutdown();
@@ -194,7 +199,7 @@ public partial class App : Application
         var menu = new NativeMenu();
         menu.Items.Add(openItem);
         menu.Items.Add(settingsItem);
-        menu.Items.Add(checkUpdateItem);
+        menu.Items.Add(_updateItem);
         menu.Items.Add(new NativeMenuItemSeparator());
         menu.Items.Add(quitItem);
 
@@ -372,31 +377,33 @@ public partial class App : Application
         return Task.CompletedTask;
     }
 
-    private async Task CheckForUpdatesFromMenuAsync()
+    /// <summary>The tray item: restarts into a downloaded update, or looks for one.</summary>
+    private async Task UpdateFromMenuAsync()
     {
         var loc = _serviceProvider!.GetRequiredService<ILocalizationService>();
         try
         {
-            if (_updateService is null)
+            if (_updates is null)
             {
                 ShowInfoDialog(loc.T("dialog.update.title"), loc.T("dialog.update.notConfigured"),
                     primaryText: loc.T("dialog.ok"));
                 return;
             }
 
-            if (!await _updateService.CheckForUpdateAsync())
+            if (_updates.ReadyVersion is not null)
+            {
+                _updates.ApplyAndRestart();
+                return;
+            }
+
+            if (!await _updates.CheckNowAsync())
             {
                 ShowInfoDialog(loc.T("dialog.update.title"), loc.T("dialog.update.latest"),
                     primaryText: loc.T("dialog.ok"));
                 return;
             }
 
-            ShowInfoDialog(
-                loc.T("dialog.update.available.title"),
-                loc.T("dialog.update.available.body", _updateService.AvailableVersion ?? "unknown"),
-                primaryText: loc.T("dialog.update.available.download"),
-                primaryAction: () => _updateService.DownloadAndApplyAsync(),
-                secondaryText: loc.T("dialog.update.available.later"));
+            ShowUpdateReadyDialog();
         }
         catch (Exception ex)
         {
@@ -404,6 +411,28 @@ public partial class App : Application
             ShowInfoDialog(loc.T("dialog.update.title"), loc.T("dialog.update.failed", ex.Message),
                 primaryText: loc.T("dialog.ok"));
         }
+    }
+
+    /// <summary>A background download finished: the tray item now restarts into the new version.</summary>
+    private void ShowUpdateReady()
+    {
+        var loc = _serviceProvider!.GetRequiredService<ILocalizationService>();
+        _updateItem!.Header = loc.T("tray.restartToUpdate", _updates!.ReadyVersion!);
+    }
+
+    private void ShowUpdateReadyDialog()
+    {
+        var loc = _serviceProvider!.GetRequiredService<ILocalizationService>();
+        ShowInfoDialog(
+            loc.T("dialog.update.ready.title"),
+            loc.T("dialog.update.ready.body", _updates!.ReadyVersion!),
+            primaryText: loc.T("dialog.update.ready.restart"),
+            primaryAction: () =>
+            {
+                _updates.ApplyAndRestart();
+                return Task.CompletedTask;
+            },
+            secondaryText: loc.T("dialog.update.ready.later"));
     }
 
     private static void ShowInfoDialog(
@@ -463,22 +492,6 @@ public partial class App : Application
         DockPanel.SetDock(buttons, Dock.Bottom);
         dialog.Content = new DockPanel { Margin = new Thickness(16), Children = { text, buttons } };
         dialog.Show();
-    }
-
-    private void StartUpdateChecks(IUpdateService updateService, int intervalHours)
-    {
-        async Task CheckAsync(string failureMessage)
-        {
-            try { await updateService.CheckForUpdateAsync(); }
-            catch (Exception ex) { Log.Warning(ex, failureMessage); }
-        }
-
-        _ = Task.Run(() => CheckAsync("Background update check failed"));
-
-        var interval = TimeSpan.FromHours(Math.Max(1, intervalHours));
-        _updateCheckTimer = new Timer(
-            _ => _ = Task.Run(() => CheckAsync("Periodic update check failed")),
-            null, interval, interval);
     }
 
     private static Serilog.Events.LogEventLevel ParseSerilogLevel(string level) => level switch

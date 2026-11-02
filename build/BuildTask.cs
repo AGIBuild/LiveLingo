@@ -302,43 +302,58 @@ class BuildTask : NukeBuild
         return total > 0 ? detected * 100.0 / total : 0;
     }
 
+    // One Velopack package per platform: the installer, the full package, and the feed (releases.<channel>.json) that
+    // installed applications read to update themselves. The feed and the package must be released together.
     Target Pack => _ => _
         .DependsOn(Publish)
         .Executes(() =>
         {
             DotNetToolRestore();
 
-            var mainExe = Runtime.StartsWith("win") ? "LiveLingo.Desktop.exe" : "LiveLingo.Desktop";
+            var windows = Runtime.StartsWith("win");
+            var mainExe = windows ? "LiveLingo.Desktop.exe" : "LiveLingo.Desktop";
+            var icon = windows
+                ? SourceDir / "LiveLingo.Desktop" / "Assets" / "app-icon.ico"
+                : RootDirectory / "build" / "macos" / "app-icon.icns";
 
             var tempDir = RootDirectory / ".nuke" / "temp" / "vpk";
             tempDir.CreateDirectory();
 
-            var vpkEnv = new Dictionary<string, string>
-            {
-                ["DOTNET_ROLL_FORWARD"] = "LatestMajor",
-                ["TEMP"] = tempDir,
-                ["TMP"] = tempDir
-            }.AsReadOnly();
-
-            DotNet(
+            var arguments =
                 $"vpk pack " +
                 $"--packId LiveLingo " +
+                $"--packTitle LiveLingo " +
+                $"--packAuthors AGIBuild " +
                 $"--packVersion {Version} " +
                 $"--packDir {PublishDir / Runtime} " +
                 $"--mainExe {mainExe} " +
-                $"--outputDir {ReleasesDir}",
-                environmentVariables: vpkEnv);
+                $"--icon {icon} " +
+                $"--outputDir {ReleasesDir} " +
+                $"--noPortable";
 
-            if (Runtime.StartsWith("win"))
+            if (!windows)
             {
-                var setupExe = ReleasesDir.GlobFiles("*Setup*.exe").FirstOrDefault();
-                if (setupExe is not null)
-                {
-                    var renamed = ReleasesDir / $"LiveLingo-{Version}-{Runtime}-Setup.exe";
-                    File.Move(setupExe, renamed, overwrite: true);
-                    Log.Information("Renamed installer: {Path}", renamed);
-                }
+                var plist = tempDir / "Info.plist";
+                File.WriteAllText(plist, File.ReadAllText(RootDirectory / "build" / "macos" / "Info.plist").Replace("__VERSION__", Version));
+                arguments += $" --plist {plist}";
             }
+
+            // Replaces the process environment, so the rest of it (PATH: vpk calls cp, codesign) is carried over.
+            var vpkEnv = EnvironmentInfo.Variables
+                .ToDictionary(variable => variable.Key, variable => variable.Value);
+            vpkEnv["DOTNET_ROLL_FORWARD"] = "LatestMajor";
+            vpkEnv["TEMP"] = tempDir;
+            vpkEnv["TMP"] = tempDir;
+
+            DotNet(arguments, environmentVariables: vpkEnv.AsReadOnly());
+
+            // The installer keeps the file name of earlier releases.
+            var installer = ReleasesDir.GlobFiles(windows ? "*Setup.exe" : "*Setup.pkg").Single();
+            var renamed = ReleasesDir / (windows
+                ? $"LiveLingo-{Version}-{Runtime}-Setup.exe"
+                : $"LiveLingo-{Version}-{Runtime}.pkg");
+            File.Move(installer, renamed, overwrite: true);
+            Log.Information("Installer: {Path}", renamed);
         });
 
     Target PackMsi => _ => _
@@ -361,85 +376,6 @@ class BuildTask : NukeBuild
 
             Log.Information("Windows MSI created: {Path}", msiOutput);
         });
-
-    Target PackMac => _ => _
-        .DependsOn(Publish)
-        .Requires(() => Runtime.StartsWith("osx"))
-        .Executes(() =>
-        {
-            var macosDir = RootDirectory / "build" / "macos";
-            var appBundle = PublishDir / "LiveLingo.app";
-            var contentsDir = appBundle / "Contents";
-            var macOsDir = contentsDir / "MacOS";
-            var resourcesDir = contentsDir / "Resources";
-
-            appBundle.DeleteDirectory();
-            macOsDir.CreateDirectory();
-            resourcesDir.CreateDirectory();
-
-            var infoPlist = File.ReadAllText(macosDir / "Info.plist");
-            infoPlist = infoPlist.Replace("__VERSION__", Version);
-            File.WriteAllText(contentsDir / "Info.plist", infoPlist);
-
-            File.Copy(macosDir / "entitlements.plist", contentsDir / "entitlements.plist", overwrite: true);
-
-            var publishedFiles = PublishDir / Runtime;
-            foreach (var file in Directory.GetFiles(publishedFiles, "*", SearchOption.AllDirectories))
-            {
-                var relative = Path.GetRelativePath(publishedFiles, file);
-                var dest = macOsDir / relative;
-                Directory.CreateDirectory(Path.GetDirectoryName(dest)!);
-                File.Copy(file, dest, overwrite: true);
-            }
-
-            var mainExe = macOsDir / "LiveLingo.Desktop";
-            if (File.Exists(mainExe))
-                Chmod(mainExe, "755");
-
-            var svgIcon = RootDirectory / "src" / "LiveLingo.Desktop" / "Assets" / "app-icon.svg";
-            if (File.Exists(svgIcon))
-                File.Copy(svgIcon, resourcesDir / "app-icon.svg", overwrite: true);
-
-            ReleasesDir.CreateDirectory();
-
-            var componentPkg = PublishDir / "LiveLingo-component.pkg";
-            RunProcess("pkgbuild",
-                $"--root \"{appBundle}\" " +
-                $"--identifier com.livelingo.app " +
-                $"--version {Version} " +
-                $"--install-location /Applications/LiveLingo.app " +
-                $"\"{componentPkg}\"");
-
-            var finalPkg = ReleasesDir / $"LiveLingo-{Version}-{Runtime}.pkg";
-            RunProcess("productbuild",
-                $"--package \"{componentPkg}\" " +
-                $"\"{finalPkg}\"");
-
-            componentPkg.DeleteFile();
-            Log.Information("macOS PKG created: {Path}", finalPkg);
-        });
-
-    static void Chmod(string path, string mode)
-    {
-        RunProcess("chmod", $"{mode} \"{path}\"");
-    }
-
-    static void RunProcess(string tool, string arguments)
-    {
-        var psi = new System.Diagnostics.ProcessStartInfo(tool, arguments)
-        {
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false
-        };
-        using var proc = System.Diagnostics.Process.Start(psi)!;
-        proc.WaitForExit();
-        if (proc.ExitCode != 0)
-        {
-            var stderr = proc.StandardError.ReadToEnd();
-            throw new Exception($"{tool} failed (exit {proc.ExitCode}): {stderr}");
-        }
-    }
 
     static bool IsCoverageClassIncluded(string packageName, string className)
     {

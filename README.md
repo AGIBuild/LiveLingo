@@ -37,6 +37,9 @@ exported as SRT.
   never silently retried on the local model.
 - Models are downloaded only after you agree, from their original hosts, and verified against pinned SHA256 hashes.
 - Recent drafts are kept in memory only and are gone when the app exits.
+- The installed app looks for updates on the GitHub releases of this repository (at start and every few hours) and
+  downloads a newer version in the background. Nothing you wrote or said is part of that request. Set
+  `Update.UpdateUrl` to an empty string in `settings.json` to turn it off.
 - The output and translation direction last chosen for an app are remembered for that app (identifier and the two
   choices only, in `preferences.json` on this device; never titles, text or recordings). Turn it off, or forget one app
   or all of them, in Settings.

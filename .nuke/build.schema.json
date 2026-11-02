@@ -28,7 +28,6 @@
         "Clean",
         "Mutate",
         "Pack",
-        "PackMac",
         "PackMsi",
         "ProbeTranslation",
         "ProbeVoice",
