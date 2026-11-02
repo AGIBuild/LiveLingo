@@ -1,0 +1,76 @@
+src/LiveLingo.Desktop/Resources/i18n/zh-CN.json
+  s_6d6e9175f38e45::t_799334ba141ddc 27-28
+tests/LiveLingo.Core.Tests/Cleanup/PolishSchedulerTests.cs
+  s_6d6e9175f38e45::t_d1514deee2142a 1-211
+tests/LiveLingo.Core.Tests/Dictation/FidelityGateTests.cs
+  s_6d6e9175f38e45::t_e51f7f7a62bd31 42-54,57-67
+  s_6d6e9175f38e45::t_8cc84abdc57be8 55-56
+src/LiveLingo.Core/Cleanup/PolishScheduler.cs
+  s_6d6e9175f38e45::t_31a8de41f90130 1-176
+tests/LiveLingo.Core.Tests/Drafting/DraftTests.cs
+  s_6d6e9175f38e45::t_835563ce1debb8 233-290
+src/LiveLingo.Desktop/Web/Assets/app/20-composer-parts.js
+  s_6d6e9175f38e45::t_799334ba141ddc 75-77
+src/LiveLingo.Desktop/Resources/i18n/en-US.json
+  s_6d6e9175f38e45::t_d89947a90a2006 27-28
+src/LiveLingo.Desktop/Composer/ComposerPlacement.cs
+  s_6d6e9175f38e45::t_06b02d879ace45 104
+  s_6d6e9175f38e45::t_ee3c84f5e48287 16-17,96-98,102-103
+tests/LiveLingo.Desktop.Tests/Composer/ComposerPlacementTests.cs
+  s_6d6e9175f38e45::t_f48477d8576ad2 91-97
+tests/LiveLingo.Web.Tests/ComposerInteractionTests.cs
+  s_6d6e9175f38e45::t_864950e53ac678 854,890
+  s_6d6e9175f38e45::t_46d62924e33f96 846-853,855-889,891-894
+tests/LiveLingo.Web.Tests/Fixtures/strings.json
+  s_6d6e9175f38e45::t_d0c2bb05634cd9 13-14
+src/LiveLingo.Core/Drafting/Draft.cs
+  s_6d6e9175f38e45::t_fc82d6f6e4f070 140-141,144,146-147,149-151,153-156,158-162,182-183
+  s_6d6e9175f38e45::t_2d584b71908fbb 142-143,145,148,152,157,163-181
+src/LiveLingo.Desktop/Web/Assets/app/00-store.js
+  s_6d6e9175f38e45::t_43ab054a52f13c 21-22
+  s_6d6e9175f38e45::t_b4e375a453d826 126-127,129
+src/LiveLingo.Desktop/Web/Assets/page.html
+  s_6d6e9175f38e45::t_625146e17d0182 14-15
+CHANGELOG.md
+  s_6d6e9175f38e45::t_775cec4c93685c 17-20,24-25,28-34
+src/LiveLingo.Core/Cleanup/CleanupScheduler.cs
+  s_6d6e9175f38e45::t_8e7d7db59e1650 209
+src/LiveLingo.Desktop/Web/Assets/styles/composer.css
+  s_6d6e9175f38e45::t_2ec8a964a5408a 10-17,58-59
+  s_6d6e9175f38e45::t_7b53d47f01d959 122-123
+tests/LiveLingo.Core.Tests/Probes/VoiceProbeTests.cs
+  s_6d6e9175f38e45::t_463d0d7cd038fe 79-93
+  s_6d6e9175f38e45::t_2ee4fce9c68a28 59
+README.md
+  s_6d6e9175f38e45::t_775cec4c93685c 18
+tests/LiveLingo.Web.Tests/BrowserFixture.cs
+  s_6d6e9175f38e45::t_d60f08af9d8380 66-67
+src/LiveLingo.Core/Dictation/FidelityGate.cs
+  s_6d6e9175f38e45::t_88b35703f45a53 39-43,112,121-126,133-148,157,160
+docs/superpowers/specs/2026-11-02-passage-cleanup-and-resize-design.md
+  s_6d6e9175f38e45::t_7b64911a45db51 45,115
+  s_6d6e9175f38e45::t_24c240cbae7b1f 47-50,52,58-69,80-81,83-84
+src/LiveLingo.Desktop/App.axaml.cs
+  s_6d6e9175f38e45::t_1be6abf79be316 229-231
+  s_6d6e9175f38e45::t_153b40467e3cd9 259,261-264,311-312
+src/LiveLingo.Desktop/Composer/ComposerTexts.cs
+  s_6d6e9175f38e45::t_799334ba141ddc 25-26,268-269
+src/LiveLingo.Desktop/Composer/ComposerWindow.cs
+  s_6d6e9175f38e45::t_aa2b7dc5349f91 163
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8c3dce403fb548819a9ff7d193381320e7630441",
+  "prompts": {},
+  "sessions": {
+    "s_6d6e9175f38e45": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "f74d37e5-1d96-4ddc-a3f9-5ae24ff39e38",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
