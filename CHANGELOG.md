@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Clear the complete current draft from a visible source-header button (also `Cmd/Ctrl+N`), stopping dictation and
+  retaining the insertion target and preferences. Pending startup, queued writes and late transcription results cannot
+  repopulate the cleared draft.
+- Switching translation tiers refreshes the open composer's model requirements and cached translations; manually
+  edited translations are kept. A model switch waits for active requests instead of killing their server.
+- Start live passage cleanup after a 2 s pause instead of 3 s. Clearly label live results as previews.
+- Stopping recording atomically marks the draft as unfinished, cancels in-flight preview work, and prioritizes a
+  whole-text summary followed by final polish. Writing and copying wait for completion.
+- Remove recursive final-polish retries that could multiply latency. Cancelled or stale results cannot overwrite
+  resumed recordings, source edits, or manually edited results; rejected polish is explicitly reported.
+
+### Added
+- Brief runtime model notices and on-demand details from the local/cloud chip. Notices distinguish requested models
+  from models actually loaded locally or named by a cloud response; deployment aliases are not presented as confirmed
+  backend identities.
+- Editable whole-text polish requirements under Voice settings, with validation, persistent storage, and restore
+  default. Damaged settings use built-in requirements; unusable custom output retries default requirements once.
+- A dedicated final-polish prompt sharing the existing local/cloud cleanup route. Long summaries cover all input
+  chunks, and final output may use paragraphs without disabling the other fidelity checks.
+
 ## [2.0.2] - 2026-11-02
 
 Dictation now reads as connected text: it is cleaned passage by passage while you speak, and the whole dictation is
@@ -37,7 +58,7 @@ polished as one text when you stop.
 - A cleanup answer that was cut off by the model's output limit no longer shows a red error that blocks writing; the
   words are kept like any refused cleanup. The output limit leaves room for a model that copies the read-only context,
   and a copied context is removed from the answer.
-- Passages end after a 3 s pause or 200 characters (was 1.5 s / 120).
+- Passages end after a 3 s pause or 200 characters.
 - The composer window can be resized: drag its right edge, bottom edge or corner. The enlarge / restore button in the
   title bar (next to close), `⌘E` / `Ctrl+E`, or a double click on an edge enlarges it to show as much text as the
   screen allows and restores it. The panel then fills the window and, side by side, each column scrolls on its own.

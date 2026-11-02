@@ -6,6 +6,17 @@ namespace LiveLingo.Web.Tests;
 /// <summary>What the page draws for each golden snapshot, in both engines.</summary>
 public sealed class ComposerRenderTests(BrowserFixture browsers)
 {
+    [Theory]
+    [InlineData("webkit")]
+    [InlineData("chromium")]
+    public async Task FinalPolish_IsClearlyMarkedAndCannotBeCopiedEarly(string engine)
+    {
+        await using var page = await browsers.OpenAsync(engine, "polishing");
+        Assert.Contains("正在润色全文", await page.Page.Locator("#status").InnerTextAsync());
+        Assert.True(await page.Page.Locator("#copy").IsDisabledAsync());
+        Assert.True(await page.Page.Locator("#commit").IsEnabledAsync());
+    }
+
     public static TheoryData<string> Engines => new() { "webkit", "chromium" };
 
     public static TheoryData<string, string> BannerFixtures => new()

@@ -51,13 +51,13 @@ public static partial class FidelityGate
 
     private const string Negations = "不没别无非未否";
 
-    public static GateResult Check(string raw, string cleaned, IReadOnlyList<string>? glossary = null)
+    public static GateResult Check(string raw, string cleaned, IReadOnlyList<string>? glossary = null, bool allowParagraphs = false)
     {
         if (string.IsNullOrWhiteSpace(cleaned))
             return GateResult.Refuse(GateReason.Empty);
 
         // One line in, one line out. A line break means the model echoed the prompt layout ("词表：… 目标：…").
-        if (cleaned.Contains('\n') && !raw.Contains('\n'))
+        if (!allowParagraphs && cleaned.Contains('\n') && !raw.Contains('\n'))
             return GateResult.Refuse(GateReason.MultiLine);
 
         foreach (var (open, close) in QuotePairs)
@@ -139,12 +139,15 @@ public static partial class FidelityGate
     private const int MinSmallDrops = 4;
     private const double SmallDropShare = 0.08;
 
-    /// <summary>The characters of a short deletion that is no filler and holds no negation; 0 when it is not a small drop.</summary>
+    /// <summary>The characters of a short deletion that is no filler and holds no negation or spoken number; 0 when it is not a small drop.</summary>
     private static int SmallDrop(string text)
     {
         var rest = WithoutFillers(text);
-        return rest.Length is > 0 and <= MaxSmallDrop && !rest.Any(c => Negations.Contains(c)) ? rest.Length : 0;
+        return rest.Length is > 0 and <= MaxSmallDrop && !rest.Any(c => Negations.Contains(c) || SpokenDigits.Contains(c)) ? rest.Length : 0;
     }
+
+    /// <summary>Chinese numerals: a trim that removes one changes a number the digit check cannot see.</summary>
+    private const string SpokenDigits = "零一二三四五六七八九十百千万亿两半";
 
     private static readonly (char Open, char Close)[] QuotePairs =
         [('“', '”'), ('‘', '’'), ('「', '」'), ('『', '』'), ('（', '）'), ('(', ')'), ('《', '》')];

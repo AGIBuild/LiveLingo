@@ -47,7 +47,8 @@
     "hint": true,
     "lines": [],
     "resume": null,
-    "remembered": null
+    "remembered": null,
+    "canClear": false
   },
   "result": {
     "visible": false,
@@ -58,7 +59,8 @@
   "footer": {
     "mic": {
       "recording": false,
-      "aria": "开始听写（⌘D）"
+      "aria": "开始听写（⌘D）",
+      "enabled": true
     },
     "status": {
       "text": "语音模型准备中，稍后可用…",

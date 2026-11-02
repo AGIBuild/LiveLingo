@@ -129,7 +129,8 @@ public partial class App : Application
             if (platform is not null)
             {
                 _composer = new ComposerWindow(
-                    _serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<ComposerWindow>(), platform.WindowMover);
+                    _serviceProvider.GetRequiredService<ILoggerFactory>().CreateLogger<ComposerWindow>(), platform.WindowMover,
+                    _serviceProvider.GetRequiredService<ModelUsage>());
                 _composer.Park();
                 _serviceProvider.GetRequiredService<ModelWarmup>().AtStartup();
                 RegisterHotkey(platform, settings.Hotkeys.Summon);
@@ -261,7 +262,10 @@ public partial class App : Application
             ? new CleanupScheduler(session, cleaner, glossary.Terms, contextChars: CleanupContextChars)
             : null;
         var polish = settings.Composer.CleanupEnabled
-            ? new PolishScheduler(session, cleaner, glossary.Terms, CleanupContextChars)
+            ? new PolishScheduler(
+                session, services.GetRequiredService<IDictationPolisher>(), glossary.Terms,
+                PolishStyle.Resolve(settings.Composer.PolishPrompt), CleanupContextChars,
+                services.GetRequiredService<ILogger<PolishScheduler>>())
             : null;
         platform.Microphone.PreferredDevice = settings.Composer.Microphone;
         // Before the voice input is made: the models that are not in memory start loading now, and the composer shows that.
@@ -351,7 +355,16 @@ public partial class App : Application
 
     private void ApplySettings(IPlatformServices platform, SettingsModel settings)
     {
-        ApplyCoreOptions(settings, _serviceProvider!.GetRequiredService<CoreOptions>());
+        var services = _serviceProvider!;
+        var core = services.GetRequiredService<CoreOptions>();
+        var previousTier = core.TranslatorTier;
+        ApplyCoreOptions(settings, core);
+        if (previousTier != core.TranslatorTier)
+        {
+            _composer?.UpdateModelPlan(ComposerModelPlan.Create(core.TranslatorTier,
+                settings.Cloud.Clean && settings.Composer.CleanupEnabled, settings.Cloud.Translate));
+            services.GetRequiredService<ModelWarmup>().OnOutputChanged(ComposerOutput.Translate);
+        }
         ApplyTheme(settings);
         var loc = _serviceProvider!.GetRequiredService<ILocalizationService>();
         if (!string.Equals(loc.CurrentCulture.Name, settings.Appearance.Language, StringComparison.OrdinalIgnoreCase))

@@ -50,7 +50,8 @@
       "index": 0,
       "label": "嗯，这个 PR 先不要合并，等 CI 跑完再说。"
     },
-    "remembered": null
+    "remembered": null,
+    "canClear": false
   },
   "result": {
     "visible": false,
@@ -61,7 +62,8 @@
   "footer": {
     "mic": {
       "recording": false,
-      "aria": "开始听写（⌘D）"
+      "aria": "开始听写（⌘D）",
+      "enabled": true
     },
     "status": {
       "text": "",

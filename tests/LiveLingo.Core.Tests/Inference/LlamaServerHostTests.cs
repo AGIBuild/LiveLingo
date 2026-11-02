@@ -103,6 +103,7 @@ public class LlamaServerHostTests
              "--n-gpu-layers", "99", "--reasoning-budget", "0"],
             launch.Arguments);
         Assert.NotNull(lease.Client);
+        Assert.Equal(Fast, lease.Model);
     }
 
     [Fact]
@@ -152,6 +153,35 @@ public class LlamaServerHostTests
         Assert.Equal(2, h.Launcher.Started.Count);
         Assert.True(h.Launcher.Started[0].Process.Disposed);
         Assert.Contains("Hy-MT2-7B-Q4_K_M.gguf", h.Launcher.Started[1].Launch.Arguments[1]);
+    }
+
+    [Fact]
+    public async Task SwitchingModel_WaitsForTheOldRequestToReleaseItsLease()
+    {
+        await using var h = new Harness();
+        using var old = await h.Host.AcquireAsync(InferenceRole.Translator, Fast, CancellationToken.None);
+        var switching = h.Host.AcquireAsync(InferenceRole.Translator, Quality, CancellationToken.None);
+        Assert.False(switching.IsCompleted);
+        Assert.False(h.Launcher.Started[0].Process.Disposed);
+        old.Dispose();
+        using var next = await switching;
+        Assert.True(h.Launcher.Started[0].Process.Disposed);
+        Assert.Contains("Hy-MT2-7B-Q4_K_M.gguf", h.Launcher.Started[1].Launch.Arguments[1]);
+    }
+
+    [Fact]
+    public async Task CancellingAModelSwitch_KeepsTheOldActiveModelUsable()
+    {
+        await using var h = new Harness();
+        using var old = await h.Host.AcquireAsync(InferenceRole.Translator, Fast, CancellationToken.None);
+        using var cancel = new CancellationTokenSource();
+        var switching = h.Host.AcquireAsync(InferenceRole.Translator, Quality, cancel.Token);
+        cancel.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => switching);
+        using var stillUsable = await h.Host.AcquireAsync(InferenceRole.Translator, Fast, CancellationToken.None);
+        Assert.Same(old.Client, stillUsable.Client);
+        Assert.Single(h.Launcher.Started);
+        Assert.False(h.Launcher.Started[0].Process.Disposed);
     }
 
     [Fact]
@@ -333,10 +363,11 @@ public class LlamaServerHostTests
     }
 
     [Fact]
-    public async Task ALeaseReleasedAfterTheServerWasReplaced_DoesNotFail()
+    public async Task ALeaseReleasedAfterACrashedServerWasReplaced_DoesNotFail()
     {
         await using var h = new Harness();
         var old = await h.Host.AcquireAsync(InferenceRole.Translator, Fast, CancellationToken.None);
+        h.Launcher.Started[0].Process.HasExited = true;
         using var replacement = await h.Host.AcquireAsync(InferenceRole.Translator, Quality, CancellationToken.None);
 
         old.Dispose();

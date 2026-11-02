@@ -4,6 +4,7 @@ using Avalonia.Media;
 using Avalonia.Platform;
 using LiveLingo.Desktop.Platform;
 using LiveLingo.Desktop.Web;
+using LiveLingo.Core.Inference;
 using Microsoft.Extensions.Logging;
 
 namespace LiveLingo.Desktop.Composer;
@@ -29,6 +30,7 @@ internal sealed class ComposerWindow : Window
     private TargetWindowInfo? _target;
     private TaskCompletionSource? _dismissed;
     private bool _placed;
+    private readonly ModelUsage _modelUsage;
 
     // The user moved the window by its header or sized it: it stays where it is (kept on screen) until the next summon.
     private bool _moved;
@@ -39,8 +41,9 @@ internal sealed class ComposerWindow : Window
     private double? _userHeight;
     private double _contentHeight;
 
-    public ComposerWindow(ILogger logger, IWindowMover mover)
+    public ComposerWindow(ILogger logger, IWindowMover mover, ModelUsage modelUsage)
     {
+        _modelUsage = modelUsage;
         _logger = logger;
         _mover = mover;
         _web = new WebSurface(WebPage.ComposerEntry, logger);
@@ -82,7 +85,7 @@ internal sealed class ComposerWindow : Window
         _session = new ComposerWebSession(
             vm, texts, recent, new StorageFileDialogs(StorageProvider, texts), _web,
             SynchronizationContext.Current ?? throw new InvalidOperationException("The composer is shown from the UI thread."),
-            TimeProvider.System, _logger);
+            TimeProvider.System, _logger, _modelUsage);
         _session.SizeChanged += OnSize;
         _session.WideChanged += ApplyWidth;
         _session.Dragged += OnDrag;
@@ -103,6 +106,8 @@ internal sealed class ComposerWindow : Window
 
     /// <summary>The same as the close button: the hotkey pressed again.</summary>
     public void RequestHide() => _session?.Vm.HideCommand.Execute(null);
+
+    public void UpdateModelPlan(ComposerModelPlan plan) => _session?.Vm.UpdateModelPlan(plan);
 
     private void OnSize(SizeIntent size)
     {

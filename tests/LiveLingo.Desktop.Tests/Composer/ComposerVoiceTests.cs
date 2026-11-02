@@ -137,6 +137,37 @@ public class ComposerVoiceTests
     }
 
     [Fact]
+    public async Task ClearingDuringModelStartup_WaitsAndStopsBeforeResettingTheDraft()
+    {
+        await using var h = Create();
+        h.Voice.StartGate = new TaskCompletionSource();
+        var start = h.Vm.StartListeningAsync();
+        var clear = h.Vm.NewDraftCommand.ExecuteAsync(null);
+        Assert.False(clear.IsCompleted);
+        h.Voice.StartGate.SetResult();
+        await Task.WhenAll(start, clear);
+        Assert.False(h.Vm.IsListening);
+        Assert.Empty(h.Vm.SourceText);
+        Assert.Empty(h.Session.Read(d => d.Units));
+    }
+
+    [Fact]
+    public async Task ASecondMicrophoneStart_CannotOverlapClear()
+    {
+        await using var h = Create();
+        await h.Vm.StartListeningAsync();
+        h.Voice.StopGate = new TaskCompletionSource();
+        var clear = h.Vm.NewDraftCommand.ExecuteAsync(null);
+        await h.Vm.StartListeningAsync();
+        var starts = h.Voice.Starts;
+        h.Voice.StopGate.SetResult();
+        await clear;
+        Assert.Equal(1, starts);
+        Assert.False(h.Vm.IsListening);
+        Assert.False(h.Session.Read(d => d.Recording));
+    }
+
+    [Fact]
     public async Task ADeniedMicrophone_ShowsABanner_AndNeverStartsTheVoiceInput()
     {
         await using var h = Create();

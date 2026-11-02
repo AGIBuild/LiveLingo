@@ -72,6 +72,7 @@ internal sealed class SettingsIntents : IIntentHandler
             case SettingIntent.Names.AutoDictate: _vm.AutoDictate = value == "true"; break;
             case SettingIntent.Names.PreloadSpeech: _vm.PreloadSpeech = value == "true"; break;
             case SettingIntent.Names.RememberChoices: _vm.RememberChoices = value == "true"; break;
+            case SettingIntent.Names.PolishPrompt: _vm.PolishPrompt = value; break;
             case SettingIntent.Names.ReduceMotion: _vm.ReduceMotion = value == "true"; break;
             case SettingIntent.Names.Cleanup: _vm.CleanupEnabled = value == "true"; break;
             case SettingIntent.Names.CloudBaseUrl: _vm.CloudBaseUrl = value; break;

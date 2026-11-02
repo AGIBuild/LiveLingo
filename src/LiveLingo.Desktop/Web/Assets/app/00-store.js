@@ -82,13 +82,13 @@
     restore();
   };
 
-  function toast(text) {
+  function toast(text, duration = TOAST_MS) {
     LL.state.toast = text;
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => {
       LL.state.toast = '';
       LL.update();
-    }, TOAST_MS);
+    }, duration);
   }
 
   // Entry point of the host: every message is one JSON string with the envelope { v, type, data }.
@@ -113,7 +113,11 @@
         options = message.data.options;
         break;
       case 'toast':
-        toast(message.data.text);
+        toast(message.data.text, message.data.durationMs ?? TOAST_MS);
+        break;
+      case 'models':
+        s.models = message.data.text;
+        s.modelsCloud = message.data.cloud;
         break;
       case 'focus':
         s.focus = { target: message.data.target, n: ++focusCount };

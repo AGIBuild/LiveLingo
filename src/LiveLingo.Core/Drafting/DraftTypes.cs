@@ -1,5 +1,12 @@
 namespace LiveLingo.Core.Drafting;
 
+public enum PolishOutcome
+{
+    None,
+    DefaultRequirements,
+    KeptPreview
+}
+
 /// <summary>Which stored view of the draft is written out.</summary>
 public enum OutputKind
 {

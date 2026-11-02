@@ -50,6 +50,7 @@ public sealed class OpenAiChatClient(
         double? firstVisibleMs = null;
         var outputTokens = 0;
         string? finish = null;
+        string? reportedModel = null;
         var done = false;
         while (await reader.ReadLineAsync(ct).ConfigureAwait(false) is { } line)
         {
@@ -65,6 +66,9 @@ public sealed class OpenAiChatClient(
 
             using var json = ParseEvent(data);
             var root = json.RootElement;
+            if (root.TryGetProperty("model", out var served) && served.ValueKind == JsonValueKind.String &&
+                served.GetString() is { Length: > 0 and <= 200 } identity)
+                reportedModel = identity;
             if (root.TryGetProperty("error", out var error))
                 throw new InvalidDataException("Inference server error: " + error);
             if (root.TryGetProperty("usage", out var usage) && usage.ValueKind == JsonValueKind.Object
@@ -88,7 +92,7 @@ public sealed class OpenAiChatClient(
         if (!done || finish != "stop" || firstVisibleMs is null)
             throw new InvalidDataException($"Incomplete completion stream: done={done}, finish={finish ?? "missing"}.");
 
-        return new ChatCompletion(text.ToString().Trim(), firstVisibleMs.Value, clock.Elapsed.TotalMilliseconds, outputTokens);
+        return new ChatCompletion(text.ToString().Trim(), firstVisibleMs.Value, clock.Elapsed.TotalMilliseconds, outputTokens, reportedModel);
     }
 
     private static JsonDocument ParseEvent(string data)

@@ -50,6 +50,9 @@
   LL.Header = ({ c }) => {
     const open = LL.state.menu;
     const dest = c.dest;
+    const cloud = c.privacy.cloud || LL.state.modelsCloud;
+    const privacyText = LL.state.modelsCloud ? LL.t('modelCloud') : c.privacy.text;
+    const privacyAria = LL.state.modelsCloud ? LL.t('modelCloudAria') : c.privacy.aria;
     const output = [...c.output.menu, { id: 'swap', label: c.output.swap, sepBefore: true }];
     const more = c.menus.more.map((item) => (item.id === 'wide' || item.id === 'settings' ? { ...item, sepBefore: true } : item));
     return html`<header class="c-head">
@@ -60,8 +63,9 @@
         <${LL.Menu} id="target" align="left" label=${LL.t('destAria')} items=${c.menus.target} onPick=${pickTarget}/>
       </div>
       <span class="spacer"></span>
-      <span id="privacy" class=${'chip privacy ' + (c.privacy.cloud ? 'warn' : 'ok')} role="img" aria-label=${c.privacy.aria}>
-        <i class="dot"></i><span class="lbl">${c.privacy.text}</span></span>
+      <button type="button" id="privacy" class=${'chip privacy ' + (cloud ? 'warn' : 'ok')} aria-label=${privacyAria + ' · ' + LL.t('modelInfo')}
+        title=${(LL.state.models || privacyAria) + '\n' + LL.t('modelInfo')} onClick=${() => LL.send('modelInfo')}>
+        <i class="dot"></i><span class="lbl">${privacyText}</span></button>
       <div class="anchor">
         <button type="button" id="out-pill" class="pill" aria-label=${LL.t('outputAria')} aria-haspopup="menu" aria-expanded=${open === 'output'}
           onClick=${toggle('output')}>${c.output.globe && html`<${Icon} name="globe"/>`}${c.output.pill}<${Icon} name="chevron"/></button>
@@ -98,7 +102,7 @@
     const cm = f.commit;
     return html`<footer class="c-foot">
       <button type="button" id="mic" class=${'mic' + (f.mic.recording ? ' recording' : '')} aria-label=${f.mic.aria} title=${f.mic.aria}
-        onClick=${() => LL.send('micToggle')}>
+        disabled=${!f.mic.enabled} onClick=${() => LL.send('micToggle')}>
         <svg class="ic mic-ic" aria-hidden="true"><use href="#i-mic"/></svg>
         <span class="bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
       </button>

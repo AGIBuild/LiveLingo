@@ -11,9 +11,12 @@ internal sealed record TermState(int I, string Source, string Target);
 
 /// <param name="Microphones">Device names; the first, empty one is the system default.</param>
 /// <param name="DefaultOutput">One of <see cref="SettingsViewModel.DefaultOutputs"/>.</param>
+/// <param name="PolishPrompt">What the polish requirements box shows (the built-in text where nothing is customized).</param>
+/// <param name="PolishPromptIsDefault">True while the built-in requirements are used.</param>
+/// <param name="PolishPromptInvalid">The text the user typed is not usable and was not saved.</param>
 internal sealed record VoiceSettingsState(
     IReadOnlyList<string> Microphones, string Microphone, string Direction, bool Cleanup, string DefaultOutput, bool AutoDictate,
-    bool PreloadSpeech, IReadOnlyList<TermState> Terms);
+    bool PreloadSpeech, IReadOnlyList<TermState> Terms, string PolishPrompt, bool PolishPromptIsDefault, bool PolishPromptInvalid);
 
 /// <summary>One application the composer remembers a choice for; the summary reads like the output menu ("Translate to English").</summary>
 internal sealed record AppPreferenceState(string Id, string Name, string Summary, string Used);
@@ -74,7 +77,10 @@ internal sealed record SettingsViewState(
                 SettingsViewModel.DefaultOutputs[vm.DefaultOutputIndex],
                 vm.AutoDictate,
                 vm.PreloadSpeech,
-                [.. vm.Terms.Select((term, i) => new TermState(i, term.Source, term.Target))]),
+                [.. vm.Terms.Select((term, i) => new TermState(i, term.Source, term.Target))],
+                vm.PolishPromptShown,
+                vm.PolishPromptIsDefault,
+                vm.PolishPromptInvalid),
             new PrivacySettingsState(
                 vm.CloudTranslate, vm.CloudClean, vm.CloudBaseUrl, vm.CloudModel, vm.HasStoredKey, vm.CloudInvalid, vm.PendingConsent,
                 [.. vm.Apps.Select(app => new AppPreferenceState(app.AppId, texts.AppName(app.Name), texts.AppSummary(app.Output, app.Target), texts.Date(app.UsedAt)))]),

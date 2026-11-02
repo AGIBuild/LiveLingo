@@ -41,6 +41,11 @@ internal static class ComposerScenarios
             return State(h, recent);
         },
         ["clean-ready"] = () => Ready("那个我觉得这个方案可以。", ComposerOutput.Clean),
+        ["polishing"] = () => Ready(Chat, ComposerOutput.Clean, then: h =>
+        {
+            h.Session.Mutate(d => d.Polishing = true);
+            return Task.CompletedTask;
+        }),
         ["export-last"] = () => Ready(Chat, ComposerOutput.Clean, then: h =>
         {
             h.Vm.Begin(new ComposerStart(
@@ -65,6 +70,19 @@ internal static class ComposerScenarios
         ["row-failed"] = RowFailed,
         ["whole-wide"] = WholeWide,
         ["listening"] = Listening,
+        ["clearing"] = async () =>
+        {
+            await using var h = new Harness(output: ComposerOutput.Clean);
+            await h.Vm.StartListeningAsync();
+            h.Voice.Say(Chat);
+            await Wait.Until(() => h.Vm.Lines.Count > 0 && h.Vm.Lines.All(l => l.State == LineState.Ready));
+            h.Voice.StopGate = new TaskCompletionSource();
+            var clear = h.Vm.NewDraftCommand.ExecuteAsync(null);
+            var state = State(h);
+            h.Voice.StopGate.SetResult();
+            await clear;
+            return state;
+        },
         ["target-lost"] = () => Ready(Chat, ComposerOutput.Translate, then: async h =>
         {
             h.Tracker.IsAlive(Arg.Any<LiveLingo.Desktop.Platform.TargetWindowInfo>()).Returns(false);
