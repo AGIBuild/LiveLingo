@@ -137,6 +137,50 @@ public sealed class Draft
         return (pool[foundBody].Dequeue(), merged, foundCount);
     }
 
+    /// <summary>
+    /// Replaces consecutive units by one unit whose original text is theirs joined and whose cleanup result is
+    /// <paramref name="clean"/>; returns its id. Refused (null) when the draft is frozen, the units are no longer
+    /// consecutive, carry layout, or any has a cleanup the user edited.
+    /// </summary>
+    public int? Collapse(IReadOnlyList<int> unitIds, string clean)
+    {
+        if (Snapshot is not null || unitIds.Count < 2)
+            return null;
+
+        var first = _units.FindIndex(unit => unit.Id == unitIds[0]);
+        if (first < 0 || first + unitIds.Count > _units.Count)
+            return null;
+
+        var run = _units.GetRange(first, unitIds.Count);
+        if (!run.Select(unit => unit.Id).SequenceEqual(unitIds)
+            || run.Any(unit => unit.Clean.IsOwned || unit.Lead.Length > 0 || unit.Trail.Length > 0))
+            return null;
+
+        var merged = NewUnit(new SourceUnit(TextUnits.Join(run.Select(unit => ("", unit.Raw, ""))), IsComplete: run[^1].IsComplete));
+        merged.Clean.Text = clean;
+        _units.RemoveRange(first, run.Count);
+        _units.Insert(first, merged);
+        return merged.Id;
+    }
+
+    /// <summary>
+    /// The text before a unit as far back as <paramref name="budget"/> characters allow: whole units, nearest first, and
+    /// always at least the nearest one, so a thought that continues across a pause keeps its beginning. Cleaned text
+    /// where there is some, the original otherwise.
+    /// </summary>
+    public string PrecedingText(int index, int budget)
+    {
+        var parts = new List<(string, string, string)>();
+        var length = 0;
+        for (var i = index - 1; i >= 0 && (parts.Count == 0 || length < budget); i--)
+        {
+            var text = _units[i].Clean.Text ?? _units[i].Raw;
+            parts.Insert(0, ("", text, ""));
+            length += text.Length;
+        }
+        return TextUnits.Join(parts);
+    }
+
     /// <summary>Stores a model result. Returns false when the ticket is stale or the user owns the text.</summary>
     public bool Complete(JobTicket ticket, UnitKind kind, string text, GateRejection? rejection = null)
     {

@@ -7,8 +7,14 @@ body { padding: 18px; overflow: hidden; }
 
 /* Once the user sized the window (or zoomed it) its height is theirs: the panel fills it and shows as much text as fits. */
 html.fixed-h .composer { height: calc(100vh - 36px); max-height: none; }
-html.fixed-h .src textarea, html.fixed-h .composer.wide .src textarea { max-height: 60vh; }
-html.fixed-h .src-live, html.fixed-h .composer.wide .src-live { max-height: 45vh; }
+/* Narrow layout: the whole body scrolls. Side by side: each column fills the height and scrolls on its own, so nothing scrolls while there is room. */
+html.fixed-h .src textarea { max-height: 60vh; }
+html.fixed-h .src-live { max-height: 45vh; }
+html.fixed-h .composer.wide .c-body { overflow: hidden; grid-template-rows: minmax(0, 1fr); align-items: stretch; }
+html.fixed-h .composer.wide .src { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+html.fixed-h .composer.wide .src textarea { flex: 1 1 0; min-height: 0; height: auto !important; max-height: none; overflow-y: auto; }
+html.fixed-h .composer.wide .src-live { flex: 1 1 0; min-height: 0; max-height: none; }
+html.fixed-h .composer.wide .res { min-height: 0; overflow-y: auto; }
 
 /* Resize handles sit inside the panel: a transparent window lets clicks in its margin through to the windows behind it. */
 .rz { position: absolute; z-index: 4; touch-action: none; }
@@ -49,8 +55,8 @@ button.chip:hover { background: var(--line); }
 .c-body { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; padding-bottom: 4px; }
 .pane { padding: 4px 18px 6px; }
 .pane-label { display: flex; align-items: center; gap: 8px; min-height: 22px; font-size: 12px; color: var(--faint); font-weight: 600; }
-.src textarea { display: block; width: 100%; border: 0; background: transparent; padding: 2px 0; resize: none; outline: none; font-size: 16px; line-height: 1.6; max-height: 180px; }
-.src-live { font-size: 16px; line-height: 1.6; max-height: 200px; overflow-y: auto; }
+.src textarea { display: block; width: 100%; border: 0; background: transparent; padding: 2px 0; resize: none; outline: none; font-size: 16px; line-height: 1.6; max-height: calc(var(--panel-max, 470px) * .4); }
+.src-live { font-size: 16px; line-height: 1.6; max-height: calc(var(--panel-max, 470px) * .45); overflow-y: auto; }
 .src-live .line { display: flex; gap: 10px; }
 .src-live time { font: 12px/2.1 var(--mono); color: var(--faint); flex: none; width: 42px; }
 .src-live .tail { color: var(--faint); }
@@ -113,8 +119,8 @@ button.chip:hover { background: var(--line); }
 .composer.wide .c-body { display: grid; grid-template-columns: 1fr 1fr; align-items: start; overflow-y: auto; }
 .composer.wide .src { border-right: 1px solid var(--line); min-height: 100%; }
 .composer.wide .res { margin: 6px 12px 8px 8px; }
-.composer.wide .src textarea { max-height: 320px; min-height: 200px; }
-.composer.wide .src-live { max-height: 320px; }
+.composer.wide .src textarea { max-height: calc(var(--panel-max, 470px) * .7); min-height: 200px; }
+.composer.wide .src-live { max-height: calc(var(--panel-max, 470px) * .7); }
 
 /* Shown inside the panel, above the footer: the window has no room below the composer. */
 .toast { position: absolute; left: 50%; bottom: 68px; translate: -50% 0; z-index: 6; max-width: calc(100% - 40px); padding: 10px 16px; border-radius: 12px; background: #1d2129; color: #f2f4f8; font-size: 13px; box-shadow: 0 10px 30px rgba(0, 0, 0, .3); }

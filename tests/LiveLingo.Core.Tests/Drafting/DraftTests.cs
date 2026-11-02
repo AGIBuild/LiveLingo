@@ -231,6 +231,64 @@ public class DraftTests
     }
 
     [Fact]
+    public void Collapse_JoinsTheUnitsIntoOneWithTheGivenCleanText()
+    {
+        var draft = new Draft(hasTarget: true);
+        var ids = new[] { draft.Append("一。").UnitId, draft.Append("二。").UnitId };
+
+        var id = draft.Collapse(ids, "一二。");
+
+        Assert.NotNull(id);
+        Assert.Equal("一。二。", draft.Units.Single().Raw);
+        Assert.Equal("一二。", draft.Units.Single().Clean.Text);
+        Assert.Equal(id, draft.Units.Single().Id);
+    }
+
+    [Fact]
+    public void Collapse_IsRefused_WhenTheUnitsAreNotAConsecutiveRunOfPlainUnits()
+    {
+        var draft = new Draft(hasTarget: true);
+        var a = draft.Append("一。").UnitId;
+        var b = draft.Append("二。").UnitId;
+        var c = draft.Append("三。").UnitId;
+
+        Assert.Null(draft.Collapse([a], "x"));
+        Assert.Null(draft.Collapse([a, c], "x"));
+        Assert.Null(draft.Collapse([c, 99], "x"));
+        Assert.Null(draft.Collapse([99, 100], "x"));
+        draft.Edit(1, UnitKind.Clean, "改过");
+        Assert.Null(draft.Collapse([a, b], "x"));
+        Assert.Equal(3, draft.Units.Count);
+    }
+
+    [Fact]
+    public void Collapse_IsRefused_ForUnitsWithLayoutAndForAFrozenDraft()
+    {
+        var draft = new Draft(hasTarget: true);
+        draft.SyncSource([new SourceUnit("一。", Trail: "\n"), new SourceUnit("二。")], DraftRoute.Units);
+        Assert.Null(draft.Collapse([draft.Units[0].Id, draft.Units[1].Id], "x"));
+
+        var frozen = new Draft(hasTarget: false);
+        var ids = new[] { frozen.Append("一。").UnitId, frozen.Append("二。").UnitId };
+        frozen.Output = OutputKind.Raw;
+        frozen.RequestCommit();
+        Assert.Null(frozen.Collapse(ids, "x"));
+    }
+
+    [Fact]
+    public void PrecedingText_ReachesBackAsFarAsTheBudget_AndAlwaysIncludesTheNearestUnit()
+    {
+        var draft = new Draft(hasTarget: true);
+        draft.Complete(draft.Append("一。"), UnitKind.Clean, "甲。");
+        draft.Append("二。");
+        draft.Append("三。");
+
+        Assert.Equal("二。", draft.PrecedingText(2, 1));
+        Assert.Equal("甲。二。", draft.PrecedingText(2, 3));
+        Assert.Equal("", draft.PrecedingText(0, 300));
+    }
+
+    [Fact]
     public void LateResult_ForRemovedSentence_CannotLandOnAnotherSentence()
     {
         var draft = new Draft(hasTarget: true);

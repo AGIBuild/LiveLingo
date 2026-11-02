@@ -845,6 +845,55 @@ public sealed class ComposerInteractionTests(BrowserFixture browsers)
 
     [Theory]
     [MemberData(nameof(Engines))]
+    public async Task TheZoomButton_IsInTheHeader_NextToClose_AndNotInTheMenu(string engine)
+    {
+        await using var page = await browsers.OpenAsync(engine, "translate-ready");
+        var zoom = (await page.Page.Locator("#zoom").BoundingBoxAsync())!;
+        var close = (await page.Page.Locator("#close").BoundingBoxAsync())!;
+        Assert.True(zoom.X + zoom.Width <= close.X + 1, "The zoom button sits left of the close button.");
+        Assert.InRange(zoom.Y + zoom.Height / 2, close.Y + close.Height / 2 - 1, close.Y + close.Height / 2 + 1);
+
+        await page.Page.Locator("#more").ClickAsync();
+        Assert.Equal(0, await page.Page.Locator(".menu button", new() { HasText = "放大" }).CountAsync());
+        await page.Page.Keyboard.PressAsync("Escape");
+        await page.ClearIntentsAsync();
+
+        await page.Page.Locator("#zoom").ClickAsync();
+
+        Assert.Equal(1, await page.CountAsync<ZoomIntent>());
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public async Task TheZoomButton_ShowsRestore_WhileTheHeightIsFixed(string engine)
+    {
+        await using var page = await browsers.OpenAsync(engine, "translate-ready");
+        var before = await page.Page.Locator("#zoom").GetAttributeAsync("aria-label");
+
+        await page.ReceiveAsync("frame", new JsonObject { ["fixedHeight"] = true });
+        var during = await page.Page.Locator("#zoom").GetAttributeAsync("aria-label");
+        await page.ReceiveAsync("frame", new JsonObject { ["fixedHeight"] = false });
+
+        Assert.NotEqual(before, during);
+        Assert.Equal(before, await page.Page.Locator("#zoom").GetAttributeAsync("aria-label"));
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public async Task InTheSideBySideLayout_AFixedHeightLetsTheColumnsFillTheWindow_WithoutAScrollbarWhileThereIsRoom(string engine)
+    {
+        await using var page = await browsers.OpenAsync(engine, "whole-wide");
+
+        await page.ReceiveAsync("frame", new JsonObject { ["fixedHeight"] = true });
+
+        var layout = await page.Page.EvaluateAsync<double[]>(
+            "(() => { const b = document.querySelector('.c-body'), s = document.querySelector('.src'); return [b.scrollHeight - b.clientHeight, s.clientHeight - (b.clientHeight - parseFloat(getComputedStyle(b).paddingBottom))]; })()");
+        Assert.True(layout[0] <= 1, $"The body scrolls by {layout[0]} px.");
+        Assert.True(Math.Abs(layout[1]) <= 1, $"The source column is {layout[1]} px off the body height.");
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
     public async Task DoubleClickingAnEdge_AsksToEnlargeOrRestoreTheWindow(string engine)
     {
         await using var page = await browsers.OpenAsync(engine, "translate-ready");

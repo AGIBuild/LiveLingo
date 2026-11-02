@@ -14,16 +14,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The cleaning pause before the last sentence is gone with it.
 - A passage that fails the fidelity check is cleaned again sentence by sentence, so one bad sentence no longer costs the
   rest of the passage its cleanup.
-- The fidelity check accepts a restated clause and a word the speaker corrected away, and still refuses lost numbers,
-  lost terms, and any deleted negation.
+- The fidelity check no longer refuses a polish for trimming spoken filler words ("的话", "那么", "他们的这个"): that was
+  why real dictation often came back unchanged. Short, negation-free trims are tolerated within a small budget, a
+  restated clause and a word the speaker corrected away are accepted, and any deleted negation (even a lone "不") is
+  still refused, as are lost numbers and terms.
 - Editing the recognized text keeps the passages whose sentences did not change.
 - The cleaner gets about 300 characters of the cleaned text before a passage as context (at least the whole previous
   passage), instead of the previous two units.
+- The composer panel may take 70% of the screen's working height before it scrolls (it was a fixed 470 px), and the text
+  areas scale with it.
 
 ### Added
-- The composer window can be resized: drag its right edge, bottom edge or corner. `⌘E` / `Ctrl+E`, the more menu, or a
-  double click on an edge enlarges it to show as much text as the screen allows and restores it. The panel then fills
-  the window. The size is not remembered between uses.
+- When recording stops, neighbouring cleaned passages are polished together as one text (up to 400 characters each,
+  with the text before as context). A polish that passes the fidelity check replaces them with one row whose original
+  text is theirs joined; otherwise nothing changes.
+- The composer window can be resized: drag its right edge, bottom edge or corner. The enlarge / restore button in the
+  title bar (next to close), `⌘E` / `Ctrl+E`, or a double click on an edge enlarges it to show as much text as the
+  screen allows and restores it. The panel then fills the window and, side by side, each column scrolls on its own.
+  The size is not remembered between uses.
 
 ## [2.0.1] - 2026-11-02
 

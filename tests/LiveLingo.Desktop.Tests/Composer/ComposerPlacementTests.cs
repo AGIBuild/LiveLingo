@@ -88,12 +88,13 @@ public class ComposerPlacementTests
     }
 
     [Theory]
-    [InlineData(1055, 1, 470)]
-    [InlineData(700, 1, 470)]
-    [InlineData(500, 1, 448)]
-    [InlineData(480, 1, 428)]
-    [InlineData(800, 2, 348)]
-    public void MaxPanelHeight_LeavesRoomForTheShadowAndTheScreenEdges(int workHeightPx, double scaling, int expected)
+    [InlineData(1055, 1, 738)]
+    [InlineData(700, 1, 490)]
+    [InlineData(500, 1, 350)]
+    [InlineData(480, 1, 336)]
+    [InlineData(800, 2, 280)]
+    [InlineData(300, 1, 210)]
+    public void MaxPanelHeight_TakesAShareOfTheWorkingArea_AndLeavesRoomForTheShadowAndTheScreenEdges(int workHeightPx, double scaling, int expected)
     {
         Assert.Equal(expected, ComposerPlacement.MaxPanelHeight(workHeightPx, scaling));
     }

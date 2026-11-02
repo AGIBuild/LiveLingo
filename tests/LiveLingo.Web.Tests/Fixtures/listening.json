@@ -237,12 +237,6 @@
         "enabled": true
       },
       {
-        "id": "zoom",
-        "label": "放大 / 还原窗口",
-        "checked": false,
-        "enabled": true
-      },
-      {
         "id": "settings",
         "label": "设置",
         "checked": false,

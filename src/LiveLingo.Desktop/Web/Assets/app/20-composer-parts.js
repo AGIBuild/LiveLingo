@@ -72,6 +72,9 @@
           aria-expanded=${open === 'more'} onClick=${toggle('more')}><${Icon} name="more"/></button>
         <${LL.Menu} id="more" align="right" label=${LL.t('moreAria')} items=${more} onPick=${pickMore}/>
       </div>
+      <button type="button" id="zoom" class="icon-btn" aria-label=${LL.t(LL.state.fixed ? 'unzoomAria' : 'zoomAria')}
+        title=${LL.t(LL.state.fixed ? 'unzoomAria' : 'zoomAria') + ' (' + LL.cap('zoom') + ')'} onClick=${() => LL.send('zoom')}>
+        <${Icon} name=${LL.state.fixed ? 'shrink' : 'expand'}/></button>
       <button type="button" id="close" class="icon-btn" aria-label=${LL.t('closeAria')} title=${LL.t('closeAria')}
         onClick=${() => LL.send('hide')}><${Icon} name="close"/></button>
     </header>`;

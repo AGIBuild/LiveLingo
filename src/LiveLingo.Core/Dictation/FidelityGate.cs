@@ -36,7 +36,11 @@ public static partial class FidelityGate
     /// <summary>Characters of garbage one glossary replacement may remove.</summary>
     public const int GlossaryDropPerReplacement = 6;
 
-    private static readonly string[] Fillers = ["然后呢", "对吧", "那个", "就是", "呃", "嗯", "啊", "哦", "额"];
+    private static readonly string[] Fillers =
+    [
+        "然后呢", "所以说", "对吧", "那个", "这个", "就是", "的话", "那么", "然后", "其实", "一下",
+        "呃", "嗯", "啊", "哦", "额", "呢", "呀", "吧", "嘛"
+    ];
     private static readonly string[] CorrectionMarkers = ["不对", "不是", "说错了", "错了", "我是说", "应该是", "改成", "更正"];
 
     /// <summary>Phrases that only ever announce a self-correction; "不是" or "改成" also occur in ordinary statements.</summary>
@@ -105,6 +109,7 @@ public static partial class FidelityGate
             return GateResult.Refuse(GateReason.Added, added.ToString(CultureInfo.InvariantCulture));
 
         var garbageBudget = replacements * GlossaryDropPerReplacement;
+        var slack = Math.Max(MinSmallDrops, (int)(rawCjk.Length * SmallDropShare));
         foreach (var (start, length) in dropped)
         {
             if (IsExplainedDeletion(rawCjk, start, length, cleanedCjk)) continue;
@@ -113,10 +118,32 @@ public static partial class FidelityGate
                 garbageBudget -= length;
                 continue;
             }
+            var small = SmallDrop(rawCjk.Substring(start, length));
+            if (small > 0 && small <= slack)
+            {
+                slack -= small;
+                continue;
+            }
             return GateResult.Refuse(GateReason.Deleted, rawCjk.Substring(start, length));
         }
 
         return GateResult.Accept;
+    }
+
+    /// <summary>
+    /// Polishing a spoken passage always trims a few light words around the fillers ("他们的这个工作" to "工作"): a pronoun,
+    /// a measure word. A drop of at most this many characters, without a negation, is tolerated up to a share of the text.
+    /// </summary>
+    private const int MaxSmallDrop = 3;
+
+    private const int MinSmallDrops = 4;
+    private const double SmallDropShare = 0.08;
+
+    /// <summary>The characters of a short deletion that is no filler and holds no negation; 0 when it is not a small drop.</summary>
+    private static int SmallDrop(string text)
+    {
+        var rest = WithoutFillers(text);
+        return rest.Length is > 0 and <= MaxSmallDrop && !rest.Any(c => Negations.Contains(c)) ? rest.Length : 0;
     }
 
     private static readonly (char Open, char Close)[] QuotePairs =
@@ -126,11 +153,11 @@ public static partial class FidelityGate
 
     private static bool IsExplainedDeletion(string raw, int start, int length, string cleaned)
     {
-        if (length <= 1) return true;
         var text = raw.Substring(start, length);
+        if (length <= 1) return !Negations.Contains(text[0]);
 
         var rest = WithoutFillers(text);
-        if (rest.Length <= 1) return true;
+        if (rest.Length <= 1 && !rest.Any(c => Negations.Contains(c))) return true;
         if (IsRepetition(raw, start, length)) return true;
         if (length <= MaxCorrectionRun && CorrectionMarkers.Any(m => text.Contains(m, StringComparison.Ordinal))) return true;
         return IsRestated(rest, cleaned);
