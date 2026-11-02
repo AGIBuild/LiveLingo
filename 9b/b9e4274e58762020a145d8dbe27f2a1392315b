@@ -1,0 +1,36 @@
+src/LiveLingo.Desktop/App.axaml.cs
+  s_6d6e9175f38e45::t_1bddafcc588a00 257
+tests/LiveLingo.Desktop.Tests/Composer/ComposerHarness.cs
+  s_6d6e9175f38e45::t_01a93b4bc924d1 215
+CHANGELOG.md
+  s_6d6e9175f38e45::t_459b4765b7f88c 20-21
+src/LiveLingo.Core/Cleanup/CleanupScheduler.cs
+  s_6d6e9175f38e45::t_cbab7425f5b478 18,38,44,215-218,222-228
+tests/LiveLingo.Core.Tests/Probes/VoiceProbeTests.cs
+  s_6d6e9175f38e45::t_c62b6a26620b4c 58
+docs/superpowers/specs/2026-11-02-passage-cleanup-and-resize-design.md
+  s_6d6e9175f38e45::t_eb0d868807e8b1 100
+tests/LiveLingo.Core.Tests/Cleanup/CleanupSchedulerTests.cs
+  s_6d6e9175f38e45::t_7b0659c7838243 376-387
+  s_6d6e9175f38e45::t_6de26dd5bcb48d 361
+  s_6d6e9175f38e45::t_345384498b03cd 52
+  s_6d6e9175f38e45::t_66822bf58194ec 375
+docs/superpowers/specs/2026-10-29-voice-dictation-design.md
+  s_6d6e9175f38e45::t_9dedc61c6a50f9 129
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9bb9e4274e58762020a145d8dbe27f2a1392315b",
+  "prompts": {},
+  "sessions": {
+    "s_6d6e9175f38e45": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "f74d37e5-1d96-4ddc-a3f9-5ae24ff39e38",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
