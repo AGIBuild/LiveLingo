@@ -40,6 +40,36 @@ public class FidelityGateTests
     }
 
     [Fact]
+    public void Accepts_a_restated_clause_removed_from_a_passage()
+    {
+        var gate = FidelityGate.Check(
+            "因为。V S Code 对于中文的语音识别不是。准确率很高。准确率不是很高，所以。我写了一个验证。第二个呢是灰度范围。灰度先放百分之十的用户。",
+            "因为 VS Code 对于中文的语音识别准确率不是很高，所以我写了一个验证。第二个是灰度范围，先放百分之十的用户。");
+        Assert.True(gate.Accepted, gate.Rejection?.ToString());
+    }
+
+    [Fact]
+    public void Rejects_a_dropped_negation_even_when_the_words_occur_elsewhere() =>
+        Assert.Equal(
+            GateReason.Deleted,
+            FidelityGate.Check("发布不能提前。发布时间要确认。", "发布时间要确认，发布。").Rejection?.Reason);
+
+    [Fact]
+    public void Accepts_a_term_the_speaker_corrected_away()
+    {
+        var gate = FidelityGate.Check(
+            "绑定到按钮的 click 事件。啊不对，是 command 属性。",
+            "绑定到按钮的 Command 属性。");
+        Assert.True(gate.Accepted, gate.Rejection?.ToString());
+    }
+
+    [Fact]
+    public void Rejects_a_dropped_term_when_only_an_ordinary_negation_follows() =>
+        Assert.Equal(
+            new GateRejection(GateReason.TermLost, "token"),
+            FidelityGate.Check("这个 token 不是很长，我们先缓存起来。", "这个不是很长，我们先缓存起来。").Rejection);
+
+    [Fact]
     public void Rejects_a_dropped_clause_even_when_the_length_ratio_is_fine()
     {
         var gate = FidelityGate.Check(

@@ -70,7 +70,8 @@ public sealed class Draft
 
     /// <summary>
     /// Reconciles the units with the units of the source text. Units whose body is unchanged keep their results
-    /// and manual edits; only new units return tickets for processing.
+    /// and manual edits; only new units return tickets for processing. A unit may hold several sentences (a dictated
+    /// passage): it is kept while the same run of sentences is still in the source, and edited text falls back to sentences.
     /// </summary>
     public IReadOnlyList<JobTicket> SyncSource(IReadOnlyList<SourceUnit> source, DraftRoute route)
     {
@@ -85,26 +86,55 @@ public sealed class Draft
             queue.Enqueue(unit);
         }
 
+        var longest = _units.Count == 0 ? 0 : _units.Max(unit => unit.Raw.Length);
         var created = new List<JobTicket>();
         var next = new List<DraftUnit>(source.Count);
-        foreach (var item in source)
+        for (var start = 0; start < source.Count;)
         {
-            if (pool.TryGetValue(item.Body, out var queue) && queue.TryDequeue(out var reused))
+            var (reused, merged, count) = TakeRun(pool, source, start, longest);
+            if (reused is not null)
             {
-                reused.Apply(item);
+                reused.Apply(merged!);
                 next.Add(reused);
+                start += count;
                 continue;
             }
 
-            var unit = NewUnit(item);
+            var unit = NewUnit(source[start]);
             created.Add(TicketFor(unit));
             next.Add(unit);
+            start++;
         }
 
         _units.Clear();
         _units.AddRange(next);
         Route = route;
         return created;
+    }
+
+    /// <summary>Takes the existing unit that holds the longest run of source units starting at <paramref name="start"/>.</summary>
+    private static (DraftUnit? Unit, SourceUnit? Merged, int Count) TakeRun(
+        Dictionary<string, Queue<DraftUnit>> pool, IReadOnlyList<SourceUnit> source, int start, int longest)
+    {
+        var body = source[start].Body;
+        (string Body, int Count)? found = null;
+        for (var count = 1; body.Length <= longest; count++)
+        {
+            if (pool.TryGetValue(body, out var queue) && queue.Count > 0)
+                found = (body, count);
+
+            var following = start + count;
+            if (following >= source.Count || source[following - 1].Trail.Length > 0 || source[following].Lead.Length > 0)
+                break;
+            body = TextUnits.Join([("", body, ""), ("", source[following].Body, "")]);
+        }
+
+        if (found is not var (foundBody, foundCount))
+            return (null, null, 0);
+
+        var last = source[start + foundCount - 1];
+        var merged = new SourceUnit(foundBody, source[start].Lead, last.Trail, last.IsComplete);
+        return (pool[foundBody].Dequeue(), merged, foundCount);
     }
 
     /// <summary>Stores a model result. Returns false when the ticket is stale or the user owns the text.</summary>

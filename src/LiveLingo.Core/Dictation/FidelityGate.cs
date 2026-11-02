@@ -21,8 +21,9 @@ public readonly record struct GateResult(GateRejection? Rejection)
 ///
 /// Chinese text is compared character by character. English words are judged separately, because a glossary
 /// legitimately turns phonetic gibberish into a long identifier and must not look like "added length".
-/// Every deletion must be explainable: a filler word, an immediate repetition, a self-correction, a single noise
+/// Every deletion must be explainable: a filler word, a repetition, a self-correction, a single noise
 /// character, or garbage that a glossary term replaced. Anything else is information the user said, so the edit is refused.
+/// The text may be a whole spoken passage: a clause the speaker restated is then dropped because the cleaned text still says it.
 /// </summary>
 public static partial class FidelityGate
 {
@@ -38,12 +39,20 @@ public static partial class FidelityGate
     private static readonly string[] Fillers = ["然后呢", "对吧", "那个", "就是", "呃", "嗯", "啊", "哦", "额"];
     private static readonly string[] CorrectionMarkers = ["不对", "不是", "说错了", "错了", "我是说", "应该是", "改成", "更正"];
 
+    /// <summary>Phrases that only ever announce a self-correction; "不是" or "改成" also occur in ordinary statements.</summary>
+    private static readonly string[] SpokenCorrections = ["不对", "说错了", "我是说", "更正"];
+
+    /// <summary>A deleted run counts as restated when this share of its character pairs still occurs in the cleaned text.</summary>
+    private const double RestatedCoverage = 0.6;
+
+    private const string Negations = "不没别无非未否";
+
     public static GateResult Check(string raw, string cleaned, IReadOnlyList<string>? glossary = null)
     {
         if (string.IsNullOrWhiteSpace(cleaned))
             return GateResult.Refuse(GateReason.Empty);
 
-        // One sentence in, one sentence out. A line break means the model echoed the prompt layout ("词表：… 目标：…").
+        // One line in, one line out. A line break means the model echoed the prompt layout ("词表：… 目标：…").
         if (cleaned.Contains('\n') && !raw.Contains('\n'))
             return GateResult.Refuse(GateReason.MultiLine);
 
@@ -67,7 +76,9 @@ public static partial class FidelityGate
 
         // An English word the cleaner removed is acceptable only when a glossary term took its place.
         // A run of adjacent English words ("Max Oce") is one phonetic guess, so it needs one replacement.
+        // A word the speaker corrects right after saying it ("click 事件，不对，是 command 属性") is dropped on purpose.
         var lostRuns = AsciiRun().Matches(raw)
+            .Where(run => !IsCorrectedAway(raw, run))
             .Select(run => Words(run.Value).FirstOrDefault(w => !cleanedNorm.Contains(w, StringComparison.Ordinal)))
             .Where(w => w is not null)
             .ToList();
@@ -96,7 +107,7 @@ public static partial class FidelityGate
         var garbageBudget = replacements * GlossaryDropPerReplacement;
         foreach (var (start, length) in dropped)
         {
-            if (IsExplainedDeletion(rawCjk, start, length)) continue;
+            if (IsExplainedDeletion(rawCjk, start, length, cleanedCjk)) continue;
             if (length <= garbageBudget)
             {
                 garbageBudget -= length;
@@ -113,20 +124,48 @@ public static partial class FidelityGate
 
     private static int Balance(string text, char open, char close) => text.Count(c => c == open) - text.Count(c => c == close);
 
-    private static bool IsExplainedDeletion(string raw, int start, int length)
+    private static bool IsExplainedDeletion(string raw, int start, int length, string cleaned)
     {
         if (length <= 1) return true;
         var text = raw.Substring(start, length);
 
-        if (IsOnlyFillers(text)) return true;
+        var rest = WithoutFillers(text);
+        if (rest.Length <= 1) return true;
         if (IsRepetition(raw, start, length)) return true;
-        return length <= MaxCorrectionRun && CorrectionMarkers.Any(m => text.Contains(m, StringComparison.Ordinal));
+        if (length <= MaxCorrectionRun && CorrectionMarkers.Any(m => text.Contains(m, StringComparison.Ordinal))) return true;
+        return IsRestated(rest, cleaned);
     }
 
-    private static bool IsOnlyFillers(string text)
+    private static string WithoutFillers(string text)
     {
         foreach (var filler in Fillers) text = text.Replace(filler, "", StringComparison.Ordinal);
-        return text.Length == 0;
+        return text;
+    }
+
+    /// <summary>
+    /// The deleted text says again what the cleaned text still says ("准确率很高。准确率不是很高"), so nothing is lost.
+    /// A deleted negation is never excused: dropping "不" turns a statement into its opposite.
+    /// </summary>
+    private static bool IsRestated(string text, string cleaned)
+    {
+        if (text.Any(c => Negations.Contains(c))) return false;
+
+        var pairs = text.Length - 1;
+        var covered = 0;
+        for (var i = 0; i < pairs; i++)
+            if (cleaned.Contains(text.AsSpan(i, 2), StringComparison.Ordinal))
+                covered++;
+        return covered >= pairs * RestatedCoverage;
+    }
+
+    private static bool IsCorrectedAway(string raw, Match run)
+    {
+        var end = run.Index + run.Length;
+        var window = raw.AsSpan(end, Math.Min(MaxCorrectionRun, raw.Length - end));
+        foreach (var marker in SpokenCorrections)
+            if (window.Contains(marker, StringComparison.Ordinal))
+                return true;
+        return false;
     }
 
     /// <summary>The deleted text is a stutter: the same characters stand right before or right after it.</summary>

@@ -225,7 +225,6 @@ public partial class App : Application
     }
 
     private static readonly TimeSpan TailIdleDelay = TimeSpan.FromSeconds(1.5);
-    private static readonly TimeSpan CleanupHoldback = TimeSpan.FromSeconds(2);
 
     private async Task SummonAsync(IPlatformServices platform)
     {
@@ -253,10 +252,9 @@ public partial class App : Application
         var scheduler = new TranslationScheduler(
             session, services.GetRequiredService<ITranslator>(), start.Target, TailIdleDelay,
             glossary: glossary);
-        // With cleanup off no scheduler listens to the draft, so no sentence is ever sent to a cleaner.
+        // With cleanup off no scheduler listens to the draft, so nothing is ever sent to a cleaner.
         var cleanup = settings.Composer.CleanupEnabled
-            ? new CleanupScheduler(
-                session, services.GetRequiredService<ITextCleaner>(), glossary.Terms, CleanupHoldback, contextUnits: 2)
+            ? new CleanupScheduler(session, services.GetRequiredService<ITextCleaner>(), glossary.Terms, contextUnits: 2)
             : null;
         platform.Microphone.PreferredDevice = settings.Composer.Microphone;
         // Before the voice input is made: the models that are not in memory start loading now, and the composer shows that.

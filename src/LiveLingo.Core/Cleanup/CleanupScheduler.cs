@@ -5,18 +5,16 @@ using LiveLingo.Core.Inference;
 namespace LiveLingo.Core.Cleanup;
 
 /// <summary>
-/// Cleans the sentences of a <see cref="DraftSession"/> while the user is still speaking: one request at a time,
-/// always for the oldest sentence that has none. A sentence is cleaned once something follows it, because a long
-/// thinking pause can split one sentence in two; the last sentence waits at most <paramref name="holdback"/>.
-/// While the user types, the last sentence is cleaned only after a short pause in typing, not once per key.
-/// A result that fails the <see cref="FidelityGate"/> keeps the original sentence and records the reason.
+/// Cleans the units of a <see cref="DraftSession"/> while the user is still speaking: one request at a time,
+/// always for the oldest unit that has none. Dictated units are whole passages, closed by a long pause, so a unit
+/// is cleaned as soon as it exists. While the user types, the last unit is cleaned only after a short pause in
+/// typing, not once per key. A result that fails the <see cref="FidelityGate"/> keeps the original and records the reason.
 /// </summary>
 public sealed class CleanupScheduler : IAsyncDisposable
 {
     private readonly DraftSession _session;
     private readonly ITextCleaner _cleaner;
     private readonly IReadOnlyList<string> _glossary;
-    private readonly TimeSpan _holdback;
     private readonly int _contextUnits;
     private readonly TimeProvider _time;
     /// <summary>How long the source must be still before typed text is cleaned: shorter than a sentence, longer than a keystroke.</summary>
@@ -24,8 +22,7 @@ public sealed class CleanupScheduler : IAsyncDisposable
 
     private readonly object _gate = new();
     private readonly CancellationTokenSource _stop = new();
-    private readonly ITimer _holdbackTimer;
-    private readonly Dictionary<int, DateTimeOffset> _firstSeen = [];
+    private readonly ITimer _typingTimer;
 
     private int _seenEditRevision;
     private DateTimeOffset _editedAt = DateTimeOffset.MinValue;
@@ -38,17 +35,15 @@ public sealed class CleanupScheduler : IAsyncDisposable
         DraftSession session,
         ITextCleaner cleaner,
         IReadOnlyList<string> glossary,
-        TimeSpan holdback,
         int contextUnits,
         TimeProvider? time = null)
     {
         _session = session;
         _cleaner = cleaner;
         _glossary = glossary;
-        _holdback = holdback;
         _contextUnits = contextUnits;
         _time = time ?? TimeProvider.System;
-        _holdbackTimer = _time.CreateTimer(_ => Wake(), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+        _typingTimer = _time.CreateTimer(_ => Wake(), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
         _session.Changed += OnChanged;
         OnChanged();
     }
@@ -69,11 +64,7 @@ public sealed class CleanupScheduler : IAsyncDisposable
             if (_disposed)
                 return;
 
-            var now = _time.GetUtcNow();
-            ObserveEdits(now);
-
-            foreach (var id in _session.Read(draft => draft.Units.Select(unit => unit.Id).ToList()))
-                _firstSeen.TryAdd(id, now);
+            ObserveEdits(_time.GetUtcNow());
 
             if (_inFlight is { } flight && !_session.Read(draft => draft.IsCurrent(flight.Ticket, UnitKind.Clean)))
                 flight.Cancel.Cancel();
@@ -121,7 +112,7 @@ public sealed class CleanupScheduler : IAsyncDisposable
                 {
                     // Once disposed the timer must not be touched: changing a disposed timer throws.
                     if (!_disposed)
-                        _holdbackTimer.Change(wait ?? Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+                        _typingTimer.Change(wait ?? Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
                     _running = false;
                     return;
                 }
@@ -133,9 +124,8 @@ public sealed class CleanupScheduler : IAsyncDisposable
 
             try
             {
-                var cleaned = (await _cleaner.CleanAsync(request, cancel.Token).ConfigureAwait(false)).Trim();
-                var gate = FidelityGate.Check(request.Target, cleaned, _glossary);
-                _session.Mutate(draft => draft.Complete(ticket, UnitKind.Clean, cleaned, gate.Rejection));
+                var (text, rejection) = await CleanUnitAsync(request, cancel.Token).ConfigureAwait(false);
+                _session.Mutate(draft => draft.Complete(ticket, UnitKind.Clean, text, rejection));
             }
             catch (OperationCanceledException) when (cancel.IsCancellationRequested)
             {
@@ -158,7 +148,45 @@ public sealed class CleanupScheduler : IAsyncDisposable
         }
     }
 
-    /// <summary>The next sentence to clean, or how long the oldest waiting sentence is still held back.</summary>
+    /// <summary>
+    /// Cleans a unit and checks the result. A passage that fails the check is cleaned again sentence by sentence, each
+    /// sentence checked on its own, so one bad sentence does not cost the rest of the passage its cleanup. The unit
+    /// is refused (rejection set, original kept) only when nothing in it passed.
+    /// </summary>
+    private async Task<(string Text, GateRejection? Rejection)> CleanUnitAsync(CleanupRequest request, CancellationToken ct)
+    {
+        var cleaned = (await _cleaner.CleanAsync(request, ct).ConfigureAwait(false)).Trim();
+        var gate = FidelityGate.Check(request.Target, cleaned, _glossary);
+        if (gate.Accepted)
+            return (cleaned, null);
+
+        // A multi-line unit is a document whose layout would be lost by splitting it.
+        if (request.Target.Contains('\n'))
+            return (request.Target, gate.Rejection);
+
+        var sentences = TextUnits.Split(request.Target);
+        if (sentences.Count < 2)
+            return (request.Target, gate.Rejection);
+
+        var parts = new List<string>();
+        var anyCleaned = false;
+        for (var i = 0; i < sentences.Count; i++)
+        {
+            var sentence = sentences[i].Body;
+            var preceding = TextUnits.Join(parts.Prepend(request.Preceding).Select(part => ("", part, "")));
+            var one = new CleanupRequest(sentence, preceding, i < sentences.Count - 1 || request.Continues, request.Glossary);
+            var text = (await _cleaner.CleanAsync(one, ct).ConfigureAwait(false)).Trim();
+            var accepted = FidelityGate.Check(sentence, text, _glossary).Accepted;
+            anyCleaned |= accepted;
+            parts.Add(accepted ? text : sentence);
+        }
+
+        return anyCleaned
+            ? (TextUnits.Join(parts.Select(part => ("", part, ""))), null)
+            : (request.Target, gate.Rejection);
+    }
+
+    /// <summary>The next unit to clean, or how long typing must stay still before the last unit is cleaned.</summary>
     private ((JobTicket Ticket, CleanupRequest Request)? Next, TimeSpan? Wait) Find(Draft draft, DateTimeOffset now)
     {
         if (draft.Snapshot is not null || draft.Output != OutputKind.Clean)
@@ -171,12 +199,9 @@ public sealed class CleanupScheduler : IAsyncDisposable
             if (unit.Clean.Text is not null || unit.Clean.Error.Length > 0)
                 continue;
 
-            // Order is preserved: if the oldest waiting sentence is held back, nothing behind it can be eligible.
-            var continues = i < units.Count - 1 || draft.Pending.Length > 0;
-            var waited = now - _firstSeen.GetValueOrDefault(unit.Id, now);
-            if (!continues && draft.Recording && waited < _holdback)
-                return (null, _holdback - waited);
-
+            // Order is preserved: if the oldest waiting unit has to wait, nothing behind it can be eligible.
+            // While the microphone is open the speaker may always go on, even when the last passage ended in a long pause.
+            var continues = i < units.Count - 1 || draft.Pending.Length > 0 || draft.Recording;
             var typing = TypingPause - (now - _editedAt);
             if (!continues && typing > TimeSpan.Zero)
                 return (null, typing);
@@ -206,7 +231,7 @@ public sealed class CleanupScheduler : IAsyncDisposable
 
         _session.Changed -= OnChanged;
         await _stop.CancelAsync().ConfigureAwait(false);
-        await _holdbackTimer.DisposeAsync().ConfigureAwait(false);
+        await _typingTimer.DisposeAsync().ConfigureAwait(false);
         await worker.ConfigureAwait(false);
         _stop.Dispose();
     }
