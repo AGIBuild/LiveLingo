@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using LiveLingo.Core.Cleanup;
 using LiveLingo.Core.Cloud;
 using LiveLingo.Core.Models;
 using LiveLingo.Core.Translation;
@@ -67,6 +68,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         _autoDictate = current.Composer.AutoDictate;
         _preloadSpeech = current.Composer.PreloadSpeech;
         _rememberChoices = current.Composer.RememberChoices;
+        _polishPrompt = PolishStyle.IsUsable(current.Composer.PolishPrompt) ? current.Composer.PolishPrompt : "";
         _tierIndex = Math.Max(0, Tiers.ToList().IndexOf(current.Composer.TranslatorTier));
         _microphoneNames = [""];
         _microphoneIndex = 0;
@@ -112,6 +114,20 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     /// <summary>Whether the output and direction last chosen for an application are used the next time it is the target.</summary>
     [ObservableProperty] private bool _rememberChoices;
+
+    /// <summary>
+    /// The polish requirements as the user wrote them, "" for the built-in ones. Saved when set; a text that is not usable
+    /// (<see cref="PolishStyle.IsUsable"/>) is flagged and not stored.
+    /// </summary>
+    [ObservableProperty] private string _polishPrompt = "";
+
+    [ObservableProperty] private bool _polishPromptInvalid;
+
+    /// <summary>What the page shows in the box: the built-in requirements where there are no custom ones, to start editing from.</summary>
+    public string PolishPromptShown => PolishPromptIsDefault ? PolishStyle.Default : PolishPrompt;
+
+    /// <summary>True while the built-in requirements are used.</summary>
+    public bool PolishPromptIsDefault => !PolishPromptInvalid && PolishStyle.ToStored(PolishPrompt) == "";
 
     /// <summary>What is remembered per application, the one chosen in most recently first.</summary>
     public IReadOnlyList<AppChoice> Apps => _preferences.Apps;
@@ -175,6 +191,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     partial void OnAutoDictateChanged(bool value) => Apply();
     partial void OnPreloadSpeechChanged(bool value) => Apply();
     partial void OnRememberChoicesChanged(bool value) => Apply();
+    partial void OnPolishPromptChanged(string value) => Apply();
     partial void OnTierIndexChanged(int value) => ApplyIfSelected(value);
 
     /// <summary>A combo box reports -1 while its items are being replaced; that is not a choice.</summary>
@@ -225,6 +242,15 @@ public sealed partial class SettingsViewModel : ObservableObject
         model.Composer.AutoDictate = AutoDictate;
         model.Composer.PreloadSpeech = PreloadSpeech;
         model.Composer.RememberChoices = RememberChoices;
+        if (PolishStyle.ToStored(PolishPrompt) is { } polish)
+        {
+            model.Composer.PolishPrompt = polish;
+            PolishPromptInvalid = false;
+        }
+        else
+        {
+            PolishPromptInvalid = true;
+        }
         model.Composer.TranslatorTier = Tiers[TierIndex];
         if (_devicesLoaded)
             model.Composer.Microphone = MicrophoneIndex < MicrophoneNames.Count ? MicrophoneNames[MicrophoneIndex] : "";

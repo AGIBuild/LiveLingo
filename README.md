@@ -16,6 +16,7 @@ release is tag `v1.4.2`.
    too, shown next to them in the menus: `⌘1` / `⌘2` / `⌘3` pick the output, `⌘L` swaps the language, `⇧⌘C` copies,
    `⌘N` starts a new draft, `⌘R` recent drafts, `⌘O` import, `⌘S` export, `⌘E` enlarges or restores the window, `⌘,` settings.
    Drag the right edge, the bottom edge or the corner to resize the window, or use the enlarge button next to close.
+   The source header's **Clear** button stops recording and empties the entire current draft; `⌘N` / `Ctrl+N` does the same.
 3. **Pick what is written**, with one control: *Clean up* (fillers, repetitions and homophone errors removed, meaning
    untouched), *Translate to English / Chinese*, or *Original*. Your original words stay visible and can be restored for
    any sentence.
@@ -25,6 +26,14 @@ release is tag `v1.4.2`.
 Cleanup is checked by a fidelity gate: a rewrite that adds facts, drops negations or numbers, or drifts from what you
 said is rejected and that sentence keeps your words. Cleanup can be switched off in Settings; the composer then offers
 only *Translate* and *Original*.
+
+While recording, cleanup is a live preview. After stopping, the whole text is summarized and polished; writing waits
+until that processing ends. Customize the final polish requirements in **Settings → Voice**, or restore the default.
+Invalid requirements fall back to the built-in ones; a rejected final result keeps the passage preview with a notice.
+
+Model names appear briefly when recording starts or the active processing model changes. Click the **Local / Cloud**
+chip to inspect what this window actually used. Speech uses X-ASR 480 ms plus Qwen3-ASR 0.6B; cleanup uses Qwen3.5 4B.
+The fast/quality translation choice selects Hy-MT2 1.8B/7B and does not change the speech recognizer.
 
 Imported recordings become a read-only timeline that goes through the same cleanup and translation, and can be
 exported as SRT.

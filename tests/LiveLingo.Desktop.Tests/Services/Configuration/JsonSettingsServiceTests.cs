@@ -1,4 +1,5 @@
 using LiveLingo.Desktop.Services.Configuration;
+using LiveLingo.Core.Cleanup;
 
 namespace LiveLingo.Desktop.Tests.Services.Configuration;
 
@@ -30,12 +31,23 @@ public class JsonSettingsServiceTests : IDisposable
         await svc.LoadAsync(TestContext.Current.CancellationToken);
         var replacement = svc.CloneCurrent();
         replacement.Hotkeys.Summon = "Alt+X";
+        replacement.Composer.PolishPrompt = "Keep my tone without inventing facts.";
         svc.Replace(replacement);
 
         var svc2 = new JsonSettingsService(_settingsPath);
         await svc2.LoadAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal("Alt+X", svc2.Current.Hotkeys.Summon);
+        Assert.Equal(replacement.Composer.PolishPrompt, svc2.Current.Composer.PolishPrompt);
+    }
+
+    [Fact]
+    public async Task CorruptSettings_FallBackToBuiltInPolishRequirements()
+    {
+        await File.WriteAllTextAsync(_settingsPath, "{broken", TestContext.Current.CancellationToken);
+        var svc = new JsonSettingsService(_settingsPath);
+        await svc.LoadAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(PolishStyle.Default, PolishStyle.Resolve(svc.Current.Composer.PolishPrompt));
     }
 
     [Fact]

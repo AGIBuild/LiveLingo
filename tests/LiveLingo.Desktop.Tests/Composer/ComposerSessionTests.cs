@@ -134,6 +134,47 @@ public class ComposerSessionTests
     }
 
     [Fact]
+    public async Task ChangingModelPlan_InvalidatesCachedTranslationAndRefreshesAvailability()
+    {
+        await using var h = await Translated();
+        var old = h.Translator.Requests.Count;
+        h.Vm.UpdateModelPlan(ComposerModelPlan.Create(LiveLingo.Core.Models.TranslatorTier.Quality, false, false));
+        await Wait.Until(() => h.Translator.Requests.Count > old && h.Vm.Status == ComposerStatus.Ready);
+        h.Models.HasAllExpectedLocalAssets(LiveLingo.Core.Models.ModelCatalog.TranslatorQuality).Returns(false);
+        h.Vm.UpdateModelPlan(ComposerModelPlan.Create(LiveLingo.Core.Models.TranslatorTier.Quality, false, false));
+        Assert.False(h.Vm.ModelsReady);
+        Assert.Equal(BannerKind.ModelMissing, h.Vm.Banner.Kind);
+    }
+
+    [Fact]
+    public async Task Clearing_CancelsAQueuedWriteBeforeStoppingRecording()
+    {
+        await using var h = new Harness();
+        h.Vm.IsWriteQueued = true;
+        await h.Vm.NewDraftCommand.ExecuteAsync(null);
+        Assert.False(h.Vm.IsWriteQueued);
+        Assert.Empty(h.Vm.SourceText);
+        await h.Injector.DidNotReceiveWithAnyArgs().InjectAsync(default!, default!, default, TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task ClearingAnImport_DoesNotFinishUntilCancelledWorkHasSettled()
+    {
+        await using var h = new Harness();
+        var result = new TaskCompletionSource<IReadOnlyList<LiveLingo.Core.Transcription.TimedSegment>>();
+        h.Transcriber.Handler = (_, _, _) => result.Task;
+        var importing = h.Vm.ImportAsync("sample.wav");
+        var clearing = h.Vm.NewDraftCommand.ExecuteAsync(null);
+        var finishedEarly = clearing.IsCompleted;
+        result.SetResult([]);
+        await Task.WhenAll(importing, clearing);
+        Assert.False(finishedEarly);
+        Assert.True(h.Vm.IsEditable);
+        Assert.False(h.Vm.IsTranscribing);
+        Assert.Equal(BannerKind.None, h.Vm.Banner.Kind);
+    }
+
+    [Fact]
     public async Task CopyOnly_PutsTheResultOnTheClipboardInsteadOfWritingIt()
     {
         await using var h = await Translated("先检查缓存。");

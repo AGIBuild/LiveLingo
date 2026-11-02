@@ -23,7 +23,8 @@ public sealed class RoutedChatClient(
     InferenceRole role,
     ICloudRoutes routes,
     IChatCompletionClient local,
-    HttpClient http) : IChatCompletionClient
+    HttpClient http,
+    ModelUsage? usage = null) : IChatCompletionClient
 {
     public async Task<ChatCompletion> CompleteAsync(ChatRequest request, CancellationToken ct)
     {
@@ -32,6 +33,10 @@ public sealed class RoutedChatClient(
             return await local.CompleteAsync(request, ct).ConfigureAwait(false);
 
         var cloud = new OpenAiChatClient(http, route.Endpoint, route.Model, route.ApiKey, sendProviderExtras: false);
-        return await cloud.CompleteAsync(request, ct).ConfigureAwait(false);
+        usage?.Report(role, route.Model, cloud: true, confirmed: false);
+        var completion = await cloud.CompleteAsync(request, ct).ConfigureAwait(false);
+        if (completion.Model is { } served)
+            usage?.Report(role, served, cloud: true, confirmed: true);
+        return completion;
     }
 }

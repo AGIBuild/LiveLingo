@@ -60,6 +60,8 @@ internal sealed class ComposerIntents : IIntentHandler
 
     /// <summary>The user asked for the large window, or for the size that follows the content again.</summary>
     public event Action? Zoomed;
+    public event Action? ModelInfoRequested;
+    public event Action? DraftCleared;
 
     /// <summary>State that is not on the view model changed (the recent drafts).</summary>
     public event Action? Changed;
@@ -91,7 +93,14 @@ internal sealed class ComposerIntents : IIntentHandler
             case SaveEditIntent: _vm.SaveEditCommand.Execute(null); break;
             case CancelEditIntent: _vm.CancelEditCommand.Execute(null); break;
             case UseOriginalIntent original: _vm.UseOriginalCommand.Execute(original.I); break;
-            case NewDraftIntent: Run(() => _vm.NewDraftCommand.ExecuteAsync(null)); break;
+            case NewDraftIntent:
+                Run(async () =>
+                {
+                    await _vm.NewDraftCommand.ExecuteAsync(null).ConfigureAwait(true);
+                    DraftCleared?.Invoke();
+                });
+                break;
+            case ModelInfoIntent: ModelInfoRequested?.Invoke(); break;
             case RestoreRecentIntent restore: Restore(restore.Index); break;
             case ClearRecentIntent:
                 _recent.Clear();

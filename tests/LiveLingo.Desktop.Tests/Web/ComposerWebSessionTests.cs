@@ -2,6 +2,7 @@ using System.Text.Json;
 using LiveLingo.Desktop.Composer;
 using LiveLingo.Desktop.Tests.Composer;
 using LiveLingo.Desktop.Web;
+using LiveLingo.Core.Inference;
 
 namespace LiveLingo.Desktop.Tests.Web;
 
@@ -13,11 +14,12 @@ public sealed class ComposerWebSessionTests
         public FakeHost Host { get; } = new();
         public FakeClock Time { get; } = new();
         public ComposerWebSession Session { get; }
+        public ModelUsage Usage { get; } = new();
 
         public Rig()
         {
             Session = new ComposerWebSession(
-                H.Vm, Texts.Chinese(), new RecentDrafts(), new FakeFiles(), Host, new InlineContext(), Time, new ListLogger());
+                H.Vm, Texts.Chinese(), new RecentDrafts(), new FakeFiles(), Host, new InlineContext(), Time, new ListLogger(), Usage);
         }
 
         public JsonElement Message(int index) => JsonDocument.Parse(Host.Posted[index]).RootElement;
@@ -36,7 +38,7 @@ public sealed class ComposerWebSessionTests
 
         rig.Session.Start();
 
-        Assert.Equal(["strings", "composer", "focus"], rig.Host.Types);
+        Assert.Equal(["strings", "composer", "focus", "models"], rig.Host.Types);
         Assert.Equal("zh-CN", rig.Message(0).GetProperty("data").GetProperty("locale").GetString());
         Assert.Equal("source", rig.Message(2).GetProperty("data").GetProperty("target").GetString());
     }
@@ -48,7 +50,39 @@ public sealed class ComposerWebSessionTests
 
         rig.Host.FromPage("""{"v":1,"name":"ready"}""");
 
-        Assert.Equal(["strings", "composer", "focus"], rig.Host.Types);
+        Assert.Equal(["strings", "composer", "focus", "models"], rig.Host.Types);
+    }
+
+    [Fact]
+    public async Task ActualModelUse_IsBrieflyShown_AndCanBeInspectedAgain()
+    {
+        await using var rig = new Rig();
+        rig.Session.Start();
+        rig.Host.Posted.Clear();
+        rig.Usage.Report(new ModelUse(ModelStage.Translator, "Hy-MT2 7B", false, true));
+        var toast = rig.Host.Posted.Select(json => JsonDocument.Parse(json).RootElement)
+            .Single(m => m.GetProperty("type").GetString() == "toast");
+        Assert.Contains("Hy-MT2 7B", toast.GetProperty("data").GetProperty("text").GetString());
+        Assert.Equal(5000, toast.GetProperty("data").GetProperty("durationMs").GetInt32());
+        rig.Host.Posted.Clear();
+        rig.Usage.Report(new ModelUse(ModelStage.Translator, "Hy-MT2 7B", false, true));
+        Assert.Empty(rig.Host.Posted);
+        rig.Host.FromPage(new ModelInfoIntent { V = 1 });
+        Assert.Contains("Hy-MT2 7B", rig.Host.Posted.Single());
+    }
+
+    [Fact]
+    public async Task ModelSwitching_DistinguishesRequestedFromPreviouslyUsed()
+    {
+        await using var rig = new Rig();
+        rig.Session.Start();
+        rig.Usage.Report(new ModelUse(ModelStage.Translator, "Hy-MT2 1.8B", false, true));
+        rig.Host.Posted.Clear();
+        rig.Usage.Report(new ModelUse(ModelStage.Translator, "Hy-MT2 7B", false, false));
+        var details = JsonDocument.Parse(rig.Host.Posted[0]).RootElement.GetProperty("data").GetProperty("text").GetString();
+        Assert.Contains("切换", details);
+        Assert.Contains("1.8B", details);
+        Assert.Contains("7B", details);
     }
 
     [Fact]

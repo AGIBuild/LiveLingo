@@ -22,6 +22,8 @@ public enum ComposerStatus
     /// <summary>The microphone was pressed and the speech models are loading.</summary>
     Starting,
 
+    Clearing,
+
     /// <summary>The microphone is open and speech is being recognized.</summary>
     Listening,
 
@@ -172,7 +174,9 @@ public sealed record StatusInfo(
     int Units,
     ComposerOutput Output,
     bool UsesCloud,
-    int TranscribePercent);
+    int TranscribePercent,
+    bool Polishing,
+    LiveLingo.Core.Drafting.PolishOutcome PolishOutcome = LiveLingo.Core.Drafting.PolishOutcome.None);
 
 /// <summary>Settings the composer reads once when it opens.</summary>
 /// <param name="CloudTranslate">Translation runs on the user's cloud endpoint (shown in the privacy chip).</param>

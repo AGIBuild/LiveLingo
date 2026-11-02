@@ -82,6 +82,24 @@ public class RoutedChatClientTests
     }
 
     [Fact]
+    public async Task ACloudAlias_IsNotPresentedAsAProviderConfirmedModel()
+    {
+        var usage = new ModelUsage();
+        var uses = new List<ModelUse>();
+        usage.Changed += uses.Add;
+        var routes = Substitute.For<ICloudRoutes>();
+        routes.GetAsync(InferenceRole.Translator, Arg.Any<CancellationToken>())
+            .Returns(CloudRoute.Create("https://example.com/v1", "deployment", "key"));
+        var client = new RoutedChatClient(InferenceRole.Translator, routes,
+            Substitute.For<IChatCompletionClient>(), new HttpClient(new StubHandler()), usage);
+        await client.CompleteAsync(new ChatRequest("p", 8, 0, Extra), CancellationToken.None);
+        var use = Assert.Single(uses);
+        Assert.True(use.Cloud);
+        Assert.False(use.Confirmed);
+        Assert.Equal("deployment", use.Name);
+    }
+
+    [Fact]
     public async Task ACloudFailure_IsReported_NotSilentlyRetriedLocally()
     {
         var route = CloudRoute.Create("https://api.example.com/v1", "m", "k");

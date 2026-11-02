@@ -1,6 +1,7 @@
 using LiveLingo.Core.Dictation;
 using LiveLingo.Core.Drafting;
 using LiveLingo.Core.Models;
+using LiveLingo.Core.Inference;
 using LiveLingo.Core.Transcription;
 using Microsoft.Extensions.Logging;
 using SherpaOnnx;
@@ -23,10 +24,12 @@ public sealed class SherpaSpeechEngine : IDictationSessionFactory, ISpeechWarmup
     private readonly IModelManager _models;
     private readonly ResidentModel<OnlineRecognizer> _live;
     private readonly ResidentModel<OfflineRecognizer> _secondPass;
+    private readonly ModelUsage? _usage;
 
-    public SherpaSpeechEngine(IModelManager models, CoreOptions options, ILogger<SherpaSpeechEngine> logger)
+    public SherpaSpeechEngine(IModelManager models, CoreOptions options, ILogger<SherpaSpeechEngine> logger, ModelUsage? usage = null)
     {
         _models = models;
+        _usage = usage;
         _live = new ResidentModel<OnlineRecognizer>(
             "live speech recognizer",
             _ => SherpaLiveRecognizer.Load(models.GetModelDirectory(ModelCatalog.SpeechLive.Id)),
@@ -78,6 +81,8 @@ public sealed class SherpaSpeechEngine : IDictationSessionFactory, ISpeechWarmup
 
     public async Task<DictationSession> CreateAsync(DraftSession draft, IReadOnlyList<string> glossary, CancellationToken ct)
     {
+        var names = $"{ModelCatalog.SpeechLive.DisplayName} + {ModelCatalog.SpeechSecondPass.DisplayName}";
+        _usage?.Report(new ModelUse(ModelStage.Speech, names, Cloud: false, Confirmed: false));
         await WarmAsync(glossary, ct).ConfigureAwait(false);
         var live = await _live.AcquireAsync("", ct).ConfigureAwait(false);
         ResidentModel<OfflineRecognizer>.Lease secondPass;
@@ -95,7 +100,9 @@ public sealed class SherpaSpeechEngine : IDictationSessionFactory, ISpeechWarmup
         var secondPassRecognizer = new SherpaQwen3Recognizer(secondPass);
         try
         {
-            return new DictationSession(liveRecognizer, NewVad(LiveVadMinSilenceSeconds), secondPassRecognizer, draft);
+            var session = new DictationSession(liveRecognizer, NewVad(LiveVadMinSilenceSeconds), secondPassRecognizer, draft);
+            _usage?.Report(new ModelUse(ModelStage.Speech, names, Cloud: false, Confirmed: true));
+            return session;
         }
         catch
         {

@@ -79,6 +79,19 @@ public sealed class SettingsIntentsTests
     }
 
     [Fact]
+    public void ThePolishPrompt_IsStoredOrFlagged_AndCanBeReset()
+    {
+        var rig = new Rig();
+        rig.Set(SettingIntent.Names.PolishPrompt, "Keep my tone without inventing facts.");
+        Assert.Equal("Keep my tone without inventing facts.", rig.F.Last.Composer.PolishPrompt);
+        rig.Set(SettingIntent.Names.PolishPrompt, "bad");
+        Assert.True(rig.Vm.PolishPromptInvalid);
+        Assert.Equal("Keep my tone without inventing facts.", rig.F.Last.Composer.PolishPrompt);
+        rig.Set(SettingIntent.Names.PolishPrompt, "");
+        Assert.Equal("", rig.F.Last.Composer.PolishPrompt);
+    }
+
+    [Fact]
     public void ACloudEndpoint_IsStored()
     {
         var rig = new Rig();

@@ -139,6 +139,34 @@ public sealed class SettingsPageTests(BrowserFixture browsers)
 
     [Theory]
     [MemberData(nameof(Engines))]
+    public async Task PolishRequirements_SaveOnlyWhenLeavingTheBox(string engine)
+    {
+        await using var page = await browsers.OpenSettingsAsync(engine, "settings-voice");
+        Assert.NotEmpty(await page.Page.Locator("#polish").InputValueAsync());
+        await page.ClearIntentsAsync();
+        await page.Page.Locator("#polish").FillAsync("Keep my voice. Fix grammar without adding facts.");
+        Assert.DoesNotContain(await page.IntentsAsync(), i => i is SettingIntent);
+        await page.Page.Locator("#nav-general").ClickAsync();
+        var saved = await page.LastIntentAsync<SettingIntent>();
+        Assert.Equal("polishPrompt", saved.Key);
+        Assert.Equal("Keep my voice. Fix grammar without adding facts.", saved.Value);
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public async Task PolishRequirements_HaveResetAndValidation(string engine)
+    {
+        await using var page = await browsers.OpenSettingsAsync(engine, "settings-polish-custom");
+        await page.Page.Locator("#polish-reset").ClickAsync();
+        Assert.Equal(new SettingIntent("polishPrompt", "") { V = 1 }, await page.LastIntentAsync<SettingIntent>());
+        await page.PushAsync("settings-polish-invalid");
+        Assert.Equal("true", await page.Page.Locator("#polish").GetAttributeAsync("aria-invalid"));
+        Assert.Contains(S("polish.invalid"), await page.Page.Locator(".polish .err").InnerTextAsync());
+        Assert.Equal("bad", await page.Page.Locator("#polish").InputValueAsync());
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
     public async Task AStoredKey_IsReportedButNeverShown(string engine)
     {
         await using var page = await browsers.OpenSettingsAsync(engine, "settings-cloud");

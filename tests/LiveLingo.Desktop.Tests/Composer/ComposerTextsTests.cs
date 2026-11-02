@@ -20,7 +20,20 @@ public class ComposerTextsTests
     private static StatusInfo Info(
         ComposerStatus status = ComposerStatus.Empty, bool written = false, int seconds = 0,
         bool armed = false, int units = 0, ComposerOutput output = ComposerOutput.Translate, bool cloud = false, int percent = 0) =>
-        new(status, written, seconds, armed, units, output, cloud, percent);
+        new(status, written, seconds, armed, units, output, cloud, percent, false);
+
+    [Fact]
+    public void FinalPolish_IsExplicitEvenWhenWritingIsQueued()
+    {
+        var info = Info(ComposerStatus.Working, armed: true, output: ComposerOutput.Clean) with { Polishing = true };
+        Assert.Equal("[composer.status.polishing]", Create().Status(info));
+    }
+
+    [Theory]
+    [InlineData(PolishOutcome.KeptPreview, "[composer.status.polish.kept]")]
+    [InlineData(PolishOutcome.DefaultRequirements, "[composer.status.polish.default]")]
+    public void FinalPolish_ReportsFallbackInsteadOfImplyingSuccess(PolishOutcome outcome, string expected) =>
+        Assert.Equal(expected, Create().Status(Info(ComposerStatus.Ready, output: ComposerOutput.Clean) with { PolishOutcome = outcome }));
 
     [Theory]
     [InlineData(ComposerStatus.Empty, "")]

@@ -58,7 +58,8 @@
       }
     ],
     "resume": null,
-    "remembered": null
+    "remembered": null,
+    "canClear": true
   },
   "result": {
     "visible": true,
@@ -84,7 +85,8 @@
   "footer": {
     "mic": {
       "recording": true,
-      "aria": "结束听写（⌘D）"
+      "aria": "结束听写（⌘D）",
+      "enabled": true
     },
     "status": {
       "text": "正在听 · 0:00 · 点麦克风或按 ⌘D 结束",

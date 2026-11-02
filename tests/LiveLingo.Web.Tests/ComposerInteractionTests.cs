@@ -8,6 +8,52 @@ namespace LiveLingo.Web.Tests;
 /// <summary>What the page sends when the user acts, parsed by the same parser the host uses.</summary>
 public sealed class ComposerInteractionTests(BrowserFixture browsers)
 {
+    [Theory]
+    [InlineData("webkit")]
+    [InlineData("chromium")]
+    public async Task VisibleClearButton_ResetsTheWholeDraft(string engine)
+    {
+        await using var page = await browsers.OpenAsync(engine, "translate-ready");
+        Assert.Equal(1, await page.Page.Locator("#clear").CountAsync());
+        await page.ClearIntentsAsync();
+        await page.Page.Locator("#clear").ClickAsync();
+        Assert.Equal(1, await page.CountAsync<NewDraftIntent>());
+    }
+
+    [Theory]
+    [InlineData("webkit")]
+    [InlineData("chromium")]
+    public async Task ModelDetails_AreAvailableFromTheExistingPrivacyChip(string engine)
+    {
+        await using var page = await browsers.OpenAsync(engine, "translate-ready");
+        await page.ClearIntentsAsync();
+        await page.Page.Locator("#privacy").ClickAsync();
+        Assert.Equal(1, await page.CountAsync<ModelInfoIntent>());
+    }
+
+    [Theory]
+    [InlineData("webkit")]
+    [InlineData("chromium")]
+    public async Task ClearFocus_WaitsUntilTheSourceIsVisibleAgain(string engine)
+    {
+        await using var page = await browsers.OpenAsync(engine, "listening");
+        await page.ReceiveAsync("focus", new System.Text.Json.Nodes.JsonObject { ["target"] = "source" });
+        await page.PushAsync("empty");
+        Assert.Equal("src", await page.Page.EvaluateAsync<string>("document.activeElement.id"));
+    }
+
+    [Theory]
+    [InlineData("webkit")]
+    [InlineData("chromium")]
+    public async Task Clearing_DisablesRestartAndInsertionUntilResetCompletes(string engine)
+    {
+        await using var page = await browsers.OpenAsync(engine, "clearing");
+        Assert.True(await page.Page.Locator("#clear").IsDisabledAsync());
+        Assert.True(await page.Page.Locator("#mic").IsDisabledAsync());
+        Assert.True(await page.Page.Locator("#commit").IsDisabledAsync());
+        Assert.Contains("清空", await page.Page.Locator("#status").InnerTextAsync());
+    }
+
     public static TheoryData<string> Engines => new() { "webkit", "chromium" };
 
     // --- keyboard -------------------------------------------------------------------------------------------------

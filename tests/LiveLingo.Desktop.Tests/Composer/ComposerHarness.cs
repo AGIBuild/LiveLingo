@@ -140,6 +140,7 @@ internal sealed class FakeVoiceInput : IVoiceInput
     public int Stops { get; private set; }
     public Exception? StartFailure { get; set; }
     public TaskCompletionSource? StartGate { get; set; }
+    public TaskCompletionSource? StopGate { get; set; }
 
     public async Task StartAsync(DraftSession draft, IReadOnlyList<string> glossary, CancellationToken ct)
     {
@@ -153,16 +154,17 @@ internal sealed class FakeVoiceInput : IVoiceInput
         draft.Mutate(d => d.Recording = true);
     }
 
-    public Task StopAsync()
+    public async Task StopAsync()
     {
         Stops++;
+        if (StopGate is not null)
+            await StopGate.Task;
         _draft?.Mutate(d =>
         {
             d.SetPending("");
             d.Recording = false;
         });
         _draft = null;
-        return Task.CompletedTask;
     }
 
     public void Say(params string[] sentences) =>

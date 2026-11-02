@@ -1,5 +1,6 @@
 using LiveLingo.Core.Models;
 using LiveLingo.Core.Translation;
+using LiveLingo.Core.Inference;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit.Abstractions;
 
@@ -12,6 +13,40 @@ namespace LiveLingo.Core.Tests.Probes;
 public class TranslationProbeTests(ITestOutputHelper output)
 {
     private static bool Enabled => Environment.GetEnvironmentVariable("LIVELINGO_ENABLE_TRANSLATION_PROBE") == "1";
+
+    [Fact]
+    public async Task FastQualityFast_ReallyChangesTheLoadedModelAndProviderIdentity()
+    {
+        if (Environment.GetEnvironmentVariable("LIVELINGO_ENABLE_MODEL_SWITCH_PROBE") != "1")
+            return;
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddLiveLingoCore();
+        await using var provider = services.BuildServiceProvider();
+        var models = provider.GetRequiredService<IModelManager>();
+        Assert.All(new[] { ModelCatalog.TranslatorFast, ModelCatalog.TranslatorQuality, ModelCatalog.LlamaRuntime },
+            model => Assert.True(models.HasAllExpectedLocalAssets(model), $"Install {model.Id} before this probe."));
+        var options = provider.GetRequiredService<CoreOptions>();
+        var usage = provider.GetRequiredService<ModelUsage>();
+        var used = new List<string>();
+        usage.Changed += model => { if (model.Confirmed) used.Add(model.Name); };
+        var client = new LocalChatClient(provider.GetRequiredService<LlamaServerHost>(), InferenceRole.Translator,
+            () => InferenceModels.For(InferenceRole.Translator, options.TranslatorTier), usage);
+        foreach (var tier in new[] { TranslatorTier.Fast, TranslatorTier.Quality, TranslatorTier.Fast })
+        {
+            options.TranslatorTier = tier;
+            var completion = await client.CompleteAsync(new ChatRequest(
+                "将以下文本翻译成英文：这个 PR 先不要合并。", 200, 0, new Dictionary<string, object>()),
+                CancellationToken.None);
+            output.WriteLine($"{tier}: provider={completion.Model}; text={completion.Text}");
+            Assert.Contains(tier == TranslatorTier.Fast ? "1.8B" : "7B", completion.Model, StringComparison.OrdinalIgnoreCase);
+            Assert.False(string.IsNullOrWhiteSpace(completion.Text));
+        }
+        Assert.Equal(new[]
+        {
+            ModelCatalog.TranslatorFast.DisplayName, ModelCatalog.TranslatorQuality.DisplayName, ModelCatalog.TranslatorFast.DisplayName
+        }, used);
+    }
 
     [Fact]
     public async Task PinnedRuntimeAndModel_TranslateRealText()

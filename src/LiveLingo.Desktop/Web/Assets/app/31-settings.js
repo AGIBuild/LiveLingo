@@ -73,6 +73,36 @@
     }
   }
 
+  // The polish requirements: a text box of its own (a full-width block, not a row), saved when it loses the focus so one
+  // edit is one stored value. Where nothing is customized it shows the built-in text to start from.
+  class Polish extends preact.Component {
+    state = { draft: null };
+
+    commit = () => {
+      const { draft } = this.state;
+      this.setState({ draft: null });
+      if (draft !== null && draft !== this.props.p.text) LL.send('setting', { key: 'polishPrompt', value: draft });
+    };
+
+    reset = () => {
+      this.setState({ draft: null });
+      LL.send('setting', { key: 'polishPrompt', value: '' });
+    };
+
+    render({ p }, { draft }) {
+      return html`<section class="polish" aria-labelledby="polish-title">
+        <div class="polish-head">
+          <h2 id="polish-title">${LL.t('polish')}${!p.isDefault && html` <span class="chip mini">${LL.t('polish.custom')}</span>`}</h2>
+          <button type="button" id="polish-reset" class="btn" disabled=${p.isDefault} onClick=${this.reset}>${LL.t('polish.reset')}</button>
+        </div>
+        <p class="hint">${LL.t('polish.desc')}</p>
+        <textarea id="polish" rows="9" spellcheck="false" aria-labelledby="polish-title" aria-invalid=${p.invalid}
+          value=${draft ?? p.text} onInput=${(e) => this.setState({ draft: e.target.value })} onBlur=${this.commit}></textarea>
+        ${p.invalid ? html`<p class="err" role="alert">${LL.t('polish.invalid')}</p>` : html`<p class="hint">${LL.t('polish.save')}</p>`}
+      </section>`;
+    }
+  }
+
   const Voice = ({ v }) => html`<div>
     <${Row} id="mic" title=${LL.t('mic')} desc=${LL.t('mic.desc')}>
       <${Select} id="mic" value=${v.microphone} options=${v.microphones.map((name) => [name, name || LL.t('mic.default')])} onChange=${set('microphone')}/>
@@ -92,6 +122,7 @@
     <${Row} id="preload" title=${LL.t('preload')} desc=${LL.t('preload.desc')}>
       <${Switch} id="preload" checked=${v.preloadSpeech} onChange=${(on) => set('preloadSpeech')(String(on))}/>
     <//>
+    <${Polish} p=${{ text: v.polishPrompt, isDefault: v.polishPromptIsDefault, invalid: v.polishPromptInvalid }}/>
     <${Terms} terms=${v.terms}/>
   </div>`;
 

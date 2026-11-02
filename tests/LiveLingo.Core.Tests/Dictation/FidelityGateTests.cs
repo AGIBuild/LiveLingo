@@ -6,6 +6,15 @@ namespace LiveLingo.Core.Tests.Dictation;
 public class FidelityGateTests
 {
     [Fact]
+    public void FinalPolish_MayUseParagraphsWithoutChangingContent()
+    {
+        const string raw = "先改接口。然后补测试。";
+        const string polished = "先改接口。\n然后补测试。";
+        Assert.True(FidelityGate.Check(raw, polished, allowParagraphs: true).Accepted);
+        Assert.False(FidelityGate.Check(raw, polished).Accepted);
+    }
+
+    [Fact]
     public void Accepts_a_cleanup_that_removes_fillers_and_keeps_content()
     {
         var gate = FidelityGate.Check("呃，那个，我们我们今天讨论 Redis 的过期时间。", "我们今天讨论 Redis 的过期时间。");

@@ -71,7 +71,9 @@
     render({ source, options }) {
       const live = source.mode === 'live';
       return html`<section class="pane src" aria-label=${source.label}>
-        <div class="pane-label"><span id="src-label">${source.label}</span>${source.routeChip && html`<span id="route-chip" class="chip mini">${LL.t('routeChip')}</span>`}</div>
+        <div class="pane-label"><span id="src-label">${source.label}</span>${source.routeChip && html`<span id="route-chip" class="chip mini">${LL.t('routeChip')}</span>`}
+          <button type="button" id="clear" class="clear-button" disabled=${!source.canClear} title=${LL.t('clearAria')}
+            aria-label=${LL.t('clearAria')} onClick=${() => LL.send('newDraft')}>${LL.t('clear')}</button></div>
         <textarea id="src" ref=${this.setBox} rows="2" spellcheck="false" placeholder=${LL.t('placeholder')} aria-label=${source.label}
           hidden=${live} readOnly=${!source.editable} onInput=${this.onInput} oncompositionstart=${this.onCompositionStart}
           oncompositionend=${this.onCompositionEnd}></textarea>

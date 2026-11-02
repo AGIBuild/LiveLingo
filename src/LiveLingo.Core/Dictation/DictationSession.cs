@@ -29,6 +29,7 @@ public sealed class DictationSession : IAsyncDisposable
     private readonly IVoiceActivityDetector _vad;
     private readonly ISegmentRecognizer? _secondPass;
     private readonly DraftSession _draft;
+    private readonly int _draftEpoch;
     private readonly DictationOptions _options;
 
     private readonly AudioBuffer _audio = new();
@@ -68,6 +69,7 @@ public sealed class DictationSession : IAsyncDisposable
         _vad = vad;
         _secondPass = secondPass;
         _draft = draft;
+        _draftEpoch = draft.Read(d => d.Epoch);
         _options = options ?? new DictationOptions();
     }
 
@@ -85,7 +87,11 @@ public sealed class DictationSession : IAsyncDisposable
     public void Start()
     {
         _clock.Start();
-        _draft.Mutate(draft => draft.Recording = true);
+        _draft.Mutate(draft =>
+        {
+            if (draft.Epoch == _draftEpoch && draft.Snapshot is null)
+                draft.Recording = true;
+        });
         _recognitionTask = Task.Run(RecognitionLoopAsync);
         _secondPassTask = Task.Run(SecondPassLoopAsync);
     }
@@ -398,6 +404,8 @@ public sealed class DictationSession : IAsyncDisposable
         _publishedPending = pending;
         _draft.Mutate(draft =>
         {
+            if (draft.Epoch != _draftEpoch || draft.Snapshot is not null)
+                return;
             foreach (var passage in passages)
                 draft.Append(passage);
             draft.SetPending(pending);
@@ -435,7 +443,11 @@ public sealed class DictationSession : IAsyncDisposable
         }
 
         Settle(endPassage: true);
-        _draft.Mutate(draft => draft.Recording = false);
+        _draft.Mutate(draft =>
+        {
+            if (draft.Epoch == _draftEpoch && draft.Snapshot is null)
+                draft.Recording = false;
+        });
     }
 
     private static async Task WaitAsync(Task task, long deadline)

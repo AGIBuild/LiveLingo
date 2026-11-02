@@ -1,4 +1,5 @@
 using LiveLingo.Core.Drafting;
+using LiveLingo.Core.Inference;
 using LiveLingo.Core.Translation;
 using LiveLingo.Desktop.Services.Localization;
 
@@ -157,6 +158,22 @@ public sealed class ComposerTexts(ILocalizationService loc, bool? mac = null)
     public string MicStart => loc.T("composer.mic.start", Cap("dictate"));
     public string MicStop => loc.T("composer.mic.stop", Cap("dictate"));
     public string CopyAria => loc.T("composer.copy.aria");
+    public string ModelDetail(ModelStage stage, ModelUse? use, ModelUse? previous)
+    {
+        var label = loc.T($"composer.model.{stage}");
+        if (use is null)
+            return label + ": " + loc.T("composer.model.unused");
+        var detail = use switch
+        {
+            { Cloud: true, Confirmed: false } => loc.T("composer.model.requested", use.Name),
+            { Cloud: true } => loc.T("composer.model.cloud", use.Name),
+            { Confirmed: true } => loc.T("composer.model.local", use.Name),
+            _ when previous is not null => loc.T("composer.model.switching", use.Name, previous.Name),
+            _ => loc.T("composer.model.preparing", use.Name)
+        };
+        return label + ": " + detail;
+    }
+    public string CleanupPreview => loc.T("composer.result.preview");
 
     public string Status(StatusInfo info)
     {
@@ -168,8 +185,19 @@ public sealed class ComposerTexts(ILocalizationService loc, bool? mac = null)
             return loc.T("composer.status.listening", Clock(info.RecordingSeconds), Cap("dictate"));
         if (info.Status == ComposerStatus.Transcribing)
             return loc.T("composer.status.transcribing", info.TranscribePercent);
+        if (info.Status == ComposerStatus.Clearing)
+            return loc.T("composer.status.clearing");
+        if (info.Polishing)
+            return loc.T("composer.status.polishing");
         if (info.Armed)
             return loc.T("composer.status.armed");
+        if (info.Status == ComposerStatus.Ready && info.Output == ComposerOutput.Clean)
+        {
+            if (info.PolishOutcome == PolishOutcome.KeptPreview)
+                return loc.T("composer.status.polish.kept");
+            if (info.PolishOutcome == PolishOutcome.DefaultRequirements)
+                return loc.T("composer.status.polish.default");
+        }
 
         return info.Status switch
         {
@@ -268,6 +296,11 @@ public sealed class ComposerTexts(ILocalizationService loc, bool? mac = null)
         ["zoomAria"] = ZoomAria,
         ["unzoomAria"] = UnzoomAria,
         ["copyAria"] = CopyAria,
+        ["clear"] = loc.T("composer.clear"),
+        ["clearAria"] = loc.T("composer.clear.aria", Cap("new")),
+        ["modelInfo"] = loc.T("composer.model.info"),
+        ["modelCloud"] = loc.T("composer.model.cloud.badge"),
+        ["modelCloudAria"] = loc.T("composer.model.cloud.aria"),
         ["resultAria"] = ResultAria,
         ["routeChip"] = RouteChip,
         ["rowRetry"] = RowRetry,

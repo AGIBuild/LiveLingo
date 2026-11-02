@@ -66,7 +66,7 @@ public sealed class CleanupScheduler : IAsyncDisposable
 
             ObserveEdits(_time.GetUtcNow());
 
-            if (_inFlight is { } flight && !_session.Read(draft => draft.IsCurrent(flight.Ticket, UnitKind.Clean)))
+            if (_inFlight is { } flight && _session.Read(draft => draft.Polishing || !draft.IsCurrent(flight.Ticket, UnitKind.Clean)))
                 flight.Cancel.Cancel();
 
             StartWorkerIfNeeded();
@@ -194,7 +194,8 @@ public sealed class CleanupScheduler : IAsyncDisposable
     /// <summary>The next unit to clean, or how long typing must stay still before the last unit is cleaned.</summary>
     private ((JobTicket Ticket, CleanupRequest Request)? Next, TimeSpan? Wait) Find(Draft draft, DateTimeOffset now)
     {
-        if (draft.Snapshot is not null || draft.Output != OutputKind.Clean)
+        // The polish of the whole dictation reads the original text and goes first; units it could not polish are cleaned after it.
+        if (draft.Snapshot is not null || draft.Output != OutputKind.Clean || draft.Polishing)
             return (null, null);
 
         var units = draft.Units;

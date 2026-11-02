@@ -15,17 +15,48 @@ public sealed class Draft
     public Draft(bool hasTarget) => Reset(hasTarget);
 
     public IReadOnlyList<DraftUnit> Units => _units;
+    internal int Epoch => _epoch;
     public OutputKind Output { get; set; }
     public DraftRoute Route { get; private set; }
     public bool HasTarget { get; private set; }
     public bool TargetLost { get; set; }
-    public bool Recording { get; set; }
+
+    private bool _recording;
+
+    /// <summary>
+    /// While true the draft cannot be written. When it turns false after a recording and a polish is expected
+    /// (<see cref="PolishExpected"/>), <see cref="Polishing"/> turns true in the same step, so there is no moment in which the
+    /// text looks finished although the polish has not started.
+    /// </summary>
+    public bool Recording
+    {
+        get => _recording;
+        set
+        {
+            if (_recording && !value && PolishExpected)
+                Polishing = true;
+            else if (value)
+            {
+                Polishing = false;
+                PolishOutcome = PolishOutcome.None;
+            }
+            if (value && !_recording)
+                DictationRevision++;
+            _recording = value;
+        }
+    }
+
+    /// <summary>A polish of the finished dictation exists for this draft (cleanup is on); set once by whoever owns the polish.</summary>
+    public bool PolishExpected { get; set; }
+
+    public int DictationRevision { get; private set; }
 
     /// <summary>
     /// The whole dictation is being polished after recording stopped. What is written then would be the unpolished
     /// text, so with cleanup as the output the draft counts as still processing until the polish is done.
     /// </summary>
     public bool Polishing { get; set; }
+    public PolishOutcome PolishOutcome { get; set; }
 
     /// <summary>
     /// Speech that has been recognized but not settled into units yet (the live hypothesis). It is shown after the
@@ -45,6 +76,7 @@ public sealed class Draft
     public void Reset(bool hasTarget)
     {
         _epoch++;
+        DictationRevision++;
         SourceRevision++;
         _translationRevision = 0;
         _units.Clear();
@@ -52,8 +84,9 @@ public sealed class Draft
         Route = DraftRoute.Units;
         HasTarget = hasTarget;
         TargetLost = false;
-        Recording = false;
+        _recording = false;
         Polishing = false;
+        PolishOutcome = PolishOutcome.None;
         Pending = "";
         Snapshot = null;
     }
@@ -151,7 +184,7 @@ public sealed class Draft
     /// </summary>
     public int? Collapse(IReadOnlyList<int> unitIds, string clean)
     {
-        if (Snapshot is not null || unitIds.Count < 2)
+        if (Snapshot is not null || unitIds.Count == 0)
             return null;
 
         var first = _units.FindIndex(unit => unit.Id == unitIds[0]);
@@ -160,7 +193,7 @@ public sealed class Draft
 
         var run = _units.GetRange(first, unitIds.Count);
         if (!run.Select(unit => unit.Id).SequenceEqual(unitIds)
-            || run.Any(unit => unit.Clean.IsOwned || unit.Lead.Length > 0 || unit.Trail.Length > 0))
+            || run.Any(unit => unit.Clean.IsOwned || unit.Translation.IsOwned || unit.Lead.Length > 0 || unit.Trail.Length > 0))
             return null;
 
         var merged = NewUnit(new SourceUnit(TextUnits.Join(run.Select(unit => ("", unit.Raw, ""))), IsComplete: run[^1].IsComplete));
@@ -253,14 +286,15 @@ public sealed class Draft
     public void UseRaw(int index) => Edit(index, UnitKind.Clean, _units[index].Raw);
 
     /// <summary>Drops every translation and invalidates the ones still in flight (the target language changed).</summary>
-    public void InvalidateTranslations()
+    public void InvalidateTranslations(bool preserveEdits = false)
     {
         if (Snapshot is not null)
             return;
 
         _translationRevision++;
         foreach (var unit in _units)
-            unit.Translation.Clear();
+            if (!preserveEdits || !unit.Translation.IsOwned)
+                unit.Translation.Clear();
     }
 
     public void Retarget(bool hasTarget)
@@ -294,13 +328,15 @@ public sealed class Draft
     {
         if (_units.Count == 0)
             return Readiness.Blocked(BlockReason.Empty);
+        if (Polishing && Output == OutputKind.Clean)
+            return Readiness.Blocked(BlockReason.Processing);
 
         if (Output != OutputKind.Raw)
         {
             var states = _units.Select(unit => StateOf(unit, Output)).ToList();
             if (states.Any(state => state is UnitState.Error or UnitState.Empty))
                 return Readiness.Blocked(BlockReason.Unavailable);
-            if (states.Contains(UnitState.Pending) || (Polishing && Output == OutputKind.Clean))
+            if (states.Contains(UnitState.Pending))
                 return Readiness.Blocked(BlockReason.Processing);
         }
 

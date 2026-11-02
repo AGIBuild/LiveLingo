@@ -33,6 +33,16 @@ public sealed partial class ComposerViewModel
     /// <summary>The source is processed as one document, so the "whole" chip shows next to the label.</summary>
     [ObservableProperty] private bool _isWholeRoute;
 
+    /// <summary>The whole dictation is being polished after recording stopped; writing waits for it.</summary>
+    [ObservableProperty] private bool _isPolishing;
+    [ObservableProperty] private bool _isClearing;
+
+    partial void OnIsClearingChanged(bool value)
+    {
+        UpdateEditable();
+        Refresh();
+    }
+
     /// <summary>The sentences of the source pane while listening or showing a transcript.</summary>
     [ObservableProperty] private IReadOnlyList<SourceLine> _sourceLines = [];
 
@@ -70,29 +80,47 @@ public sealed partial class ComposerViewModel
     [RelayCommand]
     private async Task NewDraftAsync()
     {
-        await StopListeningAsync().ConfigureAwait(true);
-        _transcribing?.Cancel();
-        CancelQueuedWrite();
-        EditingIndex = -1;
-        _committed = null;
-        _segments = [];
-        HasTimeline = false;
-        _applyingDraftText = true;
+        if (IsClearing)
+            return;
+        IsClearing = true;
         try
         {
-            SourceText = "";
+            _draftGeneration++;
+            CancelQueuedWrite();
+            _wantsVoice = false;
+            _pendingImport = null;
+            _transcribing?.Cancel();
+            if (_importTask is { IsCompleted: false } importing)
+                await importing.ConfigureAwait(true);
+            if (_startingVoice is { IsCompleted: false } starting)
+                await starting.ConfigureAwait(true);
+            await StopListeningAsync().ConfigureAwait(true);
+            EditingIndex = -1;
+            _committed = null;
+            _segments = [];
+            HasTimeline = false;
+            TranscriptName = "";
+            _applyingDraftText = true;
+            try
+            {
+                SourceText = "";
+            }
+            finally
+            {
+                _applyingDraftText = false;
+            }
+
+            var hasTarget = HasTarget;
+            _session.Mutate(draft => draft.Reset(hasTarget));
+            ApplyDraftOutput();
+            Banner = BannerState.None;
+            UpdateEditable();
+            Refresh();
         }
         finally
         {
-            _applyingDraftText = false;
+            IsClearing = false;
         }
-
-        var hasTarget = HasTarget;
-        _session.Mutate(draft => draft.Reset(hasTarget));
-        ApplyDraftOutput();
-        Banner = BannerState.None;
-        UpdateEditable();
-        Refresh();
     }
 
     [RelayCommand]

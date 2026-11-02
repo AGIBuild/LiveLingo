@@ -32,6 +32,9 @@ internal static class SettingsScenarios
             m.Composer.CleanupEnabled = false;
             m.Composer.Glossary = "Redis\n缓存穿透=cache penetration";
         }),
+        ["settings-polish-custom"] = () => Open("voice", model: m =>
+            m.Composer.PolishPrompt = "保留我的口语风格，修正明显错字，按完整意思分段，不要添加信息。"),
+        ["settings-polish-invalid"] = () => Open("voice", then: f => f.Vm.PolishPrompt = "bad"),
         ["settings-privacy"] = () => Open("privacy"),
         ["settings-apps"] = () => Open("privacy", remembered: new PreferencesData
         {

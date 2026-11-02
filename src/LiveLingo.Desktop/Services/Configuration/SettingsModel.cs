@@ -93,6 +93,12 @@ public partial class ComposerSettings : ObservableObject
     /// </summary>
     [ObservableProperty] private bool _rememberChoices = true;
 
+    /// <summary>
+    /// The user's polish requirements (see <c>PolishStyle</c>); empty means the built-in ones. A text that is not usable
+    /// (damaged file, too long) is treated as empty wherever it is used.
+    /// </summary>
+    [ObservableProperty] private string _polishPrompt = "";
+
     public ComposerSettings DeepClone() => new()
     {
         CleanupEnabled = CleanupEnabled,
@@ -100,6 +106,7 @@ public partial class ComposerSettings : ObservableObject
         AutoDictate = AutoDictate,
         PreloadSpeech = PreloadSpeech,
         RememberChoices = RememberChoices,
+        PolishPrompt = PolishPrompt,
         TranslatorTier = TranslatorTier,
         Glossary = Glossary,
         CommitKey = CommitKey,

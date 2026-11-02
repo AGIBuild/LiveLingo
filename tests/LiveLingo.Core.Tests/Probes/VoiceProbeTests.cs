@@ -56,7 +56,8 @@ public class VoiceProbeTests(ITestOutputHelper output)
             var draft = new DraftSession(hasTarget: true);
             draft.Mutate(d => d.Output = OutputKind.Clean);
             await using var cleanup = new CleanupScheduler(draft, cleaner, [], contextChars: 300);
-            await using var polish = new PolishScheduler(draft, cleaner, [], contextChars: 300);
+            await using var polish = new PolishScheduler(
+                draft, provider.GetRequiredService<IDictationPolisher>(), [], PolishStyle.Default, contextChars: 300);
 
             var loading = Stopwatch.StartNew();
             var session = await factory.CreateAsync(draft, [], CancellationToken.None);
@@ -73,24 +74,9 @@ public class VoiceProbeTests(ITestOutputHelper output)
             var stopping = Stopwatch.StartNew();
             await session.DisposeAsync();
             var settled = stopping.ElapsedMilliseconds;
-            while (draft.Read(d => d.Units.Any(u => u.Clean.Text is null && u.Clean.Error.Length == 0)) && stopping.ElapsedMilliseconds < 60_000)
+            while (draft.Read(d => d.Polishing || d.Units.Any(u => u.Clean.Text is null && u.Clean.Error.Length == 0)) && stopping.ElapsedMilliseconds < 120_000)
                 await Task.Delay(50);
-
-            var beforePolish = draft.Read(d => TextUnits.Join(d.Units.Select(u => (u.Lead, u.Clean.Text ?? u.Raw, u.Trail))));
-            output.WriteLine($"[{id}] passages: {beforePolish}");
-            // The polish runs after the passages are cleaned; wait until the number of units has not changed for a while.
-            var count = draft.Read(d => d.Units.Count);
-            var stableSince = Stopwatch.StartNew();
-            while (stableSince.ElapsedMilliseconds < 12_000 && stopping.ElapsedMilliseconds < 120_000)
-            {
-                await Task.Delay(100);
-                var now = draft.Read(d => d.Units.Count);
-                if (now != count)
-                {
-                    count = now;
-                    stableSince.Restart();
-                }
-            }
+            Assert.False(draft.Read(d => d.Polishing), $"{id}: polish did not finish in time");
             var (raw, cleaned, warnings) = draft.Read(d => (
                 d.SourceText(),
                 TextUnits.Join(d.Units.Select(u => (u.Lead, u.Clean.Text ?? u.Raw, u.Trail))),

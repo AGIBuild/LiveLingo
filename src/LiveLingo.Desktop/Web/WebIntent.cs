@@ -32,6 +32,7 @@ namespace LiveLingo.Desktop.Web;
 [JsonDerivedType(typeof(CancelEditIntent), "cancelEdit")]
 [JsonDerivedType(typeof(UseOriginalIntent), "useOriginal")]
 [JsonDerivedType(typeof(NewDraftIntent), "newDraft")]
+[JsonDerivedType(typeof(ModelInfoIntent), "modelInfo")]
 [JsonDerivedType(typeof(RestoreRecentIntent), "restoreRecent")]
 [JsonDerivedType(typeof(ClearRecentIntent), "clearRecent")]
 [JsonDerivedType(typeof(ImportIntent), "import")]
@@ -118,6 +119,8 @@ internal abstract record WebIntent
 }
 
 internal sealed record ReadyIntent : WebIntent;
+
+internal sealed record ModelInfoIntent : WebIntent;
 
 /// <summary>The page content size in CSS pixels; the window follows it.</summary>
 internal sealed record SizeIntent(int Width, int Height) : WebIntent
@@ -237,6 +240,7 @@ internal sealed record SettingIntent(string Key, string Value) : WebIntent
         public const string AutoDictate = "autoDictate";
         public const string PreloadSpeech = "preloadSpeech";
         public const string RememberChoices = "rememberChoices";
+        public const string PolishPrompt = "polishPrompt";
         public const string CloudBaseUrl = "cloudBaseUrl";
         public const string CloudModel = "cloudModel";
     }
@@ -247,6 +251,8 @@ internal sealed record SettingIntent(string Key, string Value) : WebIntent
         Names.Hotkey => Value.Length <= 64,
         Names.Microphone or Names.CloudModel => Value.Length <= 256,
         Names.CloudBaseUrl => Value.Length <= 2_048,
+        // Bounded only; whether the text is a usable set of requirements is the view model's call (it flags it).
+        Names.PolishPrompt => Value.Length <= 4_000,
         Names.CommitKey => SettingsViewModel.CommitKeys.Contains(Value),
         Names.Language => SettingsViewModel.Languages.Contains(Value),
         Names.Theme => SettingsViewModel.Themes.Contains(Value),

@@ -47,7 +47,8 @@
     "hint": false,
     "lines": [],
     "resume": null,
-    "remembered": null
+    "remembered": null,
+    "canClear": true
   },
   "result": {
     "visible": true,
@@ -87,7 +88,8 @@
   "footer": {
     "mic": {
       "recording": false,
-      "aria": "开始听写（⌘D）"
+      "aria": "开始听写（⌘D）",
+      "enabled": true
     },
     "status": {
       "text": "2 句 · 本地处理",

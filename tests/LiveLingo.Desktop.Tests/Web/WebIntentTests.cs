@@ -7,6 +7,7 @@ public sealed class WebIntentTests
 {
     [Theory]
     [InlineData("""{"v":1,"name":"ready"}""", typeof(ReadyIntent))]
+    [InlineData("""{"v":1,"name":"modelInfo"}""", typeof(ModelInfoIntent))]
     [InlineData("""{"v":1,"name":"size","width":656,"height":300}""", typeof(SizeIntent))]
     [InlineData("""{"v":1,"name":"drag"}""", typeof(DragIntent))]
     [InlineData("""{"v":1,"name":"resize","width":900,"height":null}""", typeof(ResizeIntent))]
