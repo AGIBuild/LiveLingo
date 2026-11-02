@@ -4,6 +4,47 @@ namespace LiveLingo.Core.Tests.Drafting;
 
 public class DraftTests
 {
+    [Fact]
+    public void ModelSwitch_InvalidatesGeneratedTranslationsButKeepsManualEdits()
+    {
+        var draft = new Draft(true);
+        var first = draft.Append("先检查缓存。");
+        var second = draft.Append("不要合并。");
+        draft.Complete(first, UnitKind.Translation, "Check the cache.");
+        draft.Complete(second, UnitKind.Translation, "Do not merge.");
+        draft.Edit(0, UnitKind.Translation, "My wording.");
+        draft.InvalidateTranslations(preserveEdits: true);
+        Assert.Equal("My wording.", draft.Units[0].Translation.Text);
+        Assert.Null(draft.Units[1].Translation.Text);
+        Assert.False(draft.Complete(second, UnitKind.Translation, "Late old-model answer."));
+    }
+
+    [Fact]
+    public void StoppingRecording_BlocksUnpolishedInsertionBeforeNotificationsRun()
+    {
+        var draft = new Draft(hasTarget: true) { PolishExpected = true };
+        draft.Complete(draft.Append("先改接口。"), UnitKind.Clean, "先改接口。");
+        draft.Recording = true;
+        draft.Recording = false;
+        Assert.True(draft.Polishing);
+        Assert.Equal(BlockReason.Processing, draft.RequestCommit().Blocked);
+        draft.Output = OutputKind.Raw;
+        Assert.True(draft.InsertionReadiness().IsReady);
+        draft.Reset(true);
+        Assert.False(draft.Polishing);
+    }
+
+    [Fact]
+    public void FinalPolish_TakesPriorityOverAnOldPreviewError()
+    {
+        var draft = new Draft(true);
+        draft.Fail(draft.Append("先改接口。"), UnitKind.Clean, "Old preview error");
+        draft.Polishing = true;
+        Assert.Equal(BlockReason.Processing, draft.ContentReadiness().Reason);
+        draft.Polishing = false;
+        Assert.Equal(BlockReason.Unavailable, draft.ContentReadiness().Reason);
+    }
+
     private static (Draft Draft, JobTicket Ticket) Ready()
     {
         var draft = new Draft(hasTarget: true);
@@ -252,7 +293,7 @@ public class DraftTests
         var b = draft.Append("二。").UnitId;
         var c = draft.Append("三。").UnitId;
 
-        Assert.Null(draft.Collapse([a], "x"));
+        Assert.Null(draft.Collapse([], "x"));
         Assert.Null(draft.Collapse([a, c], "x"));
         Assert.Null(draft.Collapse([c, 99], "x"));
         Assert.Null(draft.Collapse([99, 100], "x"));

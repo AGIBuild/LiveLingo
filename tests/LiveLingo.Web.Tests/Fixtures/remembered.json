@@ -50,7 +50,8 @@
     "remembered": {
       "text": "已沿用「Slack」上次的选择：翻译成 English",
       "action": "恢复默认"
-    }
+    },
+    "canClear": false
   },
   "result": {
     "visible": false,
@@ -61,7 +62,8 @@
   "footer": {
     "mic": {
       "recording": false,
-      "aria": "开始听写（⌘D）"
+      "aria": "开始听写（⌘D）",
+      "enabled": true
     },
     "status": {
       "text": "",

@@ -30,7 +30,7 @@ internal sealed record RememberedState(string Text, string Action);
 /// <param name="Remembered">Said together with the hint of an empty composer that stands on a remembered choice; null otherwise.</param>
 internal sealed record SourceState(
     string Mode, string Text, int SourceRev, bool Editable, string Label, bool RouteChip, bool Hint, IReadOnlyList<SourceLineState> Lines,
-    ResumeState? Resume, RememberedState? Remembered);
+    ResumeState? Resume, RememberedState? Remembered, bool CanClear);
 
 internal sealed record RowState(
     int I, string State, string Text, string Note, string Time, bool Warn, bool Owned, bool Editing,
@@ -39,7 +39,7 @@ internal sealed record RowState(
 /// <param name="EditText">The page takes it once, when a sentence starts being edited.</param>
 internal sealed record ResultState(bool Visible, string Label, IReadOnlyList<RowState> Rows, string EditText);
 
-internal sealed record MicState(bool Recording, string Aria);
+internal sealed record MicState(bool Recording, string Aria, bool Enabled);
 
 internal sealed record StatusState(string Text, string Tone);
 
@@ -123,17 +123,23 @@ internal sealed record ComposerViewState(
                     : null,
                 empty && vm.Remembered is { } remembered
                     ? new RememberedState(texts.RememberedNote(remembered, vm.Output, vm.TargetLanguage), texts.RestoreDefaults)
-                    : null),
+                    : null,
+                !vm.IsClearing && !vm.IsWritten && (vm.SourceText.Length > 0 || vm.HasTimeline || vm.IsListening || vm.IsStartingListening || vm.IsTranscribing)),
             Result: new ResultState(
                 hasResult,
-                texts.ResultLabel(vm.Output, vm.TargetLanguage),
+                vm.IsListening && vm.Output == ComposerOutput.Clean
+                    ? texts.CleanupPreview
+                    : texts.ResultLabel(vm.Output, vm.TargetLanguage),
                 hasResult ? [.. vm.Lines.Select(line => Row(line, vm, texts))] : [],
                 vm.EditText),
             Footer: new FooterState(
-                new MicState(vm.IsListening, vm.IsListening ? texts.MicStop : texts.MicStart),
+                new MicState(vm.IsListening, vm.IsListening ? texts.MicStop : texts.MicStart,
+                    !vm.IsClearing),
                 new StatusState(
                     texts.Status(vm.StatusInfo),
-                    !vm.IsListening && vm.Status == ComposerStatus.Failed ? "warn" : "muted"),
+                    !vm.IsListening && (vm.Status == ComposerStatus.Failed ||
+                        vm.Output == ComposerOutput.Clean && vm.StatusInfo.PolishOutcome == LiveLingo.Core.Drafting.PolishOutcome.KeptPreview)
+                        ? "warn" : "muted"),
                 vm.CanCopy,
                 new CommitState(
                     texts.CommitLabel(vm.IsWritten, armed, vm.HasTarget, targetName),

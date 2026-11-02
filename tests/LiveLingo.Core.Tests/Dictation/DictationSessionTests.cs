@@ -6,6 +6,36 @@ namespace LiveLingo.Core.Tests.Dictation;
 
 public class DictationSessionTests
 {
+    private sealed class SlowLive : ILiveRecognizer
+    {
+        public ManualResetEventSlim Entered { get; } = new();
+        public ManualResetEventSlim Release { get; } = new();
+        public bool Disposed { get; private set; }
+        public string CurrentText => "旧录音里的内容。";
+        public void Accept(ReadOnlySpan<float> samples) { Entered.Set(); Release.Wait(5000); }
+        public string CloseSegment() => CurrentText;
+        public void Dispose() => Disposed = true;
+    }
+
+    [Fact]
+    public async Task RecognitionThatOutlivesStopTimeout_CannotWriteIntoAResetDraft()
+    {
+        var draft = new DraftSession(true);
+        var live = new SlowLive();
+        await using var session = new DictationSession(live, new ScriptedVad([]), null, draft,
+            new DictationOptions { StopTimeoutMs = 20, PassageMaxChars = 1 });
+        session.Start();
+        session.Push(new float[640]);
+        Assert.True(await Until(() => live.Entered.IsSet));
+        await session.DisposeAsync();
+        draft.Mutate(d => d.Reset(true));
+        live.Release.Set();
+        Assert.True(await Until(() => live.Disposed));
+        Assert.Empty(draft.Read(d => d.Units));
+        Assert.Empty(draft.Read(d => d.Pending));
+        Assert.Empty(draft.Read(d => d.SourceText()));
+    }
+
     private static readonly ScriptedSegment A = new(300, 2300, "把下载超时设成三十秒。");
     private static readonly ScriptedSegment B = new(2800, 4800, "只改下载接口，其他请求不要动。");
 

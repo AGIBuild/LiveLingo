@@ -257,6 +257,18 @@ public class CleanupSchedulerTests
     }
 
     [Fact]
+    public async Task FinalPolish_CancelsPassageWorkInsteadOfWaitingBehindIt()
+    {
+        await using var h = new Harness();
+        h.Speak("先改接口。");
+        var call = await h.NextCall(1);
+        h.Session.Mutate(d => d.Polishing = true);
+        await WaitUntil(() => call.Token.IsCancellationRequested);
+        Assert.Null(h.CleanOf(0));
+        Assert.Single(h.Cleaner.Calls);
+    }
+
+    [Fact]
     public async Task EditingTheSource_CancelsItsRequest_AndCleansTheNewText()
     {
         await using var h = new Harness();

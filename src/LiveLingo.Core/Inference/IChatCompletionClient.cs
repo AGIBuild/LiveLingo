@@ -10,7 +10,7 @@ public sealed record ChatRequest(
     IReadOnlyDictionary<string, object> Extra,
     string? System = null);
 
-public sealed record ChatCompletion(string Text, double FirstVisibleMs, double TotalMs, int OutputTokens);
+public sealed record ChatCompletion(string Text, double FirstVisibleMs, double TotalMs, int OutputTokens, string? Model = null);
 
 /// <summary>Streams one chat completion from an OpenAI-compatible endpoint (local llama-server or cloud) and returns the full text.</summary>
 public interface IChatCompletionClient

@@ -16,7 +16,7 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
 {
     private readonly DraftSession _session;
     private readonly TranslationScheduler _scheduler;
-    private readonly ComposerModelPlan _plan;
+    private ComposerModelPlan _plan;
     private readonly IModelManager _models;
     private readonly IModelDownloadCoordinator _downloads;
     private readonly IPlatformServices _platform;
@@ -31,6 +31,9 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
     private bool _applyingDraftText;
     private bool _wantsVoice;
     private bool _stopAfterStart;
+    private Task? _startingVoice;
+    private Task? _stoppingVoice;
+    private int _draftGeneration;
 
     public ComposerViewModel(
         DraftSession session,
@@ -183,9 +186,13 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
             await StartListeningAsync().ConfigureAwait(true);
     }
 
-    public async Task StartListeningAsync()
+    public Task StartListeningAsync() =>
+        IsStartingListening && _startingVoice is { } starting ? starting : _startingVoice = StartListeningCoreAsync();
+
+    private async Task StartListeningCoreAsync()
     {
-        if (IsListening || IsStartingListening || IsTranscribing || HasTimeline || _committed is not null)
+        if (IsClearing || _stoppingVoice is { IsCompleted: false } ||
+            IsListening || IsStartingListening || IsTranscribing || HasTimeline || _committed is not null)
             return;
 
         if (EditingIndex >= 0)
@@ -233,7 +240,10 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
         }
     }
 
-    public async Task StopListeningAsync()
+    public Task StopListeningAsync() =>
+        _stoppingVoice is { IsCompleted: false } stopping ? stopping : _stoppingVoice = StopListeningCoreAsync();
+
+    private async Task StopListeningCoreAsync()
     {
         if (!IsListening)
             return;
@@ -258,12 +268,15 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
 
     public StatusInfo StatusInfo => new(
         Status, IsWritten, RecordingSeconds, IsWriteQueued, Lines.Count, Output,
-        CloudTranslate || CloudClean, (int)TranscribeProgress);
+        CloudTranslate || CloudClean, (int)TranscribeProgress, IsPolishing, _session.Read(d => d.PolishOutcome));
 
     /// <summary>Writes the result, or queues the write while it is still being produced.</summary>
     /// <param name="fromKey">The commit key was pressed; the button instead cancels an already queued write.</param>
     public async Task CommitAsync(bool fromKey)
     {
+        if (IsClearing)
+            return;
+        var generation = _draftGeneration;
         if (_committed is not null)
             return;
 
@@ -281,6 +294,8 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
             SaveEdit();
 
         await StopListeningAsync().ConfigureAwait(true);
+        if (generation != _draftGeneration)
+            return;
         if (Output != ComposerOutput.Original && !ModelsReady)
             return;
 
@@ -334,6 +349,18 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
     }
 
     public void OpenSettings(string section = "general") => SettingsRequested?.Invoke(section);
+
+    public void UpdateModelPlan(ComposerModelPlan plan)
+    {
+        CancelQueuedWrite();
+        _plan = plan;
+        ModelsReady = IsInstalled(_plan.For(Output));
+        if (Banner.Kind is BannerKind.ModelMissing or BannerKind.DownloadFailed)
+            Banner = BannerState.None;
+        _session.Mutate(d => d.InvalidateTranslations(preserveEdits: true));
+        ApplyDraftOutput();
+        Refresh();
+    }
 
     [RelayCommand]
     private async Task CancelAsync()
@@ -433,7 +460,7 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
     private void CancelQueuedWrite() => IsWriteQueued = false;
 
     private void UpdateEditable() =>
-        IsEditable = _committed is null && !IsListening && !IsStartingListening && !IsTranscribing && !HasTimeline;
+        IsEditable = _committed is null && !IsClearing && !IsListening && !IsStartingListening && !IsTranscribing && !HasTimeline;
 
     private async Task CompleteAsync(CommitSnapshot snapshot)
     {
@@ -547,11 +574,13 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
             Count: draft.Units.Count,
             Whole: draft.Route == DraftRoute.Whole,
             HasPending: draft.Pending.Length > 0,
+            Polishing: draft.Polishing && draft.Output == OutputKind.Clean && draft.Snapshot is null,
             TargetLost: draft.TargetLost));
 
         Lines = snapshot.Lines;
         SourceLines = snapshot.SourceLines;
         IsWholeRoute = snapshot.Whole;
+        IsPolishing = snapshot.Polishing;
         IsTargetLost = snapshot.TargetLost;
         IsWide = ForceWide || HasTimeline || snapshot.Whole;
         var status = StatusOf(snapshot.Count + (snapshot.HasPending ? 1 : 0), snapshot.Content);
@@ -612,6 +641,8 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
 
     private ComposerStatus StatusOf(int itemCount, Readiness content)
     {
+        if (IsClearing)
+            return ComposerStatus.Clearing;
         if (IsTranscribing)
             return ComposerStatus.Transcribing;
         if (IsStartingListening)

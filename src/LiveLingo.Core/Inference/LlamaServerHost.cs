@@ -15,21 +15,23 @@ public sealed record LlamaServerHostOptions(
 }
 
 /// <summary>
-/// A running server that is not unloaded for idleness while a lease is held. Replacing the model of a role or
-/// disposing the host stops the server immediately; requests in flight then fail with an explicit error.
+/// A running server that is not unloaded for idleness while a lease is held. Model replacement waits for leases;
+/// disposing the host stops the server immediately.
 /// </summary>
 public sealed class ServerLease : IDisposable
 {
     private readonly Action _release;
     private int _released;
 
-    internal ServerLease(IChatCompletionClient client, Action release)
+    internal ServerLease(ModelDescriptor model, IChatCompletionClient client, Action release)
     {
+        Model = model;
         Client = client;
         _release = release;
     }
 
     public IChatCompletionClient Client { get; }
+    public ModelDescriptor Model { get; }
 
     public void Dispose()
     {
@@ -59,6 +61,7 @@ public sealed class LlamaServerHost : IAsyncDisposable
         public IChatCompletionClient Client { get; } = client;
         public ITimer IdleTimer { get; } = idleTimer;
         public int Leases { get; set; }
+        public TaskCompletionSource Drained { get; set; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public bool Stopped { get; set; }
     }
 
@@ -114,6 +117,13 @@ public sealed class LlamaServerHost : IAsyncDisposable
 
             if (current is not null && (current.Process.HasExited || current.Model.Id != model.Id))
             {
+                if (!current.Process.HasExited)
+                {
+                    Task drained;
+                    lock (_gate)
+                        drained = current.Leases == 0 ? Task.CompletedTask : current.Drained.Task;
+                    await drained.WaitAsync(ct).ConfigureAwait(false);
+                }
                 await StopAsync(role, current).ConfigureAwait(false);
                 current = null;
             }
@@ -122,12 +132,14 @@ public sealed class LlamaServerHost : IAsyncDisposable
 
             lock (_gate)
             {
+                if (current.Leases == 0)
+                    current.Drained = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                 current.Leases++;
                 current.IdleTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
             }
 
             var instance = current;
-            return new ServerLease(instance.Client, () => Release(instance));
+            return new ServerLease(instance.Model, instance.Client, () => Release(instance));
         }
         finally
         {
@@ -266,8 +278,12 @@ public sealed class LlamaServerHost : IAsyncDisposable
     {
         lock (_gate)
         {
-            if (--instance.Leases == 0 && !instance.Stopped)
-                instance.IdleTimer.Change(_options.IdleTimeout, Timeout.InfiniteTimeSpan);
+            if (--instance.Leases == 0)
+            {
+                instance.Drained.TrySetResult();
+                if (!instance.Stopped)
+                    instance.IdleTimer.Change(_options.IdleTimeout, Timeout.InfiniteTimeSpan);
+            }
         }
     }
 

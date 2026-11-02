@@ -19,8 +19,7 @@
       const { composer: c, focus } = LL.state;
       if (!c) return;
       if (focus && focus.n !== this.focusHandled) {
-        this.focusHandled = focus.n;
-        focusTarget(focus.target);
+        if (focusTarget(focus.target)) this.focusHandled = focus.n;
       }
       LL.measure();
     }
@@ -50,8 +49,11 @@
 
   function focusTarget(target) {
     const source = document.getElementById('src');
+    // Clearing may send focus before the next snapshot replaces live speech with the text box.
+    if (target === 'source' && source?.hidden) return false;
     const element = target === 'edit' ? document.querySelector('.edit') : target === 'source' && !source.hidden ? source : document.getElementById('mic');
     element?.focus();
+    return !!element;
   }
 
   // Keys that are part of an input method composition are never commands. WKWebView reports the confirming Enter with

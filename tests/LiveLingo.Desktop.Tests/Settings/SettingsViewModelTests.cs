@@ -1,4 +1,5 @@
 using LiveLingo.Core.Models;
+using LiveLingo.Core.Cleanup;
 using LiveLingo.Core.Translation;
 using LiveLingo.Desktop.Composer;
 using LiveLingo.Desktop.Platform;
@@ -76,6 +77,36 @@ public class SettingsViewModelTests
     {
         var f = new Fixture();
 
+        Assert.Empty(f.Saved);
+    }
+
+    [Fact]
+    public void PolishRequirements_AreSaved_AndInvalidEditsKeepThePreviousValue()
+    {
+        var f = new Fixture();
+        Assert.Equal(PolishStyle.Default, f.Vm.PolishPromptShown);
+        Assert.True(f.Vm.PolishPromptIsDefault);
+        f.Vm.PolishPrompt = "Keep the original tone and use paragraphs.";
+        Assert.Equal(f.Vm.PolishPrompt, f.Last.Composer.PolishPrompt);
+        Assert.Equal(f.Last.Composer.PolishPrompt, f.Last.DeepClone().Composer.PolishPrompt);
+        f.Vm.PolishPrompt = "bad";
+        Assert.True(f.Vm.PolishPromptInvalid);
+        Assert.Equal("bad", f.Vm.PolishPromptShown);
+        Assert.Equal("Keep the original tone and use paragraphs.", f.Last.Composer.PolishPrompt);
+        f.Vm.PolishPrompt = "";
+        Assert.False(f.Vm.PolishPromptInvalid);
+        Assert.True(f.Vm.PolishPromptIsDefault);
+        Assert.Equal("", f.Last.Composer.PolishPrompt);
+    }
+
+    [Fact]
+    public void DamagedStoredRequirements_ShowTheDefault()
+    {
+        var model = new SettingsModel();
+        model.Composer.PolishPrompt = "bad";
+        var f = new Fixture(model);
+        Assert.True(f.Vm.PolishPromptIsDefault);
+        Assert.Equal(PolishStyle.Default, f.Vm.PolishPromptShown);
         Assert.Empty(f.Saved);
     }
 

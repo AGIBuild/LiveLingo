@@ -75,23 +75,32 @@ public static class ServiceCollectionExtensions
 
         // Everything stays on the machine unless the host registers routes (after this call) that send a role to the cloud.
         services.AddSingleton<ICloudRoutes, LocalOnlyRoutes>();
+        services.AddSingleton<ModelUsage>();
         services.AddSingleton<IInferenceWarmup, LlamaWarmup>();
-        services.AddSingleton<ITextCleaner>(sp => new LlmTextCleaner(new RoutedChatClient(
+        // The cleanup of a passage and the polish of a whole dictation are one role: one client, so they are routed
+        // (local or cloud) by the same setting.
+        services.AddKeyedSingleton<IChatCompletionClient>(InferenceRole.Cleaner, (sp, _) => new RoutedChatClient(
             InferenceRole.Cleaner,
             sp.GetRequiredService<ICloudRoutes>(),
             new LocalChatClient(
                 sp.GetRequiredService<LlamaServerHost>(),
                 InferenceRole.Cleaner,
-                () => InferenceModels.For(InferenceRole.Cleaner, sp.GetRequiredService<CoreOptions>().TranslatorTier)),
-            CloudHttp)));
+                () => InferenceModels.For(InferenceRole.Cleaner, sp.GetRequiredService<CoreOptions>().TranslatorTier),
+                sp.GetRequiredService<ModelUsage>()),
+            CloudHttp, sp.GetRequiredService<ModelUsage>()));
+        services.AddSingleton<ITextCleaner>(sp =>
+            new LlmTextCleaner(sp.GetRequiredKeyedService<IChatCompletionClient>(InferenceRole.Cleaner)));
+        services.AddSingleton<IDictationPolisher>(sp =>
+            new LlmDictationPolisher(sp.GetRequiredKeyedService<IChatCompletionClient>(InferenceRole.Cleaner)));
         services.AddSingleton<ITranslator>(sp => new LlmTranslator(new RoutedChatClient(
             InferenceRole.Translator,
             sp.GetRequiredService<ICloudRoutes>(),
             new LocalChatClient(
                 sp.GetRequiredService<LlamaServerHost>(),
                 InferenceRole.Translator,
-                () => InferenceModels.For(InferenceRole.Translator, sp.GetRequiredService<CoreOptions>().TranslatorTier)),
-            CloudHttp)));
+                () => InferenceModels.For(InferenceRole.Translator, sp.GetRequiredService<CoreOptions>().TranslatorTier),
+                sp.GetRequiredService<ModelUsage>()),
+            CloudHttp, sp.GetRequiredService<ModelUsage>())));
 
         return services;
     }

@@ -10,6 +10,7 @@ namespace LiveLingo.Desktop.Composer;
 public sealed partial class ComposerViewModel
 {
     private CancellationTokenSource? _transcribing;
+    private Task? _importTask;
     private string? _pendingImport;
     private IReadOnlyList<TimedSegment> _segments = [];
 
@@ -26,7 +27,7 @@ public sealed partial class ComposerViewModel
 
     /// <summary>Importing a recording or restoring an earlier draft replaces the draft, so both need an empty, idle composer.</summary>
     public bool CanReplaceDraft =>
-        _committed is null && !IsListening && !IsStartingListening && !IsTranscribing && !HasTimeline
+        _committed is null && !IsClearing && !IsListening && !IsStartingListening && !IsTranscribing && !HasTimeline
         && string.IsNullOrWhiteSpace(SourceText);
 
     partial void OnIsTranscribingChanged(bool value)
@@ -59,17 +60,26 @@ public sealed partial class ComposerViewModel
         await RunImportAsync(path).ConfigureAwait(true);
     }
 
-    private async Task RunImportAsync(string path)
+    private Task RunImportAsync(string path) => _importTask = TranscribeCoreAsync(path);
+
+    private async Task TranscribeCoreAsync(string path)
     {
         _pendingImport = null;
         Banner = BannerState.None;
         using var cancellation = _transcribing = new CancellationTokenSource();
+        var generation = _draftGeneration;
         TranscribeProgress = 0;
         IsTranscribing = true;
         try
         {
-            var progress = new Progress<double>(fraction => TranscribeProgress = fraction * 100);
+            var progress = new Progress<double>(fraction =>
+            {
+                if (generation == _draftGeneration)
+                    TranscribeProgress = fraction * 100;
+            });
             var segments = await _transcriber.TranscribeAsync(path, _glossary, progress, cancellation.Token).ConfigureAwait(true);
+            if (cancellation.IsCancellationRequested || generation != _draftGeneration)
+                return;
             if (segments.Count == 0)
                 Banner = new BannerState(BannerKind.NoSpeechFound);
             else
@@ -81,11 +91,15 @@ public sealed partial class ComposerViewModel
         }
         catch (ModelNotReadyException)
         {
+            if (generation != _draftGeneration)
+                return;
             _pendingImport = path;
             Banner = new BannerState(BannerKind.ModelMissing, MissingSizeLabel());
         }
         catch (Exception ex) when (ex is UnsupportedAudioException or IOException or UnauthorizedAccessException)
         {
+            if (generation != _draftGeneration)
+                return;
             Banner = new BannerState(BannerKind.FileFailed, ex.Message);
         }
         finally

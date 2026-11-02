@@ -56,6 +56,17 @@ public class OpenAiChatClientTests
     }
 
     [Fact]
+    public async Task ProviderModel_IsReturnedSeparatelyFromTheRequestedAlias()
+    {
+        var handler = new StubHandler(_ => Sse(
+            "data: {\"model\":\"actual-backend-model\",\"choices\":[{\"delta\":{\"content\":\"ok\"}}]}",
+            Stop, "data: [DONE]"));
+        var result = await ClientFor(handler, model: "deployment-alias")
+            .CompleteAsync(new ChatRequest("p", 8, 0, NoExtra), CancellationToken.None);
+        Assert.Equal("actual-backend-model", result.Model);
+    }
+
+    [Fact]
     public async Task CompleteAsync_SendsPromptAsOneUserMessage_WithExtraFields()
     {
         var handler = new StubHandler(_ => Sse(Delta("ok"), Stop, "data: [DONE]"));
