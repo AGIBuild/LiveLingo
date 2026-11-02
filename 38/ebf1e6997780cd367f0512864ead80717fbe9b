@@ -1,0 +1,147 @@
+tests/LiveLingo.Web.Tests/Fixtures/settings-models.json
+  s_6d6e9175f38e45::t_ffc40c58fea1c4 24
+src/LiveLingo.Core/Speech/Native/SherpaLiveRecognizer.cs
+  s_6d6e9175f38e45::t_72e0c7c5279410 2,9-10,14,21,23-24,26-27,29-31,44,78
+tests/LiveLingo.Web.Tests/Fixtures/settings-diagnostics.json
+  s_6d6e9175f38e45::t_ffc40c58fea1c4 24
+tests/LiveLingo.Desktop.Tests/Composer/ComposerHarness.cs
+  s_6d6e9175f38e45::t_b2736888abac6c 127-135
+  s_6d6e9175f38e45::t_0d2dbb19f80f8d 136
+tests/LiveLingo.Desktop.Tests/Web/ComposerScenarios.cs
+  s_6d6e9175f38e45::t_da2ee6d203deaf 22-27
+tests/LiveLingo.Web.Tests/Fixtures/settings-strings.json
+  s_6d6e9175f38e45::t_ffc40c58fea1c4 43-44
+src/LiveLingo.Desktop/Web/Assets/app/31-settings.js
+  s_6d6e9175f38e45::t_94e46f688bec9e 92-94
+tests/LiveLingo.Web.Tests/Fixtures/settings-cloud-invalid.json
+  s_6d6e9175f38e45::t_ffc40c58fea1c4 24
+src/LiveLingo.Desktop/Web/SettingsViewState.cs
+  s_6d6e9175f38e45::t_b954898d160b8d 16,76
+tests/LiveLingo.Core.Tests/Inference/LlamaServerHostTests.cs
+  s_6d6e9175f38e45::t_a0cdf8dceebc72 261-287
+  s_6d6e9175f38e45::t_1ae00a152ab4c5 235-260
+src/LiveLingo.Desktop/Services/Warmup/ModelWarmup.cs
+  s_6d6e9175f38e45::t_00a660b08eb0e1 1-123
+tests/LiveLingo.Core.Tests/ServiceCollectionExtensionsTests.cs
+  s_6d6e9175f38e45::t_8f775d6ec8bef9 27-41
+src/LiveLingo.Desktop/Web/SettingsIntents.cs
+  s_6d6e9175f38e45::t_5f7da98f8e3960 73
+src/LiveLingo.Desktop/Services/Configuration/SettingsModel.cs
+  s_6d6e9175f38e45::t_15453b5be09087 85-89,101
+  s_6d6e9175f38e45::t_0a4b3dd96f6351 84
+src/LiveLingo.Desktop/Settings/SettingsTexts.cs
+  s_6d6e9175f38e45::t_6fa25b9f9f0ee5 26
+src/LiveLingo.Desktop/Composer/ComposerTypes.cs
+  s_6d6e9175f38e45::t_570b93a3cfedf3 19-21
+src/LiveLingo.Desktop/Web/WebIntent.cs
+  s_6d6e9175f38e45::t_da7c13bb1e1585 220,238
+src/LiveLingo.Core/Speech/Native/SherpaSpeechEngine.cs
+  s_6d6e9175f38e45::t_cefc78e5b31710 1-37,58-74,76-110,112,114-116,118-131,133,135-140
+  s_6d6e9175f38e45::t_6f3fa849304228 38-57
+  s_6d6e9175f38e45::t_4804eca555c45d 75,111,113,117,132,134
+tests/LiveLingo.Web.Tests/Fixtures/settings-dark.json
+  s_6d6e9175f38e45::t_ffc40c58fea1c4 24
+src/LiveLingo.Desktop/Composer/ComposerViewModel.cs
+  s_6d6e9175f38e45::t_579814444634cd 73-74,78-87,392
+  s_6d6e9175f38e45::t_29651ee232563a 620
+src/LiveLingo.Desktop/Resources/i18n/en-US.json
+  s_6d6e9175f38e45::t_4d4aad87d0ba4d 114
+  s_6d6e9175f38e45::t_99dc6007e3d1d5 198-199
+src/LiveLingo.Core/Inference/IInferenceWarmup.cs
+  s_6d6e9175f38e45::t_746c91c2341228 1-25
+docs/superpowers/specs/2026-10-31-livelingo-composer-design.md
+  s_6d6e9175f38e45::t_1e751cb0be37b4 108
+src/LiveLingo.Core/Dictation/ISpeechWarmup.cs
+  s_6d6e9175f38e45::t_0f892c1597d408 1-24
+tests/LiveLingo.Desktop.Tests/Composer/ComposerTextsTests.cs
+  s_6d6e9175f38e45::t_f34dfed87e0005 28
+tests/LiveLingo.Web.Tests/ComposerRenderTests.cs
+  s_6d6e9175f38e45::t_29e6ca7b9c3828 52
+  s_6d6e9175f38e45::t_cc62b49c689c33 45-51,53-54
+  s_6d6e9175f38e45::t_2991f989e550ed 43-44
+tests/LiveLingo.Desktop.Tests/Web/WebIntentTests.cs
+  s_6d6e9175f38e45::t_78c3f1aa413f44 49,101
+README.md
+  s_6d6e9175f38e45::t_b96f3b57b5b518 33-35
+src/LiveLingo.Core/Inference/LlamaWarmup.cs
+  s_6d6e9175f38e45::t_4d7abe3b086df0 1-14
+tests/LiveLingo.Web.Tests/Fixtures/settings-voice.json
+  s_6d6e9175f38e45::t_ffc40c58fea1c4 24
+src/LiveLingo.Core/Models/ResidentModel.cs
+  s_6d6e9175f38e45::t_6d3e63761d08e6 1-234
+src/LiveLingo.Desktop/App.axaml.cs
+  s_6d6e9175f38e45::t_99fba0e6165b3a 262-266,285-289
+  s_6d6e9175f38e45::t_7c4b1d42794bf4 26
+  s_6d6e9175f38e45::t_713070727e26c6 95,134
+tests/LiveLingo.Desktop.Tests/Services/Warmup/ModelWarmupTests.cs
+  s_6d6e9175f38e45::t_9459383957594c 1-7,9-191,207-220
+  s_6d6e9175f38e45::t_00db8e37db99be 8,192-206
+tests/LiveLingo.Web.Tests/Fixtures/speech-preparing.json
+  s_6d6e9175f38e45::t_ffc40c58fea1c4 1-225
+tests/LiveLingo.Web.Tests/SettingsPageTests.cs
+  s_6d6e9175f38e45::t_68edca318a936e 323,326,329
+src/LiveLingo.Core/ServiceCollectionExtensions.cs
+  s_6d6e9175f38e45::t_17a05041bbc740 71-74,78,82-85,93
+tests/LiveLingo.Desktop.Tests/Settings/SettingsViewModelTests.cs
+  s_6d6e9175f38e45::t_78c3f1aa413f44 124
+  s_6d6e9175f38e45::t_4fa5005a1d8bf2 113,119
+tests/LiveLingo.Web.Tests/Fixtures/settings-cloud.json
+  s_6d6e9175f38e45::t_ffc40c58fea1c4 24
+docs/superpowers/specs/2026-11-02-model-warmup-design.md
+  s_6d6e9175f38e45::t_4d615db74e8528 13,17
+  s_6d6e9175f38e45::t_5b377e7e21f3dd 1-12,14-16,18-70
+tests/LiveLingo.Desktop.Tests/Composer/ComposerVoiceTests.cs
+  s_6d6e9175f38e45::t_0e9a7fca5ed7a1 87-98,100-120
+  s_6d6e9175f38e45::t_bb5250d28a3ac6 99
+tests/LiveLingo.Web.Tests/Fixtures/settings-consent.json
+  s_6d6e9175f38e45::t_ffc40c58fea1c4 24
+src/LiveLingo.Core/CoreOptions.cs
+  s_6d6e9175f38e45::t_cd562c6475cf87 18-20
+src/LiveLingo.Desktop/Composer/ComposerTexts.cs
+  s_6d6e9175f38e45::t_29651ee232563a 175
+tests/LiveLingo.Desktop.Tests/Composer/MicrophoneVoiceInputTests.cs
+  s_6d6e9175f38e45::t_5724456be51b6a 3,34,41-66
+tests/LiveLingo.Web.Tests/Fixtures/settings-general.json
+  s_6d6e9175f38e45::t_ffc40c58fea1c4 24
+tests/LiveLingo.Web.Tests/Fixtures/settings-hotkey-invalid.json
+  s_6d6e9175f38e45::t_ffc40c58fea1c4 24
+tests/LiveLingo.Web.Tests/Fixtures/settings-privacy.json
+  s_6d6e9175f38e45::t_ffc40c58fea1c4 24
+src/LiveLingo.Core/Speech/Native/SherpaQwen3Recognizer.cs
+  s_6d6e9175f38e45::t_9b450f81a45cac 2,7-12,15,29,34,36,40
+src/LiveLingo.Desktop/Resources/i18n/zh-CN.json
+  s_6d6e9175f38e45::t_29651ee232563a 114
+  s_6d6e9175f38e45::t_e43d7be429bfea 198-199
+src/LiveLingo.Desktop/Settings/SettingsViewModel.cs
+  s_6d6e9175f38e45::t_9be9bfb067bcdb 68,110-112,176,226
+CHANGELOG.md
+  s_6d6e9175f38e45::t_8972149cd5895f 12-18
+tests/LiveLingo.Web.Tests/Fixtures/settings-apps.json
+  s_6d6e9175f38e45::t_ffc40c58fea1c4 24
+src/LiveLingo.Core/Inference/LlamaServerHost.cs
+  s_6d6e9175f38e45::t_2a27ee62dd42d0 138-146
+tests/LiveLingo.Core.Tests/Models/ResidentModelTests.cs
+  s_6d6e9175f38e45::t_83b609891616db 1-180
+src/LiveLingo.Desktop/Composer/IVoiceInput.cs
+  s_6d6e9175f38e45::t_e0949d808cad82 72,95,99-103
+  s_6d6e9175f38e45::t_abcaef95d91904 3,17-22,31
+  s_6d6e9175f38e45::t_1c224ae020b066 39-41,45-52,55-60,66
+tests/LiveLingo.Desktop.Tests/Web/SettingsIntentsTests.cs
+  s_6d6e9175f38e45::t_c6ba1f1890bae8 215,220
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "38ebf1e6997780cd367f0512864ead80717fbe9b",
+  "prompts": {},
+  "sessions": {
+    "s_6d6e9175f38e45": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "f74d37e5-1d96-4ddc-a3f9-5ae24ff39e38",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
