@@ -1,0 +1,52 @@
+src/LiveLingo.Desktop/Services/Update/VelopackUpdateService.cs
+  s_6d6e9175f38e45::t_b5f51133093c51 7-10,14-15,20,22-23,26,28,30-33,35,39-41,43-47,49,51,53
+build/macos/Info.plist
+  s_6d6e9175f38e45::t_c5c71a7fa7f989 19-20
+build/BuildTask.cs
+  s_6d6e9175f38e45::t_579cf09088601d 305-306,313-317,322,325-326,330-332,334,336-338,340,347,349-356
+  s_6d6e9175f38e45::t_d4d8af0b7263fa 341-346,348
+CONTRIBUTING.md
+  s_6d6e9175f38e45::t_94c80b94726a23 128-130,247-250,253-274
+tests/LiveLingo.Desktop.Tests/Services/Update/UpdateChecksTests.cs
+  s_6d6e9175f38e45::t_1126be055cf74d 25-26,33,36,65,67
+  s_6d6e9175f38e45::t_196b171313a25e 15,18,20-21
+  s_6d6e9175f38e45::t_66dfe56743467b 1-14,22-24,27-32,34-35,37-48,50-64,66,68-118
+  s_6d6e9175f38e45::t_b7d2eaa78c289c 49
+  s_6d6e9175f38e45::t_eb6359ebb813f2 16-17,19
+README.md
+  s_6d6e9175f38e45::t_0b6273bb40eb30 40-42
+src/LiveLingo.Desktop/App.axaml.cs
+  s_6d6e9175f38e45::t_88cf4a28650f84 38-39,103-110
+  s_6d6e9175f38e45::t_5005890e3f1888 118
+  s_6d6e9175f38e45::t_7f64140eb83de3 380-381,386,393-399,406,416-436
+  s_6d6e9175f38e45::t_0d111b5a7fa899 119,193-194,202
+  s_6d6e9175f38e45::t_3928e5cd5dcf98 437
+src/LiveLingo.Desktop/Resources/i18n/en-US.json
+  s_6d6e9175f38e45::t_c1973c6fcf44b0 4,17-20
+src/LiveLingo.Desktop/Resources/i18n/zh-CN.json
+  s_6d6e9175f38e45::t_afdfa75f5becba 4,17-20
+src/LiveLingo.Desktop/Services/Update/UpdateChecks.cs
+  s_6d6e9175f38e45::t_1d510916847312 1-86
+src/LiveLingo.Desktop/Services/Update/IUpdateService.cs
+  s_6d6e9175f38e45::t_c296eaf7c03994 3-6,9-19
+.github/workflows/release.yml
+  s_6d6e9175f38e45::t_bf7c86ce10e9fa 138,140-141,149-151,154,160,170-183,189,194-196
+CHANGELOG.md
+  s_6d6e9175f38e45::t_683203c9998697 10-18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e7a3b99120b4fb4f882f69e67d4f0eebc108451b",
+  "prompts": {},
+  "sessions": {
+    "s_6d6e9175f38e45": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "f74d37e5-1d96-4ddc-a3f9-5ae24ff39e38",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
