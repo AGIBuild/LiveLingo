@@ -11,8 +11,7 @@ Thanks for your interest in contributing! This guide covers everything you need 
 | [.NET SDK](https://dotnet.microsoft.com/download) | 10.0+ | Required |
 | Git | Any recent | Required |
 | [Nuke](https://nuke.build/) | Via `dotnet tool restore` | Build automation |
-| [Velopack](https://velopack.io/) | Via `dotnet tool restore` | Windows installer packaging |
-| [WiX Toolset](https://wixtoolset.org/) | Via `dotnet tool restore` | Windows MSI packaging |
+| [Velopack](https://velopack.io/) | Via `dotnet tool restore` | Windows (Setup.exe and .msi) and macOS packaging, updates |
 | [Stryker.NET](https://stryker-mutator.io/) | Via `dotnet tool restore` | Mutation testing |
 
 ---
@@ -23,7 +22,7 @@ Thanks for your interest in contributing! This guide covers everything you need 
 git clone https://github.com/AGIBuild/LiveLingo.git
 cd LiveLingo
 
-# Restore CLI tools (Velopack, WiX, Stryker)
+# Restore CLI tools (Velopack, Stryker)
 dotnet tool restore
 
 # Run in development mode
@@ -70,7 +69,6 @@ LiveLingo/
 │
 ├── build/                           # Nuke build automation
 │   ├── BuildTask.cs                 # All build targets
-│   ├── windows/LiveLingo.wxs        # WiX MSI definition
 │   └── macos/                       # macOS packaging scripts
 │
 ├── .github/workflows/               # CI/CD (compile → test → pack → release)
@@ -126,8 +124,7 @@ LiveLingo uses [Nuke](https://nuke.build/) for build automation. All targets are
 ./build.sh Publish --Runtime osx-arm64               # Publish for macOS
 ./build.ps1 Publish --Runtime win-x64                # Publish for Windows
 ./build.sh Pack --Runtime osx-arm64 --Version 1.0.0  # macOS: .pkg installer + update package and feed
-./build.ps1 Pack --Runtime win-x64 --Version 1.0.0   # Windows: Setup.exe installer + update package and feed
-./build.ps1 PackMsi --Runtime win-x64 --Version 1.0.0 # WiX .msi installer (does not update itself)
+./build.ps1 Pack --Runtime win-x64 --Version 1.0.0   # Windows: Setup.exe and .msi installers + update package and feed
 ```
 
 End-to-end probes download the pinned models (SHA256-verified) and use real inference; they are not part of the unit-test gate:
@@ -265,8 +262,12 @@ Installed applications update themselves from the GitHub releases of the reposit
   publish a release whose feed does not name a package that is in it.
 - The application checks at start and every `Update.CheckIntervalHours`, downloads a newer version in the background,
   and then offers *Restart to Update* in the tray menu; quitting also installs it. Pre-releases are not offered.
-- Only an application installed by the Setup.exe or the .pkg can update itself. A development build and the .msi cannot;
-  they skip the check.
+  *Settings → Models → Updates* shows the version, the progress of a check or download, and the result; the tray's
+  *Check for Updates* opens it and starts a check.
+- Only an application installed by an installer of the release (Setup.exe, the .msi or the .pkg — all Velopack) can
+  update itself; the .msi is built by `vpk pack --msi` and installs per user, so updates never need elevation. A
+  development build and a copy installed by the hand-built `.msi` of 2.1.0 and earlier cannot; they skip the check, and
+  *Updates* says so and links to the download page.
 - A release without a feed (the 1.x releases) is skipped. The application reads the latest 10 releases.
 - Installers are not signed, so Windows SmartScreen and macOS Gatekeeper warn on the first install; updates run from the
   installed application. Signing (`--signAppIdentity`, `--notaryProfile`) is not set up.

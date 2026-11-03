@@ -128,7 +128,7 @@ jobs:
       - name: Pack (Windows)
         if: matrix.runtime == 'win-x64'
         shell: pwsh
-        run: ./build.ps1 Pack PackMsi --skip Test --Runtime ${{ matrix.runtime }} --Version ${{ needs.compile.outputs.version }}
+        run: ./build.ps1 Pack --skip Test --Runtime ${{ matrix.runtime }} --Version ${{ needs.compile.outputs.version }}
 
       - name: Pack (macOS)
         if: matrix.runtime == 'osx-arm64'

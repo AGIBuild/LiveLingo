@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- The settings page showed the version `1.0.0` for every release: the build never stamped the release version into
+  the program. The version shown now is the release's (`--Version`, the tag); a build made any other way shows
+  `0.0.0-dev`.
+- The update check no longer says "you are on the latest version" when it did not look. A copy that was not installed
+  by an installer of the release (a development build, or the `.msi` of 2.1.0 and earlier) cannot update itself, and
+  says so with a link to the download page.
+
+### Changed
+- One installer technology on Windows: the `.msi` is now built by Velopack (`vpk pack --msi`) like the Setup.exe, so an
+  application installed from it updates itself the same way. It installs per user (no elevation, also for updates). The
+  hand-made WiX `.msi`, which could not update, is gone along with the WiX tool.
+- On Windows the settings, models and logs moved from `%LocalAppData%\LiveLingo` to `%LocalAppData%\AGIBuild\LiveLingo`.
+  Velopack owns the first folder: it empties it when an installer runs over it and when the application is uninstalled,
+  which would have deleted the models and the settings. The first start of this version moves `settings.json`,
+  `preferences.json` and `models` over (a rename, no copy).
+  **If you installed the old `.msi` (its data is in the old folder), uninstall it, move those three entries into
+  `%LocalAppData%\AGIBuild\LiveLingo` yourself, and only then run the new Setup.exe or `.msi`**: the installer asks
+  before it replaces a folder that is not empty, and replacing it deletes what is inside.
+- Updates report where they are: *Settings → Models → Updates* shows the checking, the download with its progress, the
+  result with the time of the check, and a failure with its reason. The tray's *Check for Updates* opens it and starts
+  a check, instead of a dialog that vanished.
+
 ## [2.1.0] - 2026-11-02
 
 Stopping a dictation now polishes the whole text (summary first), with editable polish requirements, a Clear button,

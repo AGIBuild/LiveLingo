@@ -3,10 +3,12 @@ using LiveLingo.Core.Translation;
 using LiveLingo.Desktop.Composer;
 using LiveLingo.Desktop.Services.Configuration;
 using LiveLingo.Desktop.Services.Preferences;
+using LiveLingo.Desktop.Services.Update;
 using LiveLingo.Desktop.Settings;
 using LiveLingo.Desktop.Tests.Composer;
 using LiveLingo.Desktop.Tests.Settings;
 using LiveLingo.Desktop.Web;
+using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 
 namespace LiveLingo.Desktop.Tests.Web;
@@ -17,12 +19,15 @@ public sealed class SettingsIntentsTests
     {
         public SettingsViewModelTests.Fixture F { get; }
         public ListLogger Log { get; } = new();
+        public List<string> Opened { get; } = [];
         public SettingsIntents Sut { get; }
 
-        public Rig(SettingsModel? model = null, string? storedKey = null, string section = "general", PreferencesData? remembered = null)
+        public Rig(
+            SettingsModel? model = null, string? storedKey = null, string section = "general", PreferencesData? remembered = null,
+            UpdateChecks? updates = null)
         {
             F = new SettingsViewModelTests.Fixture(model, storedKey, remembered);
-            Sut = new SettingsIntents(F.Vm, section, Log);
+            Sut = new SettingsIntents(F.Vm, section, updates, Opened.Add, Log);
         }
 
         public SettingsViewModel Vm => F.Vm;
@@ -263,6 +268,65 @@ public sealed class SettingsIntentsTests
         await Wait.Until(() => !rig.Vm.HasLegacyModels);
 
         await rig.F.Models.Received(1).CleanObsoleteModelsAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<CancellationToken>());
+    }
+
+    private static (UpdateChecks Checks, IUpdateService Service) Updates(string? ready = null, string? page = null)
+    {
+        var service = Substitute.For<IUpdateService>();
+        service.CanUpdate.Returns(true);
+        service.ReadyVersion.Returns(ready);
+        service.DownloadPage.Returns(page);
+        service.FindAsync(Arg.Any<CancellationToken>()).Returns(Task.FromResult<string?>(null));
+        return (new UpdateChecks(service, TimeSpan.FromHours(4), NullLogger.Instance), service);
+    }
+
+    [Fact]
+    public async Task CheckingForUpdates_AsksTheFeed()
+    {
+        var (checks, service) = Updates();
+        var rig = new Rig(updates: checks);
+
+        rig.Do(new CheckUpdatesIntent { V = 1 });
+
+        await Wait.Until(() => checks.State.Phase == UpdatePhase.UpToDate);
+        await service.Received(1).FindAsync(Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public void RestartToUpdate_InstallsTheDownloadedVersion_AndNothingWithout()
+    {
+        var (idle, notReady) = Updates();
+        new Rig(updates: idle).Do(new RestartToUpdateIntent { V = 1 });
+        notReady.DidNotReceive().ApplyAndRestart();
+
+        var (checks, service) = Updates(ready: "2.2.0");
+        new Rig(updates: checks).Do(new RestartToUpdateIntent { V = 1 });
+
+        service.Received(1).ApplyAndRestart();
+    }
+
+    [Fact]
+    public void TheDownloadPage_IsOpenedWhenThereIsOne()
+    {
+        var rig = new Rig(updates: Updates(page: "https://github.com/o/r/releases/latest").Checks);
+        rig.Do(new OpenDownloadsIntent { V = 1 });
+        Assert.Equal(["https://github.com/o/r/releases/latest"], rig.Opened);
+
+        var without = new Rig(updates: Updates().Checks);
+        without.Do(new OpenDownloadsIntent { V = 1 });
+        Assert.Empty(without.Opened);
+    }
+
+    [Fact]
+    public void WithUpdatesOff_TheUpdateIntentsDoNothing()
+    {
+        var rig = new Rig();
+
+        rig.Do(new CheckUpdatesIntent { V = 1 });
+        rig.Do(new RestartToUpdateIntent { V = 1 });
+        rig.Do(new OpenDownloadsIntent { V = 1 });
+
+        Assert.Empty(rig.Opened);
     }
 
     [Fact]

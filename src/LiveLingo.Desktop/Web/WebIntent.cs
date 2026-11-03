@@ -50,6 +50,9 @@ namespace LiveLingo.Desktop.Web;
 [JsonDerivedType(typeof(SaveKeyIntent), "saveKey")]
 [JsonDerivedType(typeof(ForgetKeyIntent), "forgetKey")]
 [JsonDerivedType(typeof(RemoveLegacyModelsIntent), "removeLegacyModels")]
+[JsonDerivedType(typeof(CheckUpdatesIntent), "checkUpdates")]
+[JsonDerivedType(typeof(RestartToUpdateIntent), "restartToUpdate")]
+[JsonDerivedType(typeof(OpenDownloadsIntent), "openDownloads")]
 [JsonDerivedType(typeof(ForgetAppIntent), "forgetApp")]
 [JsonDerivedType(typeof(ClearAppsIntent), "clearApps")]
 internal abstract record WebIntent
@@ -289,6 +292,15 @@ internal sealed record SaveKeyIntent(string Value) : WebIntent
 internal sealed record ForgetKeyIntent : WebIntent;
 
 internal sealed record RemoveLegacyModelsIntent : WebIntent;
+
+/// <summary>"Check for updates" of the settings page.</summary>
+internal sealed record CheckUpdatesIntent : WebIntent;
+
+/// <summary>"Restart to update": installs the downloaded version and starts it.</summary>
+internal sealed record RestartToUpdateIntent : WebIntent;
+
+/// <summary>Opens the page the installers of the latest version are downloaded from.</summary>
+internal sealed record OpenDownloadsIntent : WebIntent;
 
 /// <summary>Forgets what was remembered for one application.</summary>
 internal sealed record ForgetAppIntent(string AppId) : WebIntent

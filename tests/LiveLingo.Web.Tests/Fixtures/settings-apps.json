@@ -63,6 +63,14 @@
       "text": ""
     },
     "version": "2.0.0",
+    "update": {
+      "status": "尚未检查。",
+      "percent": null,
+      "busy": false,
+      "canCheck": true,
+      "canRestart": false,
+      "canDownload": false
+    },
     "diagnostics": [
       {
         "label": "版本",

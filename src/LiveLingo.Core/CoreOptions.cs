@@ -4,14 +4,10 @@ namespace LiveLingo.Core;
 
 public class CoreOptions
 {
-    public string ModelStoragePath { get; set; } = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "LiveLingo", "models");
+    public string ModelStoragePath { get; set; } = Path.Combine(UserData.Directory, "models");
 
     /// <summary>Where short-lived runtime state (pid records of started servers) is kept.</summary>
-    public string RuntimeStatePath { get; set; } = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "LiveLingo", "run");
+    public string RuntimeStatePath { get; set; } = Path.Combine(UserData.Directory, "run");
 
     public int InferenceThreads { get; set; }
 
