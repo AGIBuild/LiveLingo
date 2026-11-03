@@ -66,6 +66,7 @@
       "text": "语音模型准备中，稍后可用…",
       "tone": "muted"
     },
+    "download": null,
     "copyEnabled": false,
     "commit": {
       "label": "写入 Slack",

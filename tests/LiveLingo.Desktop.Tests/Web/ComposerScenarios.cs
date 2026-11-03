@@ -115,6 +115,13 @@ internal static class ComposerScenarios
             return State(h);
         },
         ["downloading"] = () => WithBanner(new BannerState(BannerKind.Downloading, "", 46)),
+        ["download-background"] = async () =>
+        {
+            await using var h = new Harness(modelsInstalled: false);
+            h.Vm.Banner = BannerState.None;
+            h.Vm.DownloadProgress = 46;
+            return State(h);
+        },
         ["download-failed"] = () => WithBanner(new BannerState(BannerKind.DownloadFailed, "network error")),
         ["slow"] = Slow,
         ["timeline"] = () => Imported(Segments("今天的周会", "下周发布", "风险有两个")),

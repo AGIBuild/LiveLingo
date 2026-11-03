@@ -224,6 +224,9 @@ public sealed class ComposerTexts(ILocalizationService loc, bool? mac = null)
 
     // ---- banners -----------------------------------------------------------------
 
+    /// <summary>The footer's line for models that are downloading while the banner is out of the way.</summary>
+    public string FooterDownload(double percent) => loc.T("composer.footer.download", Math.Round(percent));
+
     public string BannerMessage(BannerState banner) => banner.Kind switch
     {
         BannerKind.None => "",
@@ -243,7 +246,8 @@ public sealed class ComposerTexts(ILocalizationService loc, bool? mac = null)
 
     public string BannerActionLabel(BannerState banner, BannerAction action) => action switch
     {
-        BannerAction.Dismiss => loc.T(banner.Kind == BannerKind.Downloading ? "composer.banner.background" : "composer.banner.dismiss"),
+        BannerAction.Dismiss => loc.T("composer.banner.dismiss"),
+        BannerAction.Background => loc.T("composer.banner.background"),
         BannerAction.Download => loc.T(banner.Kind == BannerKind.DownloadFailed ? "composer.banner.retry" : "composer.banner.download"),
         BannerAction.OpenMicrophoneSettings => loc.T("composer.banner.openOs"),
         BannerAction.OpenInputSettings => loc.T("composer.banner.checkInput"),

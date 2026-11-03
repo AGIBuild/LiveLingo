@@ -95,6 +95,7 @@
       "text": "有句子未完成 · 可重试或改用原话",
       "tone": "warn"
     },
+    "download": null,
     "copyEnabled": false,
     "commit": {
       "label": "写入 Slack",

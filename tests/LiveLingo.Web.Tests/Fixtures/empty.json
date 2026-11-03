@@ -66,6 +66,7 @@
       "text": "",
       "tone": "muted"
     },
+    "download": null,
     "copyEnabled": false,
     "commit": {
       "label": "写入 Slack",

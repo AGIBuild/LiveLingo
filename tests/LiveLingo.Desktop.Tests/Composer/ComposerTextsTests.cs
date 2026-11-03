@@ -210,7 +210,7 @@ public class ComposerTextsTests
 
     [Theory]
     [InlineData(BannerKind.ModelMissing, BannerTone.Info, new[] { BannerAction.Download })]
-    [InlineData(BannerKind.Downloading, BannerTone.Info, new[] { BannerAction.Dismiss })]
+    [InlineData(BannerKind.Downloading, BannerTone.Info, new[] { BannerAction.Background })]
     [InlineData(BannerKind.DownloadFailed, BannerTone.Bad, new[] { BannerAction.Download })]
     [InlineData(BannerKind.TargetLost, BannerTone.Bad, new[] { BannerAction.Retarget, BannerAction.Copy })]
     [InlineData(BannerKind.MicrophoneDenied, BannerTone.Warn, new[] { BannerAction.OpenMicrophoneSettings, BannerAction.Dismiss })]
@@ -227,7 +227,7 @@ public class ComposerTextsTests
 
     [Theory]
     [InlineData(BannerAction.Dismiss, BannerKind.NoSound, "[composer.banner.dismiss]")]
-    [InlineData(BannerAction.Dismiss, BannerKind.Downloading, "[composer.banner.background]")]
+    [InlineData(BannerAction.Background, BannerKind.Downloading, "[composer.banner.background]")]
     [InlineData(BannerAction.Download, BannerKind.ModelMissing, "[composer.banner.download]")]
     [InlineData(BannerAction.Download, BannerKind.DownloadFailed, "[composer.banner.retry]")]
     [InlineData(BannerAction.OpenMicrophoneSettings, BannerKind.MicrophoneDenied, "[composer.banner.openOs]")]

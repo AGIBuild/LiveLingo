@@ -51,6 +51,9 @@ exported as SRT.
 - Settings, models and logs live in `%LocalAppData%\AGIBuild\LiveLingo` (Windows) or
   `~/Library/Application Support/LiveLingo` (macOS), outside the installed program, so updating and uninstalling keep
   them. Delete that folder to remove everything LiveLingo stored.
+- If something looks wrong (for example the composer window is cut off), the log in `logs/` of that folder says what the
+  window did; lines marked `PROBLEM=` are the ones to look at first. The log holds sizes and names of applications, never
+  what you wrote or said.
 - Recent drafts are kept in memory only and are gone when the app exits.
 - The installed app looks for updates on the GitHub releases of this repository (at start and every few hours) and
   downloads a newer version in the background. Nothing you wrote or said is part of that request. Set

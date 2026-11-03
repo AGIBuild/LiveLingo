@@ -16,6 +16,7 @@ namespace LiveLingo.Desktop.Web;
 [JsonDerivedType(typeof(DragIntent), "drag")]
 [JsonDerivedType(typeof(ResizeIntent), "resize")]
 [JsonDerivedType(typeof(ZoomIntent), "zoom")]
+[JsonDerivedType(typeof(ClippedIntent), "clipped")]
 [JsonDerivedType(typeof(SourceIntent), "source")]
 [JsonDerivedType(typeof(MicToggleIntent), "micToggle")]
 [JsonDerivedType(typeof(OutputIntent), "output")]
@@ -153,6 +154,17 @@ internal sealed record ResizeIntent(int? Width, int? Height) : WebIntent
 
 /// <summary>Toggles the window between the size that follows its content and a large one that shows as much text as the screen allows.</summary>
 internal sealed record ZoomIntent : WebIntent;
+
+/// <summary>
+/// A diagnostic, not an action: the page's visible area stayed smaller than the page's content (it is cut off).
+/// Sizes in CSS pixels. The host only logs it, with the window's own geometry next to it.
+/// </summary>
+internal sealed record ClippedIntent(int ViewportWidth, int ViewportHeight, int ContentWidth, int ContentHeight) : WebIntent
+{
+    protected override bool IsValid =>
+        ViewportWidth is >= 0 and <= 100_000 && ViewportHeight is >= 0 and <= 100_000
+        && ContentWidth is >= 0 and <= 100_000 && ContentHeight is >= 0 and <= 100_000;
+}
 
 /// <summary>The source text and the page's own revision of it (design 5.3).</summary>
 internal sealed record SourceIntent(string Text, int Rev) : WebIntent

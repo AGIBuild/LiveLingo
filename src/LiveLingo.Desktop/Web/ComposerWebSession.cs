@@ -80,6 +80,7 @@ internal sealed class ComposerWebSession : IDisposable
         _intents.Dragged += () => Dragged?.Invoke();
         _intents.Resized += resize => Resized?.Invoke(resize);
         _intents.Zoomed += () => Zoomed?.Invoke();
+        _intents.Clipped += clipped => Clipped?.Invoke(clipped);
         _intents.ModelInfoRequested += () => _bridge.Send("toast", new ToastData(ModelDetails(), 10000));
         _intents.DraftCleared += () => _bridge.Send("focus", new FocusData("source"));
     }
@@ -97,6 +98,9 @@ internal sealed class ComposerWebSession : IDisposable
 
     /// <summary>The user asked for the large window, or for the size that follows the content again.</summary>
     public event Action? Zoomed;
+
+    /// <summary>The page is cut off by the window (a diagnostic; the window logs it).</summary>
+    public event Action<ClippedIntent>? Clipped;
 
     /// <summary>Tells the page how tall its panel may get on the screen it is on; beyond that the page scrolls inside.</summary>
     public void LimitPanelHeight(int cssPixels)

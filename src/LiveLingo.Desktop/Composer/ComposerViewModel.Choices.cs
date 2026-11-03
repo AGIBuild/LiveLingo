@@ -34,6 +34,7 @@ public sealed partial class ComposerViewModel
         TargetLanguage = start.Target;
         OnPropertyChanged(nameof(Remembered));
         OnPropertyChanged(nameof(RememberFor));
+        AttachToRunningDownloads();
     }
 
     /// <summary>The application (or "copy only") whose choices are remembered; null when remembering is off or it is unknown.</summary>

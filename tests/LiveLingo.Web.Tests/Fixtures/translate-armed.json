@@ -95,6 +95,7 @@
       "text": "处理完成后自动写入 · Esc 取消",
       "tone": "muted"
     },
+    "download": null,
     "copyEnabled": false,
     "commit": {
       "label": "完成后写入",

@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 
 namespace LiveLingo.Core.Models;
@@ -55,6 +56,7 @@ public sealed class InProcessModelDownloadCoordinator : IModelDownloadCoordinato
             _sessions[descriptor.Id] = session;
 
             Publish(session, new ModelDownloadState(descriptor.Id, ModelDownloadStatus.Downloading, 0, null));
+            _logger?.LogInformation("Model download started: {ModelId} ({SizeBytes} bytes)", descriptor.Id, descriptor.SizeBytes);
 
             // Progress<T> captures the caller's SynchronizationContext so incremental
             // progress lands on the same scheduler that invoked StartAsync. Terminal
@@ -94,10 +96,12 @@ public sealed class InProcessModelDownloadCoordinator : IModelDownloadCoordinato
 
     private async Task RunAsync(ModelDescriptor descriptor, Session session, IProgress<ModelDownloadProgress> progress)
     {
+        var started = Stopwatch.GetTimestamp();
         try
         {
             await _modelManager.EnsureModelAsync(descriptor, progress, session.Cts.Token).ConfigureAwait(false);
             Publish(session, new ModelDownloadState(descriptor.Id, ModelDownloadStatus.Installed, 100, null));
+            _logger?.LogInformation("Model download finished: {ModelId} in {Seconds:0.0} s", descriptor.Id, Stopwatch.GetElapsedTime(started).TotalSeconds);
         }
         catch (OperationCanceledException)
         {

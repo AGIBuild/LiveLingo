@@ -95,6 +95,7 @@
       "text": "2 句 · 含云端处理",
       "tone": "muted"
     },
+    "download": null,
     "copyEnabled": true,
     "commit": {
       "label": "写入 Slack",

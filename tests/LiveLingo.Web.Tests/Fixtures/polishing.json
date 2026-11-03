@@ -95,6 +95,7 @@
       "text": "正在润色全文… 此时写入会等润色完成",
       "tone": "muted"
     },
+    "download": null,
     "copyEnabled": false,
     "commit": {
       "label": "写入 Slack",
