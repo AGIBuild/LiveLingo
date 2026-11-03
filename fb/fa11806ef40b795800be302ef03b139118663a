@@ -1,0 +1,168 @@
+tests/LiveLingo.Web.Tests/Fixtures/speech-preparing.json
+  s_6d6e9175f38e45::t_b078f3abe8b804 69
+src/LiveLingo.Desktop/Composer/ComposerTypes.cs
+  s_6d6e9175f38e45::t_150bed0d5b0aa0 108-110,135-136
+tests/LiveLingo.Web.Tests/ComposerRenderTests.cs
+  s_6d6e9175f38e45::t_a2076c18c1fbc6 286-297
+tests/LiveLingo.Web.Tests/Fixtures/written.json
+  s_6d6e9175f38e45::t_b078f3abe8b804 98
+src/LiveLingo.Desktop/Web/Assets/app/10-bridge.js
+  s_6d6e9175f38e45::t_b2339dea3c7459 16-39,57-58,62-64
+  s_6d6e9175f38e45::t_82898a587fef68 65
+tests/LiveLingo.Web.Tests/Fixtures/original-ready.json
+  s_6d6e9175f38e45::t_b078f3abe8b804 69
+tests/LiveLingo.Web.Tests/Fixtures/listening.json
+  s_6d6e9175f38e45::t_b078f3abe8b804 95
+tests/LiveLingo.Web.Tests/Fixtures/timeline.json
+  s_6d6e9175f38e45::t_b078f3abe8b804 128
+src/LiveLingo.Desktop/Web/Assets/styles/composer.css
+  s_6d6e9175f38e45::t_418565245ee991 118-119
+tests/LiveLingo.Desktop.Tests/Composer/ComposerBackgroundDownloadTests.cs
+  s_6d6e9175f38e45::t_37b5a7a2a8da46 164
+  s_6d6e9175f38e45::t_be083b3340b6f1 111-151
+  s_6d6e9175f38e45::t_2e63ccddf850f1 1-13,20-110,152-163
+  s_6d6e9175f38e45::t_cde7460d969e8c 14-19
+  s_6d6e9175f38e45::t_a59b7f217904ee 165-166
+tests/LiveLingo.Web.Tests/Fixtures/reduced-motion.json
+  s_6d6e9175f38e45::t_b078f3abe8b804 98
+tests/LiveLingo.Web.Tests/Fixtures/cloud-ctrl-enter.json
+  s_6d6e9175f38e45::t_b078f3abe8b804 98
+src/LiveLingo.Desktop/Web/ComposerIntents.cs
+  s_6d6e9175f38e45::t_a1eaefb2e9b482 63-65
+  s_6d6e9175f38e45::t_9513ea36b3014a 66,81
+src/LiveLingo.Core/Models/ModelDownloadCoordinatorExtensions.cs
+  s_6d6e9175f38e45::t_702f6f72a948cc 1-5,9-14,16-19
+  s_6d6e9175f38e45::t_7672595a668cee 6-8,15
+src/LiveLingo.Desktop/Composer/ComposerViewModel.Choices.cs
+  s_6d6e9175f38e45::t_29011fe0dae3ba 37
+tests/LiveLingo.Web.Tests/Fixtures/download-background.json
+  s_6d6e9175f38e45::t_b078f3abe8b804 1-237
+src/LiveLingo.Desktop/Web/Assets/app/20-composer-parts.js
+  s_6d6e9175f38e45::t_b7c187dfb00aa1 110-111
+tests/LiveLingo.Desktop.Tests/Composer/ComposerTextsTests.cs
+  s_6d6e9175f38e45::t_3a2c59686d4a0f 213,230
+tests/LiveLingo.Web.Tests/Fixtures/resume-draft.json
+  s_6d6e9175f38e45::t_b078f3abe8b804 72
+tests/LiveLingo.Desktop.Tests/Composer/ComposerGeometryLogTests.cs
+  s_6d6e9175f38e45::t_5afc4ce137dd91 1-84,99
+  s_6d6e9175f38e45::t_29fa81597fcb99 85-98
+tests/LiveLingo.Web.Tests/Fixtures/clean-ready.json
+  s_6d6e9175f38e45::t_b078f3abe8b804 84
+tests/LiveLingo.Web.Tests/Fixtures/export-last.json
+  s_6d6e9175f38e45::t_b078f3abe8b804 98
+tests/LiveLingo.Web.Tests/Fixtures/no-cleanup.json
+  s_6d6e9175f38e45::t_b078f3abe8b804 63
+src/LiveLingo.Desktop/Web/ComposerWebSession.cs
+  s_6d6e9175f38e45::t_31d81da23f77db 83,102-103
+  s_6d6e9175f38e45::t_c6f6281faa3c4f 104
+tests/LiveLingo.Web.Tests/Fixtures/translate-ready.json
+  s_6d6e9175f38e45::t_b078f3abe8b804 98
+tests/LiveLingo.Web.Tests/Fixtures/write-failed.json
+  s_6d6e9175f38e45::t_b078f3abe8b804 104
+src/LiveLingo.Desktop/Composer/ComposerViewModel.cs
+  s_6d6e9175f38e45::t_dd0da86bd3e599 33-36,417,426-427,431,449-462,465-468,471
+  s_6d6e9175f38e45::t_4064f29e893ea2 463-464
+  s_6d6e9175f38e45::t_0ed755b62469a3 657
+  s_6d6e9175f38e45::t_38f82e7ff3e043 113-115,606-612
+  s_6d6e9175f38e45::t_f9ee167d5cc8ab 400-404,406-416,418-419,421,428-430,444-448
+  s_6d6e9175f38e45::t_370f5095f7042e 432-433
+tests/LiveLingo.Desktop.Tests/Web/ComposerScenarios.cs
+  s_6d6e9175f38e45::t_b199734fe80ff1 118-124
+tests/LiveLingo.Web.Tests/Fixtures/row-failed.json
+  s_6d6e9175f38e45::t_b078f3abe8b804 98
+tests/LiveLingo.Desktop.Tests/Composer/ComposerHarness.cs
+  s_6d6e9175f38e45::t_e205c915ab923e 219
+tests/LiveLingo.Web.Tests/Fixtures/translate-armed.json
+  s_6d6e9175f38e45::t_b078f3abe8b804 98
+src/LiveLingo.Desktop/Resources/i18n/en-US.json
+  s_6d6e9175f38e45::t_2fbaa943d48412 140
+src/LiveLingo.Desktop/Composer/ComposerTexts.cs
+  s_6d6e9175f38e45::t_fb4265afcec4c5 227-229
+  s_6d6e9175f38e45::t_87eceb9fffa63c 249-250
+tests/LiveLingo.Web.Tests/Fixtures/copy-only.json
+  s_6d6e9175f38e45::t_b078f3abe8b804 98
+tests/LiveLingo.Web.Tests/Fixtures/clearing.json
+  s_6d6e9175f38e45::t_b078f3abe8b804 84
+tests/LiveLingo.Web.Tests/Fixtures/no-microphone.json
+  s_6d6e9175f38e45::t_b078f3abe8b804 84
+tests/LiveLingo.Web.Tests/Fixtures/slow.json
+  s_6d6e9175f38e45::t_b078f3abe8b804 113
+src/LiveLingo.Desktop/Composer/ComposerViewModel.Session.cs
+  s_6d6e9175f38e45::t_691b3d54426ec2 137-141
+tests/LiveLingo.Web.Tests/Fixtures/translate-pending.json
+  s_6d6e9175f38e45::t_b078f3abe8b804 98
+src/LiveLingo.Desktop/Composer/ComposerWindow.cs
+  s_6d6e9175f38e45::t_5c5b904d783a58 29
+  s_6d6e9175f38e45::t_8255d189843657 119-121,127-131,143-145
+  s_6d6e9175f38e45::t_c39ba11b958d66 236-238,247
+  s_6d6e9175f38e45::t_dcef42b213d0d2 188,206,219
+  s_6d6e9175f38e45::t_89da0f9d8542b8 49,64-77,110
+tests/LiveLingo.Web.Tests/Fixtures/remembered.json
+  s_6d6e9175f38e45::t_b078f3abe8b804 72
+src/LiveLingo.Core/Models/InProcessModelDownloadCoordinator.cs
+  s_6d6e9175f38e45::t_ed7f9dc324bb92 2
+  s_6d6e9175f38e45::t_85a5c149d2b052 59,99,104
+CHANGELOG.md
+  s_6d6e9175f38e45::t_e76abbf7989441 10-26
+  s_6d6e9175f38e45::t_5dc0895ef809a8 423
+tests/LiveLingo.Web.Tests/Fixtures/polishing.json
+  s_6d6e9175f38e45::t_b078f3abe8b804 98
+src/LiveLingo.Desktop/Composer/ComposerGeometryLog.cs
+  s_6d6e9175f38e45::t_9a1287feeed778 94
+  s_6d6e9175f38e45::t_150de2180ccb26 35,60-74,78-83,85
+  s_6d6e9175f38e45::t_eef09883b44cf6 40
+  s_6d6e9175f38e45::t_e14e6fecfcd2a2 1-34,37-39,41-48,57,59,75-77,84,86-93,95-108
+  s_6d6e9175f38e45::t_0c5695b0ac76ff 36,49-56,58
+tests/LiveLingo.Desktop.Tests/Web/ComposerIntentsTests.cs
+  s_6d6e9175f38e45::t_aa49f3a58e7bb0 121-131
+  s_6d6e9175f38e45::t_0dff9934fdd63c 120
+tests/LiveLingo.Web.Tests/Fixtures/mic-denied.json
+  s_6d6e9175f38e45::t_b078f3abe8b804 84
+tests/LiveLingo.Web.Tests/Fixtures/model-missing.json
+  s_6d6e9175f38e45::t_b078f3abe8b804 109
+tests/LiveLingo.Web.Tests/Fixtures/gate-warning.json
+  s_6d6e9175f38e45::t_b078f3abe8b804 98
+tests/LiveLingo.Web.Tests/Fixtures/no-speech.json
+  s_6d6e9175f38e45::t_b078f3abe8b804 80
+tests/LiveLingo.Web.Tests/Fixtures/editing.json
+  s_6d6e9175f38e45::t_b078f3abe8b804 98
+tests/LiveLingo.Web.Tests/Fixtures/download-failed.json
+  s_6d6e9175f38e45::t_b078f3abe8b804 80
+tests/LiveLingo.Web.Tests/Fixtures/downloading.json
+  s_6d6e9175f38e45::t_b078f3abe8b804 46,80
+tests/LiveLingo.Web.Tests/Fixtures/target-lost.json
+  s_6d6e9175f38e45::t_b078f3abe8b804 113
+src/LiveLingo.Desktop/Resources/i18n/zh-CN.json
+  s_6d6e9175f38e45::t_2ef5567a1b006f 140
+tests/LiveLingo.Desktop.Tests/Web/WebIntentTests.cs
+  s_6d6e9175f38e45::t_625ca93e400b9d 50,98
+src/LiveLingo.Desktop/Web/ComposerViewState.cs
+  s_6d6e9175f38e45::t_d226759fb84c56 46-48,51,146-148
+src/LiveLingo.Desktop/Web/WebIntent.cs
+  s_6d6e9175f38e45::t_1c90b729812763 19,158-167
+  s_6d6e9175f38e45::t_cc2c38baf4cb15 168
+tests/LiveLingo.Web.Tests/Fixtures/whole-wide.json
+  s_6d6e9175f38e45::t_b078f3abe8b804 84
+README.md
+  s_6d6e9175f38e45::t_f1fa81358c7b82 54-56
+tests/LiveLingo.Web.Tests/Fixtures/empty.json
+  s_6d6e9175f38e45::t_b078f3abe8b804 69
+tests/LiveLingo.Core.Tests/Models/ModelDownloadCoordinatorExtensionsTests.cs
+  s_6d6e9175f38e45::t_5871a7664e6b54 1-56
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "fbfa11806ef40b795800be302ef03b139118663a",
+  "prompts": {},
+  "sessions": {
+    "s_6d6e9175f38e45": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "f74d37e5-1d96-4ddc-a3f9-5ae24ff39e38",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
