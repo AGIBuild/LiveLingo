@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.2] - 2026-11-03
+
+"Download in background" really moves the download out of the way, downloads no longer depend on the composer window,
+and the composer window's size decisions are logged so a cut-off window can be diagnosed.
+
 ### Fixed
 - "Download in background" now really does it. The banner used to come back with the next progress update, so the
   message never went away; the download itself was never affected. The banner goes and the composer's footer shows
