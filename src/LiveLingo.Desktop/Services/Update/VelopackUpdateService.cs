@@ -12,38 +12,40 @@ public sealed class VelopackUpdateService : IUpdateService
 {
     private readonly ILogger<VelopackUpdateService> _logger;
     private readonly UpdateManager _manager;
+    private UpdateInfo? _found;
     private UpdateInfo? _ready;
 
     public VelopackUpdateService(string updateUrl, ILogger<VelopackUpdateService> logger)
     {
         _logger = logger;
-        IUpdateSource source = updateUrl.StartsWith("https://github.com/", StringComparison.OrdinalIgnoreCase)
+        var github = updateUrl.StartsWith("https://github.com/", StringComparison.OrdinalIgnoreCase);
+        IUpdateSource source = github
             ? new GithubSource(updateUrl, accessToken: null, prerelease: false)
             : new SimpleWebSource(updateUrl);
+        DownloadPage = github ? updateUrl.TrimEnd('/') + "/releases/latest" : null;
         _manager = new UpdateManager(source);
     }
 
+    public bool CanUpdate => _manager.IsInstalled;
+
+    public string? DownloadPage { get; }
+
     public string? ReadyVersion => _ready?.TargetFullRelease.Version.ToString();
 
-    public async Task<bool> CheckAndDownloadAsync(CancellationToken ct = default)
+    public async Task<string?> FindAsync(CancellationToken ct = default)
     {
-        if (_ready is not null)
-            return true;
+        // The feed call has no cancellation of its own; a cancelled check is dropped when it returns.
+        _found = await _manager.CheckForUpdatesAsync().ConfigureAwait(false);
+        ct.ThrowIfCancellationRequested();
+        return _found?.TargetFullRelease.Version.ToString();
+    }
 
-        if (!_manager.IsInstalled)
-        {
-            _logger.LogDebug("Skipping the update check: the application was not installed by the installer");
-            return false;
-        }
-
-        var update = await _manager.CheckForUpdatesAsync().ConfigureAwait(false);
-        if (update is null)
-            return false;
-
+    public async Task DownloadAsync(Action<int> progress, CancellationToken ct = default)
+    {
+        var update = _found ?? throw new InvalidOperationException("No update was found.");
         _logger.LogInformation("Downloading update {Version}", update.TargetFullRelease.Version);
-        await _manager.DownloadUpdatesAsync(update, cancelToken: ct).ConfigureAwait(false);
+        await _manager.DownloadUpdatesAsync(update, progress, ct).ConfigureAwait(false);
         _ready = update;
-        return true;
     }
 
     public void ApplyAndRestart() => _manager.ApplyUpdatesAndRestart(Ready());

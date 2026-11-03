@@ -2,6 +2,7 @@ using System.Globalization;
 using LiveLingo.Core.Translation;
 using LiveLingo.Desktop.Composer;
 using LiveLingo.Desktop.Services.Localization;
+using LiveLingo.Desktop.Services.Update;
 
 namespace LiveLingo.Desktop.Settings;
 
@@ -36,6 +37,7 @@ public sealed class SettingsTexts(ILocalizationService loc)
         "model", "model.desc", "model.quality", "model.fast",
         "legacy", "legacy.remove",
         "version", "version.desc",
+        "update", "update.desc", "update.check", "update.restart", "update.download",
         "diag", "diag.desc", "diag.open", "diag.title"
     ];
 
@@ -69,4 +71,20 @@ public sealed class SettingsTexts(ILocalizationService loc)
     public string AppSummary(ComposerOutput output, TargetLanguage target) => _composer.OutputMenu(output, target);
 
     public string Date(DateTimeOffset when) => when.ToLocalTime().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+    /// <summary>What the update check is doing or found, as one sentence; the user's installed <paramref name="current"/> version names the "latest".</summary>
+    public string UpdateStatus(UpdateState state, string current) => state.Phase switch
+    {
+        UpdatePhase.Off => loc.T("settings.update.off"),
+        UpdatePhase.Unsupported => loc.T("settings.update.unsupported"),
+        UpdatePhase.Idle => loc.T("settings.update.idle"),
+        UpdatePhase.Checking => loc.T("settings.update.checking"),
+        UpdatePhase.Downloading => loc.T("settings.update.downloading", state.Version!, state.Percent),
+        UpdatePhase.Ready => loc.T("settings.update.ready", state.Version!),
+        UpdatePhase.UpToDate => loc.T("settings.update.latest", current, Moment(state.At!.Value)),
+        UpdatePhase.Failed => loc.T("settings.update.failed", Moment(state.At!.Value), state.Error!),
+        _ => throw new ArgumentOutOfRangeException(nameof(state), state.Phase, "Not an update phase.")
+    };
+
+    private static string Moment(DateTimeOffset when) => when.ToLocalTime().ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
 }

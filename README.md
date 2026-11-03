@@ -48,6 +48,9 @@ exported as SRT.
   endpoint must be `https`; the API key is kept in the system secret store, not in a file. A cloud failure is shown,
   never silently retried on the local model.
 - Models are downloaded only after you agree, from their original hosts, and verified against pinned SHA256 hashes.
+- Settings, models and logs live in `%LocalAppData%\AGIBuild\LiveLingo` (Windows) or
+  `~/Library/Application Support/LiveLingo` (macOS), outside the installed program, so updating and uninstalling keep
+  them. Delete that folder to remove everything LiveLingo stored.
 - Recent drafts are kept in memory only and are gone when the app exits.
 - The installed app looks for updates on the GitHub releases of this repository (at start and every few hours) and
   downloads a newer version in the background. Nothing you wrote or said is part of that request. Set

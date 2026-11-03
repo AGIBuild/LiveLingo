@@ -1,6 +1,7 @@
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using LiveLingo.Desktop.Services.Localization;
+using LiveLingo.Desktop.Services.Update;
 using LiveLingo.Desktop.Settings;
 using LiveLingo.Desktop.Web;
 
@@ -71,6 +72,47 @@ public sealed class SettingsViewStateTests
         Assert.Equal("general", general.Section);
         Assert.Equal(("CtrlEnter", "Dark", true), (general.General.CommitKey, general.General.Theme, general.General.ReduceMotion));
         Assert.Equal(new SettingsOptionsState(Animations: false, Theme: "Dark"), general.Options);
+    }
+
+    [Fact]
+    public void EveryUpdatePhase_HasATextInBothLanguages()
+    {
+        var done = new DateTimeOffset(2026, 11, 3, 11, 5, 0, TimeSpan.Zero);
+        foreach (var culture in new[] { "zh-CN", "en-US" })
+        {
+            var loc = new LocalizationService();
+            loc.SetCulture(culture);
+            var texts = new SettingsTexts(loc);
+
+            foreach (var phase in Enum.GetValues<UpdatePhase>())
+            {
+                var state = new UpdateState(phase, "2.2.0", 7, done, "offline");
+                var text = texts.UpdateStatus(state, "2.1.0");
+
+                Assert.False(string.IsNullOrWhiteSpace(text), $"{culture} {phase}");
+                Assert.DoesNotContain("settings.update", text, StringComparison.Ordinal);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(UpdatePhase.Idle, false, "check")]
+    [InlineData(UpdatePhase.UpToDate, false, "check")]
+    [InlineData(UpdatePhase.Failed, false, "check")]
+    [InlineData(UpdatePhase.Checking, false, "busy")]
+    [InlineData(UpdatePhase.Downloading, false, "busy")]
+    [InlineData(UpdatePhase.Ready, false, "restart")]
+    [InlineData(UpdatePhase.Unsupported, true, "download")]
+    [InlineData(UpdatePhase.Unsupported, false, "")]
+    [InlineData(UpdatePhase.Off, true, "")]
+    public void TheUpdateRow_OffersWhatTheStateAllows(UpdatePhase phase, bool page, string offered)
+    {
+        var view = UpdateViewState.From(new UpdateState(phase, "2.2.0", 5, DateTimeOffset.UnixEpoch, "x"), page, Texts.ChineseSettings(), "2.1.0");
+
+        var actual = new[] { (view.CanCheck, "check"), (view.Busy, "busy"), (view.CanRestart, "restart"), (view.CanDownload, "download") }
+            .Where(flag => flag.Item1).Select(flag => flag.Item2);
+        Assert.Equal(offered == "" ? [] : [offered], actual);
+        Assert.Equal(phase == UpdatePhase.Downloading ? 5 : null, view.Percent);
     }
 
     [Fact]
