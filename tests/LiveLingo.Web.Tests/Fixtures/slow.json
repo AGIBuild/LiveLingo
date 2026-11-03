@@ -110,6 +110,7 @@
       "text": "正在翻译…",
       "tone": "muted"
     },
+    "download": null,
     "copyEnabled": false,
     "commit": {
       "label": "写入 Slack",

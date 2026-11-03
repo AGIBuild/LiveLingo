@@ -60,6 +60,10 @@ internal sealed class ComposerIntents : IIntentHandler
 
     /// <summary>The user asked for the large window, or for the size that follows the content again.</summary>
     public event Action? Zoomed;
+
+    /// <summary>The page reports that it is cut off by the window.</summary>
+    public event Action<ClippedIntent>? Clipped;
+
     public event Action? ModelInfoRequested;
     public event Action? DraftCleared;
 
@@ -74,6 +78,7 @@ internal sealed class ComposerIntents : IIntentHandler
             case DragIntent: Dragged?.Invoke(); break;
             case ResizeIntent resize: Resized?.Invoke(resize); break;
             case ZoomIntent: Zoomed?.Invoke(); break;
+            case ClippedIntent clipped: Clipped?.Invoke(clipped); break;
             case SourceIntent source:
                 _pageText = source.Text;
                 SourceRev = source.Rev;

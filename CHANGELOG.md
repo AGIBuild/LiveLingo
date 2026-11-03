@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- "Download in background" now really does it. The banner used to come back with the next progress update, so the
+  message never went away; the download itself was never affected. The banner goes and the composer's footer shows
+  `Downloading models 37%` with a progress bar until the models are there (or the download fails, which shows the
+  failure).
+- Closing the composer no longer matters to a download. The models keep downloading one after the other, a composer
+  summoned meanwhile joins the running download (progress in its footer, no "download" banner) and does what you asked
+  when it ends, and a composer that was already closed does nothing at the end (before, a closed composer could start
+  the microphone when the speech models arrived).
+
+### Added
+- Windows composer geometry is logged so "the window shows only half" can be diagnosed from the log
+  (`logs/livelingo-*.log` in the data folder; search for `PROBLEM=`). Every line carries the summon number and the
+  window's whole geometry (size, the size the system gave it, position, cap, screen working area and scale). The page
+  reports when its visible area stays smaller than its content (`page-cut-off-by-the-window`), and the window reports a
+  page taller than its cap, a size the system changed, and a position outside the working area. Model downloads log their
+  start and end.
 ## [2.1.1] - 2026-11-03
 
 The settings page shows the real version, updates report their progress and result, and Windows has one installer
@@ -403,6 +420,7 @@ process-wide task with shared progress and dedup across every UI surface.
 
 See `git log v0.1.4` for the pre-CHANGELOG history.
 
+[2.1.1]: https://github.com/AGIBuild/LiveLingo/releases/tag/v2.1.1
 [2.1.0]: https://github.com/AGIBuild/LiveLingo/releases/tag/v2.1.0
 [2.0.2]: https://github.com/AGIBuild/LiveLingo/releases/tag/v2.0.2
 [2.0.1]: https://github.com/AGIBuild/LiveLingo/releases/tag/v2.0.1

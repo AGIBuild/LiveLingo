@@ -137,6 +137,7 @@
 
   "composer.banner.modelMissing": "需要先下载本地模型（约 {0}）。只有你同意后才会下载。",
   "composer.banner.downloading": "模型下载中 {0}% · 现在可以直接打字。",
+  "composer.footer.download": "模型后台下载中 {0}%",
   "composer.banner.downloadFailed": "下载失败：{0}",
   "composer.banner.targetLost": "原输入框已失效，草稿已保留。为避免写进错误的窗口，不会自动写入。",
   "composer.banner.writeFailed": "写入失败：{0}。结果已保留，可以复制。",

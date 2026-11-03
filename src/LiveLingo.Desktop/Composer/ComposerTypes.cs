@@ -105,6 +105,9 @@ public enum BannerAction
 {
     Dismiss,
     Download,
+
+    /// <summary>Keep downloading, but out of the way: the banner goes, the footer shows the progress.</summary>
+    Background,
     OpenMicrophoneSettings,
     OpenInputSettings,
     UseOriginal,
@@ -129,7 +132,8 @@ public sealed record BannerState(BannerKind Kind, string Detail = "", double Pro
     public IReadOnlyList<BannerAction> Actions => Kind switch
     {
         BannerKind.ModelMissing or BannerKind.DownloadFailed => [BannerAction.Download],
-        BannerKind.Downloading or BannerKind.FileFailed or BannerKind.NoSpeechFound => [BannerAction.Dismiss],
+        BannerKind.Downloading => [BannerAction.Background],
+        BannerKind.FileFailed or BannerKind.NoSpeechFound => [BannerAction.Dismiss],
         BannerKind.TargetLost => [BannerAction.Retarget, BannerAction.Copy],
         BannerKind.MicrophoneDenied => [BannerAction.OpenMicrophoneSettings, BannerAction.Dismiss],
         BannerKind.NoMicrophone or BannerKind.NoSound => [BannerAction.OpenInputSettings, BannerAction.Dismiss],

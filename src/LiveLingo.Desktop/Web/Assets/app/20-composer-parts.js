@@ -107,6 +107,8 @@
         <span class="bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
       </button>
       <p id="status" class=${'status' + (f.status.tone === 'warn' ? ' warn' : '')} role="status" aria-live="polite">${f.status.text}</p>
+      ${f.download && html`<span id="download" class="dl" role="status" title=${f.download.text}>
+        <progress max="100" value=${f.download.percent} aria-label=${LL.t('progressAria')}></progress>${f.download.text}</span>`}
       <button type="button" id="copy" class="icon-btn" aria-label=${LL.t('copyAria')} title=${LL.t('copyAria') + ' (' + LL.cap('copy') + ')'} disabled=${!f.copyEnabled}
         onClick=${() => LL.send('copy')}><${Icon} name="copy"/></button>
       <button type="button" id="commit" class="btn primary" disabled=${!cm.enabled} aria-label=${cm.aria}

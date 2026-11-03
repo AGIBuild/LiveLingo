@@ -43,9 +43,12 @@ internal sealed record MicState(bool Recording, string Aria, bool Enabled);
 
 internal sealed record StatusState(string Text, string Tone);
 
+/// <summary>The models downloading in the background: the footer shows it so nobody waits without knowing.</summary>
+internal sealed record DownloadState(string Text, int Percent);
+
 internal sealed record CommitState(string Label, bool Enabled, bool Armed, bool Written, string Aria);
 
-internal sealed record FooterState(MicState Mic, StatusState Status, bool CopyEnabled, CommitState Commit);
+internal sealed record FooterState(MicState Mic, StatusState Status, DownloadState? Download, bool CopyEnabled, CommitState Commit);
 
 internal sealed record LayoutState(bool Wide);
 
@@ -140,6 +143,9 @@ internal sealed record ComposerViewState(
                     !vm.IsListening && (vm.Status == ComposerStatus.Failed ||
                         vm.Output == ComposerOutput.Clean && vm.StatusInfo.PolishOutcome == LiveLingo.Core.Drafting.PolishOutcome.KeptPreview)
                         ? "warn" : "muted"),
+                vm.DownloadProgress is { } download && vm.Banner.Kind != BannerKind.Downloading
+                    ? new DownloadState(texts.FooterDownload(download), (int)Math.Round(download))
+                    : null,
                 vm.CanCopy,
                 new CommitState(
                     texts.CommitLabel(vm.IsWritten, armed, vm.HasTarget, targetName),

@@ -118,6 +118,18 @@ public sealed class ComposerIntentsTests
     }
 
     [Fact]
+    public async Task APageThatIsCutOff_IsReportedToTheWindowForTheLog()
+    {
+        await using var rig = new Rig();
+        ClippedIntent? seen = null;
+        rig.Sut.Clipped += clipped => seen = clipped;
+
+        rig.Do(new ClippedIntent(656, 300, 656, 560) { V = 1 });
+
+        Assert.Equal((656, 300, 656, 560), (seen!.ViewportWidth, seen.ViewportHeight, seen.ContentWidth, seen.ContentHeight));
+    }
+
+    [Fact]
     public async Task AnOutputThatIsNotOffered_IsRefused()
     {
         await using var h = new Harness(output: null, options: ComposerOptions.Default with { Cleanup = false });
