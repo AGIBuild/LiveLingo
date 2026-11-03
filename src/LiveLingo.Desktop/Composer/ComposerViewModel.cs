@@ -30,6 +30,10 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
     private CommitSnapshot? _committed;
     private bool _applyingDraftText;
     private bool _wantsVoice;
+    private bool _disposed;
+
+    /// <summary>The user sent the download to the background: the banner stays away until the models are there.</summary>
+    private bool _downloadInBackground;
     private bool _stopAfterStart;
     private Task? _startingVoice;
     private Task? _stoppingVoice;
@@ -105,6 +109,9 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
     [ObservableProperty] private bool _canCopy;
     [ObservableProperty] private bool _isEditable = true;
     [ObservableProperty] private bool _modelsReady;
+
+    /// <summary>Overall download progress (0–100) of the models this composer needs; null when none is downloading.</summary>
+    [ObservableProperty] private double? _downloadProgress;
 
     [ObservableProperty] private bool _isListening;
 
@@ -390,15 +397,38 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
     [RelayCommand]
     private async Task DownloadModelsAsync()
     {
-        foreach (var model in WantedModels().Where(model => !_models.HasAllExpectedLocalAssets(model)))
+        // What the composer needs can grow while the models download (the microphone or an import was asked for), so
+        // the missing models are worked off until none is left. A round that installed nothing new ends it.
+        var attempted = "";
+        List<ModelDescriptor> missing;
+        while ((missing = WantedModels().Where(model => !_models.HasAllExpectedLocalAssets(model)).ToList()).Count > 0)
         {
-            await _downloads.StartAsync(model).ConfigureAwait(true);
-            if (!_models.HasAllExpectedLocalAssets(model))
+            var round = string.Join(',', missing.Select(model => model.Id));
+            if (round == attempted)
+                break;
+
+            attempted = round;
+            await _downloads.StartAllAsync(missing).ConfigureAwait(true);
+
+            // The composer was closed meanwhile: the downloads went on without it, and nothing here may act for a
+            // window that is gone (starting the microphone, for one).
+            if (_disposed)
+                return;
+
+            if (missing.Select(model => _downloads.GetState(model.Id)).FirstOrDefault(
+                    state => state.Status is ModelDownloadStatus.Failed or ModelDownloadStatus.Cancelled) is { } stopped)
             {
-                var error = _downloads.GetState(model.Id).ErrorMessage ?? "";
-                Banner = new BannerState(BannerKind.DownloadFailed, error);
+                ShowDownloadFailure(stopped.ErrorMessage);
                 return;
             }
+        }
+
+        DownloadProgress = null;
+        _downloadInBackground = false;
+        if (missing.Count > 0)
+        {
+            ShowDownloadFailure(_downloads.GetState(missing[0].Id).ErrorMessage);
+            return;
         }
 
         ModelsReady = IsInstalled(_plan.For(Output));
@@ -411,8 +441,34 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
             await StartListeningAsync().ConfigureAwait(true);
     }
 
+    private void ShowDownloadFailure(string? error)
+    {
+        DownloadProgress = null;
+        _downloadInBackground = false;
+        Banner = new BannerState(BannerKind.DownloadFailed, error ?? "");
+    }
+
+    /// <summary>
+    /// A summon that finds the models of its output already downloading (the composer of an earlier summon started
+    /// them) joins them: the footer shows the progress, and what the user asked for happens when they are done.
+    /// </summary>
+    private void AttachToRunningDownloads()
+    {
+        var wanted = WantedModels();
+        if (!wanted.Any(model => _downloads.GetState(model.Id).IsDownloading))
+            return;
+
+        _downloadInBackground = true;
+        DownloadProgress = OverallProgress(wanted);
+        if (Banner.Kind is BannerKind.ModelMissing)
+            Banner = BannerState.None;
+        _ = DownloadModelsCommand.ExecuteAsync(null);
+        Refresh();
+    }
+
     public async ValueTask DisposeAsync()
     {
+        _disposed = true;
         _session.Changed -= OnDraftChanged;
         _downloads.StateChanged -= OnDownloadStateChanged;
         _voice.NoSignalChanged -= OnNoSignalChanged;
@@ -547,8 +603,13 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
 
         void Apply()
         {
-            if (state.Status == ModelDownloadStatus.Downloading)
-                Banner = new BannerState(BannerKind.Downloading, "", OverallProgress(wanted));
+            if (_disposed || state.Status != ModelDownloadStatus.Downloading)
+                return;
+
+            var progress = OverallProgress(wanted);
+            DownloadProgress = progress;
+            if (!_downloadInBackground)
+                Banner = new BannerState(BannerKind.Downloading, "", progress);
         }
 
         if (_notifyOn is null)
@@ -593,7 +654,7 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
         OnPropertyChanged(nameof(CanEditRows));
 
         var needsModels = !ModelsReady && Output != ComposerOutput.Original;
-        if (needsModels && Banner.Kind is BannerKind.None)
+        if (needsModels && Banner.Kind is BannerKind.None && DownloadProgress is null)
             Banner = new BannerState(BannerKind.ModelMissing, MissingSizeLabel());
     }
 

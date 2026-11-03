@@ -137,6 +137,7 @@
 
   "composer.banner.modelMissing": "A local model must be downloaded first (about {0}). Nothing is downloaded until you agree.",
   "composer.banner.downloading": "Downloading models {0}% · you can keep typing.",
+  "composer.footer.download": "Downloading models {0}%",
   "composer.banner.downloadFailed": "Download failed: {0}",
   "composer.banner.targetLost": "The input box is gone and the draft is kept. To avoid writing into the wrong window, nothing is written automatically.",
   "composer.banner.writeFailed": "Writing failed: {0}. The result is kept; you can copy it.",

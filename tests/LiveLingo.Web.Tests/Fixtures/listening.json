@@ -92,6 +92,7 @@
       "text": "正在听 · 0:00 · 点麦克风或按 ⌘D 结束",
       "tone": "muted"
     },
+    "download": null,
     "copyEnabled": false,
     "commit": {
       "label": "写入 Slack",

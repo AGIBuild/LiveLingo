@@ -125,6 +125,7 @@
       "text": "3 句 · 本地处理",
       "tone": "muted"
     },
+    "download": null,
     "copyEnabled": true,
     "commit": {
       "label": "写入 Slack",

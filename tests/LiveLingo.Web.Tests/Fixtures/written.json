@@ -95,6 +95,7 @@
       "text": "已写入",
       "tone": "muted"
     },
+    "download": null,
     "copyEnabled": true,
     "commit": {
       "label": "已写入",

@@ -26,6 +26,7 @@ internal sealed class ComposerWindow : Window
     private readonly WebSurface _web;
     private readonly IWindowMover _mover;
     private readonly ILogger _logger;
+    private readonly ComposerGeometryLog _geometryLog;
     private ComposerWebSession? _session;
     private TargetWindowInfo? _target;
     private TaskCompletionSource? _dismissed;
@@ -45,6 +46,7 @@ internal sealed class ComposerWindow : Window
     {
         _modelUsage = modelUsage;
         _logger = logger;
+        _geometryLog = new ComposerGeometryLog(logger);
         _mover = mover;
         _web = new WebSurface(WebPage.ComposerEntry, logger);
         Width = NarrowWidth;
@@ -59,6 +61,20 @@ internal sealed class ComposerWindow : Window
         WindowStartupLocation = WindowStartupLocation.Manual;
         Title = "LiveLingo";
         Content = _web.View;
+        Resized += (_, _) =>
+        {
+            if (_session is not null)
+                _geometryLog.SystemResized(Geometry());
+        };
+    }
+
+    /// <summary>The window's geometry as it is now, for the log.</summary>
+    private ComposerGeometry Geometry()
+    {
+        var screen = CurrentScreen();
+        return new ComposerGeometry(
+            Width, Height, ClientSize, Position.X, Position.Y, MaxHeight, _userWidth, _userHeight, _contentHeight,
+            _moved, _session?.Wide ?? false, screen?.Scaling ?? RenderScaling, screen?.WorkingArea);
     }
 
     public bool IsPresenting => _session is not null;
@@ -91,6 +107,7 @@ internal sealed class ComposerWindow : Window
         _session.Dragged += OnDrag;
         _session.Resized += OnResize;
         _session.Zoomed += OnZoom;
+        _session.Clipped += OnClipped;
         vm.Completed += Dismiss;
         vm.CloseRequested += Dismiss;
 
@@ -99,10 +116,18 @@ internal sealed class ComposerWindow : Window
         ApplyWidth();
         LimitToScreen();
         Place();
+        _geometryLog.SummonStarted(
+            target is null ? "none" : $"{target.ProcessName} rect=({target.Left},{target.Top},{target.Width}x{target.Height})",
+            Geometry());
         if (_web.IsReady)
             _session.Start();
         return _dismissed.Task;
     }
+
+    /// <summary>The page is cut off by the window: the one symptom of "only half of the composer is visible", logged with everything the window knows.</summary>
+    private void OnClipped(ClippedIntent clipped) => _geometryLog.Warn(
+        "page-cut-off-by-the-window", Geometry(),
+        $"viewport={clipped.ViewportWidth}x{clipped.ViewportHeight}css page={clipped.ContentWidth}x{clipped.ContentHeight}css");
 
     /// <summary>The same as the close button: the hotkey pressed again.</summary>
     public void RequestHide() => _session?.Vm.HideCommand.Execute(null);
@@ -115,6 +140,9 @@ internal sealed class ComposerWindow : Window
         if (_userHeight is null)
             Height = size.Height;
         Place();
+        var geometry = Geometry();
+        _geometryLog.Sized(size.Width, size.Height, geometry);
+        _geometryLog.CheckOnScreen(geometry);
         if (_placed)
             return;
 
@@ -157,6 +185,7 @@ internal sealed class ComposerWindow : Window
             Height = height;
             _session.SetFixedHeight(true);
         }
+        _geometryLog.InfoThrottled("user-resize", Geometry(), $"asked={resize.Width?.ToString() ?? "-"}x{resize.Height?.ToString() ?? "-"}css");
     }
 
     /// <summary>Like zooming a window by its title bar: a large window that shows much text, and back to the size that fits the content.</summary>
@@ -174,6 +203,7 @@ internal sealed class ComposerWindow : Window
             ApplyWidth();
             Height = _contentHeight;
             Place();
+            _geometryLog.Info("unzoom", Geometry());
             return;
         }
 
@@ -186,6 +216,7 @@ internal sealed class ComposerWindow : Window
         Height = zoomed.Height;
         Position = new PixelPoint(zoomed.X, zoomed.Y);
         _session.SetFixedHeight(true);
+        _geometryLog.Info("zoom", Geometry());
     }
 
     /// <summary>
@@ -202,6 +233,9 @@ internal sealed class ComposerWindow : Window
         _moved = true;
         LimitToScreen();
         Place();
+        var geometry = Geometry();
+        _geometryLog.Info("dragged", geometry);
+        _geometryLog.CheckOnScreen(geometry);
     }
 
     private void Dismiss()
@@ -210,6 +244,7 @@ internal sealed class ComposerWindow : Window
         if (session is null)
             return;
 
+        _geometryLog.Info("dismiss", Geometry());
         _session = null;
         session.Vm.Completed -= Dismiss;
         session.Vm.CloseRequested -= Dismiss;

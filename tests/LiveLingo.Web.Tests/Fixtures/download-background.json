@@ -1,0 +1,237 @@
+{
+  "rev": 1,
+  "dest": {
+    "text": "Slack",
+    "kind": "target"
+  },
+  "privacy": {
+    "text": "本地",
+    "cloud": false,
+    "aria": "全部本地处理"
+  },
+  "output": {
+    "value": "translate",
+    "pill": "→ English",
+    "globe": true,
+    "menu": [
+      {
+        "id": "clean",
+        "label": "保持中文（整理）",
+        "checked": false,
+        "enabled": true
+      },
+      {
+        "id": "translate",
+        "label": "翻译成 English",
+        "checked": true,
+        "enabled": true
+      },
+      {
+        "id": "original",
+        "label": "原话（不整理）",
+        "checked": false,
+        "enabled": true
+      }
+    ],
+    "swap": "语言：中文 → English\u3000⇄ 互换",
+    "note": null
+  },
+  "banner": null,
+  "source": {
+    "mode": "edit",
+    "text": "",
+    "sourceRev": 1,
+    "editable": true,
+    "label": "原话",
+    "routeChip": false,
+    "hint": true,
+    "lines": [],
+    "resume": null,
+    "remembered": null,
+    "canClear": false
+  },
+  "result": {
+    "visible": false,
+    "label": "将写入 · English",
+    "rows": [],
+    "editText": ""
+  },
+  "footer": {
+    "mic": {
+      "recording": false,
+      "aria": "开始听写（⌘D）",
+      "enabled": true
+    },
+    "status": {
+      "text": "",
+      "tone": "muted"
+    },
+    "download": {
+      "text": "模型后台下载中 46%",
+      "percent": 46
+    },
+    "copyEnabled": false,
+    "commit": {
+      "label": "写入 Slack",
+      "enabled": false,
+      "armed": false,
+      "written": false,
+      "aria": "写入"
+    }
+  },
+  "layout": {
+    "wide": false
+  },
+  "options": {
+    "animations": true,
+    "theme": "Auto",
+    "commitKey": "enter",
+    "commitKeyCap": "↵",
+    "newlineKeyCap": "⇧↵",
+    "modifier": "meta",
+    "shortcuts": [
+      {
+        "id": "dictate",
+        "code": "KeyD",
+        "shift": false,
+        "cap": "⌘D"
+      },
+      {
+        "id": "clean",
+        "code": "Digit1",
+        "shift": false,
+        "cap": "⌘1"
+      },
+      {
+        "id": "translate",
+        "code": "Digit2",
+        "shift": false,
+        "cap": "⌘2"
+      },
+      {
+        "id": "original",
+        "code": "Digit3",
+        "shift": false,
+        "cap": "⌘3"
+      },
+      {
+        "id": "swap",
+        "code": "KeyL",
+        "shift": false,
+        "cap": "⌘L"
+      },
+      {
+        "id": "copy",
+        "code": "KeyC",
+        "shift": true,
+        "cap": "⇧⌘C"
+      },
+      {
+        "id": "new",
+        "code": "KeyN",
+        "shift": false,
+        "cap": "⌘N"
+      },
+      {
+        "id": "recent",
+        "code": "KeyR",
+        "shift": false,
+        "cap": "⌘R"
+      },
+      {
+        "id": "import",
+        "code": "KeyO",
+        "shift": false,
+        "cap": "⌘O"
+      },
+      {
+        "id": "export",
+        "code": "KeyS",
+        "shift": false,
+        "cap": "⌘S"
+      },
+      {
+        "id": "zoom",
+        "code": "KeyE",
+        "shift": false,
+        "cap": "⌘E"
+      },
+      {
+        "id": "settings",
+        "code": "Comma",
+        "shift": false,
+        "cap": "⌘,"
+      }
+    ]
+  },
+  "menus": {
+    "target": [
+      {
+        "id": "target",
+        "label": "Slack 输入框",
+        "checked": true,
+        "enabled": true
+      },
+      {
+        "id": "copyOnly",
+        "label": "没有输入框 · 仅复制",
+        "checked": false,
+        "enabled": true
+      }
+    ],
+    "more": [
+      {
+        "id": "new",
+        "label": "新草稿",
+        "checked": false,
+        "enabled": true
+      },
+      {
+        "id": "recent",
+        "label": "最近草稿",
+        "checked": false,
+        "enabled": true
+      },
+      {
+        "id": "import",
+        "label": "导入录音…",
+        "checked": false,
+        "enabled": true
+      },
+      {
+        "id": "export",
+        "label": "导出…",
+        "checked": false,
+        "enabled": true
+      },
+      {
+        "id": "wide",
+        "label": "宽屏对照",
+        "checked": false,
+        "enabled": true
+      },
+      {
+        "id": "whole",
+        "label": "整段处理（保留格式）",
+        "checked": false,
+        "enabled": true
+      },
+      {
+        "id": "settings",
+        "label": "设置",
+        "checked": false,
+        "enabled": true
+      }
+    ]
+  },
+  "dialogs": {
+    "recent": [],
+    "canRestore": true,
+    "export": {
+      "txt": true,
+      "markdown": true,
+      "srt": false,
+      "last": null
+    }
+  }
+}

@@ -283,6 +283,18 @@ public sealed class ComposerRenderTests(BrowserFixture browsers)
         await using var page = await browsers.OpenAsync(engine, "downloading");
 
         Assert.Equal(1, await page.Page.Locator("#banner progress").CountAsync());
+        Assert.Equal(0, await page.Page.Locator("#download").CountAsync());
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public async Task ADownloadInTheBackground_ShowsItsProgressInTheFooter_AndNoBanner(string engine)
+    {
+        await using var page = await browsers.OpenAsync(engine, "download-background");
+
+        Assert.Equal(0, await page.Page.Locator("#banner").CountAsync());
+        Assert.Equal("46", await page.Page.Locator("#download progress").GetAttributeAsync("value"));
+        Assert.Contains("46%", await page.Page.Locator("#download").InnerTextAsync());
     }
 
     [Theory]

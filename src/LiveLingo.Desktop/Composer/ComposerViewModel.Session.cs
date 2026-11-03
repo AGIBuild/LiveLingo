@@ -134,6 +134,11 @@ public sealed partial class ComposerViewModel
             case BannerAction.Download:
                 await DownloadModelsCommand.ExecuteAsync(null).ConfigureAwait(true);
                 break;
+            case BannerAction.Background:
+                _downloadInBackground = true;
+                Banner = BannerState.None;
+                Refresh();
+                break;
             case BannerAction.OpenMicrophoneSettings:
                 _platform.MicrophonePermission.OpenSettings();
                 break;
