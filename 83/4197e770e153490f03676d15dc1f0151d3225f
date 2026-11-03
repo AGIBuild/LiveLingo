@@ -1,0 +1,164 @@
+src/LiveLingo.Desktop/AppVersion.cs
+  s_6d6e9175f38e45::t_0310f22071125f 1-20
+src/LiveLingo.Desktop/Web/Assets/styles/settings.css
+  s_6d6e9175f38e45::t_fa1c6dded45b41 28-32
+src/LiveLingo.Desktop/Services/Update/VelopackUpdateService.cs
+  s_6d6e9175f38e45::t_330a9de53989ab 15,21-22,25,29,31,33,35-41,43-45,47
+CHANGELOG.md
+  s_6d6e9175f38e45::t_00f82596c0dad0 15-16,19-20
+  s_6d6e9175f38e45::t_e0fce4e45e39ef 10-14,17-18,29-32
+  s_6d6e9175f38e45::t_9b46e467823243 21-28
+tests/LiveLingo.Web.Tests/Fixtures/settings-strings.json
+  s_6d6e9175f38e45::t_9b9510712611e6 98-102
+tests/LiveLingo.Web.Tests/Fixtures/settings-privacy.json
+  s_6d6e9175f38e45::t_9b9510712611e6 47-54
+src/LiveLingo.Desktop/Settings/SettingsTexts.cs
+  s_6d6e9175f38e45::t_ad84123581735d 5
+  s_6d6e9175f38e45::t_7d950117a405da 40,74-89
+tests/LiveLingo.Web.Tests/Fixtures/settings-update-failed.json
+  s_6d6e9175f38e45::t_9b9510712611e6 1-98
+tests/LiveLingo.Desktop.Tests/Web/WebIntentTests.cs
+  s_6d6e9175f38e45::t_93bb0fdc36c26f 49-51
+src/LiveLingo.Desktop/LiveLingo.Desktop.csproj
+  s_6d6e9175f38e45::t_d99ed8095f12c3 12-13
+tests/LiveLingo.Web.Tests/Fixtures/settings-update-latest.json
+  s_6d6e9175f38e45::t_9b9510712611e6 1-98
+src/LiveLingo.Desktop/Services/Update/UpdateChecks.cs
+  s_6d6e9175f38e45::t_afb90a68b8bcbd 95-99
+  s_6d6e9175f38e45::t_7424caff6aa805 6-8,18,26,32-36,39-40,44-51,54-58,60-62,65-74,77-87,114,116-124,127
+tests/LiveLingo.Web.Tests/Fixtures/settings-update-downloading.json
+  s_6d6e9175f38e45::t_9b9510712611e6 1-98
+src/LiveLingo.Desktop/Web/SettingsViewState.cs
+  s_6d6e9175f38e45::t_de96cf3a4496c6 38-53,74
+  s_6d6e9175f38e45::t_922f0445664790 3,107
+tests/LiveLingo.Desktop.Tests/Web/SettingsWebSessionTests.cs
+  s_6d6e9175f38e45::t_599c4c07a203f0 22,25
+  s_6d6e9175f38e45::t_359d03aff11910 126
+  s_6d6e9175f38e45::t_3d2566da0e6c30 134
+  s_6d6e9175f38e45::t_99b660b25df281 3,8-9,120-125,127-133,135-158
+  s_6d6e9175f38e45::t_5f9ab6892caa08 159
+tests/LiveLingo.Web.Tests/Fixtures/settings-update-checking.json
+  s_6d6e9175f38e45::t_9b9510712611e6 1-98
+build/BuildTask.cs
+  s_6d6e9175f38e45::t_3a7af1aba5291e 335-339,358,366-372
+  s_6d6e9175f38e45::t_17d2a0c351c910 261
+tests/LiveLingo.Desktop.Tests/AppVersionTests.cs
+  s_6d6e9175f38e45::t_27f083e770e572 1-26
+tests/LiveLingo.Web.Tests/Fixtures/settings-voice.json
+  s_6d6e9175f38e45::t_9b9510712611e6 58-65
+tests/LiveLingo.Core.Tests/UserDataTests.cs
+  s_6d6e9175f38e45::t_cc0be3403c8eb7 1-30
+tests/LiveLingo.Web.Tests/Fixtures/settings-apps.json
+  s_6d6e9175f38e45::t_9b9510712611e6 66-73
+src/LiveLingo.Core/CoreOptions.cs
+  s_6d6e9175f38e45::t_727ea51cce7db2 7,10
+tests/LiveLingo.Desktop.Tests/Services/Configuration/UserDataMigrationTests.cs
+  s_6d6e9175f38e45::t_2061b7fc429bdc 11-15
+  s_6d6e9175f38e45::t_8f2b83eae107f2 75,78-80,84-87
+  s_6d6e9175f38e45::t_628db019de3e3d 1-10,16-74,76-77,81-83,88-89
+README.md
+  s_6d6e9175f38e45::t_bcce15af2872a2 51-53
+tests/LiveLingo.Web.Tests/Fixtures/settings-hotkey-invalid.json
+  s_6d6e9175f38e45::t_9b9510712611e6 47-54
+CONTRIBUTING.md
+  s_6d6e9175f38e45::t_52db280f39d69f 127
+  s_6d6e9175f38e45::t_1e1c6a5b86262e 14,25
+  s_6d6e9175f38e45::t_7964b3be4e53c8 265-266
+  s_6d6e9175f38e45::t_ac6eaa011905fe 267-270
+src/LiveLingo.Desktop/Web/SettingsWebSession.cs
+  s_6d6e9175f38e45::t_f3bb22cf5ae853 1,16-17,25-26,33-34,36,39,46-47,60-61,65-67,70-71
+  s_6d6e9175f38e45::t_7b86558fd145ca 72
+tests/LiveLingo.Web.Tests/Fixtures/settings-cloud-invalid.json
+  s_6d6e9175f38e45::t_9b9510712611e6 47-54
+tests/LiveLingo.Desktop.Tests/Web/SettingsScenarios.cs
+  s_6d6e9175f38e45::t_ac399dff557a6e 6
+  s_6d6e9175f38e45::t_1328c8aad90efe 63-69,74-80,100-102,110
+src/LiveLingo.Desktop/Web/WebIntent.cs
+  s_6d6e9175f38e45::t_bbea6cb5f90666 53-55
+  s_6d6e9175f38e45::t_4b5498eee60a19 296-304
+tests/LiveLingo.Web.Tests/Fixtures/settings-update-ready.json
+  s_6d6e9175f38e45::t_9b9510712611e6 1-98
+src/LiveLingo.Core/UserData.cs
+  s_6d6e9175f38e45::t_4971c36b3f6b74 1-23
+tests/LiveLingo.Web.Tests/Fixtures/settings-diagnostics.json
+  s_6d6e9175f38e45::t_9b9510712611e6 58-65
+src/LiveLingo.Desktop/Services/Configuration/UserDataMigration.cs
+  s_6d6e9175f38e45::t_79be2b13e6d38b 1-46
+src/LiveLingo.Desktop/Web/Assets/app/31-settings.js
+  s_6d6e9175f38e45::t_a6edca2206d759 230
+  s_6d6e9175f38e45::t_6fba0d0e1ae003 223-229,231-234,247
+src/LiveLingo.Desktop/Services/Configuration/JsonSettingsService.cs
+  s_6d6e9175f38e45::t_866722a3e4137a 2
+  s_6d6e9175f38e45::t_8000e2f0fd9484 150
+tests/LiveLingo.Web.Tests/Fixtures/settings-cloud.json
+  s_6d6e9175f38e45::t_9b9510712611e6 47-54
+src/LiveLingo.Desktop/App.axaml.cs
+  s_6d6e9175f38e45::t_0c634c912963de 210,425-429,431,433-434,436-439
+  s_6d6e9175f38e45::t_e3bff5cf7e35be 348
+  s_6d6e9175f38e45::t_18b68a9eaa9084 56-60,66-72
+  s_6d6e9175f38e45::t_65368e9f9699a1 105,180
+tests/LiveLingo.Web.Tests/Fixtures/settings-general.json
+  s_6d6e9175f38e45::t_9b9510712611e6 47-54
+tests/LiveLingo.Web.Tests/Fixtures/settings-models.json
+  s_6d6e9175f38e45::t_9b9510712611e6 47-54
+tests/LiveLingo.Web.Tests/Fixtures/settings-dark.json
+  s_6d6e9175f38e45::t_9b9510712611e6 47-54
+src/LiveLingo.Desktop/Settings/SettingsWindow.cs
+  s_6d6e9175f38e45::t_99712c29fb6548 4,14,29
+  s_6d6e9175f38e45::t_cf989d6e1e586b 27
+tests/LiveLingo.Web.Tests/Fixtures/settings-polish-invalid.json
+  s_6d6e9175f38e45::t_9b9510712611e6 47-54
+tests/LiveLingo.Desktop.Tests/Web/SettingsViewStateTests.cs
+  s_6d6e9175f38e45::t_49a8bfe99ce74c 4,77-92,94-116
+  s_6d6e9175f38e45::t_04cc67f51af224 93
+  s_6d6e9175f38e45::t_a9e5282e091e4d 117
+src/LiveLingo.Desktop/Services/Update/IUpdateService.cs
+  s_6d6e9175f38e45::t_3451bf7d20cfb6 9-14,18-22
+src/LiveLingo.Desktop/Services/Update/UpdateState.cs
+  s_6d6e9175f38e45::t_64959bf8062473 1-30
+tests/LiveLingo.Web.Tests/Fixtures/settings-consent.json
+  s_6d6e9175f38e45::t_9b9510712611e6 47-54
+tests/LiveLingo.Web.Tests/SettingsPageTests.cs
+  s_6d6e9175f38e45::t_120c7ab330efd6 656-700
+.github/workflows/release.yml
+  s_6d6e9175f38e45::t_8b5bfc88f34f03 131
+src/LiveLingo.Desktop/Web/SettingsIntents.cs
+  s_6d6e9175f38e45::t_2afd5f9911b7e5 1
+  s_6d6e9175f38e45::t_6f88b4731ab91e 14-15,18,22-23,59-67
+tests/LiveLingo.Web.Tests/Fixtures/settings-update-off.json
+  s_6d6e9175f38e45::t_9b9510712611e6 1-98
+tests/LiveLingo.Desktop.Tests/Services/Update/UpdateChecksTests.cs
+  s_6d6e9175f38e45::t_a80e441762ee4e 11,13-38,41-42,44,46-55,63,66-94,98,100-108,110,114-118,120-130,132,134,136,140,142-145,149-152,154-155,159,161-162,165-171,182,184,187-188,190,192,196,198,200,202,204,208,212,214,216-218,220-222
+  s_6d6e9175f38e45::t_088bc79473f443 119,174-181
+tests/LiveLingo.Web.Tests/Fixtures/settings-update-unsupported.json
+  s_6d6e9175f38e45::t_9b9510712611e6 1-98
+tests/LiveLingo.Web.Tests/Fixtures/settings-polish-custom.json
+  s_6d6e9175f38e45::t_9b9510712611e6 47-54
+docs/superpowers/specs/2026-11-03-windows-packaging-design.md
+  s_6d6e9175f38e45::t_a668a6cc93f7d3 1-34
+src/LiveLingo.Desktop/Resources/i18n/zh-CN.json
+  s_6d6e9175f38e45::t_c56b1ac8ac9d8c 268-280
+src/LiveLingo.Desktop/Resources/i18n/en-US.json
+  s_6d6e9175f38e45::t_7a703ce42c2416 268-280
+tests/LiveLingo.Desktop.Tests/Web/SettingsIntentsTests.cs
+  s_6d6e9175f38e45::t_565fdb757aff77 298-300
+  s_6d6e9175f38e45::t_0890db61b913a8 6,11,273-297,301-330
+  s_6d6e9175f38e45::t_245ab362f3da91 22,25-27,30
+  s_6d6e9175f38e45::t_d59d3e2e0f06e7 331
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "834197e770e153490f03676d15dc1f0151d3225f",
+  "prompts": {},
+  "sessions": {
+    "s_6d6e9175f38e45": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "f74d37e5-1d96-4ddc-a3f9-5ae24ff39e38",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
