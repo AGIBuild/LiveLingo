@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.1] - 2026-11-03
+
+The settings page shows the real version, updates report their progress and result, and Windows has one installer
+technology (both installers update themselves).
+
 ### Fixed
 - The settings page showed the version `1.0.0` for every release: the build never stamped the release version into
   the program. The version shown now is the release's (`--Version`, the tag); a build made any other way shows
