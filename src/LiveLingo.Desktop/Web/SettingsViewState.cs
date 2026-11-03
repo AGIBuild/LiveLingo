@@ -1,5 +1,6 @@
 using System.Globalization;
 using LiveLingo.Desktop.Settings;
+using LiveLingo.Desktop.Services.Update;
 
 namespace LiveLingo.Desktop.Web;
 
@@ -34,7 +35,22 @@ internal sealed record LegacyModelsState(int Count, string Text);
 internal sealed record DiagnosticLine(string Label, string Value);
 
 internal sealed record ModelsSettingsState(
-    string Tier, LegacyModelsState Legacy, string Version, IReadOnlyList<DiagnosticLine> Diagnostics);
+    string Tier, LegacyModelsState Legacy, string Version, UpdateViewState Update, IReadOnlyList<DiagnosticLine> Diagnostics);
+
+/// <summary>What the update row draws: a sentence, the download progress while there is one, and which buttons make sense.</summary>
+/// <param name="Percent">The download progress; null when nothing is being downloaded.</param>
+/// <param name="Busy">A check or download is under way; the page shows it and offers nothing else.</param>
+/// <param name="CanDownload">The copy cannot update itself and the releases page is where to get a new installer.</param>
+internal sealed record UpdateViewState(string Status, int? Percent, bool Busy, bool CanCheck, bool CanRestart, bool CanDownload)
+{
+    public static UpdateViewState From(UpdateState state, bool hasDownloadPage, SettingsTexts texts, string current) => new(
+        texts.UpdateStatus(state, current),
+        state.Phase == UpdatePhase.Downloading ? state.Percent : null,
+        state.Busy,
+        state.Phase is UpdatePhase.Idle or UpdatePhase.UpToDate or UpdatePhase.Failed,
+        state.Phase == UpdatePhase.Ready,
+        state.Phase == UpdatePhase.Unsupported && hasDownloadPage);
+}
 
 /// <summary>What the host knows about itself: the app version and the system it runs on.</summary>
 internal sealed record AppInfo(string Version, string Platform);
@@ -55,7 +71,7 @@ internal sealed record SettingsViewState(
     ModelsSettingsState Models,
     SettingsOptionsState Options)
 {
-    public static SettingsViewState From(SettingsViewModel vm, SettingsTexts texts, string section, AppInfo app)
+    public static SettingsViewState From(SettingsViewModel vm, SettingsTexts texts, string section, AppInfo app, UpdateViewState update)
     {
         var theme = SettingsViewModel.Themes[vm.ThemeIndex];
         return new SettingsViewState(
@@ -88,6 +104,7 @@ internal sealed record SettingsViewState(
                 SettingsViewModel.Tiers[vm.TierIndex],
                 new LegacyModelsState(vm.LegacyCount, vm.HasLegacyModels ? texts.LegacyDescription(vm.LegacyCount, vm.LegacyBytes) : ""),
                 app.Version,
+                update,
                 Diagnostics(vm, texts, app)),
             new SettingsOptionsState(!vm.ReduceMotion, theme));
     }

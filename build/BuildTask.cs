@@ -258,6 +258,7 @@ class BuildTask : NukeBuild
                 .SetConfiguration(Configuration.Release)
                 .SetRuntime(Runtime)
                 .SetSelfContained(true)
+                .SetVersion(Version)
                 .SetOutput(PublishDir / Runtime)
                 .SetNoLogo(true));
         });
@@ -331,6 +332,11 @@ class BuildTask : NukeBuild
                 $"--outputDir {ReleasesDir} " +
                 $"--noPortable";
 
+            // The .msi is Velopack's too, so an application installed from it updates itself like the Setup.exe one.
+            // Per user, so that updates never need elevation.
+            if (windows)
+                arguments += " --msi --instLocation PerUser";
+
             if (!windows)
             {
                 // The bundle version has no pre-release suffix; the update feed carries the full semantic version.
@@ -349,34 +355,21 @@ class BuildTask : NukeBuild
 
             DotNet(arguments, environmentVariables: vpkEnv.AsReadOnly());
 
-            // The installer keeps the file name of earlier releases.
+            // The installers keep the file names of earlier releases.
             var installer = ReleasesDir.GlobFiles(windows ? "*Setup.exe" : "*Setup.pkg").Single();
             var renamed = ReleasesDir / (windows
                 ? $"LiveLingo-{Version}-{Runtime}-Setup.exe"
                 : $"LiveLingo-{Version}-{Runtime}.pkg");
             File.Move(installer, renamed, overwrite: true);
             Log.Information("Installer: {Path}", renamed);
-        });
 
-    Target PackMsi => _ => _
-        .DependsOn(Publish)
-        .Requires(() => Runtime.StartsWith("win"))
-        .Executes(() =>
-        {
-            DotNetToolRestore();
-
-            ReleasesDir.CreateDirectory();
-
-            var wxsFile = RootDirectory / "build" / "windows" / "LiveLingo.wxs";
-            var msiOutput = ReleasesDir / $"LiveLingo-{Version}-{Runtime}.msi";
-
-            DotNet(
-                $"wix build \"{wxsFile}\" " +
-                $"-o \"{msiOutput}\" " +
-                $"-d Version={Version} " +
-                $"-d PublishDir={PublishDir / Runtime}");
-
-            Log.Information("Windows MSI created: {Path}", msiOutput);
+            if (windows)
+            {
+                var msi = ReleasesDir.GlobFiles("*.msi").Single();
+                var msiRenamed = ReleasesDir / $"LiveLingo-{Version}-{Runtime}.msi";
+                File.Move(msi, msiRenamed, overwrite: true);
+                Log.Information("MSI installer: {Path}", msiRenamed);
+            }
         });
 
     static bool IsCoverageClassIncluded(string packageName, string className)

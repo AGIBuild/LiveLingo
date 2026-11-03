@@ -3,6 +3,7 @@ using LiveLingo.Core.Translation;
 using LiveLingo.Desktop.Composer;
 using LiveLingo.Desktop.Services.Configuration;
 using LiveLingo.Desktop.Services.Preferences;
+using LiveLingo.Desktop.Services.Update;
 using LiveLingo.Desktop.Settings;
 using LiveLingo.Desktop.Tests.Settings;
 using LiveLingo.Desktop.Web;
@@ -59,12 +60,24 @@ internal static class SettingsScenarios
             m.Composer.Microphone = "USB Mic";
         }, key: "sk-stored"),
         ["settings-models"] = () => Open("models", before: f => f.Models.ListInstalled().Returns([Legacy("old-a", 5_500_000_000), Legacy("old-b", 3_000_000_000)])),
+        ["settings-update-checking"] = () => Open("models", update: new UpdateState(UpdatePhase.Checking)),
+        ["settings-update-downloading"] = () => Open("models", update: new UpdateState(UpdatePhase.Downloading, "2.2.0", 42)),
+        ["settings-update-ready"] = () => Open("models", update: new UpdateState(UpdatePhase.Ready, "2.2.0")),
+        ["settings-update-latest"] = () => Open("models", update: new UpdateState(UpdatePhase.UpToDate, At: CheckedAt)),
+        ["settings-update-failed"] = () => Open("models", update: new UpdateState(UpdatePhase.Failed, At: CheckedAt, Error: "Unable to connect to github.com")),
+        ["settings-update-unsupported"] = () => Open("models", update: new UpdateState(UpdatePhase.Unsupported), downloadPage: true),
+        ["settings-update-off"] = () => Open("models", update: UpdateState.Off),
     };
 
     public static AppInfo App { get; } = new("2.0.0", "macOS 15.0 Arm64");
 
-    public static SettingsViewState State(SettingsViewModel vm, string section = "general") =>
-        SettingsViewState.From(vm, Texts.ChineseSettings(), section, App) with { Rev = 1 };
+    // Built from a local time so the text does not depend on the time zone the tests run in.
+    private static DateTimeOffset CheckedAt { get; } = new(new DateTime(2026, 11, 3, 19, 5, 0, DateTimeKind.Local));
+
+    public static SettingsViewState State(SettingsViewModel vm, string section = "general", UpdateState? update = null, bool downloadPage = false) =>
+        SettingsViewState.From(
+            vm, Texts.ChineseSettings(), section, App,
+            UpdateViewState.From(update ?? new UpdateState(UpdatePhase.Idle), downloadPage, Texts.ChineseSettings(), App.Version)) with { Rev = 1 };
 
     private static void Cloud(SettingsModel model)
     {
@@ -84,7 +97,9 @@ internal static class SettingsScenarios
         string? key = null,
         PreferencesData? remembered = null,
         Action<SettingsViewModelTests.Fixture>? before = null,
-        Action<SettingsViewModelTests.Fixture>? then = null)
+        Action<SettingsViewModelTests.Fixture>? then = null,
+        UpdateState? update = null,
+        bool downloadPage = false)
     {
         var current = new SettingsModel();
         model?.Invoke(current);
@@ -92,6 +107,6 @@ internal static class SettingsScenarios
         before?.Invoke(f);
         await f.Vm.InitializeAsync();
         then?.Invoke(f);
-        return State(f.Vm, section);
+        return State(f.Vm, section, update, downloadPage);
     }
 }

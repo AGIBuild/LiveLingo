@@ -53,11 +53,23 @@ public partial class App : Application
         if (OperatingSystem.IsMacOS())
             SetMacActivationPolicyAccessory();
 
+        // Before anything reads the data folder.
+        var moves = OperatingSystem.IsWindows()
+            ? UserDataMigration.Run(UserData.LegacyWindowsDirectory, UserData.Directory)
+            : [];
+
         var settingsService = new JsonSettingsService();
         await settingsService.LoadAsync();
         var settings = settingsService.Current;
 
         ConfigureLogging(settings);
+        foreach (var move in moves)
+        {
+            if (move.Error is null)
+                Log.Information("Moved {Entry} to the data folder {Folder}", move.Name, UserData.Directory);
+            else
+                Log.Error(move.Error, "Could not move {Entry} to the data folder; it stays in the installer's folder", move.Name);
+        }
 
         var services = new ServiceCollection();
         services.AddLogging(builder =>
@@ -90,7 +102,7 @@ public partial class App : Application
         }
 
         services.AddSingleton<IPreferencesStore>(sp =>
-            new JsonPreferencesStore(Path.Combine(GetUserDataDirectory(), "preferences.json"), sp.GetService<ILogger<JsonPreferencesStore>>()));
+            new JsonPreferencesStore(Path.Combine(UserData.Directory, "preferences.json"), sp.GetService<ILogger<JsonPreferencesStore>>()));
         services.AddSingleton<ComposerPreferences>();
         services.AddSingleton<ModelWarmup>();
 
@@ -165,7 +177,7 @@ public partial class App : Application
 
     private static void ConfigureLogging(SettingsModel settings)
     {
-        var logDirectory = Path.Combine(GetUserDataDirectory(), "logs");
+        var logDirectory = Path.Combine(UserData.Directory, "logs");
         Directory.CreateDirectory(logDirectory);
         var logPath = Path.Combine(logDirectory, "livelingo-.log");
 
@@ -195,7 +207,7 @@ public partial class App : Application
         settingsItem.Click += (_, _) => Dispatcher.UIThread.Post(() => ShowSettings());
 
         _updateItem = new NativeMenuItem(loc.T("tray.checkUpdates"));
-        _updateItem.Click += (_, _) => Dispatcher.UIThread.Post(async () => await UpdateFromMenuAsync());
+        _updateItem.Click += (_, _) => Dispatcher.UIThread.Post(UpdateFromMenu);
 
         var quitItem = new NativeMenuItem(loc.T("tray.quit"));
         quitItem.Click += (_, _) => desktop.Shutdown();
@@ -333,6 +345,7 @@ public partial class App : Application
             services.GetRequiredService<ComposerPreferences>());
         _settingsWindow = new SettingsWindow(
             vm, new SettingsTexts(services.GetRequiredService<ILocalizationService>()), section,
+            _updates, services.GetRequiredService<IPlatformServices>().OpenUrl,
             services.GetRequiredService<ILoggerFactory>().CreateLogger<SettingsWindow>());
         _settingsWindow.Closed += (_, _) => _settingsWindow = null;
         _settingsWindow.Show();
@@ -409,40 +422,21 @@ public partial class App : Application
         return Task.CompletedTask;
     }
 
-    /// <summary>The tray item: restarts into a downloaded update, or looks for one.</summary>
-    private async Task UpdateFromMenuAsync()
+    /// <summary>
+    /// The tray item: restarts into a downloaded update, or shows the settings where the check runs and reports its
+    /// progress and result.
+    /// </summary>
+    private void UpdateFromMenu()
     {
-        var loc = _serviceProvider!.GetRequiredService<ILocalizationService>();
-        try
+        if (_updates?.ReadyVersion is not null)
         {
-            if (_updates is null)
-            {
-                ShowInfoDialog(loc.T("dialog.update.title"), loc.T("dialog.update.notConfigured"),
-                    primaryText: loc.T("dialog.ok"));
-                return;
-            }
-
-            if (_updates.ReadyVersion is not null)
-            {
-                _updates.ApplyAndRestart();
-                return;
-            }
-
-            if (!await _updates.CheckNowAsync())
-            {
-                ShowInfoDialog(loc.T("dialog.update.title"), loc.T("dialog.update.latest"),
-                    primaryText: loc.T("dialog.ok"));
-                return;
-            }
-
-            ShowUpdateReadyDialog();
+            _updates.ApplyAndRestart();
+            return;
         }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Manual update check failed from tray menu.");
-            ShowInfoDialog(loc.T("dialog.update.title"), loc.T("dialog.update.failed", ex.Message),
-                primaryText: loc.T("dialog.ok"));
-        }
+
+        ShowSettings("models");
+        if (_updates is not null)
+            _ = _updates.CheckNowAsync();
     }
 
     /// <summary>A background download finished: the tray item now restarts into the new version.</summary>
@@ -450,21 +444,6 @@ public partial class App : Application
     {
         var loc = _serviceProvider!.GetRequiredService<ILocalizationService>();
         _updateItem!.Header = loc.T("tray.restartToUpdate", _updates!.ReadyVersion!);
-    }
-
-    private void ShowUpdateReadyDialog()
-    {
-        var loc = _serviceProvider!.GetRequiredService<ILocalizationService>();
-        ShowInfoDialog(
-            loc.T("dialog.update.ready.title"),
-            loc.T("dialog.update.ready.body", _updates!.ReadyVersion!),
-            primaryText: loc.T("dialog.update.ready.restart"),
-            primaryAction: () =>
-            {
-                _updates.ApplyAndRestart();
-                return Task.CompletedTask;
-            },
-            secondaryText: loc.T("dialog.update.ready.later"));
     }
 
     private static void ShowInfoDialog(
@@ -534,22 +513,6 @@ public partial class App : Application
         "Error" => Serilog.Events.LogEventLevel.Error,
         _ => Serilog.Events.LogEventLevel.Information,
     };
-
-    private static string GetUserDataDirectory()
-    {
-        if (OperatingSystem.IsMacOS())
-        {
-            return Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                "Library",
-                "Application Support",
-                "LiveLingo");
-        }
-
-        return Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "LiveLingo");
-    }
 
     [System.Runtime.Versioning.SupportedOSPlatform("macos")]
     private static void SetMacActivationPolicyAccessory()

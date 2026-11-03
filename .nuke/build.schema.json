@@ -28,7 +28,6 @@
         "Clean",
         "Mutate",
         "Pack",
-        "PackMsi",
         "ProbeTranslation",
         "ProbeVoice",
         "Publish",

@@ -220,6 +220,18 @@
     }
   }
 
+  // The check and download report here; the progress bar is the download's, and a check without a known length
+  // (looking at the feed) only shows that it is busy.
+  const Update = ({ u }) => html`<${Row} id="update-action" title=${LL.t('update')} desc=${LL.t('update.desc')}
+    extra=${html`<p id="update-status" role="status" aria-live="polite">${u.status}</p>
+      ${u.busy && html`<div id="update-progress" class=${'progress' + (u.percent === null ? ' indeterminate' : '')} role="progressbar"
+        aria-valuemin="0" aria-valuemax="100" aria-valuenow=${u.percent === null ? undefined : u.percent}>
+        <span style=${u.percent === null ? undefined : { width: u.percent + '%' }}></span></div>`}`}>
+    ${(u.canCheck || u.busy) && html`<button type="button" id="update-action" class="btn" disabled=${u.busy} onClick=${() => LL.send('checkUpdates')}>${LL.t('update.check')}</button>`}
+    ${u.canRestart && html`<button type="button" id="update-action" class="btn primary" onClick=${() => LL.send('restartToUpdate')}>${LL.t('update.restart')}</button>`}
+    ${u.canDownload && html`<button type="button" id="update-action" class="btn primary" onClick=${() => LL.send('openDownloads')}>${LL.t('update.download')}</button>`}
+  <//>`;
+
   const Models = ({ m }) => html`<div>
     <div class="chips">${['models.speech', 'models.clean', 'models.translate'].map((key) => html`<span class="chip" key=${key}>${LL.t(key)}</span>`)}</div>
     <${Row} id="tier" title=${LL.t('model')} desc=${LL.t('model.desc')}>
@@ -232,6 +244,7 @@
     <${Row} id="version" title=${LL.t('version')} desc=${LL.t('version.desc')}>
       <span id="version" class="chip">${m.version}</span>
     <//>
+    <${Update} u=${m.update}/>
   </div>`;
 
   // Turning a cloud step on needs the user's consent every time. C# says when to ask; the safe answer is the first button.

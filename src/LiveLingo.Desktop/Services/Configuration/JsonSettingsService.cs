@@ -1,4 +1,5 @@
 using System.Text.Json;
+using LiveLingo.Core;
 
 namespace LiveLingo.Desktop.Services.Configuration;
 
@@ -146,18 +147,7 @@ public sealed class JsonSettingsService : ISettingsService
 
     public bool SettingsFileExists() => File.Exists(_filePath);
 
-    private static string GetDefaultPath()
-    {
-        var folder = OperatingSystem.IsMacOS()
-            ? Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                "Library", "Application Support", "LiveLingo")
-            : Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "LiveLingo");
-
-        return Path.Combine(folder, "settings.json");
-    }
+    private static string GetDefaultPath() => Path.Combine(UserData.Directory, "settings.json");
 
     private void SaveCurrentUnsafe()
     {

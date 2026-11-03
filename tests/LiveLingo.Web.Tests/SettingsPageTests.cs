@@ -655,6 +655,51 @@ public sealed class SettingsPageTests(BrowserFixture browsers)
 
     [Theory]
     [MemberData(nameof(Engines))]
+    public async Task TheUpdateRow_ChecksOnRequest_AndShowsTheDownloadsProgress(string engine)
+    {
+        await using var idle = await browsers.OpenSettingsAsync(engine, "settings-models");
+        await idle.Page.Locator("#update-action").ClickAsync();
+        Assert.Equal(1, await idle.CountAsync<CheckUpdatesIntent>());
+
+        await using var downloading = await browsers.OpenSettingsAsync(engine, "settings-update-downloading");
+        Assert.Contains("42%", await downloading.Page.Locator("#update-status").InnerTextAsync());
+        Assert.Equal("42", await downloading.Page.Locator("#update-progress").GetAttributeAsync("aria-valuenow"));
+        Assert.True(await downloading.Page.Locator("#update-action").IsDisabledAsync());
+
+        await using var checking = await browsers.OpenSettingsAsync(engine, "settings-update-checking");
+        Assert.Contains("indeterminate", await checking.Page.Locator("#update-progress").GetAttributeAsync("class"));
+        Assert.True(await checking.Page.Locator("#update-action").IsDisabledAsync());
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public async Task TheUpdateRow_RestartsIntoADownloadedVersion_OrOpensTheDownloadPage(string engine)
+    {
+        await using var ready = await browsers.OpenSettingsAsync(engine, "settings-update-ready");
+        await ready.Page.Locator("#update-action").ClickAsync();
+        Assert.Equal(1, await ready.CountAsync<RestartToUpdateIntent>());
+
+        await using var unsupported = await browsers.OpenSettingsAsync(engine, "settings-update-unsupported");
+        Assert.Contains("无法自动更新", await unsupported.Page.Locator("#update-status").InnerTextAsync());
+        await unsupported.Page.Locator("#update-action").ClickAsync();
+        Assert.Equal(1, await unsupported.CountAsync<OpenDownloadsIntent>());
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public async Task TheUpdateRow_SaysWhenAnUpdateCheckFailedOrUpdatesAreOff(string engine)
+    {
+        await using var failed = await browsers.OpenSettingsAsync(engine, "settings-update-failed");
+        Assert.Contains("Unable to connect", await failed.Page.Locator("#update-status").InnerTextAsync());
+        Assert.False(await failed.Page.Locator("#update-action").IsDisabledAsync());
+
+        await using var off = await browsers.OpenSettingsAsync(engine, "settings-update-off");
+        Assert.Contains("已关闭自动更新", await off.Page.Locator("#update-status").InnerTextAsync());
+        Assert.Equal(0, await off.Page.Locator("#update-action").CountAsync());
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
     public async Task TheNavigation_AsksTheHost_AndTheGroupChangesWithTheNextSnapshot(string engine)
     {
         await using var page = await browsers.OpenSettingsAsync(engine);

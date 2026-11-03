@@ -44,6 +44,14 @@
       "text": "旧版本下载的 2 个模型（8.5 GB）已不再使用；不点击就不会删除"
     },
     "version": "2.0.0",
+    "update": {
+      "status": "尚未检查。",
+      "percent": null,
+      "busy": false,
+      "canCheck": true,
+      "canRestart": false,
+      "canDownload": false
+    },
     "diagnostics": [
       {
         "label": "版本",

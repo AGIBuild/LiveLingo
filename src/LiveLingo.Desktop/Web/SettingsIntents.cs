@@ -1,3 +1,4 @@
+using LiveLingo.Desktop.Services.Update;
 using LiveLingo.Desktop.Settings;
 using Microsoft.Extensions.Logging;
 
@@ -10,12 +11,16 @@ namespace LiveLingo.Desktop.Web;
 internal sealed class SettingsIntents : IIntentHandler
 {
     private readonly SettingsViewModel _vm;
+    private readonly UpdateChecks? _updates;
+    private readonly Action<string> _openUrl;
     private readonly ILogger _logger;
 
-    public SettingsIntents(SettingsViewModel vm, string section, ILogger logger)
+    public SettingsIntents(SettingsViewModel vm, string section, UpdateChecks? updates, Action<string> openUrl, ILogger logger)
     {
         _vm = vm;
         Section = section;
+        _updates = updates;
+        _openUrl = openUrl;
         _logger = logger;
     }
 
@@ -51,6 +56,15 @@ internal sealed class SettingsIntents : IIntentHandler
             case ForgetAppIntent forget: _vm.ForgetApp(forget.AppId); break;
             case ClearAppsIntent: _vm.ClearApps(); break;
             case RemoveLegacyModelsIntent: Run(() => _vm.RemoveLegacyModelsCommand.ExecuteAsync(null)); break;
+            case CheckUpdatesIntent:
+                if (_updates is not null)
+                    Run(() => _updates.CheckNowAsync());
+                break;
+            case RestartToUpdateIntent: _updates?.ApplyAndRestart(); break;
+            case OpenDownloadsIntent:
+                if (_updates?.DownloadPage is { } page)
+                    _openUrl(page);
+                break;
             default: throw new ArgumentOutOfRangeException(nameof(intent), intent.GetType().Name, "Not a settings intent.");
         }
 
