@@ -317,7 +317,7 @@
   "settings.update.ready": "Version {0} is downloaded. Restart to install it; quitting installs it too.",
   "settings.update.latest": "You are on the latest version ({0}). Checked {1}.",
   "settings.update.failed": "The check failed ({0}): {1}",
-  "settings.update.unsupported": "This copy was not installed with the LiveLingo installer (Setup.exe or .pkg), so it cannot update itself. Install the latest version from the download page.",
+  "settings.update.unsupported": "This copy was not installed with the LiveLingo installer (.msi or .pkg), so it cannot update itself. Install the latest version from the download page.",
   "settings.update.off": "Updates are turned off (Update.UpdateUrl is empty in settings.json).",
   "settings.diag": "Status",
   "settings.diag.desc": "Contains no text, terms, addresses or keys; handy when asking for help",

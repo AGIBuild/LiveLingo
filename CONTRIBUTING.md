@@ -11,7 +11,7 @@ Thanks for your interest in contributing! This guide covers everything you need 
 | [.NET SDK](https://dotnet.microsoft.com/download) | 10.0+ | Required |
 | Git | Any recent | Required |
 | [Nuke](https://nuke.build/) | Via `dotnet tool restore` | Build automation |
-| [Velopack](https://velopack.io/) | Via `dotnet tool restore` | Windows (Setup.exe and .msi) and macOS packaging, updates |
+| [Velopack](https://velopack.io/) | Via `dotnet tool restore` | Windows (.msi) and macOS packaging, updates |
 | [Stryker.NET](https://stryker-mutator.io/) | Via `dotnet tool restore` | Mutation testing |
 
 ---
@@ -124,7 +124,7 @@ LiveLingo uses [Nuke](https://nuke.build/) for build automation. All targets are
 ./build.sh Publish --Runtime osx-arm64               # Publish for macOS
 ./build.ps1 Publish --Runtime win-x64                # Publish for Windows
 ./build.sh Pack --Runtime osx-arm64 --Version 1.0.0  # macOS: .pkg installer + update package and feed
-./build.ps1 Pack --Runtime win-x64 --Version 1.0.0   # Windows: Setup.exe and .msi installers + update package and feed
+./build.ps1 Pack --Runtime win-x64 --Version 1.0.0   # Windows: .msi installer + update package and feed
 ```
 
 End-to-end probes download the pinned models (SHA256-verified) and use real inference; they are not part of the unit-test gate:
@@ -242,7 +242,7 @@ The CI pipeline (`.github/workflows/release.yml`) runs on tag push (`v*`) with f
 compile  →  test  →  pack  →  release
    │          │        │         │
    │          │        │         └─ Check the update feeds, then create the GitHub Release
-   │          │        └─ Matrix build: win-x64 (Setup.exe + .msi) / osx-arm64 (.pkg), each with its update package and feed
+   │          │        └─ Matrix build: win-x64 (.msi) / osx-arm64 (.pkg), each with its update package and feed
    │          └─ Unit tests + coverage gates (on macOS, where the web tests run both browsers)
    └─ Build verification
 ```
@@ -264,7 +264,10 @@ Installed applications update themselves from the GitHub releases of the reposit
   and then offers *Restart to Update* in the tray menu; quitting also installs it. Pre-releases are not offered.
   *Settings → Models → Updates* shows the version, the progress of a check or download, and the result; the tray's
   *Check for Updates* opens it and starts a check.
-- Only an application installed by an installer of the release (Setup.exe, the .msi or the .pkg — all Velopack) can
+- A release lists only what is needed: the installer (`.msi` / `.pkg`), the full package (the file the application
+  downloads to update; it is not a library) and the feed. Velopack's `Setup.exe` and legacy `RELEASES` files are built
+  but not released. There is one feed per platform because a feed lists packages without saying which system they are for.
+- Only an application installed by an installer of the release (the .msi or the .pkg — both Velopack) can
   update itself; the .msi is built by `vpk pack --msi` and installs per user, so updates never need elevation. A
   development build and a copy installed by the hand-built `.msi` of 2.1.0 and earlier cannot; they skip the check, and
   *Updates* says so and links to the download page.

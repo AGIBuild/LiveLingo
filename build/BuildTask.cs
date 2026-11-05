@@ -303,7 +303,7 @@ class BuildTask : NukeBuild
         return total > 0 ? detected * 100.0 / total : 0;
     }
 
-    // One Velopack package per platform: the installer, the full package, and the feed (releases.<channel>.json) that
+    // One Velopack package per platform: the installer (.msi / .pkg), the full package, and the feed (releases.<channel>.json) that
     // installed applications read to update themselves. The feed and the package must be released together.
     Target Pack => _ => _
         .DependsOn(Publish)
@@ -332,7 +332,7 @@ class BuildTask : NukeBuild
                 $"--outputDir {ReleasesDir} " +
                 $"--noPortable";
 
-            // The .msi is Velopack's too, so an application installed from it updates itself like the Setup.exe one.
+            // The .msi is Velopack's, so an application installed from it updates itself (Update.exe, as after Setup.exe).
             // Per user, so that updates never need elevation.
             if (windows)
                 arguments += " --msi --instLocation PerUser";
@@ -355,21 +355,12 @@ class BuildTask : NukeBuild
 
             DotNet(arguments, environmentVariables: vpkEnv.AsReadOnly());
 
-            // The installers keep the file names of earlier releases.
-            var installer = ReleasesDir.GlobFiles(windows ? "*Setup.exe" : "*Setup.pkg").Single();
-            var renamed = ReleasesDir / (windows
-                ? $"LiveLingo-{Version}-{Runtime}-Setup.exe"
-                : $"LiveLingo-{Version}-{Runtime}.pkg");
+            // The one installer per platform keeps the file name of earlier releases. On Windows that is the .msi;
+            // the Setup.exe vpk builds next to it is not released.
+            var installer = ReleasesDir.GlobFiles(windows ? "*.msi" : "*Setup.pkg").Single();
+            var renamed = ReleasesDir / $"LiveLingo-{Version}-{Runtime}.{(windows ? "msi" : "pkg")}";
             File.Move(installer, renamed, overwrite: true);
             Log.Information("Installer: {Path}", renamed);
-
-            if (windows)
-            {
-                var msi = ReleasesDir.GlobFiles("*.msi").Single();
-                var msiRenamed = ReleasesDir / $"LiveLingo-{Version}-{Runtime}.msi";
-                File.Move(msi, msiRenamed, overwrite: true);
-                Log.Information("MSI installer: {Path}", msiRenamed);
-            }
         });
 
     static bool IsCoverageClassIncluded(string packageName, string className)

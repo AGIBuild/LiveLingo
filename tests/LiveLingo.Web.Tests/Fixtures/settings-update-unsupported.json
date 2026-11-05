@@ -45,7 +45,7 @@
     },
     "version": "2.0.0",
     "update": {
-      "status": "当前不是通过 LiveLingo 安装程序（Setup.exe 或 .pkg）安装的，无法自动更新。请从下载页面安装最新版本。",
+      "status": "当前不是通过 LiveLingo 安装程序（.msi 或 .pkg）安装的，无法自动更新。请从下载页面安装最新版本。",
       "percent": null,
       "busy": false,
       "canCheck": false,
