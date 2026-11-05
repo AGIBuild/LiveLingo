@@ -1,0 +1,31 @@
+CHANGELOG.md
+  s_b07327ae3c9305::t_57b8830163305e 15-22,28-29,32
+  s_6d6e9175f38e45::t_4ac7b2fc593a54 452
+  s_b07327ae3c9305::t_251b667a01d10d 10-14,30-31
+  s_b07327ae3c9305::t_e87aa9ecf35aee 23-27
+  s_b07327ae3c9305::t_6a65cb88554b50 451
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "d0dc09e1ee74822042213523f1863a3bde19f170",
+  "prompts": {},
+  "sessions": {
+    "s_6d6e9175f38e45": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "f74d37e5-1d96-4ddc-a3f9-5ae24ff39e38",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    },
+    "s_b07327ae3c9305": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "9df5d57d-d775-4135-9760-4e8118f77d2c",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
