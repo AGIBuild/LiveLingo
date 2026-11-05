@@ -317,7 +317,7 @@
   "settings.update.ready": "{0} 版已下载完成。重启即可安装；退出应用时也会自动安装。",
   "settings.update.latest": "已是最新版本（{0}），检查于 {1}。",
   "settings.update.failed": "检查失败（{0}）：{1}",
-  "settings.update.unsupported": "当前不是通过 LiveLingo 安装程序（Setup.exe 或 .pkg）安装的，无法自动更新。请从下载页面安装最新版本。",
+  "settings.update.unsupported": "当前不是通过 LiveLingo 安装程序（.msi 或 .pkg）安装的，无法自动更新。请从下载页面安装最新版本。",
   "settings.update.off": "已关闭自动更新（settings.json 中的 Update.UpdateUrl 为空）。",
   "settings.diag": "运行状态",
   "settings.diag.desc": "不含正文、术语、地址和密钥，便于排查",

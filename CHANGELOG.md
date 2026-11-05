@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.1] - 2026-11-05
+
+Fixes garbled text in the target app on macOS and the failing update check, and releases fewer files.
+
+### Fixed
+- **Garbled text in the target app (macOS, installed app)**: the text was put on the clipboard with `pbcopy`, which reads
+  the locale's encoding. An app started from Finder has no locale, so Chinese came out as mojibake (`‰Ω†Â•Ω`); a build
+  started from a terminal has a UTF-8 locale and was fine. The clipboard tools now always run with a UTF-8 locale.
+- **Update check failed with "403 (rate limit exceeded)"**: the check used the GitHub API, which allows only 60
+  unauthenticated requests an hour per address. It now reads the feed from the latest release's download address, which
+  has no such limit.
+
+### Changed
+- A release carries fewer files. Windows has one installer, the `.msi` (per user, updates itself like the Setup.exe
+  did), instead of Setup.exe and `.msi`; the legacy `RELEASES` files are gone. What remains: the installer, the update
+  package (`*-full.nupkg`, which the app downloads to update) and one feed per platform.
+
 ## [2.2.0] - 2026-11-05
 
 Cloud models can have several endpoints (only one enabled at a time), and the model the composer is using moves from a
@@ -448,6 +465,7 @@ process-wide task with shared progress and dedup across every UI surface.
 
 See `git log v0.1.4` for the pre-CHANGELOG history.
 
+[2.2.1]: https://github.com/AGIBuild/LiveLingo/releases/tag/v2.2.1
 [2.2.0]: https://github.com/AGIBuild/LiveLingo/releases/tag/v2.2.0
 [2.1.2]: https://github.com/AGIBuild/LiveLingo/releases/tag/v2.1.2
 [2.1.1]: https://github.com/AGIBuild/LiveLingo/releases/tag/v2.1.1

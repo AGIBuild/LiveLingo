@@ -143,12 +143,10 @@ jobs:
         with:
           name: installers-${{ matrix.runtime }}
           path: |
-            releases/*.exe
             releases/*.msi
             releases/*.pkg
             releases/*.nupkg
             releases/releases.*.json
-            releases/RELEASES*
           if-no-files-found: error
 
   # Stage 4: Create the GitHub Release with the installers and the update feeds
@@ -188,10 +186,8 @@ jobs:
           name: LiveLingo ${{ needs.compile.outputs.tag }}
           prerelease: ${{ contains(needs.compile.outputs.version, '-') }}
           files: |
-            installers/*.exe
             installers/*.msi
             installers/*.pkg
             installers/*.nupkg
             installers/releases.*.json
-            installers/RELEASES*
           generate_release_notes: true

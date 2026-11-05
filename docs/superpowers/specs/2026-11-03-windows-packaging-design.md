@@ -32,3 +32,11 @@
   信誉随发布逐步积累）。Velopack 支持 `--signTemplate` / Azure Trusted Signing。需要账号和密钥，不在本次范围。
 - `winget` 分发（`winget upgrade` 也能升级）：需要先有签名与稳定的下载地址，之后再评估。
 - `.msi` 的产物文件名、`--msi` 在 CI 上的输出需要在首次 Windows 发布时核对（本地 macOS 无法运行 MSI 打包）。
+
+## 修订（2026-11-05）：发布物精简
+
+- Windows 只发布 `.msi`，不再发布 `Setup.exe`（vpk 仍会生成，但不上传）：两者装完后的更新方式完全一致（`Update.exe`），保留两个只会让用户困惑。
+- 不再上传传统格式的 `RELEASES*`：客户端用的是 `releases.<channel>.json`。
+- `*-full.nupkg` 必须保留：它是客户端下载的更新包，不是给开发者的库。
+- `releases.win.json` / `releases.osx.json` 必须各一份：feed 只列包，不标平台，合并后 Windows 会拿到 macOS 的包。
+- 更新检查改用 `releases/latest/download/` 的静态地址，不再走有每小时 60 次限制的 GitHub API。

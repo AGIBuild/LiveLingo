@@ -19,9 +19,11 @@ public sealed class VelopackUpdateService : IUpdateService
     {
         _logger = logger;
         var github = updateUrl.StartsWith("https://github.com/", StringComparison.OrdinalIgnoreCase);
-        IUpdateSource source = github
-            ? new GithubSource(updateUrl, accessToken: null, prerelease: false)
-            : new SimpleWebSource(updateUrl);
+        // GithubSource calls api.github.com, whose unauthenticated limit (60 requests an hour per IP) is easily exhausted
+        // (403 rate limit exceeded). The latest release's assets, feed included, are served without that limit.
+        IUpdateSource source = new SimpleWebSource(github
+            ? updateUrl.TrimEnd('/') + "/releases/latest/download/"
+            : updateUrl);
         DownloadPage = github ? updateUrl.TrimEnd('/') + "/releases/latest" : null;
         _manager = new UpdateManager(source);
     }
