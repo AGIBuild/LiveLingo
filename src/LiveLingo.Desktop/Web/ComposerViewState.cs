@@ -1,10 +1,18 @@
+using LiveLingo.Core.Inference;
 using LiveLingo.Desktop.Composer;
 
 namespace LiveLingo.Desktop.Web;
 
 internal sealed record DestState(string Text, string Kind);
 
-internal sealed record PrivacyState(string Text, bool Cloud, string Aria);
+internal sealed record PrivacyState(string Text, bool Cloud, string Aria, IReadOnlyList<ModelRowState> Models);
+
+/// <summary>One stage in the card the privacy chip opens: the stage, and the actual model with whether it was confirmed.</summary>
+internal sealed record ModelRowState(string Label, string Text);
+
+/// <summary>The footer's model line. <paramref name="Tone"/> is "local", "info" (being prepared or replaced) or "cloud".</summary>
+/// <param name="Title">The full details of the stage, for the tooltip.</param>
+internal sealed record ModelLineState(string Text, string Tone, string Title);
 
 internal sealed record MenuItemState(string Id, string Label, bool Checked, bool Enabled);
 
@@ -48,7 +56,8 @@ internal sealed record DownloadState(string Text, int Percent);
 
 internal sealed record CommitState(string Label, bool Enabled, bool Armed, bool Written, string Aria);
 
-internal sealed record FooterState(MicState Mic, StatusState Status, DownloadState? Download, bool CopyEnabled, CommitState Commit);
+internal sealed record FooterState(
+    MicState Mic, StatusState Status, ModelLineState? Model, DownloadState? Download, bool CopyEnabled, CommitState Commit);
 
 internal sealed record LayoutState(bool Wide);
 
@@ -88,8 +97,9 @@ internal sealed record ComposerViewState(
     MenusState Menus,
     DialogsState Dialogs)
 {
-    public static ComposerViewState From(ComposerViewModel vm, ComposerTexts texts, RecentDrafts recent, int sourceRev)
+    public static ComposerViewState From(ComposerViewModel vm, ComposerTexts texts, RecentDrafts recent, int sourceRev, ModelReport? models = null)
     {
+        models ??= ModelReport.None;
         var live = vm.IsListening || vm.IsStartingListening || vm.HasTimeline;
         var empty = vm.Lines.Count == 0 && !live && string.IsNullOrWhiteSpace(vm.SourceText);
         var hasResult = vm.Lines.Count > 0 && vm.Output != ComposerOutput.Original;
@@ -102,8 +112,14 @@ internal sealed record ComposerViewState(
             Dest: new DestState(
                 texts.Dest(vm.HasTarget, vm.IsTargetLost, targetName),
                 vm.IsTargetLost ? "lost" : vm.HasTarget ? "target" : "copyOnly"),
+            // Once a request went to a cloud model, the chip says so whatever the settings say now.
             Privacy: new PrivacyState(
-                texts.Privacy(vm.CloudTranslate, vm.CloudClean), cloud, texts.PrivacyAria(vm.CloudTranslate, vm.CloudClean)),
+                models.CloudUsed ? texts.ModelCloudBadge : texts.Privacy(vm.CloudTranslate, vm.CloudClean),
+                cloud || models.CloudUsed,
+                models.CloudUsed ? texts.ModelCloudAria : texts.PrivacyAria(vm.CloudTranslate, vm.CloudClean),
+                [.. Enum.GetValues<ModelStage>().Select(stage => new ModelRowState(
+                    texts.ModelStageLabel(stage),
+                    texts.ModelDetailBody(models.Used.GetValueOrDefault(stage), models.Confirmed.GetValueOrDefault(stage))))]),
             Output: new OutputState(
                 Name(vm.Output),
                 texts.OutputPill(vm.Output, vm.TargetLanguage),
@@ -143,6 +159,7 @@ internal sealed record ComposerViewState(
                     !vm.IsListening && (vm.Status == ComposerStatus.Failed ||
                         vm.Output == ComposerOutput.Clean && vm.StatusInfo.PolishOutcome == LiveLingo.Core.Drafting.PolishOutcome.KeptPreview)
                         ? "warn" : "muted"),
+                ModelLineOf(vm, texts, models),
                 vm.DownloadProgress is { } download && vm.Banner.Kind != BannerKind.Downloading
                     ? new DownloadState(texts.FooterDownload(download), (int)Math.Round(download))
                     : null,
@@ -195,6 +212,30 @@ internal sealed record ComposerViewState(
         ComposerOutput.Translate => "translate",
         _ => "original"
     };
+
+    /// <summary>
+    /// The model behind what is happening now: the speech model while dictating, otherwise the model of the chosen output
+    /// (once there is a result for it); none for the original wording or for a stage this window has not used yet.
+    /// </summary>
+    private static ModelLineState? ModelLineOf(ComposerViewModel vm, ComposerTexts texts, ModelReport models)
+    {
+        ModelStage? stage = vm.IsListening || vm.IsStartingListening
+            ? ModelStage.Speech
+            : vm.Lines.Count == 0 ? null : vm.Output switch
+            {
+                ComposerOutput.Clean => ModelStage.Cleaner,
+                ComposerOutput.Translate => ModelStage.Translator,
+                _ => null
+            };
+        if (stage is not { } current || !models.Used.TryGetValue(current, out var use))
+            return null;
+
+        var previous = models.Confirmed.GetValueOrDefault(current);
+        return new ModelLineState(
+            texts.ModelLine(use, previous),
+            use.Cloud ? "cloud" : use.Confirmed ? "local" : "info",
+            texts.ModelDetail(current, use, previous));
+    }
 
     private static BannerView? BannerOf(BannerState banner, ComposerTexts texts) => banner.Kind == BannerKind.None
         ? null

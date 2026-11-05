@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace LiveLingo.Desktop.Services.Configuration;
@@ -30,19 +31,91 @@ public partial class SettingsModel : ObservableObject
 
 /// <summary>
 /// Optional cloud models (Microsoft Foundry or any OpenAI-compatible service). Off by default: nothing is sent
-/// anywhere until the user switches a feature on. Only text is sent, never audio. The API key is not stored here;
-/// it lives in the system secret store under <see cref="ApiKeySecretId"/>.
+/// anywhere until the user switches a feature on. Only text is sent, never audio. The user may keep any number of
+/// endpoints, at most one of them enabled (<see cref="ActiveEndpointId"/>); the steps that are switched on use that one.
 /// </summary>
 public partial class CloudSettings : ObservableObject
 {
-    public const string ApiKeySecretId = "cloud-api-key";
+    /// <summary>The secret id the single endpoint of earlier versions kept its API key under; its migrated endpoint keeps using it.</summary>
+    public const string LegacyApiKeySecretId = "cloud-api-key";
 
-    [ObservableProperty] private string _baseUrl = "";
-    [ObservableProperty] private string _model = "";
+    [ObservableProperty] private List<CloudEndpoint> _endpoints = [];
+
+    /// <summary>The id of the enabled endpoint; empty when none is enabled, which keeps everything local.</summary>
+    [ObservableProperty] private string _activeEndpointId = "";
+
     [ObservableProperty] private bool _translate;
     [ObservableProperty] private bool _clean;
 
-    public CloudSettings DeepClone() => new() { BaseUrl = BaseUrl, Model = Model, Translate = Translate, Clean = Clean };
+    /// <summary>The address of the one endpoint earlier versions had. Read only to migrate it, never written (see <see cref="MigrateLegacy"/>).</summary>
+    [JsonPropertyName("baseUrl"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? LegacyBaseUrl { get; set; }
+
+    [JsonPropertyName("model"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? LegacyModel { get; set; }
+
+    /// <summary>The enabled endpoint, or null when none is.</summary>
+    [JsonIgnore]
+    public CloudEndpoint? Active => Endpoints.FirstOrDefault(endpoint => endpoint.Id == ActiveEndpointId);
+
+    /// <summary>
+    /// Turns the single address and model of earlier versions into an endpoint named "Default" that keeps its API key.
+    /// It is enabled only if a cloud step was on, so a migration never changes where text goes. Returns true when
+    /// something was converted and the settings must be saved.
+    /// </summary>
+    public bool MigrateLegacy()
+    {
+        if (LegacyBaseUrl is null && LegacyModel is null)
+            return false;
+
+        if (Endpoints.Count == 0 && !string.IsNullOrWhiteSpace(LegacyBaseUrl))
+        {
+            var endpoint = new CloudEndpoint
+            {
+                Id = CloudEndpoint.NewId(),
+                Name = "Default",
+                BaseUrl = LegacyBaseUrl.Trim(),
+                Model = (LegacyModel ?? "").Trim(),
+                SecretId = LegacyApiKeySecretId
+            };
+            Endpoints = [endpoint];
+            ActiveEndpointId = Translate || Clean ? endpoint.Id : "";
+        }
+
+        if (Active is null)
+        {
+            Translate = false;
+            Clean = false;
+        }
+
+        LegacyBaseUrl = null;
+        LegacyModel = null;
+        return true;
+    }
+
+    public CloudSettings DeepClone() => new()
+    {
+        Endpoints = [.. Endpoints.Select(endpoint => endpoint.DeepClone())],
+        ActiveEndpointId = ActiveEndpointId,
+        Translate = Translate,
+        Clean = Clean,
+        LegacyBaseUrl = LegacyBaseUrl,
+        LegacyModel = LegacyModel
+    };
+}
+
+/// <summary>One OpenAI-compatible endpoint the user saved. The API key is not stored here; it lives in the system secret store under <see cref="SecretId"/>.</summary>
+public sealed class CloudEndpoint
+{
+    public string Id { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string BaseUrl { get; set; } = "";
+    public string Model { get; set; } = "";
+    public string SecretId { get; set; } = "";
+
+    public static string NewId() => Guid.NewGuid().ToString("N");
+
+    public CloudEndpoint DeepClone() => new() { Id = Id, Name = Name, BaseUrl = BaseUrl, Model = Model, SecretId = SecretId };
 }
 
 public partial class HotkeySettings : ObservableObject

@@ -7,7 +7,21 @@
   "privacy": {
     "text": "本地",
     "cloud": false,
-    "aria": "全部本地处理"
+    "aria": "全部本地处理",
+    "models": [
+      {
+        "label": "语音识别",
+        "text": "本次窗口尚未使用"
+      },
+      {
+        "label": "整理与润色",
+        "text": "本次窗口尚未使用"
+      },
+      {
+        "label": "翻译",
+        "text": "本次窗口尚未使用"
+      }
+    ]
   },
   "output": {
     "value": "translate",
@@ -95,6 +109,7 @@
       "text": "正在翻译…",
       "tone": "muted"
     },
+    "model": null,
     "download": null,
     "copyEnabled": false,
     "commit": {

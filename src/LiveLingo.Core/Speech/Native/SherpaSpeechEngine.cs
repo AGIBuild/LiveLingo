@@ -82,7 +82,8 @@ public sealed class SherpaSpeechEngine : IDictationSessionFactory, ISpeechWarmup
     public async Task<DictationSession> CreateAsync(DraftSession draft, IReadOnlyList<string> glossary, CancellationToken ct)
     {
         var names = $"{ModelCatalog.SpeechLive.DisplayName} + {ModelCatalog.SpeechSecondPass.DisplayName}";
-        _usage?.Report(new ModelUse(ModelStage.Speech, names, Cloud: false, Confirmed: false));
+        var shortNames = $"{ModelCatalog.SpeechLive.ShortName} + {ModelCatalog.SpeechSecondPass.ShortName}";
+        _usage?.Report(new ModelUse(ModelStage.Speech, names, Cloud: false, Confirmed: false, shortNames));
         await WarmAsync(glossary, ct).ConfigureAwait(false);
         var live = await _live.AcquireAsync("", ct).ConfigureAwait(false);
         ResidentModel<OfflineRecognizer>.Lease secondPass;
@@ -101,7 +102,7 @@ public sealed class SherpaSpeechEngine : IDictationSessionFactory, ISpeechWarmup
         try
         {
             var session = new DictationSession(liveRecognizer, NewVad(LiveVadMinSilenceSeconds), secondPassRecognizer, draft);
-            _usage?.Report(new ModelUse(ModelStage.Speech, names, Cloud: false, Confirmed: true));
+            _usage?.Report(new ModelUse(ModelStage.Speech, names, Cloud: false, Confirmed: true, shortNames));
             return session;
         }
         catch

@@ -24,6 +24,8 @@ public sealed class ComposerWebSessionTests
 
         public JsonElement Message(int index) => JsonDocument.Parse(Host.Posted[index]).RootElement;
 
+        public JsonElement Last => Message(Host.Posted.Count - 1);
+
         public ValueTask DisposeAsync()
         {
             Session.Dispose();
@@ -38,7 +40,7 @@ public sealed class ComposerWebSessionTests
 
         rig.Session.Start();
 
-        Assert.Equal(["strings", "composer", "focus", "models"], rig.Host.Types);
+        Assert.Equal(["strings", "composer", "focus"], rig.Host.Types);
         Assert.Equal("zh-CN", rig.Message(0).GetProperty("data").GetProperty("locale").GetString());
         Assert.Equal("source", rig.Message(2).GetProperty("data").GetProperty("target").GetString());
     }
@@ -50,39 +52,97 @@ public sealed class ComposerWebSessionTests
 
         rig.Host.FromPage("""{"v":1,"name":"ready"}""");
 
-        Assert.Equal(["strings", "composer", "focus", "models"], rig.Host.Types);
+        Assert.Equal(["strings", "composer", "focus"], rig.Host.Types);
+    }
+
+    private static async Task<Rig> RigWithResultAsync(ComposerOutput output)
+    {
+        var rig = new Rig();
+        rig.H.Vm.Output = output;
+        rig.H.Vm.SourceText = "先检查缓存。";
+        await Wait.Until(() => rig.H.Vm.Lines.Count > 0 && rig.H.Vm.Status == ComposerStatus.Ready);
+        rig.Session.Start();
+        rig.Host.Posted.Clear();
+        return rig;
+    }
+
+    private static JsonElement Footer(JsonElement message) => message.GetProperty("data").GetProperty("footer");
+
+    [Fact]
+    public async Task ActualModelUse_ReachesThePageInTheNextSnapshot_AsALine_NotAsAToast()
+    {
+        await using var rig = await RigWithResultAsync(ComposerOutput.Clean);
+
+        rig.Usage.Report(new ModelUse(ModelStage.Cleaner, "Qwen3.5 4B (text cleanup)", false, true, "Qwen3.5 4B"));
+        rig.Time.Advance(WebBridge.Frame);
+
+        Assert.Equal(["composer"], rig.Host.Types);
+        var model = Footer(rig.Message(0)).GetProperty("model");
+        Assert.Equal("整理 · Qwen3.5 4B · 本地", model.GetProperty("text").GetString());
+        Assert.Equal("local", model.GetProperty("tone").GetString());
+        Assert.Contains("Qwen3.5 4B (text cleanup)", model.GetProperty("title").GetString());
+        rig.Host.Posted.Clear();
+        rig.Usage.Report(new ModelUse(ModelStage.Cleaner, "Qwen3.5 4B (text cleanup)", false, true, "Qwen3.5 4B"));
+        rig.Time.Advance(WebBridge.Frame);
+        Assert.Empty(rig.Host.Posted);
     }
 
     [Fact]
-    public async Task ActualModelUse_IsBrieflyShown_AndCanBeInspectedAgain()
+    public async Task TheCardOfThePrivacyChip_ListsEveryStageWithTheActualModelsInFull()
     {
-        await using var rig = new Rig();
-        rig.Session.Start();
-        rig.Host.Posted.Clear();
-        rig.Usage.Report(new ModelUse(ModelStage.Translator, "Hy-MT2 7B", false, true));
-        var toast = rig.Host.Posted.Select(json => JsonDocument.Parse(json).RootElement)
-            .Single(m => m.GetProperty("type").GetString() == "toast");
-        Assert.Contains("Hy-MT2 7B", toast.GetProperty("data").GetProperty("text").GetString());
-        Assert.Equal(5000, toast.GetProperty("data").GetProperty("durationMs").GetInt32());
-        rig.Host.Posted.Clear();
-        rig.Usage.Report(new ModelUse(ModelStage.Translator, "Hy-MT2 7B", false, true));
-        Assert.Empty(rig.Host.Posted);
-        rig.Host.FromPage(new ModelInfoIntent { V = 1 });
-        Assert.Contains("Hy-MT2 7B", rig.Host.Posted.Single());
+        await using var rig = await RigWithResultAsync(ComposerOutput.Clean);
+
+        rig.Usage.Report(new ModelUse(ModelStage.Cleaner, "Qwen3.5 4B (text cleanup)", false, true, "Qwen3.5 4B"));
+        rig.Time.Advance(WebBridge.Frame);
+
+        var rows = rig.Message(0).GetProperty("data").GetProperty("privacy").GetProperty("models").EnumerateArray().ToList();
+        Assert.Equal(3, rows.Count);
+        Assert.Contains("尚未使用", rows[0].GetProperty("text").GetString());
+        Assert.Contains("Qwen3.5 4B (text cleanup)", rows[1].GetProperty("text").GetString());
+        Assert.Contains("尚未使用", rows[2].GetProperty("text").GetString());
     }
 
     [Fact]
     public async Task ModelSwitching_DistinguishesRequestedFromPreviouslyUsed()
     {
-        await using var rig = new Rig();
-        rig.Session.Start();
-        rig.Usage.Report(new ModelUse(ModelStage.Translator, "Hy-MT2 1.8B", false, true));
+        await using var rig = await RigWithResultAsync(ComposerOutput.Translate);
+        rig.Usage.Report(new ModelUse(ModelStage.Translator, "Hy-MT2 1.8B (fast translation)", false, true, "Hy-MT2-1.8B"));
+        rig.Time.Advance(WebBridge.Frame);
         rig.Host.Posted.Clear();
-        rig.Usage.Report(new ModelUse(ModelStage.Translator, "Hy-MT2 7B", false, false));
-        var details = JsonDocument.Parse(rig.Host.Posted[0]).RootElement.GetProperty("data").GetProperty("text").GetString();
-        Assert.Contains("切换", details);
-        Assert.Contains("1.8B", details);
-        Assert.Contains("7B", details);
+
+        rig.Usage.Report(new ModelUse(ModelStage.Translator, "Hy-MT2 7B (quality translation)", false, false, "Hy-MT2-7B"));
+        rig.Time.Advance(WebBridge.Frame);
+
+        var model = Footer(rig.Message(0)).GetProperty("model");
+        Assert.Equal("翻译 · 正在切换到 Hy-MT2-7B（上次 Hy-MT2-1.8B）", model.GetProperty("text").GetString());
+        Assert.Equal("info", model.GetProperty("tone").GetString());
+    }
+
+    [Fact]
+    public async Task ACloudRequest_NamesTheEndpoint_AndTheChipSaysCloudForTheRestOfTheWindow()
+    {
+        await using var rig = await RigWithResultAsync(ComposerOutput.Translate);
+
+        rig.Usage.Report(new ModelUse(ModelStage.Translator, "gpt-4o-mini", true, true, Endpoint: "Foundry · 东亚"));
+        rig.Time.Advance(WebBridge.Frame);
+        rig.Usage.Report(new ModelUse(ModelStage.Translator, "Hy-MT2 7B (quality translation)", false, true, "Hy-MT2-7B"));
+        rig.Time.Advance(WebBridge.Frame);
+
+        var data = rig.Last.GetProperty("data");
+        Assert.True(data.GetProperty("privacy").GetProperty("cloud").GetBoolean());
+        Assert.Equal("云端", data.GetProperty("privacy").GetProperty("text").GetString());
+        Assert.Equal("翻译 · Hy-MT2-7B · 本地", data.GetProperty("footer").GetProperty("model").GetProperty("text").GetString());
+    }
+
+    [Fact]
+    public async Task WithoutAnyModelUse_TheFooterHasNoModelLine()
+    {
+        await using var rig = await RigWithResultAsync(ComposerOutput.Translate);
+
+        rig.H.Vm.SourceText = "先检查缓存。再看日志。";
+        rig.Time.Advance(WebBridge.Frame);
+
+        Assert.Equal(JsonValueKind.Null, Footer(rig.Last).GetProperty("model").ValueKind);
     }
 
     [Fact]

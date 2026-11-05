@@ -48,11 +48,16 @@ internal static class SettingsScenarios
         }),
         ["settings-cloud"] = () => Open("privacy", Cloud, key: "sk-stored"),
         ["settings-consent"] = () => Open("privacy", Cloud, key: "sk-stored", then: f => f.Vm.SetCloud(CloudStep.Clean, on: true)),
-        ["settings-cloud-invalid"] = () => Open("privacy", then: f =>
+        ["settings-cloud-invalid"] = () => Open("privacy", then: f => f.Vm.SetCloud(CloudStep.Translate, on: true)),
+        ["settings-endpoint-add"] = () => Open("privacy", then: f => f.Vm.OpenEndpointForm(null)),
+        ["settings-endpoint-edit"] = () => Open("privacy", Cloud, key: "sk-stored", then: f => f.Vm.OpenEndpointForm("main")),
+        ["settings-endpoint-error"] = () => Open("privacy", Cloud, key: "sk-stored", then: f =>
         {
-            f.Vm.SetCloud(CloudStep.Translate, on: true);
-            f.Vm.AnswerConsent(allow: true);
+            f.Vm.OpenEndpointForm(null);
+            f.Vm.SaveEndpointAsync("Contoso", "http://api.example.com/v1", "m", "sk").GetAwaiter().GetResult();
         }),
+        ["settings-endpoint-switch"] = () => Open("privacy", Cloud, key: "sk-stored", then: f => f.Vm.SetEndpointEnabled("other", on: true)),
+        ["settings-endpoint-delete"] = () => Open("privacy", Cloud, key: "sk-stored", then: f => f.Vm.DeleteEndpoint("other")),
         ["settings-diagnostics"] = () => Open("models", model: m =>
         {
             Cloud(m);
@@ -79,12 +84,7 @@ internal static class SettingsScenarios
             vm, Texts.ChineseSettings(), section, App,
             UpdateViewState.From(update ?? new UpdateState(UpdatePhase.Idle), downloadPage, Texts.ChineseSettings(), App.Version)) with { Rev = 1 };
 
-    private static void Cloud(SettingsModel model)
-    {
-        model.Cloud.BaseUrl = "https://api.example.com/v1";
-        model.Cloud.Model = "gpt-deploy";
-        model.Cloud.Translate = true;
-    }
+    private static void Cloud(SettingsModel model) => model.Cloud = CloudTestData.WithEndpoints(translate: true).Cloud;
 
     private static InstalledModel Legacy(string id, long bytes) =>
         new(id, id, "/models/" + id, bytes, ModelType.Translation, DateTime.UnixEpoch);

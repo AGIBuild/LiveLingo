@@ -3,6 +3,7 @@ using LiveLingo.Core.Inference;
 using LiveLingo.Desktop.Platform;
 using LiveLingo.Desktop.Services.Cloud;
 using LiveLingo.Desktop.Services.Configuration;
+using LiveLingo.Desktop.Tests.Settings;
 using NSubstitute;
 
 namespace LiveLingo.Desktop.Tests.Services.Cloud;
@@ -12,12 +13,17 @@ public class SettingsCloudRoutesTests
     private static (SettingsCloudRoutes Routes, SettingsModel Model, ISecretStore Secrets) Create(string? key = "sk-test")
     {
         var model = new SettingsModel();
-        model.Cloud.BaseUrl = "https://example.openai.azure.com/openai/v1";
-        model.Cloud.Model = "gpt-4.1-mini";
+        model.Cloud.Endpoints =
+        [
+            CloudTestData.Endpoint("a", "Foundry", "https://example.openai.azure.com/openai/v1", "gpt-4.1-mini"),
+            CloudTestData.Endpoint("b", "Other", "https://other.example.com/v1", "other-model")
+        ];
+        model.Cloud.ActiveEndpointId = "a";
         var settings = Substitute.For<ISettingsService>();
         settings.Current.Returns(_ => model);
         var secrets = Substitute.For<ISecretStore>();
-        secrets.GetSecretAsync(CloudSettings.ApiKeySecretId, Arg.Any<CancellationToken>()).Returns(key);
+        secrets.GetSecretAsync(CloudTestData.SecretId("a"), Arg.Any<CancellationToken>()).Returns(key);
+        secrets.GetSecretAsync(CloudTestData.SecretId("b"), Arg.Any<CancellationToken>()).Returns("sk-other");
         return (new SettingsCloudRoutes(settings, secrets), model, secrets);
     }
 
@@ -72,10 +78,38 @@ public class SettingsCloudRoutesTests
     {
         var (routes, model, _) = Create();
         model.Cloud.Translate = true;
-        model.Cloud.BaseUrl = "http://not-secure.example.com/v1";
+        model.Cloud.Endpoints[0].BaseUrl = "http://not-secure.example.com/v1";
 
         await Assert.ThrowsAsync<CloudNotConfiguredException>(
             () => routes.GetAsync(InferenceRole.Translator, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task OnlyTheEnabledEndpoint_IsUsed_WithItsOwnKey()
+    {
+        var (routes, model, _) = Create();
+        model.Cloud.Translate = true;
+        model.Cloud.ActiveEndpointId = "b";
+
+        var route = await routes.GetAsync(InferenceRole.Translator, CancellationToken.None);
+
+        Assert.Equal("https://other.example.com/v1/chat/completions", route!.Endpoint.ToString());
+        Assert.Equal("other-model", route.Model);
+        Assert.Equal("sk-other", route.ApiKey);
+    }
+
+    [Fact]
+    public async Task AStepOnWithNoEnabledEndpoint_IsAnExplicitError_NotAnotherEndpoint()
+    {
+        var (routes, model, secrets) = Create();
+        model.Cloud.Translate = true;
+        model.Cloud.ActiveEndpointId = "";
+
+        var ex = await Assert.ThrowsAsync<CloudNotConfiguredException>(
+            () => routes.GetAsync(InferenceRole.Translator, CancellationToken.None));
+
+        Assert.Contains("no cloud endpoint is enabled", ex.Message);
+        await secrets.DidNotReceiveWithAnyArgs().GetSecretAsync(default!, TestContext.Current.CancellationToken);
     }
 
     [Fact]

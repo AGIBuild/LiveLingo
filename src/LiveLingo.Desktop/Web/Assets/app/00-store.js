@@ -115,10 +115,6 @@
       case 'toast':
         toast(message.data.text, message.data.durationMs ?? TOAST_MS);
         break;
-      case 'models':
-        s.models = message.data.text;
-        s.modelsCloud = message.data.cloud;
-        break;
       case 'focus':
         s.focus = { target: message.data.target, n: ++focusCount };
         break;

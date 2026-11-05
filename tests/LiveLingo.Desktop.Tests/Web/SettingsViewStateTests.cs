@@ -159,8 +159,36 @@ public sealed class SettingsViewStateTests
         var state = await SettingsScenarios.All["settings-cloud"]();
         var json = JsonSerializer.Serialize(state, WebJson.Wire);
 
-        Assert.True(state.Privacy.HasKey);
+        Assert.All(state.Privacy.Endpoints, endpoint => Assert.True(endpoint.HasKey));
         Assert.DoesNotContain("sk-stored", json);
+    }
+
+    [Fact]
+    public async Task TheEndpoints_AreListedWithTheEnabledOneMarked_AndTheHostNamed()
+    {
+        var state = await SettingsScenarios.All["settings-cloud"]();
+
+        Assert.Equal(["Main", "Other"], state.Privacy.Endpoints.Select(endpoint => endpoint.Name));
+        Assert.Equal(["main"], state.Privacy.Endpoints.Where(endpoint => endpoint.Active).Select(endpoint => endpoint.Id));
+        Assert.Equal("other.example.com", state.Privacy.Endpoints[1].Host);
+        Assert.Null(state.Privacy.Form);
+        Assert.Null(state.Privacy.Change);
+    }
+
+    [Fact]
+    public async Task TheFormAndTheQuestionsAboutAnEndpoint_TravelInTheSnapshot()
+    {
+        var add = await SettingsScenarios.All["settings-endpoint-add"]();
+        var edit = await SettingsScenarios.All["settings-endpoint-edit"]();
+        var error = await SettingsScenarios.All["settings-endpoint-error"]();
+        var switching = await SettingsScenarios.All["settings-endpoint-switch"]();
+        var delete = await SettingsScenarios.All["settings-endpoint-delete"]();
+
+        Assert.Equal(new EndpointForm(null, null), add.Privacy.Form);
+        Assert.Equal(new EndpointForm("main", null), edit.Privacy.Form);
+        Assert.Equal(new EndpointForm(null, EndpointError.UrlInvalid), error.Privacy.Form);
+        Assert.Equal(new PendingEndpointChange(EndpointChange.Switch, "other"), switching.Privacy.Change);
+        Assert.Equal(new PendingEndpointChange(EndpointChange.Delete, "other"), delete.Privacy.Change);
     }
 
     [Fact]
@@ -214,7 +242,7 @@ public sealed class SettingsViewStateTests
             ["general", "models", "options", "privacy", "rev", "section", "voice"],
             document.RootElement.EnumerateObject().Select(p => p.Name).Order(StringComparer.Ordinal));
         Assert.Equal(
-            ["apps", "baseUrl", "cloudClean", "cloudTranslate", "consent", "hasKey", "invalid", "model"],
+            ["apps", "change", "cloudClean", "cloudTranslate", "consent", "endpoints", "form", "invalid"],
             document.RootElement.GetProperty("privacy").EnumerateObject().Select(p => p.Name).Order(StringComparer.Ordinal));
     }
 

@@ -40,6 +40,9 @@ public record ModelDescriptor(
     string License,
     IReadOnlyList<ModelAsset> Assets)
 {
+    /// <summary>The name without its description ("Hy-MT2-1.8B"), for one line of status text; <see cref="DisplayName"/> is the full one.</summary>
+    public string ShortName { get; init; } = DisplayName;
+
     /// <summary>Total download size in bytes.</summary>
     public long SizeBytes => Assets.Sum(asset => asset.SizeBytes);
 

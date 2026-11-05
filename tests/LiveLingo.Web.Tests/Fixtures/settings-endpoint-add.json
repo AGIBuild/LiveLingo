@@ -1,0 +1,105 @@
+{
+  "rev": 1,
+  "section": "privacy",
+  "general": {
+    "hotkey": "Ctrl+Alt+T",
+    "hotkeyInvalid": false,
+    "commitKey": "Enter",
+    "language": "en-US",
+    "theme": "Auto",
+    "reduceMotion": false,
+    "rememberChoices": true
+  },
+  "voice": {
+    "microphones": [
+      "",
+      "USB Mic",
+      "Built-in"
+    ],
+    "microphone": "",
+    "direction": "English",
+    "cleanup": true,
+    "defaultOutput": "Clean",
+    "autoDictate": false,
+    "preloadSpeech": true,
+    "terms": [],
+    "polishPrompt": "润色要求：\n1. 把被停顿切碎的半句话接成完整的句子，按意思重新断句，理顺前后的衔接。\n2. 必须删去所有口头语和填充词（呃、嗯、啊、那个、这个、就是、然后呢、对吧、你看），以及犹豫、重复和说到一半就放弃的半句；说话人把同一个意思又完整地说了一遍时，只保留完整的那一遍；自我纠正时，只保留纠正后的内容。\n3. 根据全文主题和上下文改正同音错字和技术名词的误识别；词表里的写法优先；拿不准的词保留原样，不要删除。\n4. 保持说话人自己的口吻，写成通顺、可以直接发送的文字，不要改成公文腔。\n\n示例：\n原文：呃，我觉得这个，就是那个接口的超时。设成十秒。不对，设成三十秒吧。嗯，对，就这样。\n润色：我觉得这个接口的超时设成三十秒吧。",
+    "polishPromptIsDefault": true,
+    "polishPromptInvalid": false
+  },
+  "privacy": {
+    "cloudTranslate": false,
+    "cloudClean": false,
+    "endpoints": [],
+    "form": {
+      "id": null,
+      "error": null
+    },
+    "change": null,
+    "invalid": false,
+    "consent": null,
+    "apps": []
+  },
+  "models": {
+    "tier": "Fast",
+    "legacy": {
+      "count": 0,
+      "text": ""
+    },
+    "version": "2.0.0",
+    "update": {
+      "status": "尚未检查。",
+      "percent": null,
+      "busy": false,
+      "canCheck": true,
+      "canRestart": false,
+      "canDownload": false
+    },
+    "diagnostics": [
+      {
+        "label": "版本",
+        "value": "2.0.0"
+      },
+      {
+        "label": "系统",
+        "value": "macOS 15.0 Arm64"
+      },
+      {
+        "label": "界面语言",
+        "value": "en-US"
+      },
+      {
+        "label": "翻译模型",
+        "value": "Fast"
+      },
+      {
+        "label": "整理句子",
+        "value": "开"
+      },
+      {
+        "label": "云端翻译",
+        "value": "关"
+      },
+      {
+        "label": "云端整理",
+        "value": "关"
+      },
+      {
+        "label": "云端端点",
+        "value": "0"
+      },
+      {
+        "label": "API 密钥",
+        "value": "未保存"
+      },
+      {
+        "label": "旧版本模型",
+        "value": "0"
+      }
+    ]
+  },
+  "options": {
+    "animations": true,
+    "theme": "Auto"
+  }
+}

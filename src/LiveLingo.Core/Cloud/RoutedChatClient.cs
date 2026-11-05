@@ -33,10 +33,10 @@ public sealed class RoutedChatClient(
             return await local.CompleteAsync(request, ct).ConfigureAwait(false);
 
         var cloud = new OpenAiChatClient(http, route.Endpoint, route.Model, route.ApiKey, sendProviderExtras: false);
-        usage?.Report(role, route.Model, cloud: true, confirmed: false);
+        usage?.Report(role, route.Model, cloud: true, confirmed: false, endpoint: route.Name);
         var completion = await cloud.CompleteAsync(request, ct).ConfigureAwait(false);
         if (completion.Model is { } served)
-            usage?.Report(role, served, cloud: true, confirmed: true);
+            usage?.Report(role, served, cloud: true, confirmed: true, endpoint: route.Name);
         return completion;
     }
 }

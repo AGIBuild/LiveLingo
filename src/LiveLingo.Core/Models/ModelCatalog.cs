@@ -31,7 +31,10 @@ public static class ModelCatalog
                 "https://huggingface.co/tencent/Hy-MT2-1.8B-GGUF/resolve/a0c709d9fac510f2c807aa3af52872340dc37a4a/Hy-MT2-1.8B-Q4_K_M.gguf",
                 1_133_080_448,
                 "dc5f44fcf1fa496ee7ad725982c0c8c553a4de00259b53af84c4b89fb0c06699")
-        ]);
+        ])
+    {
+        ShortName = "Hy-MT2-1.8B"
+    };
 
     public static readonly ModelDescriptor TranslatorQuality = new(
         "hy-mt2-7b-q4km",
@@ -44,7 +47,10 @@ public static class ModelCatalog
                 "https://huggingface.co/tencent/Hy-MT2-7B-GGUF/resolve/ab8472660ac61fac25f1af43fac2599d52a8a775/Hy-MT2-7B-Q4_K_M.gguf",
                 4_624_648_896,
                 "9f96256500f3fc1ab4d64336b58f52a949a95ad7516b0c229476eef782f9f77b")
-        ]);
+        ])
+    {
+        ShortName = "Hy-MT2-7B"
+    };
 
     public static readonly ModelDescriptor Cleaner = new(
         "qwen3.5-4b-q4km",
@@ -57,7 +63,10 @@ public static class ModelCatalog
                 "https://huggingface.co/unsloth/Qwen3.5-4B-GGUF/resolve/e87f176479d0855a907a41277aca2f8ee7a09523/Qwen3.5-4B-Q4_K_M.gguf",
                 2_740_937_888,
                 "00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4")
-        ]);
+        ])
+    {
+        ShortName = "Qwen3.5 4B"
+    };
 
     /// <summary>Streaming X-ASR (480 ms chunks) that produces the live text while the user speaks.</summary>
     public static readonly ModelDescriptor SpeechLive = new(
@@ -73,6 +82,7 @@ public static class ModelCatalog
                 "fa5f63d618e5a01526e275a358bb7772e403f84808a4769fba52cffd8160bf74")
         ])
     {
+        ShortName = "X-ASR",
         ArchiveType = ModelArchiveType.TarBz2,
         ExtractedFiles = ["encoder.int8.onnx", "decoder.onnx", "joiner.int8.onnx", "tokens.txt"]
     };
@@ -91,6 +101,7 @@ public static class ModelCatalog
                 "393f8a14e2f5fb96746aaab342997a40641001fbd5bf9592a080a8329178ee96")
         ])
     {
+        ShortName = "Qwen3-ASR",
         ArchiveType = ModelArchiveType.TarBz2,
         ExtractedFiles =
         [

@@ -31,7 +31,7 @@ public class SettingsViewModelTests
             service.Current.Returns(_ => Saved.Count > 0 ? Saved[^1] : Current);
             service.CloneCurrent().Returns(_ => Saved.Count > 0 ? Saved[^1].DeepClone() : Current.DeepClone());
             service.When(s => s.Replace(Arg.Any<SettingsModel>())).Do(call => Saved.Add(call.Arg<SettingsModel>()));
-            Secrets.GetSecretAsync(CloudSettings.ApiKeySecretId, Arg.Any<CancellationToken>()).Returns(storedKey);
+            Secrets.GetSecretAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(storedKey);
             Microphone.InputDevices().Returns(["USB Mic", "Built-in"]);
             Vm = new SettingsViewModel(service, Secrets, Models, Recent, Microphone, new ComposerPreferences(PreferenceStore, service));
         }
@@ -52,8 +52,8 @@ public class SettingsViewModelTests
         model.Composer.TranslatorTier = "Fast";
         model.Composer.CleanupEnabled = false;
         model.Composer.Glossary = "Redis\n缓存穿透=cache penetration";
-        model.Cloud.BaseUrl = "https://api.example.com/v1";
-        model.Cloud.Model = "m";
+        model.Cloud.Endpoints = CloudTestData.WithEndpoints("main", translate: true).Cloud.Endpoints;
+        model.Cloud.ActiveEndpointId = "main";
         model.Cloud.Translate = true;
 
         var vm = new Fixture(model).Vm;
@@ -67,7 +67,8 @@ public class SettingsViewModelTests
         Assert.Equal(1, vm.TargetIndex);
         Assert.Equal(1, vm.TierIndex);
         Assert.Equal([new TermEntry("Redis", "Redis"), new TermEntry("缓存穿透", "cache penetration")], vm.Terms);
-        Assert.Equal("https://api.example.com/v1", vm.CloudBaseUrl);
+        Assert.Equal(["Main", "Other"], vm.Endpoints.Select(endpoint => endpoint.Name));
+        Assert.Equal("Main", vm.ActiveEndpoint?.Name);
         Assert.True(vm.CloudTranslate);
         Assert.False(vm.CloudClean);
     }
@@ -266,65 +267,261 @@ public class SettingsViewModelTests
     }
 
     [Fact]
-    public void EnablingCloud_WithoutAnEndpointModelAndKey_IsRefused_AndFlagged()
+    public void EnablingCloud_WithoutAnEnabledEndpoint_IsRefused_AndFlagged()
     {
-        var f = new Fixture();
+        var f = new Fixture(CloudTestData.WithEndpoints(active: null), storedKey: "sk");
 
         Assert.False(f.Vm.TryEnableCloud(translation: true));
 
         Assert.True(f.Vm.CloudInvalid);
         Assert.False(f.Vm.CloudTranslate);
         Assert.Empty(f.Saved);
-
-        f.Vm.CloudModel = "m";
-        Assert.False(f.Vm.CloudInvalid);
     }
 
     [Fact]
-    public async Task EnablingCloud_StoresTheKeyInTheSecretStore_NotInTheSettings()
+    public async Task AddingAnEndpoint_StoresTheKeyInTheSecretStore_NotInTheSettings_AndDoesNotEnableIt()
     {
         var f = new Fixture();
-        f.Vm.CloudBaseUrl = " https://example.openai.azure.com/openai/v1 ";
-        f.Vm.CloudModel = " gpt-4.1-mini ";
-        f.Vm.CloudApiKey = " sk-secret ";
-        await f.Vm.SaveCloudKeyCommand.ExecuteAsync(null);
+        f.Vm.OpenEndpointForm(null);
 
-        Assert.True(f.Vm.TryEnableCloud(translation: true));
-        Assert.True(f.Vm.TryEnableCloud(translation: false));
+        await f.Vm.SaveEndpointAsync(" Foundry ", " https://example.openai.azure.com/openai/v1/ ", " gpt-4.1-mini ", " sk-secret ");
 
-        await f.Secrets.Received(1).SetSecretAsync(CloudSettings.ApiKeySecretId, "sk-secret", Arg.Any<CancellationToken>());
-        Assert.True(f.Vm.HasStoredKey);
-        Assert.Equal("", f.Vm.CloudApiKey);
-        Assert.Equal("https://example.openai.azure.com/openai/v1", f.Last.Cloud.BaseUrl);
-        Assert.Equal("gpt-4.1-mini", f.Last.Cloud.Model);
-        Assert.True(f.Last.Cloud.Translate);
-        Assert.True(f.Last.Cloud.Clean);
+        var saved = Assert.Single(f.Last.Cloud.Endpoints);
+        Assert.Equal("Foundry", saved.Name);
+        Assert.Equal("https://example.openai.azure.com/openai/v1", saved.BaseUrl);
+        Assert.Equal("gpt-4.1-mini", saved.Model);
+        await f.Secrets.Received(1).SetSecretAsync(saved.SecretId, "sk-secret", Arg.Any<CancellationToken>());
+        Assert.Equal("", f.Last.Cloud.ActiveEndpointId);
+        Assert.Null(f.Vm.ActiveEndpoint);
+        Assert.Null(f.Vm.Form);
+        Assert.True(Assert.Single(f.Vm.Endpoints).HasKey);
         Assert.DoesNotContain("sk-secret", System.Text.Json.JsonSerializer.Serialize(f.Last));
     }
 
     [Theory]
-    [InlineData("http://api.example.com/v1", "m")]
-    [InlineData("https://api.example.com/v1", "")]
-    public void EnablingCloud_WithAnUnusableEndpoint_IsRefused(string url, string model)
+    [InlineData("", "https://api.example.com/v1", "m", "sk", EndpointError.NameMissing)]
+    [InlineData("main", "https://api.example.com/v1", "m", "sk", EndpointError.NameTaken)]
+    [InlineData("New", "http://api.example.com/v1", "m", "sk", EndpointError.UrlInvalid)]
+    [InlineData("New", "not a url", "m", "sk", EndpointError.UrlInvalid)]
+    [InlineData("New", "https://api.example.com/v1", "", "sk", EndpointError.ModelMissing)]
+    [InlineData("New", "https://api.example.com/v1", "m", "", EndpointError.KeyMissing)]
+    public async Task AnUnusableEndpoint_KeepsTheFormOpen_WithTheReason_AndStoresNothing(
+        string name, string url, string model, string key, EndpointError expected)
     {
-        var f = new Fixture(storedKey: "sk");
-        f.Vm.CloudBaseUrl = url;
-        f.Vm.CloudModel = model;
+        var f = new Fixture(CloudTestData.WithEndpoints(active: null));
+        f.Vm.OpenEndpointForm(null);
 
-        Assert.False(f.Vm.TryEnableCloud(translation: false));
+        await f.Vm.SaveEndpointAsync(name, url, model, key);
+
+        Assert.Equal(expected, f.Vm.Form?.Error);
+        Assert.Empty(f.Saved);
+        await f.Secrets.DidNotReceiveWithAnyArgs().SetSecretAsync(default!, default!, TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task LocalhostMayUsePlainHttp()
+    {
+        var f = new Fixture();
+        f.Vm.OpenEndpointForm(null);
+
+        await f.Vm.SaveEndpointAsync("Local", "http://localhost:8080/v1", "qwen", "sk");
+
+        Assert.Equal("http://localhost:8080/v1", Assert.Single(f.Last.Cloud.Endpoints).BaseUrl);
+    }
+
+    [Fact]
+    public async Task EditingAnEndpoint_WithAnEmptyKey_KeepsTheStoredKey_AndItsOwnNameIsNotATaken()
+    {
+        var f = new Fixture(CloudTestData.WithEndpoints(active: null), storedKey: "sk-stored");
+        await f.Vm.InitializeAsync();
+        f.Vm.OpenEndpointForm("main");
+
+        await f.Vm.SaveEndpointAsync("Main", CloudTestData.MainUrl, "m2", "");
+
+        Assert.Null(f.Vm.Form);
+        Assert.Equal("m2", f.Last.Cloud.Endpoints.Single(endpoint => endpoint.Id == "main").Model);
+        await f.Secrets.DidNotReceiveWithAnyArgs().SetSecretAsync(default!, default!, TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task EditingAnEndpoint_WithANewKey_ReplacesItUnderTheSameSecretId()
+    {
+        var f = new Fixture(CloudTestData.WithEndpoints(active: null), storedKey: "sk-stored");
+        await f.Vm.InitializeAsync();
+        f.Vm.OpenEndpointForm("other");
+
+        await f.Vm.SaveEndpointAsync("Other", CloudTestData.OtherUrl, "o", " sk-new ");
+
+        await f.Secrets.Received(1).SetSecretAsync(CloudTestData.SecretId("other"), "sk-new", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ChangingTheHostOfTheEnabledEndpoint_SwitchesTheCloudStepsOff()
+    {
+        var f = new Fixture(CloudTestData.WithEndpoints(translate: true, clean: true), storedKey: "sk");
+        await f.Vm.InitializeAsync();
+        f.Vm.OpenEndpointForm("main");
+
+        await f.Vm.SaveEndpointAsync("Main", "https://elsewhere.example.net/v1", "m", "");
+
+        Assert.False(f.Vm.CloudTranslate);
+        Assert.False(f.Vm.CloudClean);
+        Assert.False(f.Last.Cloud.Translate);
+        Assert.False(f.Last.Cloud.Clean);
+        Assert.Equal("main", f.Last.Cloud.ActiveEndpointId);
+    }
+
+    [Fact]
+    public async Task ChangingOnlyThePathOrModelOfTheEnabledEndpoint_KeepsTheCloudStepsOn()
+    {
+        var f = new Fixture(CloudTestData.WithEndpoints(translate: true), storedKey: "sk");
+        await f.Vm.InitializeAsync();
+        f.Vm.OpenEndpointForm("main");
+
+        await f.Vm.SaveEndpointAsync("Renamed", "https://api.example.com/openai/v1", "m2", "");
+
+        Assert.True(f.Last.Cloud.Translate);
+        Assert.Equal("Renamed", f.Last.Cloud.Endpoints[0].Name);
+    }
+
+    [Fact]
+    public void OpeningTheFormForAnUnknownEndpoint_ShowsNothing()
+    {
+        var f = new Fixture(CloudTestData.WithEndpoints());
+
+        f.Vm.OpenEndpointForm("gone");
+
+        Assert.Null(f.Vm.Form);
+    }
+
+    [Fact]
+    public async Task EnablingAnEndpoint_DisablesTheOne_ThatWasEnabled()
+    {
+        var f = new Fixture(CloudTestData.WithEndpoints(), storedKey: "sk");
+        await f.Vm.InitializeAsync();
+
+        f.Vm.SetEndpointEnabled("other", on: true);
+
+        Assert.Equal("other", f.Last.Cloud.ActiveEndpointId);
+        Assert.Equal(["other"], f.Vm.Endpoints.Where(endpoint => endpoint.Active).Select(endpoint => endpoint.Id));
+        Assert.Null(f.Vm.PendingChange);
+    }
+
+    [Fact]
+    public async Task EnablingAnEndpoint_WhileAStepIsOn_AsksFirst_AndKeepsTheOldOneUntilAnswered()
+    {
+        var f = new Fixture(CloudTestData.WithEndpoints(translate: true), storedKey: "sk");
+        await f.Vm.InitializeAsync();
+
+        f.Vm.SetEndpointEnabled("other", on: true);
+
+        Assert.Equal(new PendingEndpointChange(EndpointChange.Switch, "other"), f.Vm.PendingChange);
+        Assert.Empty(f.Saved);
+
+        await f.Vm.AnswerChangeAsync(allow: false);
+        Assert.Null(f.Vm.PendingChange);
+        Assert.Empty(f.Saved);
+
+        f.Vm.SetEndpointEnabled("other", on: true);
+        await f.Vm.AnswerChangeAsync(allow: true);
+        Assert.Equal("other", f.Last.Cloud.ActiveEndpointId);
+        Assert.True(f.Last.Cloud.Translate);
+    }
+
+    [Fact]
+    public async Task SwitchingToAnEndpointWithoutAKey_WhileAStepIsOn_IsRefusedAndFlagged()
+    {
+        var f = new Fixture(CloudTestData.WithEndpoints(translate: true), storedKey: null);
+        await f.Vm.InitializeAsync();
+
+        f.Vm.SetEndpointEnabled("other", on: true);
+
+        Assert.Null(f.Vm.PendingChange);
         Assert.True(f.Vm.CloudInvalid);
+        Assert.Empty(f.Saved);
+    }
+
+    [Fact]
+    public async Task DisablingTheEnabledEndpoint_SwitchesBothCloudStepsOff()
+    {
+        var f = new Fixture(CloudTestData.WithEndpoints(translate: true, clean: true), storedKey: "sk");
+        await f.Vm.InitializeAsync();
+
+        f.Vm.SetEndpointEnabled("main", on: false);
+
+        Assert.Equal("", f.Last.Cloud.ActiveEndpointId);
+        Assert.False(f.Last.Cloud.Translate);
+        Assert.False(f.Last.Cloud.Clean);
+        Assert.False(f.Vm.CloudTranslate);
+        Assert.Null(f.Vm.ActiveEndpoint);
+    }
+
+    [Fact]
+    public async Task ExactlyOneEndpoint_IsEverEnabled()
+    {
+        var f = new Fixture(CloudTestData.WithEndpoints(active: null), storedKey: "sk");
+        await f.Vm.InitializeAsync();
+
+        f.Vm.SetEndpointEnabled("main", on: true);
+        f.Vm.SetEndpointEnabled("other", on: true);
+        f.Vm.SetEndpointEnabled("main", on: true);
+
+        Assert.Equal(1, f.Vm.Endpoints.Count(endpoint => endpoint.Active));
+        Assert.Equal("main", f.Last.Cloud.ActiveEndpointId);
+    }
+
+    [Fact]
+    public async Task DeletingAnEndpoint_AsksFirst_ThenDeletesItsKey()
+    {
+        var f = new Fixture(CloudTestData.WithEndpoints(active: "main"), storedKey: "sk");
+        await f.Vm.InitializeAsync();
+
+        f.Vm.DeleteEndpoint("other");
+        Assert.Equal(new PendingEndpointChange(EndpointChange.Delete, "other"), f.Vm.PendingChange);
+        Assert.Empty(f.Saved);
+
+        await f.Vm.AnswerChangeAsync(allow: true);
+
+        await f.Secrets.Received(1).DeleteSecretAsync(CloudTestData.SecretId("other"), Arg.Any<CancellationToken>());
+        Assert.Equal(["main"], f.Last.Cloud.Endpoints.Select(endpoint => endpoint.Id));
+        Assert.Equal("main", f.Last.Cloud.ActiveEndpointId);
+    }
+
+    [Fact]
+    public async Task DeletingTheEnabledEndpoint_SwitchesTheCloudStepsOff()
+    {
+        var f = new Fixture(CloudTestData.WithEndpoints(translate: true, clean: true), storedKey: "sk");
+        await f.Vm.InitializeAsync();
+
+        f.Vm.DeleteEndpoint("main");
+        await f.Vm.AnswerChangeAsync(allow: true);
+
+        Assert.Equal("", f.Last.Cloud.ActiveEndpointId);
+        Assert.False(f.Last.Cloud.Translate);
+        Assert.False(f.Last.Cloud.Clean);
+        Assert.Equal(["other"], f.Last.Cloud.Endpoints.Select(endpoint => endpoint.Id));
+    }
+
+    [Fact]
+    public async Task RefusingTheDeletion_ChangesNothing()
+    {
+        var f = new Fixture(CloudTestData.WithEndpoints(), storedKey: "sk");
+        await f.Vm.InitializeAsync();
+        f.Vm.DeleteEndpoint("main");
+
+        await f.Vm.AnswerChangeAsync(allow: false);
+
+        Assert.Empty(f.Saved);
+        await f.Secrets.DidNotReceiveWithAnyArgs().DeleteSecretAsync(default!, TestContext.Current.CancellationToken);
     }
 
     [Fact]
     public async Task AStoredKey_SatisfiesTheConfiguration_WithoutRetypingIt()
     {
-        var model = new SettingsModel();
-        model.Cloud.BaseUrl = "https://api.example.com/v1";
-        model.Cloud.Model = "m";
-        var f = new Fixture(model, storedKey: "sk-stored");
+        var f = new Fixture(CloudTestData.WithEndpoints(), storedKey: "sk-stored");
         await f.Vm.InitializeAsync();
 
-        Assert.True(f.Vm.HasStoredKey);
+        Assert.True(f.Vm.ActiveEndpoint?.HasKey);
         Assert.True(f.Vm.TryEnableCloud(translation: true));
         Assert.True(f.Last.Cloud.Translate);
     }
@@ -332,12 +529,7 @@ public class SettingsViewModelTests
     [Fact]
     public async Task DisablingCloud_SwitchesOnlyThatStepOff()
     {
-        var model = new SettingsModel();
-        model.Cloud.BaseUrl = "https://api.example.com/v1";
-        model.Cloud.Model = "m";
-        model.Cloud.Translate = true;
-        model.Cloud.Clean = true;
-        var f = new Fixture(model, storedKey: "sk");
+        var f = new Fixture(CloudTestData.WithEndpoints(translate: true, clean: true), storedKey: "sk");
         await f.Vm.InitializeAsync();
 
         f.Vm.DisableCloud(translation: true);
@@ -347,47 +539,16 @@ public class SettingsViewModelTests
     }
 
     [Fact]
-    public async Task SavingAnEmptyKey_DoesNothing()
+    public async Task Initialize_ReportsWhichEndpointsHaveAKey()
     {
-        var f = new Fixture();
-
-        await f.Vm.SaveCloudKeyCommand.ExecuteAsync(null);
-
-        await f.Secrets.DidNotReceiveWithAnyArgs().SetSecretAsync(default!, default!, TestContext.Current.CancellationToken);
-    }
-
-    [Fact]
-    public async Task ForgettingTheKey_DeletesIt_AndSwitchesTheCloudOff()
-    {
-        var model = new SettingsModel();
-        model.Cloud.BaseUrl = "https://api.example.com/v1";
-        model.Cloud.Model = "m";
-        model.Cloud.Translate = true;
-        model.Cloud.Clean = true;
-        var f = new Fixture(model, storedKey: "sk");
-        await f.Vm.InitializeAsync();
-
-        await f.Vm.ForgetCloudKeyCommand.ExecuteAsync(null);
-
-        await f.Secrets.Received(1).DeleteSecretAsync(CloudSettings.ApiKeySecretId, Arg.Any<CancellationToken>());
-        Assert.False(f.Vm.HasStoredKey);
-        Assert.False(f.Vm.CloudTranslate);
-        Assert.False(f.Vm.CloudClean);
-        Assert.False(f.Last.Cloud.Translate);
-        Assert.False(f.Last.Cloud.Clean);
-    }
-
-    [Fact]
-    public async Task Initialize_ReportsWhetherAKeyIsStored()
-    {
-        var withKey = new Fixture(storedKey: "sk").Vm;
-        var withoutKey = new Fixture(storedKey: null).Vm;
+        var withKey = new Fixture(CloudTestData.WithEndpoints(), storedKey: "sk").Vm;
+        var withoutKey = new Fixture(CloudTestData.WithEndpoints(), storedKey: null).Vm;
 
         await withKey.InitializeAsync();
         await withoutKey.InitializeAsync();
 
-        Assert.True(withKey.HasStoredKey);
-        Assert.False(withoutKey.HasStoredKey);
+        Assert.All(withKey.Endpoints, endpoint => Assert.True(endpoint.HasKey));
+        Assert.All(withoutKey.Endpoints, endpoint => Assert.False(endpoint.HasKey));
     }
 
     // ---- microphone -------------------------------------------------------------
@@ -497,10 +658,7 @@ public class SettingsViewModelTests
 
     private static async Task<Fixture> ConfiguredCloudAsync()
     {
-        var model = new SettingsModel();
-        model.Cloud.BaseUrl = "https://api.example.com/v1";
-        model.Cloud.Model = "m";
-        var f = new Fixture(model, storedKey: "sk");
+        var f = new Fixture(CloudTestData.WithEndpoints(), storedKey: "sk");
         await f.Vm.InitializeAsync();
         return f;
     }
@@ -544,13 +702,13 @@ public class SettingsViewModelTests
     }
 
     [Fact]
-    public void ConsentWithoutAnEndpoint_IsRefusedAndFlagged()
+    public void TurningAStepOn_WithoutAnEnabledEndpoint_IsRefusedAndFlagged_WithoutAskingForConsent()
     {
-        var f = new Fixture();
+        var f = new Fixture(CloudTestData.WithEndpoints(active: null), storedKey: "sk");
+
         f.Vm.SetCloud(CloudStep.Translate, on: true);
 
-        f.Vm.AnswerConsent(allow: true);
-
+        Assert.Null(f.Vm.PendingConsent);
         Assert.False(f.Vm.CloudTranslate);
         Assert.True(f.Vm.CloudInvalid);
     }
@@ -558,11 +716,7 @@ public class SettingsViewModelTests
     [Fact]
     public async Task TurningAStepOff_NeedsNoConsent()
     {
-        var model = new SettingsModel();
-        model.Cloud.BaseUrl = "https://api.example.com/v1";
-        model.Cloud.Model = "m";
-        model.Cloud.Clean = true;
-        var f = new Fixture(model, storedKey: "sk");
+        var f = new Fixture(CloudTestData.WithEndpoints(clean: true), storedKey: "sk");
         await f.Vm.InitializeAsync();
 
         f.Vm.SetCloud(CloudStep.Clean, on: false);
@@ -574,11 +728,7 @@ public class SettingsViewModelTests
     [Fact]
     public async Task AStepThatIsAlreadyOn_IsNotAskedAgain()
     {
-        var model = new SettingsModel();
-        model.Cloud.BaseUrl = "https://api.example.com/v1";
-        model.Cloud.Model = "m";
-        model.Cloud.Translate = true;
-        var f = new Fixture(model, storedKey: "sk");
+        var f = new Fixture(CloudTestData.WithEndpoints(translate: true), storedKey: "sk");
         await f.Vm.InitializeAsync();
 
         f.Vm.SetCloud(CloudStep.Translate, on: true);

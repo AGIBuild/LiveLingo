@@ -4,7 +4,7 @@
   'use strict';
 
   const html = LL.html;
-  const { Row, Select, Switch, TextField, KeyField, HotkeyField } = LL;
+  const { Row, Select, Switch, HotkeyField } = LL;
 
   const SECTIONS = [['general', 'nav.general'], ['voice', 'nav.voice'], ['privacy', 'nav.privacy'], ['models', 'nav.models']];
 
@@ -140,6 +140,45 @@
 
   const cloudToggle = (step) => (on) => LL.send('cloudToggle', { step, on });
 
+  // The page only has the strings; the placeholders ({0}, {1}…) are filled here.
+  const fmt = (key, ...args) => args.reduce((text, arg, i) => text.split('{' + i + '}').join(arg), LL.t(key));
+
+  // The cloud steps that are on, in the words of their switches.
+  const stepNames = (p) => [p.cloudTranslate && LL.t('cloud.translate'), p.cloudClean && LL.t('cloud.clean')].filter(Boolean).join(' / ');
+
+  const FORM_FIELD = { nameMissing: 'ep-name', nameTaken: 'ep-name', urlInvalid: 'ep-url', modelMissing: 'ep-model', keyMissing: 'ep-key' };
+
+  const Endpoint = ({ e }) => html`<li class=${'endpoint' + (e.active ? ' on' : '')}>
+    <div class="ep-main">
+      <div class="ep-title"><b>${e.name}</b>${e.active && html`<span class="chip ok">${LL.t('cloud.enabled')}</span>`}</div>
+      <p class="ep-meta">${e.host} · ${e.model} · ${e.hasKey ? LL.t('cloud.keySaved') : LL.t('cloud.keyMissing')}</p>
+    </div>
+    <div class="ep-actions">
+      <button type="button" id=${'endpoint-edit-' + e.id} class="link" aria-label=${LL.t('cloud.edit') + ' ' + e.name}
+        onClick=${() => LL.send('openEndpointForm', { id: e.id })}>${LL.t('cloud.edit')}</button>
+      <button type="button" id=${'endpoint-delete-' + e.id} class="link danger" aria-label=${LL.t('cloud.delete') + ' ' + e.name}
+        onClick=${() => LL.send('deleteEndpoint', { id: e.id })}>${LL.t('cloud.delete')}</button>
+      <${Switch} id=${'endpoint-on-' + e.id} label=${LL.t('cloud.enable') + ' ' + e.name} checked=${e.active}
+        onChange=${(on) => LL.send('enableEndpoint', { id: e.id, on })}/>
+    </div>
+  </li>`;
+
+  // Any number of endpoints can be kept; the switch of one turns the others off (C# decides, the page only draws it).
+  const Endpoints = ({ p }) => {
+    const active = p.endpoints.find((e) => e.active);
+    return html`<section class="endpoints" aria-labelledby="endpoints-title">
+      <div class="endpoints-head">
+        <div><h2 id="endpoints-title">${LL.t('cloud.endpoints')}</h2>
+          <p id="endpoints-hint" class="hint">${active ? fmt('cloud.endpoints.active', active.name) : LL.t('cloud.endpoints.none')}</p>
+          ${p.invalid && html`<p class="err" role="alert">${LL.t('cloud.invalid')}</p>`}</div>
+        <button type="button" id="endpoint-add" class="btn" onClick=${() => LL.send('openEndpointForm', { id: null })}>${LL.t('cloud.add')}</button>
+      </div>
+      ${p.endpoints.length === 0
+        ? html`<p id="endpoints-empty" class="hint">${LL.t('cloud.endpoints.empty')}</p>`
+        : html`<ul class="endpoint-list">${p.endpoints.map((e) => html`<${Endpoint} key=${e.id} e=${e}/>`)}</ul>`}
+    </section>`;
+  };
+
   const Privacy = ({ p }) => html`<div>
     <${Row} id="cloud-translate" title=${LL.t('cloud.translate')} desc=${LL.t('cloud.translate.desc')}>
       <${Switch} id="cloud-translate" checked=${p.cloudTranslate} onChange=${cloudToggle('translate')}/>
@@ -147,18 +186,7 @@
     <${Row} id="cloud-clean" title=${LL.t('cloud.clean')} desc=${LL.t('cloud.clean.desc')}>
       <${Switch} id="cloud-clean" checked=${p.cloudClean} onChange=${cloudToggle('clean')}/>
     <//>
-    <${Row} id="cloud-url" title=${LL.t('cloud.baseUrl')} desc=${LL.t('cloud.baseUrl.desc')}>
-      <${TextField} id="cloud-url" value=${p.baseUrl} placeholder="https://…/v1" onChange=${set('cloudBaseUrl')}/>
-    <//>
-    <${Row} id="cloud-model" title=${LL.t('cloud.model')} desc=${LL.t('cloud.model.desc')}>
-      <${TextField} id="cloud-model" value=${p.model} onChange=${set('cloudModel')}/>
-    <//>
-    <${Row} id="cloud-key" title=${LL.t('cloud.apiKey')} desc=${LL.t('cloud.apiKey.desc')}
-      extra=${html`${p.hasKey && html`<p class="stored"><span>${LL.t('cloud.keyStored')}</span>
-          <button type="button" id="forget-key" class="danger" onClick=${() => LL.send('forgetKey')}>${LL.t('cloud.forget')}</button></p>`}
-        ${p.invalid && html`<p class="err" role="alert">${LL.t('cloud.invalid')}</p>`}`}>
-      <${KeyField} id="cloud-key"/>
-    <//>
+    <${Endpoints} p=${p}/>
     <${Row} id="recent-clear" title=${LL.t('recent')} desc=${LL.t('recent.desc')}>
       <button type="button" id="recent-clear" class="btn" onClick=${() => LL.send('clearRecent')}>${LL.t('recent.clear')}</button>
     <//>
@@ -183,11 +211,11 @@
         e.preventDefault();
         this.props.onClose();
       } else if (e.key === 'Tab') {
-        const buttons = [...this.pane.querySelectorAll('button')];
-        const at = buttons.indexOf(document.activeElement);
-        const next = (at + (e.shiftKey ? -1 : 1) + buttons.length) % buttons.length;
+        const items = [...this.pane.querySelectorAll('button, input')];
+        const at = items.indexOf(document.activeElement);
+        const next = (at + (e.shiftKey ? -1 : 1) + items.length) % items.length;
         e.preventDefault();
-        buttons[next].focus();
+        items[next].focus();
       }
     };
 
@@ -250,13 +278,92 @@
   // Turning a cloud step on needs the user's consent every time. C# says when to ask; the safe answer is the first button.
   const answer = (allow) => LL.send('consent', { allow });
 
-  const Consent = ({ step }) => html`<${Modal} id="consent" title=${LL.t('consent.' + step)} returnTo=${'cloud-' + step} onClose=${() => answer(false)}>
-    <p>${LL.t('consent.body')}</p>
+  const Consent = ({ step, active }) => html`<${Modal} id="consent" title=${LL.t('consent.' + step)} returnTo=${'cloud-' + step} onClose=${() => answer(false)}>
+    <p>${fmt('consent.body', active.name, active.host)}</p>
     <div class="dlg-actions">
       <button type="button" id="consent-keep" class="btn" data-initial onClick=${() => answer(false)}>${LL.t('consent.keepLocal')}</button>
       <button type="button" id="consent-allow" class="btn primary" onClick=${() => answer(true)}>${LL.t('consent.allow')}</button>
     </div>
   <//>`;
+
+  // The add or edit form. The fields are the page's until they are sent; the key stays in this form only while it is open
+  // (it is kept across a refused submission so a wrong name does not mean typing it again) and never goes into a snapshot.
+  class EndpointForm extends preact.Component {
+    constructor(props) {
+      super(props);
+      const e = props.endpoint;
+      this.state = { name: e?.name ?? '', url: e?.url ?? '', model: e?.model ?? '', key: '' };
+    }
+
+    componentDidUpdate(before) {
+      const { form } = this.props;
+      if (this.submitted && form !== before.form) {
+        this.submitted = false;
+        if (form.error) this.pane.querySelector('#' + FORM_FIELD[form.error])?.focus();
+      }
+    }
+
+    field = (name) => (e) => this.setState({ [name]: e.target.value });
+
+    submit = (e) => {
+      e.preventDefault();
+      const { name, url, model, key } = this.state;
+      this.submitted = true;
+      LL.send('saveEndpoint', { label: name, baseUrl: url, model, apiKey: key });
+    };
+
+    // An input method confirms its candidate with Enter (keyCode 229 in WKWebView); that is not "submit".
+    onKeyDown = (e) => {
+      if (e.key === 'Enter' && (e.isComposing || e.keyCode === 229)) e.preventDefault();
+    };
+
+    render({ form, endpoint }, { name, url, model, key }) {
+      const adding = form.id === null;
+      const bad = (field) => (form.error && FORM_FIELD[form.error] === field ? 'true' : undefined);
+      return html`<${Modal} id="endpoint-form" title=${LL.t(adding ? 'cloud.form.add' : 'cloud.form.edit')}
+        returnTo=${adding ? 'endpoint-add' : 'endpoint-edit-' + form.id} onClose=${() => LL.send('closeEndpointForm')}
+        ref=${(modal) => (this.pane = modal?.pane)}>
+        <form class="endpoint-form" onSubmit=${this.submit} onKeyDown=${this.onKeyDown} novalidate>
+          <label>${LL.t('cloud.name')}<input id="ep-name" value=${name} maxlength="40" placeholder=${LL.t('cloud.name.example')} data-initial
+            autocomplete="off" spellcheck="false" aria-invalid=${bad('ep-name')} onInput=${this.field('name')}/></label>
+          <label>${LL.t('cloud.baseUrl')}<input id="ep-url" type="url" value=${url} placeholder="https://…/v1"
+            autocomplete="off" spellcheck="false" aria-invalid=${bad('ep-url')} onInput=${this.field('url')}/>
+            <small>${LL.t('cloud.baseUrl.desc')}</small></label>
+          <label>${LL.t('cloud.model')}<input id="ep-model" value=${model}
+            autocomplete="off" spellcheck="false" aria-invalid=${bad('ep-model')} onInput=${this.field('model')}/>
+            <small>${LL.t('cloud.model.desc')}</small></label>
+          <label>${LL.t('cloud.apiKey')}<input id="ep-key" type="password" value=${key} placeholder=${endpoint?.hasKey ? LL.t('cloud.keyStored') : ''}
+            autocomplete="off" spellcheck="false" aria-invalid=${bad('ep-key')} onInput=${this.field('key')}/>
+            <small>${LL.t('cloud.apiKey.desc')}</small></label>
+          ${form.error && html`<p class="err" role="alert">${LL.t('cloud.error.' + form.error)}</p>`}
+          <div class="dlg-actions">
+            <button type="button" id="ep-cancel" class="btn" onClick=${() => LL.send('closeEndpointForm')}>${LL.t('cloud.form.cancel')}</button>
+            <button type="submit" id="ep-save" class="btn primary">${LL.t(adding ? 'cloud.form.create' : 'cloud.form.save')}</button>
+          </div>
+        </form>
+      <//>`;
+    }
+  }
+
+  // Switching the enabled endpoint while a step is on, and deleting one, ask first; the safe answer is the first button.
+  const endpointAnswer = (allow) => LL.send('endpointAnswer', { allow });
+
+  const EndpointChange = ({ p }) => {
+    const endpoint = p.endpoints.find((e) => e.id === p.change.id);
+    const active = p.endpoints.find((e) => e.active);
+    if (!endpoint) return null;
+    const switching = p.change.kind === 'switch';
+    const steps = stepNames(p);
+    return html`<${Modal} id="endpoint-change" title=${switching ? LL.t('cloud.switch.title') : fmt('cloud.delete.title', endpoint.name)}
+      returnTo=${switching ? 'endpoint-on-' + endpoint.id : 'endpoint-delete-' + endpoint.id} onClose=${() => endpointAnswer(false)}>
+      <p>${switching ? fmt('cloud.switch.body', steps, active.name, endpoint.name, endpoint.host)
+        : LL.t('cloud.delete.body') + (endpoint.active && steps ? ' ' + fmt('cloud.delete.steps', steps) : '')}</p>
+      <div class="dlg-actions">
+        <button type="button" id="endpoint-keep" class="btn" data-initial onClick=${() => endpointAnswer(false)}>${LL.t(switching ? 'cloud.switch.keep' : 'cloud.delete.keep')}</button>
+        <button type="button" id="endpoint-confirm" class=${'btn primary' + (switching ? '' : ' destructive')} onClick=${() => endpointAnswer(true)}>${LL.t(switching ? 'cloud.switch.confirm' : 'cloud.delete.confirm')}</button>
+      </div>
+    <//>`;
+  };
 
   LL.Settings = () => {
     const s = LL.state.settings;
@@ -270,7 +377,9 @@
         ${s.section === 'privacy' && html`<${Privacy} p=${s.privacy}/>`}
         ${s.section === 'models' && html`<${Models} m=${s.models}/>`}
       </main>
-      ${s.privacy.consent && html`<${Consent} step=${s.privacy.consent}/>`}
+      ${s.privacy.consent && html`<${Consent} step=${s.privacy.consent} active=${s.privacy.endpoints.find((e) => e.active)}/>`}
+      ${s.privacy.form && html`<${EndpointForm} form=${s.privacy.form} endpoint=${s.privacy.endpoints.find((e) => e.id === s.privacy.form.id)}/>`}
+      ${s.privacy.change && html`<${EndpointChange} p=${s.privacy}/>`}
     </div>`;
   };
 })();

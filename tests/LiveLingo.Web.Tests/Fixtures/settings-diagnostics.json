@@ -41,9 +41,28 @@
   "privacy": {
     "cloudTranslate": true,
     "cloudClean": false,
-    "baseUrl": "https://api.example.com/v1",
-    "model": "gpt-deploy",
-    "hasKey": true,
+    "endpoints": [
+      {
+        "id": "main",
+        "name": "Main",
+        "url": "https://api.example.com/v1",
+        "host": "api.example.com",
+        "model": "m",
+        "hasKey": true,
+        "active": true
+      },
+      {
+        "id": "other",
+        "name": "Other",
+        "url": "https://other.example.com/v1",
+        "host": "other.example.com",
+        "model": "o",
+        "hasKey": true,
+        "active": false
+      }
+    ],
+    "form": null,
+    "change": null,
     "invalid": false,
     "consent": null,
     "apps": []
@@ -91,6 +110,10 @@
       {
         "label": "云端整理",
         "value": "关"
+      },
+      {
+        "label": "云端端点",
+        "value": "2"
       },
       {
         "label": "API 密钥",

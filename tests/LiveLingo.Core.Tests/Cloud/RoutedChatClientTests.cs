@@ -100,6 +100,24 @@ public class RoutedChatClientTests
     }
 
     [Fact]
+    public async Task ACloudUse_NamesTheEndpointThatServedIt()
+    {
+        var usage = new ModelUsage();
+        var uses = new List<ModelUse>();
+        usage.Changed += uses.Add;
+        var routes = Substitute.For<ICloudRoutes>();
+        routes.GetAsync(InferenceRole.Translator, Arg.Any<CancellationToken>())
+            .Returns(CloudRoute.Create("https://example.com/v1", "deployment", "key", " Foundry · 东亚 "));
+        var client = new RoutedChatClient(InferenceRole.Translator, routes,
+            Substitute.For<IChatCompletionClient>(), new HttpClient(new StubHandler()), usage);
+
+        await client.CompleteAsync(new ChatRequest("p", 8, 0, Extra), CancellationToken.None);
+
+        Assert.All(uses, use => Assert.Equal("Foundry · 东亚", use.Endpoint));
+        Assert.Equal("deployment", Assert.Single(uses).Label);
+    }
+
+    [Fact]
     public async Task ACloudFailure_IsReported_NotSilentlyRetriedLocally()
     {
         var route = CloudRoute.Create("https://api.example.com/v1", "m", "k");

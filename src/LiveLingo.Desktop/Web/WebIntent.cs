@@ -33,7 +33,6 @@ namespace LiveLingo.Desktop.Web;
 [JsonDerivedType(typeof(CancelEditIntent), "cancelEdit")]
 [JsonDerivedType(typeof(UseOriginalIntent), "useOriginal")]
 [JsonDerivedType(typeof(NewDraftIntent), "newDraft")]
-[JsonDerivedType(typeof(ModelInfoIntent), "modelInfo")]
 [JsonDerivedType(typeof(RestoreRecentIntent), "restoreRecent")]
 [JsonDerivedType(typeof(ClearRecentIntent), "clearRecent")]
 [JsonDerivedType(typeof(ImportIntent), "import")]
@@ -48,8 +47,12 @@ namespace LiveLingo.Desktop.Web;
 [JsonDerivedType(typeof(RemoveTermIntent), "removeTerm")]
 [JsonDerivedType(typeof(CloudToggleIntent), "cloudToggle")]
 [JsonDerivedType(typeof(ConsentIntent), "consent")]
-[JsonDerivedType(typeof(SaveKeyIntent), "saveKey")]
-[JsonDerivedType(typeof(ForgetKeyIntent), "forgetKey")]
+[JsonDerivedType(typeof(OpenEndpointFormIntent), "openEndpointForm")]
+[JsonDerivedType(typeof(CloseEndpointFormIntent), "closeEndpointForm")]
+[JsonDerivedType(typeof(SaveEndpointIntent), "saveEndpoint")]
+[JsonDerivedType(typeof(EnableEndpointIntent), "enableEndpoint")]
+[JsonDerivedType(typeof(DeleteEndpointIntent), "deleteEndpoint")]
+[JsonDerivedType(typeof(EndpointAnswerIntent), "endpointAnswer")]
 [JsonDerivedType(typeof(RemoveLegacyModelsIntent), "removeLegacyModels")]
 [JsonDerivedType(typeof(CheckUpdatesIntent), "checkUpdates")]
 [JsonDerivedType(typeof(RestartToUpdateIntent), "restartToUpdate")]
@@ -74,6 +77,8 @@ internal abstract record WebIntent
     protected static bool IsExtent(int value) => value is >= 1 and <= 4_000;
 
     protected static bool IsSection(string value) => SettingsSections.Contains(value);
+
+    protected static bool IsEndpointId(string value) => value.Length is >= 1 and <= 64;
 
     /// <summary>
     /// Returns the intent, or null with a <paramref name="reason"/> that is safe to log: it names the kind of failure
@@ -123,8 +128,6 @@ internal abstract record WebIntent
 }
 
 internal sealed record ReadyIntent : WebIntent;
-
-internal sealed record ModelInfoIntent : WebIntent;
 
 /// <summary>The page content size in CSS pixels; the window follows it.</summary>
 internal sealed record SizeIntent(int Width, int Height) : WebIntent
@@ -256,16 +259,13 @@ internal sealed record SettingIntent(string Key, string Value) : WebIntent
         public const string PreloadSpeech = "preloadSpeech";
         public const string RememberChoices = "rememberChoices";
         public const string PolishPrompt = "polishPrompt";
-        public const string CloudBaseUrl = "cloudBaseUrl";
-        public const string CloudModel = "cloudModel";
     }
 
     protected override bool IsValid => Key switch
     {
-        // Free text is bounded here; whether it is a usable hotkey or endpoint is the view model's call.
+        // Free text is bounded here; whether it is a usable hotkey is the view model's call.
         Names.Hotkey => Value.Length <= 64,
-        Names.Microphone or Names.CloudModel => Value.Length <= 256,
-        Names.CloudBaseUrl => Value.Length <= 2_048,
+        Names.Microphone => Value.Length <= 256,
         // Bounded only; whether the text is a usable set of requirements is the view model's call (it flags it).
         Names.PolishPrompt => Value.Length <= 4_000,
         Names.CommitKey => SettingsViewModel.CommitKeys.Contains(Value),
@@ -293,15 +293,37 @@ internal sealed record CloudToggleIntent(CloudStep Step, bool On) : WebIntent;
 
 internal sealed record ConsentIntent(bool Allow) : WebIntent;
 
-/// <summary>The API key the user typed. It crosses once, here, and is never part of a snapshot or a log line.</summary>
-internal sealed record SaveKeyIntent(string Value) : WebIntent
+/// <summary>Opens the form that adds an endpoint (no id) or edits one.</summary>
+internal sealed record OpenEndpointFormIntent(string? Id) : WebIntent
 {
-    protected override bool IsValid => Value.Length is >= 1 and <= 4_096;
-
-    public override string ToString() => nameof(SaveKeyIntent);
+    protected override bool IsValid => Id is null || IsEndpointId(Id);
 }
 
-internal sealed record ForgetKeyIntent : WebIntent;
+internal sealed record CloseEndpointFormIntent : WebIntent;
+
+/// <summary>
+/// What the user filled in. The API key crosses once, here, and is never part of a snapshot or a log line; an empty key
+/// keeps the stored one of an existing endpoint. Whether the values are usable is the view model's call.
+/// </summary>
+internal sealed record SaveEndpointIntent(string Label, string BaseUrl, string Model, string ApiKey) : WebIntent
+{
+    protected override bool IsValid => Label.Length <= 40 && BaseUrl.Length <= 2_048 && Model.Length <= 256 && ApiKey.Length <= 4_096;
+
+    public override string ToString() => nameof(SaveEndpointIntent);
+}
+
+internal sealed record EnableEndpointIntent(string Id, bool On) : WebIntent
+{
+    protected override bool IsValid => IsEndpointId(Id);
+}
+
+internal sealed record DeleteEndpointIntent(string Id) : WebIntent
+{
+    protected override bool IsValid => IsEndpointId(Id);
+}
+
+/// <summary>The answer to a switch of the enabled endpoint or a deletion that was asked about.</summary>
+internal sealed record EndpointAnswerIntent(bool Allow) : WebIntent;
 
 internal sealed record RemoveLegacyModelsIntent : WebIntent;
 

@@ -99,11 +99,8 @@ public sealed class SettingsWebSessionTests
     [Fact]
     public async Task TheConsentQuestion_TravelsInTheSnapshot()
     {
-        var model = new SettingsModel();
-        model.Cloud.BaseUrl = "https://api.example.com/v1";
-        model.Cloud.Model = "m";
-        using var rig = new Rig(model, storedKey: "sk", section: "privacy");
-        await Wait.Until(() => rig.F.Vm.HasStoredKey);
+        using var rig = new Rig(CloudTestData.WithEndpoints(), storedKey: "sk", section: "privacy");
+        await Wait.Until(() => rig.F.Vm.Endpoints[0].HasKey);
         rig.Host.Posted.Clear();
 
         rig.Host.FromPage("""{"v":1,"name":"cloudToggle","step":"translate","on":true}""");

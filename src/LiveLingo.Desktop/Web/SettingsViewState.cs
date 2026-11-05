@@ -22,11 +22,17 @@ internal sealed record VoiceSettingsState(
 /// <summary>One application the composer remembers a choice for; the summary reads like the output menu ("Translate to English").</summary>
 internal sealed record AppPreferenceState(string Id, string Name, string Summary, string Used);
 
-/// <summary>There is no key here, only whether one is stored: the key itself never goes back to the page.</summary>
+/// <summary>One saved cloud endpoint. There is no key here, only whether one is stored: the key itself never goes back to the page.</summary>
+/// <param name="Host">What the address points at, for lists and questions where the whole URL is too long.</param>
+/// <param name="Active">The one endpoint the cloud steps use; at most one is.</param>
+internal sealed record EndpointState(string Id, string Name, string Url, string Host, string Model, bool HasKey, bool Active);
+
+/// <param name="Form">The add or edit form while it is open, with why its last submission was refused.</param>
+/// <param name="Change">A switch of the enabled endpoint or a deletion the user is being asked about.</param>
 /// <param name="Consent">The step the user is being asked to authorize, or null.</param>
 internal sealed record PrivacySettingsState(
-    bool CloudTranslate, bool CloudClean, string BaseUrl, string Model, bool HasKey, bool Invalid, CloudStep? Consent,
-    IReadOnlyList<AppPreferenceState> Apps);
+    bool CloudTranslate, bool CloudClean, IReadOnlyList<EndpointState> Endpoints, EndpointForm? Form, PendingEndpointChange? Change,
+    bool Invalid, CloudStep? Consent, IReadOnlyList<AppPreferenceState> Apps);
 
 /// <param name="Text">What the old models are and how much room they take; empty when there are none.</param>
 internal sealed record LegacyModelsState(int Count, string Text);
@@ -98,7 +104,10 @@ internal sealed record SettingsViewState(
                 vm.PolishPromptIsDefault,
                 vm.PolishPromptInvalid),
             new PrivacySettingsState(
-                vm.CloudTranslate, vm.CloudClean, vm.CloudBaseUrl, vm.CloudModel, vm.HasStoredKey, vm.CloudInvalid, vm.PendingConsent,
+                vm.CloudTranslate, vm.CloudClean,
+                [.. vm.Endpoints.Select(endpoint => new EndpointState(
+                    endpoint.Id, endpoint.Name, endpoint.BaseUrl, HostOf(endpoint.BaseUrl), endpoint.Model, endpoint.HasKey, endpoint.Active))],
+                vm.Form, vm.PendingChange, vm.CloudInvalid, vm.PendingConsent,
                 [.. vm.Apps.Select(app => new AppPreferenceState(app.AppId, texts.AppName(app.Name), texts.AppSummary(app.Output, app.Target), texts.Date(app.UsedAt)))]),
             new ModelsSettingsState(
                 SettingsViewModel.Tiers[vm.TierIndex],
@@ -108,6 +117,8 @@ internal sealed record SettingsViewState(
                 Diagnostics(vm, texts, app)),
             new SettingsOptionsState(!vm.ReduceMotion, theme));
     }
+
+    private static string HostOf(string url) => Uri.TryCreate(url, UriKind.Absolute, out var uri) ? uri.Authority : url;
 
     /// <summary>Only settings that are switches or closed choices: terms, endpoints, device names and keys never go in.</summary>
     private static DiagnosticLine[] Diagnostics(SettingsViewModel vm, SettingsTexts texts, AppInfo app) =>
@@ -119,7 +130,8 @@ internal sealed record SettingsViewState(
         new(texts.Label("cleanup"), texts.OnOff(vm.CleanupEnabled)),
         new(texts.Label("cloud.translate"), texts.OnOff(vm.CloudTranslate)),
         new(texts.Label("cloud.clean"), texts.OnOff(vm.CloudClean)),
-        new(texts.Label("cloud.apiKey"), texts.Stored(vm.HasStoredKey)),
+        new(texts.Label("cloud.endpoints"), vm.Endpoints.Count.ToString(CultureInfo.InvariantCulture)),
+        new(texts.Label("cloud.apiKey"), texts.Stored(vm.ActiveEndpoint?.HasKey == true)),
         new(texts.Label("legacy"), vm.LegacyCount.ToString(CultureInfo.InvariantCulture))
     ];
 }

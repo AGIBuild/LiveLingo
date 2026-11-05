@@ -46,7 +46,8 @@ public class SettingsMigrationTests : IDisposable
 
         Assert.False(model.Cloud.Translate);
         Assert.False(model.Cloud.Clean);
-        Assert.Equal("", model.Cloud.BaseUrl);
+        Assert.Empty(model.Cloud.Endpoints);
+        Assert.Equal("", model.Cloud.ActiveEndpointId);
         Assert.Equal("Fast", model.Composer.TranslatorTier);
         Assert.Equal("", model.Composer.Glossary);
         Assert.DoesNotContain("old.example.com", JsonSerializer.Serialize(model));

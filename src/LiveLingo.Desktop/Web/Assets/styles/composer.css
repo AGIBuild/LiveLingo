@@ -113,8 +113,16 @@ button.chip:hover { background: var(--line); }
 .mic.recording { background: #d93a2f; animation: ring 1.8s ease-out infinite; }
 .mic.recording .mic-ic { display: none; } .mic.recording .bars { display: flex; }
 @keyframes ring { 0% { box-shadow: 0 0 0 0 rgba(217, 58, 47, .45); } 100% { box-shadow: 0 0 0 14px rgba(217, 58, 47, 0); } }
-.status { flex: 1; min-width: 0; font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.status { min-width: 0; font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.status-block { flex: 1; min-width: 0; display: grid; gap: 1px; align-content: center; }
 .status.warn { color: var(--warn); }
+/* One quiet line under the status, right of the microphone: the model behind what is happening now. Never a popup. */
+.model-line { display: flex; align-items: center; gap: 6px; min-width: 0; margin: 0; font-size: 12px; line-height: 16px; color: var(--muted); }
+.model-line span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.model-line .dot { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--ok); }
+.model-line.info { color: var(--info); } .model-line.info .dot { background: currentColor; animation: pulse 1.2s ease-in-out infinite; }
+.model-line.cloud { color: var(--warn); } .model-line.cloud .dot { background: currentColor; }
+@keyframes pulse { 50% { opacity: .35; } }
 .c-foot .dl { flex: none; display: flex; align-items: center; gap: 6px; max-width: 45%; font-size: 12px; color: var(--info); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .c-foot .dl progress { width: 56px; height: 6px; accent-color: currentColor; flex: none; }
 .c-foot .btn { height: 40px; padding: 0 16px; border-radius: 14px; }
@@ -140,6 +148,11 @@ html[data-theme=dark] .toast { background: #eceef3; color: #15181e; }
 .menu button kbd { flex: none; }
 .menu button[aria-checked=true]::after { content: "✓"; color: var(--accent-ink); font-weight: 700; }
 .menu hr { border: 0; border-top: 1px solid var(--line); margin: 5px 4px; }
+.model-card { width: max-content; max-width: 360px; padding: 12px 14px; }
+.model-card h3 { margin: 0 0 8px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.model-card dl { display: grid; gap: 8px; margin: 0; }
+.model-card dt { font-size: 12px; color: var(--muted); }
+.model-card dd { margin: 0; font-size: 13px; overflow-wrap: anywhere; }
 
 /* dialogs replace the body of the panel, so the window never has to grow for them */
 .dialog { padding: 6px 18px 16px; }

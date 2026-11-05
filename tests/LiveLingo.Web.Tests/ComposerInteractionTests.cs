@@ -23,12 +23,74 @@ public sealed class ComposerInteractionTests(BrowserFixture browsers)
     [Theory]
     [InlineData("webkit")]
     [InlineData("chromium")]
-    public async Task ModelDetails_AreAvailableFromTheExistingPrivacyChip(string engine)
+    public async Task ModelDetails_OpenAsACardUnderThePrivacyChip_AndSendNothing(string engine)
+    {
+        await using var page = await browsers.OpenAsync(engine, "model-local");
+        await page.ClearIntentsAsync();
+
+        await page.Page.Locator("#privacy").ClickAsync();
+
+        var card = page.Page.Locator(".model-card");
+        Assert.Equal(3, await card.Locator("dt").CountAsync());
+        Assert.Contains("Qwen3.5 4B (text cleanup)", await card.InnerTextAsync());
+        Assert.Contains("Hy-MT2 1.8B (translation)", await card.InnerTextAsync());
+        Assert.Equal("true", await page.Page.Locator("#privacy").GetAttributeAsync("aria-expanded"));
+        Assert.Empty(await page.IntentsAsync());
+        var chip = await page.Page.Locator("#privacy").BoundingBoxAsync();
+        var box = await card.BoundingBoxAsync();
+        Assert.True(box!.Y >= chip!.Y + chip.Height, "under the chip");
+        Assert.True(box.X + box.Width <= BrowserFixture.NarrowWidth, "inside the window");
+
+        await page.Page.Keyboard.PressAsync("Escape");
+        Assert.Equal(0, await page.Page.Locator(".model-card").CountAsync());
+    }
+
+    [Theory]
+    [InlineData("webkit")]
+    [InlineData("chromium")]
+    public async Task TheModelLine_SitsBelowTheStatus_RightOfTheMicrophone_AndNeverFloats(string engine)
+    {
+        await using var page = await browsers.OpenAsync(engine, "model-local");
+
+        var line = page.Page.Locator("#model-line");
+        Assert.Equal("翻译 · Hy-MT2-1.8B · 本地", (await line.InnerTextAsync()).Trim());
+        Assert.Equal(0, await page.Page.Locator("#toast").CountAsync());
+        var mic = await page.Page.Locator("#mic").BoundingBoxAsync();
+        var status = await page.Page.Locator("#status").BoundingBoxAsync();
+        var box = await line.BoundingBoxAsync();
+        var foot = await page.Page.Locator(".c-foot").BoundingBoxAsync();
+        Assert.True(box!.X >= mic!.X + mic.Width, "right of the microphone");
+        Assert.True(box.Y >= status!.Y + status.Height - 1, "below the status text");
+        Assert.True(box.Y + box.Height <= foot!.Y + foot.Height, "inside the footer");
+        Assert.Equal(mic.Height + 20, foot.Height, 1);
+        Assert.Contains("Hy-MT2 1.8B (translation)", await line.GetAttributeAsync("title"));
+    }
+
+    [Theory]
+    [InlineData("webkit", "model-cloud", "cloud", "翻译 · gpt-4o-mini-2024-07-18 · 云端（Foundry · 东亚）")]
+    [InlineData("chromium", "model-cloud", "cloud", "翻译 · gpt-4o-mini-2024-07-18 · 云端（Foundry · 东亚）")]
+    [InlineData("webkit", "model-switching", "info", "翻译 · 正在切换到 Hy-MT2-1.8B（上次 Hy-MT2-7B）")]
+    [InlineData("chromium", "model-switching", "info", "翻译 · 正在切换到 Hy-MT2-1.8B（上次 Hy-MT2-7B）")]
+    [InlineData("webkit", "model-preparing", "info", "整理 · 正在准备 Qwen3.5 4B")]
+    [InlineData("webkit", "model-listening", "local", "识别 · X-ASR + Qwen3-ASR · 本地")]
+    [InlineData("chromium", "model-listening", "local", "识别 · X-ASR + Qwen3-ASR · 本地")]
+    public async Task TheModelLine_ShowsWhereTheModelRuns_OrThatItIsBeingPrepared(string engine, string fixture, string tone, string text)
+    {
+        await using var page = await browsers.OpenAsync(engine, fixture);
+
+        var line = page.Page.Locator("#model-line");
+        Assert.Equal(text, (await line.InnerTextAsync()).Trim());
+        Assert.Contains(tone, await line.GetAttributeAsync("class"));
+    }
+
+    [Theory]
+    [InlineData("webkit")]
+    [InlineData("chromium")]
+    public async Task WithoutAModelToReport_ThereIsNoModelLine(string engine)
     {
         await using var page = await browsers.OpenAsync(engine, "translate-ready");
-        await page.ClearIntentsAsync();
-        await page.Page.Locator("#privacy").ClickAsync();
-        Assert.Equal(1, await page.CountAsync<ModelInfoIntent>());
+
+        Assert.Equal(0, await page.Page.Locator("#model-line").CountAsync());
     }
 
     [Theory]
@@ -580,17 +642,20 @@ public sealed class ComposerInteractionTests(BrowserFixture browsers)
 
     [Theory]
     [MemberData(nameof(Engines))]
-    public async Task MoreMenu_SwitchesStayOpenAndSendTheirNewValue(string engine)
+    public async Task MoreMenu_SwitchesSendTheirNewValueAndCloseTheMenu(string engine)
     {
         await using var page = await browsers.OpenAsync(engine, "translate-ready");
         await page.Page.Locator("#more").ClickAsync();
-
         await page.Page.Locator(".menu button", new() { HasText = "宽屏" }).ClickAsync();
-        await page.Page.Locator(".menu button", new() { HasText = "整段" }).ClickAsync();
 
         Assert.True((await page.LastIntentAsync<WideIntent>()).On);
+        Assert.Equal(0, await page.Page.Locator(".menu").CountAsync());
+
+        await page.Page.Locator("#more").ClickAsync();
+        await page.Page.Locator(".menu button", new() { HasText = "整段" }).ClickAsync();
+
         Assert.True((await page.LastIntentAsync<WholeIntent>()).On);
-        Assert.Equal(1, await page.Page.Locator(".menu").CountAsync());
+        Assert.Equal(0, await page.Page.Locator(".menu").CountAsync());
     }
 
     [Theory]

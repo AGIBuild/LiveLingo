@@ -22,6 +22,31 @@ public enum CloudStep
     Clean
 }
 
+/// <summary>One saved cloud endpoint as the page shows it; the API key is never part of it, only whether one is stored.</summary>
+public sealed record EndpointEntry(string Id, string Name, string BaseUrl, string Model, bool HasKey, bool Active);
+
+/// <summary>Why the add or edit form was not accepted; the page shows the reason beside the field.</summary>
+public enum EndpointError
+{
+    NameMissing,
+    NameTaken,
+    UrlInvalid,
+    ModelMissing,
+    KeyMissing
+}
+
+/// <summary>The form that adds an endpoint (<paramref name="Id"/> null) or edits one, and why its last submission was refused.</summary>
+public sealed record EndpointForm(string? Id, EndpointError? Error);
+
+public enum EndpointChange
+{
+    Switch,
+    Delete
+}
+
+/// <summary>A change of where text goes, or of what is stored, that waits for the user's answer.</summary>
+public sealed record PendingEndpointChange(EndpointChange Kind, string Id);
+
 /// <summary>
 /// The settings page of the prototype: there is no save button, every change is applied at once. A value that is not
 /// usable yet (a hotkey being typed, a half-filled cloud endpoint) is flagged and not stored.
@@ -72,10 +97,9 @@ public sealed partial class SettingsViewModel : ObservableObject
         _tierIndex = Math.Max(0, Tiers.ToList().IndexOf(current.Composer.TranslatorTier));
         _microphoneNames = [""];
         _microphoneIndex = 0;
-        _cloudBaseUrl = current.Cloud.BaseUrl;
-        _cloudModel = current.Cloud.Model;
         _cloudTranslate = current.Cloud.Translate;
         _cloudClean = current.Cloud.Clean;
+        _endpoints = EntriesOf(current.Cloud);
         Terms = new ObservableCollection<TermEntry>(ParseTerms(current.Composer.Glossary));
         _loading = false;
     }
@@ -153,16 +177,24 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     [ObservableProperty] private bool _cloudTranslate;
     [ObservableProperty] private bool _cloudClean;
-    [ObservableProperty] private string _cloudBaseUrl;
-    [ObservableProperty] private string _cloudModel;
 
-    /// <summary>A new API key typed by the user; saved on request and never shown again.</summary>
-    [ObservableProperty] private string _cloudApiKey = "";
-
-    [ObservableProperty] private bool _hasStoredKey;
-
-    /// <summary>True when a cloud feature was asked for but the endpoint, model or key is missing or unusable.</summary>
+    /// <summary>True when a cloud step was asked for but the enabled endpoint is missing or unusable (no key, bad address).</summary>
     [ObservableProperty] private bool _cloudInvalid;
+
+    /// <summary>The saved endpoints, in the order they were added; at most one is the enabled one.</summary>
+    [ObservableProperty] private IReadOnlyList<EndpointEntry> _endpoints;
+
+    /// <summary>The endpoint the cloud steps use, or null while none is enabled.</summary>
+    public EndpointEntry? ActiveEndpoint => Endpoints.FirstOrDefault(endpoint => endpoint.Active);
+
+    /// <summary>The add or edit form while it is open; the page draws it over the settings.</summary>
+    [ObservableProperty] private EndpointForm? _form;
+
+    /// <summary>A switch of the enabled endpoint or a deletion waiting for the user's answer.</summary>
+    [ObservableProperty] private PendingEndpointChange? _pendingChange;
+
+    // Endpoints whose API key is in the secret store; read when the window opens and kept up to date by the commands below.
+    private readonly HashSet<string> _keyed = [];
 
     // ---- models ----------------------------------------------------------------------------
 
@@ -200,20 +232,6 @@ public sealed partial class SettingsViewModel : ObservableObject
         if (index >= 0)
             Apply();
     }
-
-    partial void OnCloudBaseUrlChanged(string value)
-    {
-        CloudInvalid = false;
-        Apply();
-    }
-
-    partial void OnCloudModelChanged(string value)
-    {
-        CloudInvalid = false;
-        Apply();
-    }
-
-    partial void OnCloudApiKeyChanged(string value) => CloudInvalid = false;
 
     /// <summary>Stores every usable value at once; the rest keeps its last stored state.</summary>
     private void Apply()
@@ -255,17 +273,6 @@ public sealed partial class SettingsViewModel : ObservableObject
         if (_devicesLoaded)
             model.Composer.Microphone = MicrophoneIndex < MicrophoneNames.Count ? MicrophoneNames[MicrophoneIndex] : "";
         model.Composer.Glossary = SerializeTerms(Terms);
-
-        if (!(CloudTranslate || CloudClean) || IsCloudConfigured())
-        {
-            model.Cloud.BaseUrl = CloudBaseUrl.Trim();
-            model.Cloud.Model = CloudModel.Trim();
-        }
-        else
-        {
-            CloudInvalid = true;
-        }
-
         model.Cloud.Translate = CloudTranslate;
         model.Cloud.Clean = CloudClean;
         _settings.Replace(model);
@@ -325,14 +332,22 @@ public sealed partial class SettingsViewModel : ObservableObject
     /// <summary>The step the user asked to turn on and has not consented to yet; the page shows its consent dialog meanwhile.</summary>
     [ObservableProperty] private CloudStep? _pendingConsent;
 
-    /// <summary>Turning a step on needs the user's consent every time (<see cref="AnswerConsent"/>); turning it off is immediate.</summary>
+    /// <summary>
+    /// Turning a step on needs the user's consent every time (<see cref="AnswerConsent"/>) and an enabled, usable endpoint
+    /// to send to; turning it off is immediate.
+    /// </summary>
     public void SetCloud(CloudStep step, bool on)
     {
         var translation = step == CloudStep.Translate;
         if (!on)
             DisableCloud(translation);
         else if (!(translation ? CloudTranslate : CloudClean))
-            PendingConsent = step;
+        {
+            if (IsConfigured(ActiveEndpoint))
+                PendingConsent = step;
+            else
+                CloudInvalid = true;
+        }
     }
 
     public void AnswerConsent(bool allow)
@@ -345,10 +360,10 @@ public sealed partial class SettingsViewModel : ObservableObject
             TryEnableCloud(step == CloudStep.Translate);
     }
 
-    /// <summary>Turns a cloud step on after the user consented; refused while the endpoint, model or key is not set.</summary>
+    /// <summary>Turns a cloud step on after the user consented; refused while no usable endpoint is enabled.</summary>
     public bool TryEnableCloud(bool translation)
     {
-        if (!IsCloudConfigured())
+        if (!IsConfigured(ActiveEndpoint))
         {
             CloudInvalid = true;
             return false;
@@ -371,36 +386,176 @@ public sealed partial class SettingsViewModel : ObservableObject
         Apply();
     }
 
-    /// <summary>Saves the typed key into the system secret store and forgets it here.</summary>
-    [RelayCommand]
-    private async Task SaveCloudKeyAsync()
+    // ---- cloud endpoints --------------------------------------------------------------------
+    // Any number of endpoints may be saved, at most one is enabled and both cloud steps use it. Whatever would change where
+    // text goes (enabling another endpoint while a step is on, deleting, a new host for the enabled one) asks first or
+    // switches the steps off: text never moves to another service without the user's say.
+
+    /// <summary>Opens the form for a new endpoint (<paramref name="id"/> null) or to edit one.</summary>
+    public void OpenEndpointForm(string? id)
     {
-        if (string.IsNullOrWhiteSpace(CloudApiKey))
+        if (id is null || Endpoints.Any(endpoint => endpoint.Id == id))
+            Form = new EndpointForm(id, null);
+    }
+
+    public void CloseEndpointForm() => Form = null;
+
+    /// <summary>
+    /// Saves the open form. A rejected value keeps the form open with the reason; for an existing endpoint an empty key
+    /// keeps the stored one. The key goes straight into the secret store and is never kept here.
+    /// </summary>
+    public async Task SaveEndpointAsync(string name, string baseUrl, string model, string apiKey)
+    {
+        if (Form is not { } form)
             return;
 
-        await _secrets.SetSecretAsync(CloudSettings.ApiKeySecretId, CloudApiKey.Trim()).ConfigureAwait(true);
-        HasStoredKey = true;
-        CloudApiKey = "";
+        var existing = form.Id is null ? null : Endpoints.FirstOrDefault(endpoint => endpoint.Id == form.Id);
+        if (form.Id is not null && existing is null)
+        {
+            Form = null;
+            return;
+        }
+
+        name = name.Trim();
+        baseUrl = baseUrl.Trim().TrimEnd('/');
+        model = model.Trim();
+        apiKey = apiKey.Trim();
+
+        var error = ValidateEndpoint(existing, name, baseUrl, model, apiKey);
+        if (error is not null)
+        {
+            Form = form with { Error = error };
+            return;
+        }
+
+        var id = existing?.Id ?? CloudEndpoint.NewId();
+        var secretId = existing is null ? "cloud-key-" + id : _settings.CloneCurrent().Cloud.Endpoints.First(endpoint => endpoint.Id == id).SecretId;
+        if (apiKey.Length > 0)
+        {
+            await _secrets.SetSecretAsync(secretId, apiKey).ConfigureAwait(true);
+            _keyed.Add(id);
+        }
+
+        Mutate(cloud =>
+        {
+            var endpoint = cloud.Endpoints.FirstOrDefault(item => item.Id == id);
+            if (endpoint is null)
+            {
+                endpoint = new CloudEndpoint { Id = id, SecretId = secretId };
+                cloud.Endpoints.Add(endpoint);
+            }
+            else if (id == cloud.ActiveEndpointId && !SameService(endpoint.BaseUrl, baseUrl))
+            {
+                cloud.Translate = false;
+                cloud.Clean = false;
+            }
+
+            endpoint.Name = name;
+            endpoint.BaseUrl = baseUrl;
+            endpoint.Model = model;
+        });
+        Form = null;
     }
 
-    /// <summary>Removes the stored API key and switches both cloud steps off.</summary>
-    [RelayCommand]
-    private async Task ForgetCloudKeyAsync()
+    private EndpointError? ValidateEndpoint(EndpointEntry? existing, string name, string baseUrl, string model, string apiKey)
     {
-        await _secrets.DeleteSecretAsync(CloudSettings.ApiKeySecretId).ConfigureAwait(true);
-        HasStoredKey = false;
-        CloudApiKey = "";
-        CloudTranslate = false;
-        CloudClean = false;
-        Apply();
+        if (name.Length == 0)
+            return EndpointError.NameMissing;
+        if (Endpoints.Any(endpoint => endpoint.Id != existing?.Id && string.Equals(endpoint.Name, name, StringComparison.OrdinalIgnoreCase)))
+            return EndpointError.NameTaken;
+        if (!IsUsableUrl(baseUrl))
+            return EndpointError.UrlInvalid;
+        if (model.Length == 0)
+            return EndpointError.ModelMissing;
+        return apiKey.Length == 0 && existing?.HasKey != true ? EndpointError.KeyMissing : null;
     }
 
-    private bool IsCloudConfigured()
+    /// <summary>Enables an endpoint (the one that was enabled is switched off) or switches the enabled one off, which also turns both cloud steps off.</summary>
+    public void SetEndpointEnabled(string id, bool on)
+    {
+        if (Endpoints.FirstOrDefault(endpoint => endpoint.Id == id) is not { } endpoint)
+            return;
+
+        if (!on)
+        {
+            if (endpoint.Active)
+                Mutate(cloud => Deactivate(cloud));
+        }
+        else if (!endpoint.Active)
+        {
+            if (!(CloudTranslate || CloudClean))
+                Mutate(cloud => cloud.ActiveEndpointId = id);
+            else if (IsConfigured(endpoint))
+                PendingChange = new PendingEndpointChange(EndpointChange.Switch, id);
+            else
+                CloudInvalid = true;
+        }
+    }
+
+    /// <summary>Asks to delete an endpoint together with its API key; <see cref="AnswerChangeAsync"/> carries it out.</summary>
+    public void DeleteEndpoint(string id)
+    {
+        if (Endpoints.Any(endpoint => endpoint.Id == id))
+            PendingChange = new PendingEndpointChange(EndpointChange.Delete, id);
+    }
+
+    public async Task AnswerChangeAsync(bool allow)
+    {
+        if (PendingChange is not { } change)
+            return;
+
+        PendingChange = null;
+        if (!allow || Endpoints.FirstOrDefault(endpoint => endpoint.Id == change.Id) is not { } endpoint)
+            return;
+
+        if (change.Kind == EndpointChange.Switch)
+        {
+            Mutate(cloud => cloud.ActiveEndpointId = change.Id);
+            return;
+        }
+
+        var secretId = _settings.CloneCurrent().Cloud.Endpoints.First(item => item.Id == endpoint.Id).SecretId;
+        await _secrets.DeleteSecretAsync(secretId).ConfigureAwait(true);
+        _keyed.Remove(endpoint.Id);
+        Mutate(cloud =>
+        {
+            if (cloud.ActiveEndpointId == change.Id)
+                Deactivate(cloud);
+            cloud.Endpoints.RemoveAll(item => item.Id == change.Id);
+        });
+    }
+
+    private static void Deactivate(CloudSettings cloud)
+    {
+        cloud.ActiveEndpointId = "";
+        cloud.Translate = false;
+        cloud.Clean = false;
+    }
+
+    /// <summary>Changes the cloud settings and brings everything this page keeps of them up to date.</summary>
+    private void Mutate(Action<CloudSettings> change)
+    {
+        var model = _settings.CloneCurrent();
+        change(model.Cloud);
+        _settings.Replace(model);
+        CloudTranslate = model.Cloud.Translate;
+        CloudClean = model.Cloud.Clean;
+        CloudInvalid = false;
+        Endpoints = EntriesOf(model.Cloud);
+        OnPropertyChanged(nameof(ActiveEndpoint));
+    }
+
+    private IReadOnlyList<EndpointEntry> EntriesOf(CloudSettings cloud) =>
+    [
+        .. cloud.Endpoints.Select(endpoint => new EndpointEntry(
+            endpoint.Id, endpoint.Name, endpoint.BaseUrl, endpoint.Model, _keyed.Contains(endpoint.Id), endpoint.Id == cloud.ActiveEndpointId))
+    ];
+
+    private static bool IsUsableUrl(string baseUrl)
     {
         try
         {
-            // The key is checked for presence only; a stored key is validated when it is used.
-            CloudRoute.Create(CloudBaseUrl, CloudModel, HasStoredKey || !string.IsNullOrWhiteSpace(CloudApiKey) ? "key" : "");
+            CloudRoute.Create(baseUrl, "model", "key");
             return true;
         }
         catch (ArgumentException)
@@ -408,6 +563,28 @@ public sealed partial class SettingsViewModel : ObservableObject
             return false;
         }
     }
+
+    /// <summary>The key is checked for presence only; a stored key is validated when it is used.</summary>
+    private static bool IsConfigured(EndpointEntry? endpoint)
+    {
+        if (endpoint is null)
+            return false;
+
+        try
+        {
+            CloudRoute.Create(endpoint.BaseUrl, endpoint.Model, endpoint.HasKey ? "key" : "");
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Whether two addresses reach the same service (scheme, host and port); the text goes to the same place.</summary>
+    private static bool SameService(string before, string after) =>
+        Uri.TryCreate(before, UriKind.Absolute, out var a) && Uri.TryCreate(after, UriKind.Absolute, out var b) &&
+        string.Equals(a.GetLeftPart(UriPartial.Authority), b.GetLeftPart(UriPartial.Authority), StringComparison.OrdinalIgnoreCase);
 
     // ---- recent drafts and models -----------------------------------------------------------------
 
@@ -417,7 +594,13 @@ public sealed partial class SettingsViewModel : ObservableObject
     /// <summary>Reads what the system provides (key, devices, models on disk); the window calls it when it opens.</summary>
     public async Task InitializeAsync()
     {
-        HasStoredKey = !string.IsNullOrEmpty(await _secrets.GetSecretAsync(CloudSettings.ApiKeySecretId).ConfigureAwait(true));
+        foreach (var endpoint in _settings.CloneCurrent().Cloud.Endpoints)
+        {
+            if (!string.IsNullOrEmpty(await _secrets.GetSecretAsync(endpoint.SecretId).ConfigureAwait(true)))
+                _keyed.Add(endpoint.Id);
+        }
+        Endpoints = EntriesOf(_settings.CloneCurrent().Cloud);
+        OnPropertyChanged(nameof(ActiveEndpoint));
 
         var saved = _settings.CloneCurrent().Composer.Microphone;
         var devices = await Task.Run(() => _microphone.InputDevices()).ConfigureAwait(true);

@@ -7,7 +7,6 @@ public sealed class WebIntentTests
 {
     [Theory]
     [InlineData("""{"v":1,"name":"ready"}""", typeof(ReadyIntent))]
-    [InlineData("""{"v":1,"name":"modelInfo"}""", typeof(ModelInfoIntent))]
     [InlineData("""{"v":1,"name":"size","width":656,"height":300}""", typeof(SizeIntent))]
     [InlineData("""{"v":1,"name":"drag"}""", typeof(DragIntent))]
     [InlineData("""{"v":1,"name":"resize","width":900,"height":null}""", typeof(ResizeIntent))]
@@ -43,8 +42,13 @@ public sealed class WebIntentTests
     [InlineData("""{"v":1,"name":"removeTerm","index":1}""", typeof(RemoveTermIntent))]
     [InlineData("""{"v":1,"name":"cloudToggle","step":"clean","on":true}""", typeof(CloudToggleIntent))]
     [InlineData("""{"v":1,"name":"consent","allow":false}""", typeof(ConsentIntent))]
-    [InlineData("""{"v":1,"name":"saveKey","value":"sk-1"}""", typeof(SaveKeyIntent))]
-    [InlineData("""{"v":1,"name":"forgetKey"}""", typeof(ForgetKeyIntent))]
+    [InlineData("""{"v":1,"name":"openEndpointForm","id":null}""", typeof(OpenEndpointFormIntent))]
+    [InlineData("""{"v":1,"name":"openEndpointForm","id":"abc"}""", typeof(OpenEndpointFormIntent))]
+    [InlineData("""{"v":1,"name":"closeEndpointForm"}""", typeof(CloseEndpointFormIntent))]
+    [InlineData("""{"v":1,"name":"saveEndpoint","label":"Main","baseUrl":"https://x.example/v1","model":"m","apiKey":"sk-1"}""", typeof(SaveEndpointIntent))]
+    [InlineData("""{"v":1,"name":"enableEndpoint","id":"abc","on":true}""", typeof(EnableEndpointIntent))]
+    [InlineData("""{"v":1,"name":"deleteEndpoint","id":"abc"}""", typeof(DeleteEndpointIntent))]
+    [InlineData("""{"v":1,"name":"endpointAnswer","allow":false}""", typeof(EndpointAnswerIntent))]
     [InlineData("""{"v":1,"name":"removeLegacyModels"}""", typeof(RemoveLegacyModelsIntent))]
     [InlineData("""{"v":1,"name":"checkUpdates"}""", typeof(CheckUpdatesIntent))]
     [InlineData("""{"v":1,"name":"clipped","viewportWidth":656,"viewportHeight":300,"contentWidth":656,"contentHeight":560}""", typeof(ClippedIntent))]
@@ -121,7 +125,12 @@ public sealed class WebIntentTests
     [InlineData("""{"v":1,"name":"setting","key":"theme"}""", "JsonException")]
     [InlineData("""{"v":1,"name":"removeTerm","index":-1}""", "invalid")]
     [InlineData("""{"v":1,"name":"cloudToggle","step":"everything","on":true}""", "JsonException")]
-    [InlineData("""{"v":1,"name":"saveKey","value":""}""", "invalid")]
+    [InlineData("""{"v":1,"name":"modelInfo"}""", "JsonException")]
+    [InlineData("""{"v":1,"name":"openEndpointForm","id":""}""", "invalid")]
+    [InlineData("""{"v":1,"name":"enableEndpoint","id":"","on":true}""", "invalid")]
+    [InlineData("""{"v":1,"name":"deleteEndpoint","id":""}""", "invalid")]
+    [InlineData("""{"v":1,"name":"saveEndpoint","label":"x","baseUrl":"u","model":"m"}""", "JsonException")]
+    [InlineData("""{"v":1,"name":"setting","key":"cloudBaseUrl","value":"https://x.example"}""", "invalid")]
     public void Parse_RejectsAnythingOutsideTheClosedSet(string json, string expectedReason)
     {
         var intent = WebIntent.Parse(json, out var reason);
@@ -142,8 +151,6 @@ public sealed class WebIntentTests
     [Theory]
     [InlineData("hotkey", 65)]
     [InlineData("microphone", 257)]
-    [InlineData("cloudBaseUrl", 2_049)]
-    [InlineData("cloudModel", 257)]
     public void Parse_BoundsTheFreeTextOfASetting(string key, int length)
     {
         var json = $$"""{"v":1,"name":"setting","key":"{{key}}","value":"{{new string('a', length)}}"}""";
@@ -152,19 +159,31 @@ public sealed class WebIntentTests
         Assert.Equal("invalid", reason);
     }
 
+    [Theory]
+    [InlineData(41, 10, 10, 10)]
+    [InlineData(10, 2_049, 10, 10)]
+    [InlineData(10, 10, 257, 10)]
+    [InlineData(10, 10, 10, 4_097)]
+    public void Parse_BoundsTheFieldsOfAnEndpoint(int label, int url, int model, int key)
+    {
+        var json = $$"""{"v":1,"name":"saveEndpoint","label":"{{new string('a', label)}}","baseUrl":"{{new string('a', url)}}","model":"{{new string('a', model)}}","apiKey":"{{new string('a', key)}}"}""";
+
+        Assert.Null(WebIntent.Parse(json, out var reason));
+        Assert.Equal("invalid", reason);
+    }
+
     [Fact]
-    public void Parse_BoundsTheGlossaryTermsAndTheKey()
+    public void Parse_BoundsTheGlossaryTerms()
     {
         var long200 = new string('a', 201);
 
         Assert.Null(WebIntent.Parse($$"""{"v":1,"name":"addTerm","source":"{{long200}}","target":""}""", out _));
-        Assert.Null(WebIntent.Parse($$"""{"v":1,"name":"saveKey","value":"{{new string('k', 4_097)}}"}""", out _));
     }
 
     [Fact]
-    public void ASavedKey_NeverPrintsItself()
+    public void AnEndpointWithItsKey_NeverPrintsItself()
     {
-        var intent = WebIntent.Parse("""{"v":1,"name":"saveKey","value":"sk-very-secret"}""", out _);
+        var intent = WebIntent.Parse("""{"v":1,"name":"saveEndpoint","label":"Main","baseUrl":"https://x.example/v1","model":"m","apiKey":"sk-very-secret"}""", out _);
 
         Assert.DoesNotContain("sk-very-secret", intent!.ToString());
     }

@@ -158,12 +158,17 @@ public sealed class ComposerTexts(ILocalizationService loc, bool? mac = null)
     public string MicStart => loc.T("composer.mic.start", Cap("dictate"));
     public string MicStop => loc.T("composer.mic.stop", Cap("dictate"));
     public string CopyAria => loc.T("composer.copy.aria");
-    public string ModelDetail(ModelStage stage, ModelUse? use, ModelUse? previous)
+    public string ModelDetail(ModelStage stage, ModelUse? use, ModelUse? previous) =>
+        ModelStageLabel(stage) + ": " + ModelDetailBody(use, previous);
+
+    public string ModelStageLabel(ModelStage stage) => loc.T($"composer.model.{stage}");
+
+    /// <summary>What is known about the model of a stage, in full: the actual names, and whether the service confirmed them.</summary>
+    public string ModelDetailBody(ModelUse? use, ModelUse? previous)
     {
-        var label = loc.T($"composer.model.{stage}");
         if (use is null)
-            return label + ": " + loc.T("composer.model.unused");
-        var detail = use switch
+            return loc.T("composer.model.unused");
+        return use switch
         {
             { Cloud: true, Confirmed: false } => loc.T("composer.model.requested", use.Name),
             { Cloud: true } => loc.T("composer.model.cloud", use.Name),
@@ -171,8 +176,27 @@ public sealed class ComposerTexts(ILocalizationService loc, bool? mac = null)
             _ when previous is not null => loc.T("composer.model.switching", use.Name, previous.Name),
             _ => loc.T("composer.model.preparing", use.Name)
         };
-        return label + ": " + detail;
     }
+
+    /// <summary>
+    /// The one line of the footer: the stage, the short name of the model and where it runs ("Translation · Hy-MT2-1.8B ·
+    /// Local"), or that it is being prepared or replaced.
+    /// </summary>
+    public string ModelLine(ModelUse use, ModelUse? previous)
+    {
+        var stage = loc.T($"composer.modelLine.stage.{use.Stage}");
+        return use switch
+        {
+            { Cloud: true, Endpoint: { } endpoint } => loc.T("composer.modelLine.cloud", stage, use.Label, endpoint),
+            { Cloud: true } => loc.T("composer.modelLine.cloudUnnamed", stage, use.Label),
+            { Confirmed: true } => loc.T("composer.modelLine.local", stage, use.Label),
+            _ when previous is not null => loc.T("composer.modelLine.switching", stage, use.Label, previous.Label),
+            _ => loc.T("composer.modelLine.preparing", stage, use.Label)
+        };
+    }
+
+    public string ModelCloudBadge => loc.T("composer.model.cloud.badge");
+    public string ModelCloudAria => loc.T("composer.model.cloud.aria");
     public string CleanupPreview => loc.T("composer.result.preview");
 
     public string Status(StatusInfo info)
@@ -303,8 +327,7 @@ public sealed class ComposerTexts(ILocalizationService loc, bool? mac = null)
         ["clear"] = loc.T("composer.clear"),
         ["clearAria"] = loc.T("composer.clear.aria", Cap("new")),
         ["modelInfo"] = loc.T("composer.model.info"),
-        ["modelCloud"] = loc.T("composer.model.cloud.badge"),
-        ["modelCloudAria"] = loc.T("composer.model.cloud.aria"),
+        ["modelCardTitle"] = loc.T("composer.model.card"),
         ["resultAria"] = ResultAria,
         ["routeChip"] = RouteChip,
         ["rowRetry"] = RowRetry,

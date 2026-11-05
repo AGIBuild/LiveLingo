@@ -30,9 +30,9 @@
   "privacy": {
     "cloudTranslate": false,
     "cloudClean": false,
-    "baseUrl": "",
-    "model": "",
-    "hasKey": false,
+    "endpoints": [],
+    "form": null,
+    "change": null,
     "invalid": true,
     "consent": null,
     "apps": []
@@ -80,6 +80,10 @@
       {
         "label": "云端整理",
         "value": "关"
+      },
+      {
+        "label": "云端端点",
+        "value": "0"
       },
       {
         "label": "API 密钥",

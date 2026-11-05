@@ -64,7 +64,6 @@ internal sealed class ComposerIntents : IIntentHandler
     /// <summary>The page reports that it is cut off by the window.</summary>
     public event Action<ClippedIntent>? Clipped;
 
-    public event Action? ModelInfoRequested;
     public event Action? DraftCleared;
 
     /// <summary>State that is not on the view model changed (the recent drafts).</summary>
@@ -105,7 +104,6 @@ internal sealed class ComposerIntents : IIntentHandler
                     DraftCleared?.Invoke();
                 });
                 break;
-            case ModelInfoIntent: ModelInfoRequested?.Invoke(); break;
             case RestoreRecentIntent restore: Restore(restore.Index); break;
             case ClearRecentIntent:
                 _recent.Clear();
