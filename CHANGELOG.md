@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-11-05
+
+Cloud models can have several endpoints (only one enabled at a time), and the model the composer is using moves from a
+box over the transcript to a quiet line in the footer.
+
+### Added
+- Cloud models can have several endpoints. *Settings → Privacy and cloud* lists them: add, edit and delete as many as you
+  like, each with its own name, address, model and API key. Exactly one can be enabled (or none, which keeps everything
+  local), and cloud translation and cleanup both use it. A new endpoint starts disabled. Switching the enabled endpoint
+  while a cloud step is on asks first; disabling or deleting it, or changing its host, turns the cloud steps off so text
+  never moves to another service without your say.
+
+### Changed
+- The model the composer is using is now one quiet line in the footer, under the status text and right of the microphone,
+  instead of a dark box in the middle of the window that covered the transcript. It shows the stage, the short model name
+  and where it runs (`Translation · Hy-MT2-1.8B · Local`, `Translation · gpt-4o-mini · Cloud (Foundry)`), says so while a
+  model is being prepared or replaced, and stays while it applies. The "Local" / "Cloud" chip now opens a small card under
+  it with the full name of the model of every stage, instead of a 10 second box.
+- The single cloud address of earlier versions becomes an endpoint named "Default" and keeps its API key. It stays
+  enabled only if a cloud step was on. "Remove key" is gone: deleting an endpoint deletes its key.
+- The "Wide comparison" and "Whole text" switches in the composer's more menu now close the menu when you pick them, like
+  every other item.
+
 ## [2.1.2] - 2026-11-03
 
 "Download in background" really moves the download out of the way, downloads no longer depend on the composer window,
@@ -425,6 +448,8 @@ process-wide task with shared progress and dedup across every UI surface.
 
 See `git log v0.1.4` for the pre-CHANGELOG history.
 
+[2.2.0]: https://github.com/AGIBuild/LiveLingo/releases/tag/v2.2.0
+[2.1.2]: https://github.com/AGIBuild/LiveLingo/releases/tag/v2.1.2
 [2.1.1]: https://github.com/AGIBuild/LiveLingo/releases/tag/v2.1.1
 [2.1.0]: https://github.com/AGIBuild/LiveLingo/releases/tag/v2.1.0
 [2.0.2]: https://github.com/AGIBuild/LiveLingo/releases/tag/v2.0.2
