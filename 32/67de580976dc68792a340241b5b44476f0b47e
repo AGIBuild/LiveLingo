@@ -1,0 +1,42 @@
+src/LiveLingo.Desktop/Resources/i18n/zh-CN.json
+  s_c7d6d7e38a8087::t_b346067363e4bf 320
+src/LiveLingo.Desktop/Resources/i18n/en-US.json
+  s_c7d6d7e38a8087::t_5154d03a670eea 320
+tests/LiveLingo.Desktop.Tests/Platform/MacClipboardServiceTests.cs
+  s_c7d6d7e38a8087::t_66749f2ecf2171 1-2,5-28,37-45
+  s_c7d6d7e38a8087::t_53fad60c6ba8bf 3-4,29-36
+CONTRIBUTING.md
+  s_c7d6d7e38a8087::t_89db6d5e16a743 14,127,245,267-270
+build/BuildTask.cs
+  s_c7d6d7e38a8087::t_be2dbddd1bf952 306,358-361
+  s_c7d6d7e38a8087::t_37ad0f1fc5b905 335
+src/LiveLingo.Desktop/Platform/macOS/MacClipboardService.cs
+  s_c7d6d7e38a8087::t_bba97229855100 3,10-19,22-25,34-37
+src/LiveLingo.Desktop/Services/Update/VelopackUpdateService.cs
+  s_c7d6d7e38a8087::t_7b1974b70d0b57 22-26
+CHANGELOG.md
+  s_c7d6d7e38a8087::t_84836f0dea473d 22-26
+  s_c7d6d7e38a8087::t_4cac85d6dbc5dd 15-17
+  s_c7d6d7e38a8087::t_5062498afd48ef 14,18-21
+  s_c7d6d7e38a8087::t_a0ccfc8e4ffa60 10-13,468
+tests/LiveLingo.Web.Tests/Fixtures/settings-update-unsupported.json
+  s_c7d6d7e38a8087::t_f4813d8132ad85 48
+docs/superpowers/specs/2026-11-03-windows-packaging-design.md
+  s_c7d6d7e38a8087::t_27f740a7785981 35-42
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "3267de580976dc68792a340241b5b44476f0b47e",
+  "prompts": {},
+  "sessions": {
+    "s_c7d6d7e38a8087": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "3c3a28b5-d626-4e8f-9571-1b34fe96b33f",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
