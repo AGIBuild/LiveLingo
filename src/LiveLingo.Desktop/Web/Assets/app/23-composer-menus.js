@@ -51,6 +51,13 @@
   LL.Menu = ({ id, align, label, items, note, onPick }) =>
     LL.state.menu === id ? html`<${MenuList} align=${align} label=${label} items=${items} note=${note} onPick=${onPick}/>` : null;
 
+  // What the privacy chip opens: the model of each stage as this window actually used it. Nothing to pick, so it is a
+  // card under the chip, not a menu; like a menu it closes on Escape and when the pointer goes anywhere else.
+  LL.ModelCard = ({ rows }) => html`<section class="menu right model-card" aria-label=${LL.t('modelCardTitle')}>
+    <h3>${LL.t('modelCardTitle')}</h3>
+    <dl>${rows.map((row) => html`<div key=${row.label}><dt>${row.label}</dt><dd>${row.text}</dd></div>`)}</dl>
+  </section>`;
+
   class Dialog extends preact.Component {
     setPane = (el) => {
       this.pane = el;

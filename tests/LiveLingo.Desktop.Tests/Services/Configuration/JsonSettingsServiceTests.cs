@@ -42,6 +42,80 @@ public class JsonSettingsServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task CloudEndpoints_AreSavedAndLoadedWithTheEnabledOne()
+    {
+        var svc = new JsonSettingsService(_settingsPath);
+        await svc.LoadAsync(TestContext.Current.CancellationToken);
+        svc.Replace(Tests.Settings.CloudTestData.WithEndpoints("other", translate: true));
+
+        var svc2 = new JsonSettingsService(_settingsPath);
+        await svc2.LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(["main", "other"], svc2.Current.Cloud.Endpoints.Select(endpoint => endpoint.Id));
+        Assert.Equal("other", svc2.Current.Cloud.Active?.Id);
+        Assert.True(svc2.Current.Cloud.Translate);
+
+        using var document = System.Text.Json.JsonDocument.Parse(await File.ReadAllTextAsync(_settingsPath, TestContext.Current.CancellationToken));
+        Assert.False(document.RootElement.GetProperty("cloud").TryGetProperty("baseUrl", out _));
+    }
+
+    [Fact]
+    public async Task TheSingleEndpointOfEarlierVersions_BecomesTheFirstEndpoint_KeepsItsKey_AndStaysEnabledIfAStepWasOn()
+    {
+        await File.WriteAllTextAsync(_settingsPath, """
+            { "schemaVersion": 3, "hotkeys": { "summon": "Alt+X" },
+              "cloud": { "baseUrl": " https://api.example.com/v1 ", "model": "gpt-deploy", "translate": true, "clean": false } }
+            """, TestContext.Current.CancellationToken);
+        var svc = new JsonSettingsService(_settingsPath);
+
+        await svc.LoadAsync(TestContext.Current.CancellationToken);
+
+        var endpoint = Assert.Single(svc.Current.Cloud.Endpoints);
+        Assert.Equal("https://api.example.com/v1", endpoint.BaseUrl);
+        Assert.Equal("gpt-deploy", endpoint.Model);
+        Assert.Equal(CloudSettings.LegacyApiKeySecretId, endpoint.SecretId);
+        Assert.Equal(endpoint.Id, svc.Current.Cloud.ActiveEndpointId);
+        Assert.True(svc.Current.Cloud.Translate);
+        Assert.Equal("Alt+X", svc.Current.Hotkeys.Summon);
+
+        // Migrated once: the file no longer holds the old fields, and a second load keeps the same endpoint.
+        var json = await File.ReadAllTextAsync(_settingsPath, TestContext.Current.CancellationToken);
+        Assert.Contains($"\"id\": \"{endpoint.Id}\"", json);
+        var again = new JsonSettingsService(_settingsPath);
+        await again.LoadAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(endpoint.Id, Assert.Single(again.Current.Cloud.Endpoints).Id);
+    }
+
+    [Fact]
+    public async Task TheSingleEndpointOfEarlierVersions_IsNotEnabled_WhenNoCloudStepWasOn()
+    {
+        await File.WriteAllTextAsync(_settingsPath, """
+            { "schemaVersion": 3, "cloud": { "baseUrl": "https://api.example.com/v1", "model": "m", "translate": false, "clean": false } }
+            """, TestContext.Current.CancellationToken);
+        var svc = new JsonSettingsService(_settingsPath);
+
+        await svc.LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.Single(svc.Current.Cloud.Endpoints);
+        Assert.Equal("", svc.Current.Cloud.ActiveEndpointId);
+        Assert.Null(svc.Current.Cloud.Active);
+    }
+
+    [Fact]
+    public async Task AnEmptyCloudOfEarlierVersions_MigratesToNoEndpoints()
+    {
+        await File.WriteAllTextAsync(_settingsPath, """
+            { "schemaVersion": 3, "cloud": { "baseUrl": "", "model": "", "translate": true, "clean": false } }
+            """, TestContext.Current.CancellationToken);
+        var svc = new JsonSettingsService(_settingsPath);
+
+        await svc.LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.Empty(svc.Current.Cloud.Endpoints);
+        Assert.False(svc.Current.Cloud.Translate);
+    }
+
+    [Fact]
     public async Task CorruptSettings_FallBackToBuiltInPolishRequirements()
     {
         await File.WriteAllTextAsync(_settingsPath, "{broken", TestContext.Current.CancellationToken);

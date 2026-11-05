@@ -44,9 +44,11 @@ exported as SRT.
   loaded in the background when the app starts, which takes about 1.5 GB of memory until they have been idle for 30
   minutes; turn that off in *Settings → Voice* to load them only when you summon the composer.
 - Cloud models are **off by default**. In *Settings → Privacy and cloud* you can switch translation and cleanup to your own
-  OpenAI-compatible endpoint (for example Microsoft Foundry) separately. Only the text of that step is sent; the
-  endpoint must be `https`; the API key is kept in the system secret store, not in a file. A cloud failure is shown,
-  never silently retried on the local model.
+  OpenAI-compatible endpoint (for example Microsoft Foundry) separately. Save as many endpoints as you like, each with its
+  own API key; only one is enabled at a time, and both cloud steps send to it. Only the text of that step is sent; the
+  endpoint must be `https`; API keys are kept in the system secret store, not in a file. Switching the enabled endpoint
+  while a cloud step is on asks first; disabling or deleting it, or changing its host, turns the cloud steps off. A cloud
+  failure is shown, never silently retried on the local model.
 - Models are downloaded only after you agree, from their original hosts, and verified against pinned SHA256 hashes.
 - Settings, models and logs live in `%LocalAppData%\AGIBuild\LiveLingo` (Windows) or
   `~/Library/Application Support/LiveLingo` (macOS), outside the installed program, so updating and uninstalling keep

@@ -16,57 +16,11 @@
   </select>`;
 
   // The box always shows the snapshot: a change the host does not accept (a cloud step waiting for consent) must not stay checked.
-  LL.Switch = ({ id, checked, onChange }) => html`<input type="checkbox" role="switch" id=${id} checked=${checked}
+  LL.Switch = ({ id, label, checked, onChange }) => html`<input type="checkbox" role="switch" id=${id} aria-label=${label} checked=${checked}
     onChange=${(e) => {
       e.target.checked = checked;
       onChange(!checked);
     }}/>`;
-
-  // The user types here, so the box keeps its own text until it loses the focus; an echo of an older snapshot
-  // (the host answers a frame late) must not overwrite what was typed since.
-  class TextField extends preact.Component {
-    state = { draft: null };
-
-    onInput = (e) => {
-      this.setState({ draft: e.target.value });
-      this.props.onChange(e.target.value);
-    };
-
-    onBlur = () => this.setState({ draft: null });
-
-    render({ id, value, placeholder }, { draft }) {
-      return html`<input type="text" id=${id} value=${draft ?? value} placeholder=${placeholder} spellcheck="false" autocomplete="off"
-        onInput=${this.onInput} onBlur=${this.onBlur}/>`;
-    }
-  }
-
-  LL.TextField = TextField;
-
-  // The key crosses once, in saveKey, and the box is emptied at once: the page never holds it longer than the user types it.
-  class KeyField extends preact.Component {
-    state = { text: '' };
-
-    save = () => {
-      const key = this.state.text.trim();
-      if (!key) return;
-      this.setState({ text: '' });
-      LL.send('saveKey', { value: key });
-    };
-
-    onKeyDown = (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        this.save();
-      }
-    };
-
-    render({ id }, { text }) {
-      return html`<input type="password" id=${id} value=${text} autocomplete="off" spellcheck="false"
-        onInput=${(e) => this.setState({ text: e.target.value })} onBlur=${this.save} onKeyDown=${this.onKeyDown}/>`;
-    }
-  }
-
-  LL.KeyField = KeyField;
 
   const MAC = /Mac/.test(navigator.userAgent);
   const MODIFIERS = { ctrl: 'Ctrl', alt: MAC ? 'Option' : 'Alt', shift: 'Shift', meta: MAC ? 'Cmd' : 'Win' };

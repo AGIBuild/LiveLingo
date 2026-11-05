@@ -37,13 +37,7 @@ public sealed class SettingsIntentsTests
         public void Set(string key, string value) => Do(new SettingIntent(key, value) { V = 1 });
     }
 
-    private static SettingsModel ConfiguredCloud()
-    {
-        var model = new SettingsModel();
-        model.Cloud.BaseUrl = "https://api.example.com/v1";
-        model.Cloud.Model = "m";
-        return model;
-    }
+    private static SettingsModel ConfiguredCloud() => CloudTestData.WithEndpoints();
 
     [Fact]
     public void EachSetting_ReachesItsViewModelProperty_AndIsStored()
@@ -94,19 +88,6 @@ public sealed class SettingsIntentsTests
         Assert.Equal("Keep my tone without inventing facts.", rig.F.Last.Composer.PolishPrompt);
         rig.Set(SettingIntent.Names.PolishPrompt, "");
         Assert.Equal("", rig.F.Last.Composer.PolishPrompt);
-    }
-
-    [Fact]
-    public void ACloudEndpoint_IsStored()
-    {
-        var rig = new Rig();
-
-        rig.Set(SettingIntent.Names.CloudBaseUrl, "https://api.example.com/v1");
-        rig.Set(SettingIntent.Names.CloudModel, "gpt-deploy");
-
-        Assert.Equal("https://api.example.com/v1", rig.Vm.CloudBaseUrl);
-        Assert.Equal("gpt-deploy", rig.Vm.CloudModel);
-        Assert.Equal("gpt-deploy", rig.F.Last.Cloud.Model);
     }
 
     [Fact]
@@ -182,28 +163,49 @@ public sealed class SettingsIntentsTests
     }
 
     [Fact]
-    public async Task TheKey_GoesToTheSecretStoreOnly()
+    public async Task AnEndpoint_IsAddedThroughTheForm_AndItsKeyGoesToTheSecretStoreOnly()
     {
         var rig = new Rig();
 
-        rig.Do(new SaveKeyIntent("sk-typed") { V = 1 });
-        await Wait.Until(() => rig.Vm.HasStoredKey);
+        rig.Do(new OpenEndpointFormIntent(null) { V = 1 });
+        Assert.Equal(new EndpointForm(null, null), rig.Vm.Form);
+        rig.Do(new SaveEndpointIntent("Main", "https://api.example.com/v1", "gpt-deploy", "sk-typed") { V = 1 });
+        await Wait.Until(() => rig.Vm.Endpoints.Count == 1);
 
-        await rig.F.Secrets.Received(1).SetSecretAsync(CloudSettings.ApiKeySecretId, "sk-typed", Arg.Any<CancellationToken>());
-        Assert.Equal("", rig.Vm.CloudApiKey);
+        var saved = Assert.Single(rig.F.Last.Cloud.Endpoints);
+        await rig.F.Secrets.Received(1).SetSecretAsync(saved.SecretId, "sk-typed", Arg.Any<CancellationToken>());
+        Assert.Null(rig.Vm.Form);
+        Assert.Equal("gpt-deploy", saved.Model);
         Assert.DoesNotContain(rig.Log.Lines, line => line.Contains("sk-typed", StringComparison.Ordinal));
     }
 
     [Fact]
-    public async Task ForgettingTheKey_DeletesItAndTurnsTheCloudOff()
+    public void TheFormCanBeClosedWithoutSaving()
+    {
+        var rig = new Rig();
+        rig.Do(new OpenEndpointFormIntent(null) { V = 1 });
+
+        rig.Do(new CloseEndpointFormIntent { V = 1 });
+
+        Assert.Null(rig.Vm.Form);
+        Assert.Empty(rig.F.Saved);
+    }
+
+    [Fact]
+    public async Task AnEndpoint_IsEnabledByTheSwitch_AndAskedAboutBeforeItIsDeleted()
     {
         var rig = new Rig(ConfiguredCloud(), storedKey: "sk");
         await rig.Vm.InitializeAsync();
 
-        rig.Do(new ForgetKeyIntent { V = 1 });
-        await Wait.Until(() => !rig.Vm.HasStoredKey);
+        rig.Do(new EnableEndpointIntent("other", On: true) { V = 1 });
+        Assert.Equal("other", rig.F.Last.Cloud.ActiveEndpointId);
 
-        await rig.F.Secrets.Received(1).DeleteSecretAsync(CloudSettings.ApiKeySecretId, Arg.Any<CancellationToken>());
+        rig.Do(new DeleteEndpointIntent("main") { V = 1 });
+        Assert.Equal(new PendingEndpointChange(EndpointChange.Delete, "main"), rig.Vm.PendingChange);
+
+        rig.Do(new EndpointAnswerIntent(Allow: true) { V = 1 });
+        await Wait.Until(() => rig.Vm.Endpoints.Count == 1);
+        await rig.F.Secrets.Received(1).DeleteSecretAsync(CloudTestData.SecretId("main"), Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -211,8 +213,9 @@ public sealed class SettingsIntentsTests
     {
         var rig = new Rig();
         rig.F.Secrets.SetSecretAsync(default!, default!, TestContext.Current.CancellationToken).ReturnsForAnyArgs(Task.FromException(new InvalidOperationException("sk-secret rejected")));
+        rig.Do(new OpenEndpointFormIntent(null) { V = 1 });
 
-        rig.Do(new SaveKeyIntent("sk-secret") { V = 1 });
+        rig.Do(new SaveEndpointIntent("Main", "https://api.example.com/v1", "m", "sk-secret") { V = 1 });
         await Wait.Until(() => rig.Log.Lines.Count > 0);
 
         Assert.Contains("InvalidOperationException", rig.Log.Lines[0]);

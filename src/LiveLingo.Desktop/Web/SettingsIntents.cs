@@ -47,11 +47,12 @@ internal sealed class SettingsIntents : IIntentHandler
                 break;
             case CloudToggleIntent toggle: _vm.SetCloud(toggle.Step, toggle.On); break;
             case ConsentIntent consent: _vm.AnswerConsent(consent.Allow); break;
-            case SaveKeyIntent key:
-                _vm.CloudApiKey = key.Value;
-                Run(() => _vm.SaveCloudKeyCommand.ExecuteAsync(null));
-                break;
-            case ForgetKeyIntent: Run(() => _vm.ForgetCloudKeyCommand.ExecuteAsync(null)); break;
+            case OpenEndpointFormIntent open: _vm.OpenEndpointForm(open.Id); break;
+            case CloseEndpointFormIntent: _vm.CloseEndpointForm(); break;
+            case SaveEndpointIntent save: Run(() => _vm.SaveEndpointAsync(save.Label, save.BaseUrl, save.Model, save.ApiKey)); break;
+            case EnableEndpointIntent enable: _vm.SetEndpointEnabled(enable.Id, enable.On); break;
+            case DeleteEndpointIntent delete: _vm.DeleteEndpoint(delete.Id); break;
+            case EndpointAnswerIntent answer: Run(() => _vm.AnswerChangeAsync(answer.Allow)); break;
             case ClearRecentIntent: _vm.ClearRecentCommand.Execute(null); break;
             case ForgetAppIntent forget: _vm.ForgetApp(forget.AppId); break;
             case ClearAppsIntent: _vm.ClearApps(); break;
@@ -89,8 +90,6 @@ internal sealed class SettingsIntents : IIntentHandler
             case SettingIntent.Names.PolishPrompt: _vm.PolishPrompt = value; break;
             case SettingIntent.Names.ReduceMotion: _vm.ReduceMotion = value == "true"; break;
             case SettingIntent.Names.Cleanup: _vm.CleanupEnabled = value == "true"; break;
-            case SettingIntent.Names.CloudBaseUrl: _vm.CloudBaseUrl = value; break;
-            case SettingIntent.Names.CloudModel: _vm.CloudModel = value; break;
             case SettingIntent.Names.Microphone:
                 // A device that is not in the list (unplugged since the snapshot) changes nothing.
                 var index = _vm.MicrophoneNames.ToList().IndexOf(value);

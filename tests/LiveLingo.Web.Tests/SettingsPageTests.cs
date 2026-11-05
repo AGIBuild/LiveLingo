@@ -167,25 +167,31 @@ public sealed class SettingsPageTests(BrowserFixture browsers)
 
     [Theory]
     [MemberData(nameof(Engines))]
-    public async Task AStoredKey_IsReportedButNeverShown(string engine)
+    public async Task TheEndpoints_AreListed_WithTheEnabledOneMarked_AndNoKeyIsEverShown(string engine)
     {
         await using var page = await browsers.OpenSettingsAsync(engine, "settings-cloud");
 
         Assert.True(await page.Page.Locator("#cloud-translate").IsCheckedAsync());
         Assert.False(await page.Page.Locator("#cloud-clean").IsCheckedAsync());
-        Assert.Equal("", await page.Page.Locator("#cloud-key").InputValueAsync());
-        Assert.Equal("password", await page.Page.Locator("#cloud-key").GetAttributeAsync("type"));
-        Assert.Equal(1, await page.Page.Locator("#forget-key").CountAsync());
-        Assert.Equal("https://api.example.com/v1", await page.Page.Locator("#cloud-url").InputValueAsync());
+        Assert.Equal(["Main", "Other"], await page.Page.Locator(".endpoint .ep-title b").AllInnerTextsAsync());
+        Assert.Equal(1, await page.Page.Locator(".endpoint.on").CountAsync());
+        Assert.True(await page.Page.Locator("#endpoint-on-main").IsCheckedAsync());
+        Assert.False(await page.Page.Locator("#endpoint-on-other").IsCheckedAsync());
+        Assert.Contains("other.example.com", await page.Page.Locator(".endpoint").Nth(1).InnerTextAsync());
+        Assert.Contains(S("cloud.keySaved"), await page.Page.Locator(".endpoint").Nth(1).InnerTextAsync());
+        Assert.Equal(S("cloud.endpoints.active").Replace("{0}", "Main"), (await page.Page.Locator("#endpoints-hint").InnerTextAsync()).Trim());
+        Assert.Equal(0, await page.Page.Locator("input[type=password]").CountAsync());
     }
 
     [Theory]
     [MemberData(nameof(Engines))]
-    public async Task WithoutAStoredKey_ThereIsNothingToForget(string engine)
+    public async Task WithoutEndpoints_ThePageSaysEverythingStaysLocal(string engine)
     {
         await using var page = await browsers.OpenSettingsAsync(engine, "settings-privacy");
 
-        Assert.Equal(0, await page.Page.Locator("#forget-key").CountAsync());
+        Assert.Equal(0, await page.Page.Locator(".endpoint").CountAsync());
+        Assert.Equal(S("cloud.endpoints.empty"), (await page.Page.Locator("#endpoints-empty").InnerTextAsync()).Trim());
+        Assert.Equal(S("cloud.endpoints.none"), (await page.Page.Locator("#endpoints-hint").InnerTextAsync()).Trim());
     }
 
     [Theory]
@@ -264,6 +270,8 @@ public sealed class SettingsPageTests(BrowserFixture browsers)
 
         var dialog = page.Page.GetByRole(AriaRole.Dialog);
         Assert.Equal(S("consent.clean"), (await dialog.Locator("h2").InnerTextAsync()).Trim());
+        Assert.Contains("Main", await dialog.InnerTextAsync());
+        Assert.Contains("api.example.com", await dialog.InnerTextAsync());
         Assert.Equal("consent-keep", await page.Page.EvaluateAsync<string>("document.activeElement.id"));
     }
 
@@ -454,35 +462,170 @@ public sealed class SettingsPageTests(BrowserFixture browsers)
         Assert.Equal((CloudStep.Translate, false), (toggle.Step, toggle.On));
     }
 
+    // --- the endpoints ----------------------------------------------------------------------------------------------
+
     [Theory]
     [MemberData(nameof(Engines))]
-    public async Task Typing_SendsEveryChange_AndAStaleSnapshotNeverOverwritesIt(string engine)
+    public async Task AddingAndEditing_AskTheHostToOpenTheForm(string engine)
     {
-        await using var page = await browsers.OpenSettingsAsync(engine, "settings-privacy");
-        var url = page.Page.Locator("#cloud-url");
+        await using var page = await browsers.OpenSettingsAsync(engine, "settings-cloud");
 
-        await url.FocusAsync();
-        await page.Page.Keyboard.TypeAsync("https://a");
-        await page.PushAsync("settings-privacy"); // the host answers a frame late, with the text from before
+        await page.Page.Locator("#endpoint-add").ClickAsync();
+        await page.Page.Locator("#endpoint-edit-other").ClickAsync();
 
-        Assert.Equal("https://a", await url.InputValueAsync());
-        Assert.Equal("https://a", (await page.LastIntentAsync<SettingIntent>()).Value);
-        Assert.Equal("cloudBaseUrl", (await page.LastIntentAsync<SettingIntent>()).Key);
-
-        await page.Page.Locator("#cloud-model").FocusAsync();
-        Assert.Equal("", await url.InputValueAsync()); // once it lost the focus, the box shows the snapshot again
+        Assert.Equal(
+            [new OpenEndpointFormIntent(null) { V = 1 }, new OpenEndpointFormIntent("other") { V = 1 }],
+            (await page.IntentsAsync()).OfType<OpenEndpointFormIntent>());
     }
 
     [Theory]
     [MemberData(nameof(Engines))]
-    public async Task TheModelNameIsSentAsTyped(string engine)
+    public async Task TheEndpointSwitch_AsksTheHost_NeverDecidesItself(string engine)
     {
-        await using var page = await browsers.OpenSettingsAsync(engine, "settings-privacy");
+        await using var page = await browsers.OpenSettingsAsync(engine, "settings-cloud");
 
-        await page.Page.Locator("#cloud-model").FillAsync("gpt-deploy");
+        await page.Page.Locator("#endpoint-on-other").ClickAsync();
+        await page.Page.Locator("#endpoint-on-main").ClickAsync();
 
-        var setting = await page.LastIntentAsync<SettingIntent>();
-        Assert.Equal(("cloudModel", "gpt-deploy"), (setting.Key, setting.Value));
+        Assert.Equal(
+            [new EnableEndpointIntent("other", true) { V = 1 }, new EnableEndpointIntent("main", false) { V = 1 }],
+            (await page.IntentsAsync()).OfType<EnableEndpointIntent>());
+        Assert.False(await page.Page.Locator("#endpoint-on-other").IsCheckedAsync());
+        Assert.True(await page.Page.Locator("#endpoint-on-main").IsCheckedAsync());
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public async Task Deleting_AsksTheHostWhichAsksTheUser(string engine)
+    {
+        await using var page = await browsers.OpenSettingsAsync(engine, "settings-cloud");
+
+        await page.Page.Locator("#endpoint-delete-other").ClickAsync();
+
+        Assert.Equal(new DeleteEndpointIntent("other") { V = 1 }, await page.LastIntentAsync<DeleteEndpointIntent>());
+        Assert.Equal(0, await page.Page.GetByRole(AriaRole.Dialog).CountAsync());
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public async Task TheAddForm_StartsOnTheName_HidesTheKey_AndEscapeClosesIt(string engine)
+    {
+        await using var page = await browsers.OpenSettingsAsync(engine, "settings-endpoint-add");
+
+        var dialog = page.Page.GetByRole(AriaRole.Dialog);
+        Assert.Equal(S("cloud.form.add"), (await dialog.Locator("h2").InnerTextAsync()).Trim());
+        Assert.Equal("ep-name", await page.Page.EvaluateAsync<string>("document.activeElement.id"));
+        Assert.Equal("password", await page.Page.Locator("#ep-key").GetAttributeAsync("type"));
+        Assert.Equal(S("cloud.form.create"), (await page.Page.Locator("#ep-save").InnerTextAsync()).Trim());
+
+        await page.Page.Keyboard.PressAsync("Escape");
+
+        Assert.Equal(1, await page.CountAsync<CloseEndpointFormIntent>());
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public async Task SubmittingTheForm_SendsWhatWasTyped_OnceWithTheKey(string engine)
+    {
+        await using var page = await browsers.OpenSettingsAsync(engine, "settings-endpoint-add");
+
+        await page.Page.Locator("#ep-name").FillAsync("Contoso");
+        await page.Page.Locator("#ep-url").FillAsync("https://contoso.example/v1");
+        await page.Page.Locator("#ep-model").FillAsync("contoso-chat");
+        await page.Page.Locator("#ep-key").FillAsync("sk-typed");
+        await page.Page.Locator("#ep-key").PressAsync("Enter");
+
+        Assert.Equal(
+            new SaveEndpointIntent("Contoso", "https://contoso.example/v1", "contoso-chat", "sk-typed") { V = 1 },
+            await page.LastIntentAsync<SaveEndpointIntent>());
+        Assert.Equal(1, await page.CountAsync<SaveEndpointIntent>());
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public async Task TheEditForm_ShowsTheSavedValues_AndNeverTheKey(string engine)
+    {
+        await using var page = await browsers.OpenSettingsAsync(engine, "settings-endpoint-edit");
+
+        Assert.Equal(S("cloud.form.edit"), (await page.Page.GetByRole(AriaRole.Dialog).Locator("h2").InnerTextAsync()).Trim());
+        Assert.Equal("Main", await page.Page.Locator("#ep-name").InputValueAsync());
+        Assert.Equal("https://api.example.com/v1", await page.Page.Locator("#ep-url").InputValueAsync());
+        Assert.Equal("m", await page.Page.Locator("#ep-model").InputValueAsync());
+        Assert.Equal("", await page.Page.Locator("#ep-key").InputValueAsync());
+        Assert.Equal(S("cloud.keyStored"), await page.Page.Locator("#ep-key").GetAttributeAsync("placeholder"));
+        Assert.Equal(S("cloud.form.save"), (await page.Page.Locator("#ep-save").InnerTextAsync()).Trim());
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public async Task ARefusedForm_ShowsWhy_KeepsWhatWasTyped_AndFocusesTheField(string engine)
+    {
+        await using var page = await browsers.OpenSettingsAsync(engine, "settings-endpoint-add");
+        await page.Page.Locator("#ep-name").FillAsync("Contoso");
+        await page.Page.Locator("#ep-url").FillAsync("http://contoso.example/v1");
+        await page.Page.Locator("#ep-key").FillAsync("sk-typed");
+        await page.Page.Locator("#ep-save").ClickAsync();
+
+        await page.PushAsync("settings-endpoint-error");
+
+        Assert.Equal(S("cloud.error.urlInvalid"), (await page.Page.Locator(".endpoint-form .err[role=alert]").InnerTextAsync()).Trim());
+        Assert.Equal("true", await page.Page.Locator("#ep-url").GetAttributeAsync("aria-invalid"));
+        Assert.Equal("ep-url", await page.Page.EvaluateAsync<string>("document.activeElement.id"));
+        Assert.Equal("Contoso", await page.Page.Locator("#ep-name").InputValueAsync());
+        Assert.Equal("sk-typed", await page.Page.Locator("#ep-key").InputValueAsync());
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public async Task TabNeverLeavesTheForm_AndVisitsEveryField(string engine)
+    {
+        await using var page = await browsers.OpenSettingsAsync(engine, "settings-endpoint-add");
+
+        var visited = new List<string>();
+        for (var i = 0; i < 7; i++)
+        {
+            await page.Page.Keyboard.PressAsync("Tab");
+            Assert.True(await page.Page.EvaluateAsync<bool>("!!document.activeElement.closest('[role=dialog]')"));
+            visited.Add(await page.Page.EvaluateAsync<string>("document.activeElement.id"));
+        }
+
+        // The close button has no id; after the last control the focus wraps to the first field.
+        Assert.Equal(["ep-cancel", "ep-key", "ep-model", "ep-name", "ep-save", "ep-url"], visited.Where(id => id != "").Distinct().Order());
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public async Task SwitchingTheEnabledEndpoint_NamesBothEndpointsAndStartsOnTheSafeAnswer(string engine)
+    {
+        await using var page = await browsers.OpenSettingsAsync(engine, "settings-endpoint-switch");
+
+        var dialog = page.Page.GetByRole(AriaRole.Dialog);
+        var text = await dialog.InnerTextAsync();
+        Assert.Equal(S("cloud.switch.title"), (await dialog.Locator("h2").InnerTextAsync()).Trim());
+        Assert.Contains("Main", text);
+        Assert.Contains("Other", text);
+        Assert.Contains("other.example.com", text);
+        Assert.Contains(S("cloud.translate"), text);
+        Assert.Equal("endpoint-keep", await page.Page.EvaluateAsync<string>("document.activeElement.id"));
+
+        await page.Page.Locator("#endpoint-confirm").ClickAsync();
+        Assert.True((await page.LastIntentAsync<EndpointAnswerIntent>()).Allow);
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public async Task Deleting_NamesTheEndpoint_AndEscapeKeepsIt(string engine)
+    {
+        await using var page = await browsers.OpenSettingsAsync(engine, "settings-endpoint-delete");
+
+        var dialog = page.Page.GetByRole(AriaRole.Dialog);
+        Assert.Equal(S("cloud.delete.title").Replace("{0}", "Other"), (await dialog.Locator("h2").InnerTextAsync()).Trim());
+        Assert.Contains(S("cloud.delete.body"), await dialog.InnerTextAsync());
+        Assert.Contains("destructive", await page.Page.Locator("#endpoint-confirm").GetAttributeAsync("class"));
+
+        await page.Page.Keyboard.PressAsync("Escape");
+
+        Assert.False((await page.LastIntentAsync<EndpointAnswerIntent>()).Allow);
     }
 
     // --- the hotkey -------------------------------------------------------------------------------------------------
@@ -595,60 +738,17 @@ public sealed class SettingsPageTests(BrowserFixture browsers)
         Assert.Equal(1, (await page.LastIntentAsync<RemoveTermIntent>()).Index);
     }
 
-    // --- the key ----------------------------------------------------------------------------------------------------
-
-    [Theory]
-    [MemberData(nameof(Engines))]
-    public async Task TheKey_IsSentOnEnter_AndTheBoxIsEmptiedAtOnce(string engine)
-    {
-        await using var page = await browsers.OpenSettingsAsync(engine, "settings-privacy");
-
-        await page.Page.Locator("#cloud-key").FillAsync("sk-typed");
-        await page.Page.Locator("#cloud-key").PressAsync("Enter");
-
-        Assert.Equal("sk-typed", (await page.LastIntentAsync<SaveKeyIntent>()).Value);
-        Assert.Equal("", await page.Page.Locator("#cloud-key").InputValueAsync());
-        Assert.Equal(1, await page.CountAsync<SaveKeyIntent>());
-    }
-
-    [Theory]
-    [MemberData(nameof(Engines))]
-    public async Task TheKey_IsAlsoSentWhenTheBoxLosesTheFocus(string engine)
-    {
-        await using var page = await browsers.OpenSettingsAsync(engine, "settings-privacy");
-
-        await page.Page.Locator("#cloud-key").FillAsync("sk-typed");
-        await page.Page.Locator("#cloud-model").FocusAsync();
-
-        Assert.Equal("sk-typed", (await page.LastIntentAsync<SaveKeyIntent>()).Value);
-    }
-
-    [Theory]
-    [MemberData(nameof(Engines))]
-    public async Task AnEmptyKey_SendsNothing(string engine)
-    {
-        await using var page = await browsers.OpenSettingsAsync(engine, "settings-privacy");
-
-        await page.Page.Locator("#cloud-key").FocusAsync();
-        await page.Page.Keyboard.PressAsync("Enter");
-        await page.Page.Locator("#cloud-model").FocusAsync();
-
-        Assert.Equal(0, await page.CountAsync<SaveKeyIntent>());
-    }
-
     // --- the rest ---------------------------------------------------------------------------------------------------
 
     [Theory]
     [MemberData(nameof(Engines))]
-    public async Task ForgettingTheKey_RecentDraftsAndLegacyModels_AreOneClickIntents(string engine)
+    public async Task RecentDraftsAndLegacyModels_AreOneClickIntents(string engine)
     {
         await using var cloud = await browsers.OpenSettingsAsync(engine, "settings-cloud");
-        await cloud.Page.Locator("#forget-key").ClickAsync();
         await cloud.Page.Locator("#recent-clear").ClickAsync();
         await using var models = await browsers.OpenSettingsAsync(engine, "settings-models");
         await models.Page.Locator("#legacy-remove").ClickAsync();
 
-        Assert.Equal(1, await cloud.CountAsync<ForgetKeyIntent>());
         Assert.Equal(1, await cloud.CountAsync<ClearRecentIntent>());
         Assert.Equal(1, await models.CountAsync<RemoveLegacyModelsIntent>());
     }

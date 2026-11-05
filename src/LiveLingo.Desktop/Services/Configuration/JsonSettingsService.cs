@@ -73,6 +73,10 @@ public sealed class JsonSettingsService : ISettingsService
                 }
             }
 
+            // The single cloud endpoint of earlier versions becomes the first of the endpoint list.
+            if (_current.Cloud.MigrateLegacy())
+                shouldPersistDefaults = true;
+
             if (shouldPersistDefaults)
                 SaveCurrentUnsafe();
 

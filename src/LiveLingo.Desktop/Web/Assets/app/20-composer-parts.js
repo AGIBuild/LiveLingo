@@ -23,7 +23,6 @@
     LL.closeMenu();
   };
 
-  // The switches stay open so several can be changed in a row, like the prototype.
   const pickMore = (item) => {
     switch (item.id) {
       case 'recent':
@@ -34,10 +33,10 @@
         return;
       case 'wide':
         LL.send('wide', { on: !item.checked });
-        return;
+        break;
       case 'whole':
         LL.send('whole', { on: !item.checked });
-        return;
+        break;
       case 'settings':
         LL.send('openSettings', { section: 'general' });
         break;
@@ -50,9 +49,9 @@
   LL.Header = ({ c }) => {
     const open = LL.state.menu;
     const dest = c.dest;
-    const cloud = c.privacy.cloud || LL.state.modelsCloud;
-    const privacyText = LL.state.modelsCloud ? LL.t('modelCloud') : c.privacy.text;
-    const privacyAria = LL.state.modelsCloud ? LL.t('modelCloudAria') : c.privacy.aria;
+    const cloud = c.privacy.cloud;
+    const privacyText = c.privacy.text;
+    const privacyAria = c.privacy.aria;
     const output = [...c.output.menu, { id: 'swap', label: c.output.swap, sepBefore: true }];
     const more = c.menus.more.map((item) => (item.id === 'wide' || item.id === 'settings' ? { ...item, sepBefore: true } : item));
     return html`<header class="c-head">
@@ -63,9 +62,12 @@
         <${LL.Menu} id="target" align="left" label=${LL.t('destAria')} items=${c.menus.target} onPick=${pickTarget}/>
       </div>
       <span class="spacer"></span>
-      <button type="button" id="privacy" class=${'chip privacy ' + (cloud ? 'warn' : 'ok')} aria-label=${privacyAria + ' · ' + LL.t('modelInfo')}
-        title=${(LL.state.models || privacyAria) + '\n' + LL.t('modelInfo')} onClick=${() => LL.send('modelInfo')}>
-        <i class="dot"></i><span class="lbl">${privacyText}</span></button>
+      <div class="anchor">
+        <button type="button" id="privacy" class=${'chip privacy ' + (cloud ? 'warn' : 'ok')} aria-label=${privacyAria + ' · ' + LL.t('modelInfo')}
+          title=${LL.t('modelInfo')} aria-haspopup="true" aria-expanded=${open === 'models'} onClick=${toggle('models')}>
+          <i class="dot"></i><span class="lbl">${privacyText}</span></button>
+        ${open === 'models' && html`<${LL.ModelCard} rows=${c.privacy.models}/>`}
+      </div>
       <div class="anchor">
         <button type="button" id="out-pill" class="pill" aria-label=${LL.t('outputAria')} aria-haspopup="menu" aria-expanded=${open === 'output'}
           onClick=${toggle('output')}>${c.output.globe && html`<${Icon} name="globe"/>`}${c.output.pill}<${Icon} name="chevron"/></button>
@@ -106,7 +108,11 @@
         <svg class="ic mic-ic" aria-hidden="true"><use href="#i-mic"/></svg>
         <span class="bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
       </button>
-      <p id="status" class=${'status' + (f.status.tone === 'warn' ? ' warn' : '')} role="status" aria-live="polite">${f.status.text}</p>
+      <div class="status-block">
+        <p id="status" class=${'status' + (f.status.tone === 'warn' ? ' warn' : '')} role="status" aria-live="polite">${f.status.text}</p>
+        ${f.model && html`<p id="model-line" class=${'model-line ' + f.model.tone} title=${f.model.title} role="status" aria-live="polite">
+          <i class="dot" aria-hidden="true"></i><span>${f.model.text}</span></p>`}
+      </div>
       ${f.download && html`<span id="download" class="dl" role="status" title=${f.download.text}>
         <progress max="100" value=${f.download.percent} aria-label=${LL.t('progressAria')}></progress>${f.download.text}</span>`}
       <button type="button" id="copy" class="icon-btn" aria-label=${LL.t('copyAria')} title=${LL.t('copyAria') + ' (' + LL.cap('copy') + ')'} disabled=${!f.copyEnabled}

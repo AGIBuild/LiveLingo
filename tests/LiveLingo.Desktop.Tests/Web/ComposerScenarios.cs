@@ -1,4 +1,5 @@
 using LiveLingo.Core.Drafting;
+using LiveLingo.Core.Inference;
 using LiveLingo.Core.Transcription;
 using LiveLingo.Core.Translation;
 using LiveLingo.Desktop.Composer;
@@ -53,6 +54,19 @@ internal static class ComposerScenarios
             return Task.CompletedTask;
         }),
         ["translate-ready"] = () => Ready(Chat, ComposerOutput.Translate),
+        ["model-local"] = () => Ready(Chat, ComposerOutput.Translate, models: Models(Speech(), Cleaner(), Translator("Hy-MT2-1.8B", confirmed: true))),
+        ["model-cloud"] = () => Ready(Chat, ComposerOutput.Translate, models: Models(
+            Speech(), new ModelUse(ModelStage.Translator, "gpt-4o-mini-2024-07-18", Cloud: true, Confirmed: true, Endpoint: "Foundry · 东亚"))),
+        ["model-switching"] = () => Ready(Chat, ComposerOutput.Translate, models: Models(
+            Translator("Hy-MT2-7B", confirmed: true), Translator("Hy-MT2-1.8B", confirmed: false))),
+        ["model-preparing"] = () => Ready(Chat, ComposerOutput.Clean, models: Models(
+            new ModelUse(ModelStage.Cleaner, "Qwen3.5 4B (text cleanup)", Cloud: false, Confirmed: false, "Qwen3.5 4B"))),
+        ["model-listening"] = async () =>
+        {
+            await using var h = new Harness(output: ComposerOutput.Clean);
+            await h.Vm.StartListeningAsync();
+            return State(h, models: Models(Speech()));
+        },
         ["original-ready"] = () => Ready(Chat, ComposerOutput.Original),
         ["copy-only"] = () => Ready(Chat, ComposerOutput.Translate, hasTarget: false),
         ["cloud-ctrl-enter"] = () => Ready(Chat, ComposerOutput.Translate, options: new ComposerOptions(true, true, CommitKey.CtrlEnter, true, "Auto", true)),
@@ -128,8 +142,23 @@ internal static class ComposerScenarios
         ["no-speech"] = () => Imported([]),
     };
 
-    public static ComposerViewState State(Harness h, RecentDrafts? recent = null) =>
-        Normalize(ComposerViewState.From(h.Vm, Texts.Chinese(), recent ?? new RecentDrafts(), sourceRev: 1));
+    public static ComposerViewState State(Harness h, RecentDrafts? recent = null, ModelReport? models = null) =>
+        Normalize(ComposerViewState.From(h.Vm, Texts.Chinese(), recent ?? new RecentDrafts(), sourceRev: 1, models));
+
+    // The uses are reported in order, like the providers do: the last of a stage is the latest, the confirmed ones are what was really loaded.
+    private static ModelReport Models(params ModelUse[] uses) => new(
+        uses.GroupBy(use => use.Stage).ToDictionary(group => group.Key, group => group.Last()),
+        uses.Where(use => use.Confirmed).GroupBy(use => use.Stage).ToDictionary(group => group.Key, group => group.Last()),
+        uses.Any(use => use.Cloud));
+
+    private static ModelUse Speech() =>
+        new(ModelStage.Speech, "X-ASR 480 ms streaming (live text) + Qwen3-ASR 0.6B (settled text)", Cloud: false, Confirmed: true, "X-ASR + Qwen3-ASR");
+
+    private static ModelUse Cleaner() =>
+        new(ModelStage.Cleaner, "Qwen3.5 4B (text cleanup)", Cloud: false, Confirmed: true, "Qwen3.5 4B");
+
+    private static ModelUse Translator(string shortName, bool confirmed) =>
+        new(ModelStage.Translator, shortName.Replace("Hy-MT2-", "Hy-MT2 ") + " (translation)", Cloud: false, confirmed, shortName);
 
     /// <summary>Key caps differ per operating system and the clock time of a draft per time zone; the fixtures are the macOS ones at 12:00.</summary>
     private static ComposerViewState Normalize(ComposerViewState state) => state with
@@ -147,14 +176,15 @@ internal static class ComposerScenarios
     };
 
     private static async Task<ComposerViewState> Ready(
-        string text, ComposerOutput output, bool hasTarget = true, ComposerOptions? options = null, Func<Harness, Task>? then = null)
+        string text, ComposerOutput output, bool hasTarget = true, ComposerOptions? options = null, Func<Harness, Task>? then = null,
+        ModelReport? models = null)
     {
         await using var h = new Harness(hasTarget: hasTarget, output: output, options: options);
         h.Vm.SourceText = text;
         await Wait.Until(() => h.Vm.Status == ComposerStatus.Ready);
         if (then is not null)
             await then(h);
-        return State(h);
+        return State(h, models: models);
     }
 
     private static async Task<ComposerViewState> Pending(bool commit)

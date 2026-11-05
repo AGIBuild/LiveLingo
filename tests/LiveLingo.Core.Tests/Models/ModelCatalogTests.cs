@@ -5,6 +5,16 @@ namespace LiveLingo.Core.Tests.Models;
 public class ModelCatalogTests
 {
     [Fact]
+    public void TheModelsThatAreReportedAsUsed_HaveAShortNameWithoutTheDescription()
+    {
+        Assert.Equal("Hy-MT2-1.8B", ModelCatalog.TranslatorFast.ShortName);
+        Assert.Equal("Hy-MT2-7B", ModelCatalog.TranslatorQuality.ShortName);
+        Assert.Equal("Qwen3.5 4B", ModelCatalog.Cleaner.ShortName);
+        Assert.Equal("X-ASR", ModelCatalog.SpeechLive.ShortName);
+        Assert.Equal("Qwen3-ASR", ModelCatalog.SpeechSecondPass.ShortName);
+    }
+
+    [Fact]
     public void EveryAsset_IsPinnedAndVerifiable()
     {
         foreach (var model in ModelCatalog.All)

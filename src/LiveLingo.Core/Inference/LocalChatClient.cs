@@ -9,9 +9,9 @@ public sealed class LocalChatClient(
     public async Task<ChatCompletion> CompleteAsync(ChatRequest request, CancellationToken ct)
     {
         var selected = model();
-        usage?.Report(role, selected.DisplayName, cloud: false, confirmed: false);
+        usage?.Report(role, selected.DisplayName, cloud: false, confirmed: false, selected.ShortName);
         using var lease = await host.AcquireAsync(role, selected, ct).ConfigureAwait(false);
-        usage?.Report(role, lease.Model.DisplayName, cloud: false, confirmed: true);
+        usage?.Report(role, lease.Model.DisplayName, cloud: false, confirmed: true, lease.Model.ShortName);
         return await lease.Client.CompleteAsync(request, ct).ConfigureAwait(false);
     }
 }
