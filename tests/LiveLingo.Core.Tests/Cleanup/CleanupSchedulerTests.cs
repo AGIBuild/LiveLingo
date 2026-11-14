@@ -357,6 +357,24 @@ public class CleanupSchedulerTests
     }
 
     [Fact]
+    public async Task ARefusedPassage_SkipsPerSentenceFallback_WhenRecordingAlreadyQueuedNewerUnitsBehindIt()
+    {
+        await using var h = new Harness();
+        h.Recording(true);
+        h.Speak("端口改成 8080。超时设成三十秒。", "下一段实时口述已经到达。");
+
+        // Refusing the multi-sentence passage while a newer live unit is waiting must advance straight to unit 1
+        // instead of stalling behind 2 extra per-sentence LLM calls.
+        (await h.NextCall(1)).Result.SetResult("端口改一下。超时改一下。");
+        var next = await h.NextCall(2);
+
+        Assert.Equal("下一段实时口述已经到达。", next.Request.Target);
+        Assert.Equal("端口改成 8080。超时设成三十秒。", h.CleanOf(0));
+        Assert.Equal(GateReason.NumberLost, h.RejectionOf(0)?.Reason);
+        next.Result.SetResult("下一段实时口述已经到达。");
+    }
+
+    [Fact]
     public async Task ATruncatedAnswer_KeepsTheOriginal_InsteadOfFailingTheUnit()
     {
         await using var h = new Harness();

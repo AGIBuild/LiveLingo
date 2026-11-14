@@ -13,8 +13,8 @@ namespace LiveLingo.Desktop.Services.Warmup;
 /// <list type="bullet">
 /// <item>the speech models a few seconds after the application started (unless the user turned that off), and right
 /// after they were downloaded: dictation then starts at once;</item>
-/// <item>when the composer opens, whatever is not in memory yet: the speech models first, then the model of the output
-/// the composer starts with, since that is what the first sentence will need;</item>
+/// <item>when the composer opens, whatever is not in memory yet: the speech models and the model of the output the
+/// composer starts with load concurrently, since speech runs on CPU ONNX while local inference spawns a GPU server;</item>
 /// <item>when the output is changed, the model of the new output.</item>
 /// </list>
 /// What stays in memory, and for how long, is the business of the models themselves (they unload when idle). A model that
@@ -67,8 +67,7 @@ public sealed class ModelWarmup : IDisposable
     public void OnSummon(ComposerOutput output) =>
         _ = Start(async () =>
         {
-            await WarmSpeechAsync().ConfigureAwait(false);
-            await WarmOutputAsync(output).ConfigureAwait(false);
+            await Task.WhenAll(WarmSpeechAsync(), WarmOutputAsync(output)).ConfigureAwait(false);
             if (SecondaryOutputToWarm(output) is { } secondary)
                 await WarmOutputAsync(secondary).ConfigureAwait(false);
         });

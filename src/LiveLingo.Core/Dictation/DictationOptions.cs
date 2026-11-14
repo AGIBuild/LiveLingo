@@ -8,28 +8,35 @@ public sealed class DictationOptions
     /// Shorter pauses (a comma, a breath, switching between Chinese and an English term) never reset the stream:
     /// a fresh stream starting mid-sentence recognizes badly.
     /// </summary>
-    public int HardPauseMs { get; init; } = 1000;
+    public int HardPauseMs { get; init; } = 800;
 
     /// <summary>An utterance this long is cut at the next short pause instead of waiting for a hard pause.</summary>
-    public int SoftMaxUtteranceMs { get; init; } = 8_000;
+    public int SoftMaxUtteranceMs { get; init; } = 4_000;
 
     /// <summary>
     /// Upper bound on an open utterance when the speaker never pauses (or background noise keeps VAD active),
-    /// sized to stay well within Qwen3-ASR's 512-token total KV budget (~13 s of audio + prompt + decoded text).
+    /// sized well within Qwen3-ASR's 512-token total KV budget so live cleanup never waits over ten seconds for a slice.
     /// </summary>
-    public int HardMaxUtteranceMs { get; init; } = 12_000;
+    public int HardMaxUtteranceMs { get; init; } = 8_000;
 
     /// <summary>A tail this long becomes a sentence at the next segment even without sentence punctuation.</summary>
-    public int MaxTailChars { get; init; } = 90;
+    public int MaxTailChars { get; init; } = 45;
 
     /// <summary>
-    /// Silence after speech that ends a passage. Sentences are collected into passages because the recognizer cuts
-    /// speech at every pause, so a single sentence is often half a thought and cannot be cleaned or translated well.
+    /// Silence after speech that ends a passage. Sentences are collected into compact micro-passages during live speech
+    /// so cleanup previews stream promptly; stopping polishes neighbouring passages together as one coherent text.
     /// </summary>
-    public int PassagePauseMs { get; init; } = 2500;
+    public int PassagePauseMs { get; init; } = 1200;
 
-    /// <summary>A passage this long ends at its next sentence boundary, so cleanup of a long monologue is not postponed.</summary>
-    public int PassageMaxChars { get; init; } = 200;
+    /// <summary>A passage this long ends at its next sentence boundary, keeping live cleanup responsive (~1–2 sentences).</summary>
+    public int PassageMaxChars { get; init; } = 55;
+
+    /// <summary>
+    /// Minimum length of the very first settled sentence in a session to emit immediately as its own passage without
+    /// waiting for <see cref="PassageMaxChars"/> or <see cref="PassagePauseMs"/>, so the result pane starts cleaning
+    /// right after the user's opening sentence. Set to 0 to disable fast-tracking.
+    /// </summary>
+    public int FirstPassageMinChars { get; init; } = 8;
 
     /// <summary>
     /// The live text appears this long after the speech it recognizes. Audio this far before the first text is kept
