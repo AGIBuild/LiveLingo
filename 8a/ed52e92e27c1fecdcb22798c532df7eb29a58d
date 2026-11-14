@@ -1,0 +1,341 @@
+tests/LiveLingo.Web.Tests/SettingsPageTests.cs
+  s_96f44aacef3575::t_6f253dd6a0556c 403,406,408-414
+tests/LiveLingo.Web.Tests/Fixtures/settings-endpoint-edit.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 25,27
+  s_96f44aacef3575::t_5b74d0d67b86df 28
+src/LiveLingo.Desktop/Web/Assets/styles/composer.css
+  s_96f44aacef3575::t_a281273eb65d73 64,102-103
+src/LiveLingo.Desktop/Web/Assets/app/21-composer-source.js
+  s_96f44aacef3575::t_63ef224996099d 73,81
+tests/LiveLingo.Web.Tests/Fixtures/settings-cloud.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 25,27
+  s_96f44aacef3575::t_5b74d0d67b86df 28
+tests/LiveLingo.Desktop.Tests/Settings/SettingsViewModelTests.cs
+  s_96f44aacef3575::t_518935e3df4478 258-281
+tests/LiveLingo.Web.Tests/Fixtures/model-local.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 100-101
+src/LiveLingo.Core/Speech/Native/SherpaSileroVad.cs
+  s_96f44aacef3575::t_cffe9c15c60103 14
+src/LiveLingo.Core/Dictation/DictationOptions.cs
+  s_96f44aacef3575::t_a7ac29d190f365 14-20
+  s_96f44aacef3575::t_79c4a44d17b74f 8-9,11,29
+src/LiveLingo.Desktop/App.axaml.cs
+  s_96f44aacef3575::t_372ee01b4c46b8 259-261,275,281-282,302,305-308,310,338-349
+  s_96f44aacef3575::t_e643743011f81b 350-351
+tests/LiveLingo.Web.Tests/Fixtures/settings-endpoint-add.json
+  s_96f44aacef3575::t_5b74d0d67b86df 28
+  s_96f44aacef3575::t_0d0f25f17b4dfc 25,27
+tests/LiveLingo.Web.Tests/Fixtures/speech-preparing.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 71-72
+tests/LiveLingo.Web.Tests/Fixtures/original-ready.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 71-72
+tests/LiveLingo.Web.Tests/Fixtures/settings-update-downloading.json
+  s_96f44aacef3575::t_5b74d0d67b86df 28
+  s_96f44aacef3575::t_0d0f25f17b4dfc 25,27
+tests/LiveLingo.Desktop.Tests/Composer/ComposerViewModelTests.cs
+  s_96f44aacef3575::t_e0c4f0fb4e6340 356-392
+tests/LiveLingo.Web.Tests/Fixtures/resume-draft.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 74-75
+src/LiveLingo.Desktop/Services/Configuration/SettingsModel.cs
+  s_96f44aacef3575::t_8c5f0b31acdda9 136-141,181-183,194
+tests/LiveLingo.Web.Tests/Fixtures/model-switching.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 100-101
+tests/LiveLingo.Web.Tests/Fixtures/settings-update-off.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 25,27
+  s_96f44aacef3575::t_5b74d0d67b86df 28
+tests/LiveLingo.Web.Tests/Fixtures/settings-polish-custom.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 25,27
+src/LiveLingo.Core/Speech/Native/SherpaSpeechEngine.cs
+  s_96f44aacef3575::t_0807ffade924c5 19-23
+  s_96f44aacef3575::t_3fe3f0f38a0299 6
+  s_96f44aacef3575::t_2cedbc005effd9 142-143
+tests/LiveLingo.Web.Tests/Fixtures/settings-voice.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 25,38
+  s_96f44aacef3575::t_5b74d0d67b86df 39
+tests/LiveLingo.Web.Tests/Fixtures/downloading.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 82-83
+src/LiveLingo.Core/Cleanup/PolishScheduler.cs
+  s_96f44aacef3575::t_c8fee6b637a7ea 4,33,54-55,60,214,226,233,291-292,298-299
+tests/LiveLingo.Web.Tests/Fixtures/slow.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 115-116
+tests/LiveLingo.Web.Tests/Fixtures/settings-consent.json
+  s_96f44aacef3575::t_5b74d0d67b86df 28
+  s_96f44aacef3575::t_0d0f25f17b4dfc 25,27
+tests/LiveLingo.Core.Tests/Probes/CleanupProbeTests.cs
+  s_96f44aacef3575::t_334390248643b5 219,239-248
+  s_96f44aacef3575::t_5afce994e21f9b 141-143,220-238,249
+  s_96f44aacef3575::t_22b9bc0d2f23f1 5,92-137,140
+  s_96f44aacef3575::t_a1006fe025437d 207
+  s_96f44aacef3575::t_c5e8301c616841 144-180,182-184,186-196,198,200-206,208-213,216-218
+  s_96f44aacef3575::t_4c64b2b2600a44 214-215
+  s_96f44aacef3575::t_a076883bae1e61 181,185,197,199
+  s_96f44aacef3575::t_39c04a536798a6 138-139
+tests/LiveLingo.Web.Tests/Fixtures/empty.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 71-72
+tests/LiveLingo.Desktop.Tests/Composer/ComposerHarness.cs
+  s_96f44aacef3575::t_4a011b262e6071 60,64-68,72-77,82-85,88-100
+src/LiveLingo.Desktop/Web/Assets/app/31-settings.js
+  s_96f44aacef3575::t_b7c32f867e4b85 76-113,163-165,167
+tests/LiveLingo.Web.Tests/ComposerInteractionTests.cs
+  s_96f44aacef3575::t_09964ff1657c52 463-484
+  s_96f44aacef3575::t_fa2a4c7e5005ab 461-462
+tests/LiveLingo.Web.Tests/Fixtures/download-failed.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 82-83
+tests/LiveLingo.Desktop.Tests/Services/Warmup/ModelWarmupTests.cs
+  s_96f44aacef3575::t_acebb450a41fc4 77-80,88,90,96-110,165,176
+src/LiveLingo.Desktop/Composer/ComposerTexts.cs
+  s_96f44aacef3575::t_aa96c089806160 142-143,300
+tests/LiveLingo.Web.Tests/Fixtures/export-last.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 100-101
+tests/LiveLingo.Web.Tests/Fixtures/row-failed.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 100-101
+src/LiveLingo.Core/Transcription/FileTranscriber.cs
+  s_96f44aacef3575::t_7b142e012c4710 50,72
+tests/LiveLingo.Web.Tests/Fixtures/remembered.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 74-75
+tests/LiveLingo.Web.Tests/Fixtures/settings-update-failed.json
+  s_96f44aacef3575::t_5b74d0d67b86df 28
+  s_96f44aacef3575::t_0d0f25f17b4dfc 25,27
+src/LiveLingo.Core/Translation/Glossary.cs
+  s_96f44aacef3575::t_f1fdabd95a9bbf 4-7,20,22,25,29-31,38-40,42,46,49,54-56,65-66,68,74-77,82-85,87-91,95-96,99-100,148-152,155-157,159-173,175-220,223-234,266-287,317-331
+  s_96f44aacef3575::t_431f71712713e0 237-242,244-265,332
+  s_96f44aacef3575::t_c7d131449bea58 11-19,26-28,32-37,67,69-73,78-79,81,86,92-94,97-98,101-126,128-147
+tests/LiveLingo.Core.Tests/Cleanup/PolishSchedulerTests.cs
+  s_96f44aacef3575::t_00dead1ea109eb 91-106,108-109
+tests/LiveLingo.Web.Tests/Fixtures/translate-armed.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 100-101
+tests/LiveLingo.Web.Tests/Fixtures/whole-wide.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 86-87
+tests/LiveLingo.Core.Tests/Cleanup/LlmTextCleanerTests.cs
+  s_96f44aacef3575::t_4fd95f24056713 31-32,34-35,37-38,40-41
+  s_96f44aacef3575::t_7a2ae04527d25c 30,33,36,39
+  s_96f44aacef3575::t_4245be471b7290 29
+src/LiveLingo.Core/Cleanup/PolishStyle.cs
+  s_96f44aacef3575::t_739c221d9f89de 20
+  s_96f44aacef3575::t_171258f9c741b2 19
+  s_96f44aacef3575::t_472b0c0d045548 18
+tests/LiveLingo.Web.Tests/Fixtures/model-missing.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 111-112
+tests/LiveLingo.Web.Tests/Fixtures/settings-hotkey-invalid.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 25,27
+  s_96f44aacef3575::t_5b74d0d67b86df 28
+tests/LiveLingo.Web.Tests/Fixtures/settings-update-ready.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 25,27
+  s_96f44aacef3575::t_5b74d0d67b86df 28
+src/LiveLingo.Desktop/Web/Assets/app/22-composer-result.js
+  s_96f44aacef3575::t_a45e7ca864ac92 38,45,80
+tests/LiveLingo.Core.Tests/Dictation/DictationSessionTests.cs
+  s_96f44aacef3575::t_3455ba00003cab 432-480
+  s_96f44aacef3575::t_445bf2b097d57b 481-508
+  s_96f44aacef3575::t_85b8ebce308af9 576-578,587
+  s_96f44aacef3575::t_36dcc5cc70a62f 431,509-575,579-586,588-683
+tests/LiveLingo.Web.Tests/Fixtures/settings-update-checking.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 25,27
+  s_96f44aacef3575::t_5b74d0d67b86df 28
+src/LiveLingo.Desktop/Web/WebBridge.cs
+  s_96f44aacef3575::t_38c243f1b4b77f 99-100
+src/LiveLingo.Desktop/Resources/i18n/en-US.json
+  s_96f44aacef3575::t_bd81898cf06bc4 101,179,226-227,230-237
+src/LiveLingo.Desktop/Services/Warmup/ModelWarmup.cs
+  s_96f44aacef3575::t_4c8f24db0a6e90 72-73,88-105
+src/LiveLingo.Desktop/Resources/i18n/zh-CN.json
+  s_96f44aacef3575::t_1f81b9fcdce6b9 226-227,230-237
+  s_96f44aacef3575::t_4e22ad969dbb03 101,179
+tests/LiveLingo.Web.Tests/Fixtures/download-background.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 71-72
+tests/LiveLingo.Web.Tests/Fixtures/reduced-motion.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 100-101
+src/LiveLingo.Core/Cleanup/LlmDictationPolisher.cs
+  s_96f44aacef3575::t_b01c162d7b86ad 24
+  s_96f44aacef3575::t_0dae91a2b4a712 76,83
+  s_96f44aacef3575::t_f8eb033e38d03e 26
+  s_96f44aacef3575::t_ebddfeedc5f4f9 25
+  s_96f44aacef3575::t_c8f62564334995 38-42
+tests/LiveLingo.Web.Tests/Fixtures/settings-update-unsupported.json
+  s_96f44aacef3575::t_5b74d0d67b86df 28
+  s_96f44aacef3575::t_0d0f25f17b4dfc 25,27
+tests/LiveLingo.Web.Tests/Fixtures/settings-update-latest.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 25,27
+  s_96f44aacef3575::t_5b74d0d67b86df 28
+src/LiveLingo.Desktop/Composer/ComposerTypes.cs
+  s_96f44aacef3575::t_ae016ec41ee28f 169-170
+src/LiveLingo.Desktop/Web/WebIntent.cs
+  s_96f44aacef3575::t_32c29bc0ae0818 33,49-50,213-214,265,283,298-304,306
+  s_96f44aacef3575::t_3b2e97dc8c6edd 305
+  s_96f44aacef3575::t_654d7e7dd5049f 307
+tests/LiveLingo.Web.Tests/Fixtures/settings-strings.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 45-46,60-67
+tests/LiveLingo.Web.Tests/Fixtures/translate-pending.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 100-101
+tests/LiveLingo.Web.Tests/Fixtures/clearing.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 86-87
+src/LiveLingo.Desktop/Web/SettingsIntents.cs
+  s_96f44aacef3575::t_602cfe3f41a00a 48-56,98
+tests/LiveLingo.Web.Tests/Fixtures/cloud-ctrl-enter.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 100-101
+src/LiveLingo.Desktop/Composer/ComposerViewModel.cs
+  s_96f44aacef3575::t_2434e16526ad20 30,631-662
+tests/LiveLingo.Core.Tests/Inference/LlamaServerHostTests.cs
+  s_96f44aacef3575::t_d082c3069baecc 102
+tests/LiveLingo.Web.Tests/Fixtures/clean-ready.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 86-87
+tests/LiveLingo.Web.Tests/Fixtures/no-speech.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 82-83
+tests/LiveLingo.Web.Tests/Fixtures/model-preparing.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 100-101
+tests/LiveLingo.Web.Tests/Fixtures/no-cleanup.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 65-66
+src/LiveLingo.Core/Translation/TranslationRequest.cs
+  s_96f44aacef3575::t_11e515087e6c85 12-17
+tests/LiveLingo.Web.Tests/Fixtures/settings-models.json
+  s_96f44aacef3575::t_5b74d0d67b86df 28
+  s_96f44aacef3575::t_0d0f25f17b4dfc 25,27
+src/LiveLingo.Core/Cleanup/IDictationPolisher.cs
+  s_96f44aacef3575::t_84b03be6c51040 1-2,10,16-17
+src/LiveLingo.Core/Translation/LlmTranslator.cs
+  s_96f44aacef3575::t_4c025826f9719d 17
+tests/LiveLingo.Web.Tests/Fixtures/settings-apps.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 25,27
+  s_96f44aacef3575::t_5b74d0d67b86df 28
+tests/LiveLingo.Web.Tests/Fixtures/model-cloud.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 100-101
+src/LiveLingo.Core/Cleanup/ITextCleaner.cs
+  s_96f44aacef3575::t_277e2fdbe1fb50 1-2,12,17-18
+tests/LiveLingo.Web.Tests/Fixtures/settings-endpoint-switch.json
+  s_96f44aacef3575::t_5b74d0d67b86df 28
+  s_96f44aacef3575::t_0d0f25f17b4dfc 25,27
+src/LiveLingo.Core/Dictation/FidelityGate.cs
+  s_96f44aacef3575::t_b5061051505cfe 510-511,513,523,525-528,530,532-533,535-537,539,541-546,550-551,555-556
+  s_96f44aacef3575::t_20f22b57ccd89f 5,51-52,56-57,63-68,84-96,99-105,109-115,117-119,122-124,126,129-135,146-149,153-154,172-173,208-219
+  s_96f44aacef3575::t_b198206470e7e1 152,157-171,255-275
+  s_96f44aacef3575::t_88ef0166e5c601 233,243-254,276-286,319-322,325-505
+  s_96f44aacef3575::t_2ba1128a53b92f 42,50,53-55
+src/LiveLingo.Desktop/Settings/SettingsViewModel.cs
+  s_96f44aacef3575::t_b742ee31975d86 236,274,288,331-356,358-369,372-376
+  s_96f44aacef3575::t_7d1fdb22abc56b 95,104-106,142-144,182-185
+  s_96f44aacef3575::t_847628b72a6ddb 186
+src/LiveLingo.Core/Cleanup/CleanupScheduler.cs
+  s_96f44aacef3575::t_6744302d3c50c7 168,186,188,219
+  s_96f44aacef3575::t_6c06bc9e3e6b1a 4,19,41-42,47
+tests/LiveLingo.Web.Tests/Fixtures/settings-diagnostics.json
+  s_96f44aacef3575::t_5b74d0d67b86df 39
+  s_96f44aacef3575::t_0d0f25f17b4dfc 25,38
+tests/LiveLingo.Web.Tests/Fixtures/settings-endpoint-error.json
+  s_96f44aacef3575::t_5b74d0d67b86df 28
+  s_96f44aacef3575::t_0d0f25f17b4dfc 25,27
+tests/LiveLingo.Core.Tests/Translation/GlossaryTests.cs
+  s_96f44aacef3575::t_5c153204a7faeb 69,71,74,77-81
+  s_96f44aacef3575::t_3e97b3e8c0dbe5 48,53-68,70,72-73,75-76,82-101
+tests/LiveLingo.Core.Tests/Dictation/FidelityGateTests.cs
+  s_96f44aacef3575::t_23c2824de0a0f8 308-332
+  s_96f44aacef3575::t_564f64a33dc247 3,245-279,281-306
+  s_96f44aacef3575::t_ba211f539a9687 280,307
+tests/LiveLingo.Core.Tests/Translation/LlmTranslatorTests.cs
+  s_96f44aacef3575::t_775c523c2c6ca9 31
+tests/LiveLingo.Web.Tests/Fixtures/model-listening.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 71-72
+src/LiveLingo.Core/Cleanup/LlmTextCleaner.cs
+  s_96f44aacef3575::t_cc91189d024e11 20,23
+  s_96f44aacef3575::t_7b80f36ded928d 56,61
+  s_96f44aacef3575::t_c7dad8be635c2c 24
+  s_96f44aacef3575::t_44c75d10eb5d3b 4,39-40
+tests/LiveLingo.Web.Tests/Fixtures/timeline.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 130-131
+tests/LiveLingo.Web.Tests/Fixtures/settings-general.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 25,27
+  s_96f44aacef3575::t_5b74d0d67b86df 28
+src/LiveLingo.Desktop/Composer/ComposerViewModel.Editing.cs
+  s_96f44aacef3575::t_e8e51745f7fc59 4,8,11-18,24-29,36,41-42,52,67,72,74-97
+src/LiveLingo.Desktop/Settings/SettingsTexts.cs
+  s_96f44aacef3575::t_86dbed8b8c2ddc 27,30-31
+src/LiveLingo.Desktop/Web/ComposerIntents.cs
+  s_96f44aacef3575::t_4094a8c55e79ea 98
+src/LiveLingo.Core/Inference/LlamaServerHost.cs
+  s_96f44aacef3575::t_ced7466ce48d2c 11
+tests/LiveLingo.Web.Tests/Fixtures/settings-polish-invalid.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 25,27
+tests/LiveLingo.Web.Tests/Fixtures/no-microphone.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 86-87
+docs/superpowers/specs/2026-11-13-bilingual-dictation-polish-and-glossary-design.md
+  s_96f44aacef3575::t_b6b6437a5cd013 50-51
+  s_96f44aacef3575::t_26c581697cb6e5 45-46
+  s_96f44aacef3575::t_f97c6c3447aa2a 61,63,65,67-73
+  s_96f44aacef3575::t_dccad7dbed7543 1-44,47-49,52-60,62,64,66,74-81
+src/LiveLingo.Desktop/Web/ComposerViewState.cs
+  s_96f44aacef3575::t_5cc1ae605c625b 47-48,50-52,157-160
+src/LiveLingo.Desktop/Web/SettingsViewState.cs
+  s_96f44aacef3575::t_d2e20a251f7db3 13-14,22-23,105,107
+tests/LiveLingo.Web.Tests/Fixtures/target-lost.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 115-116
+tests/LiveLingo.Web.Tests/Fixtures/listening.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 97-98
+tests/LiveLingo.Web.Tests/Fixtures/written.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 100-101
+tests/LiveLingo.Web.Tests/Fixtures/gate-warning.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 100-101
+tests/LiveLingo.Web.Tests/Fixtures/editing.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 100-101
+tests/LiveLingo.Web.Tests/Fixtures/mic-denied.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 86-87
+tests/LiveLingo.Web.Tests/Fixtures/copy-only.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 100-101
+src/LiveLingo.Core/Speech/Native/SherpaQwen3Recognizer.cs
+  s_96f44aacef3575::t_83f218bc2aeaa8 1,4,16-24,44-60,63,68-71,84-89
+  s_96f44aacef3575::t_5d30734c62cdf9 72-83
+  s_96f44aacef3575::t_aaef994fb33889 90
+tests/LiveLingo.Core.Tests/Translation/TranslationSchedulerTests.cs
+  s_96f44aacef3575::t_c6f5e586262203 311-337
+  s_96f44aacef3575::t_58763406c3a102 310
+tests/LiveLingo.Web.Tests/Fixtures/settings-privacy.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 25,27
+  s_96f44aacef3575::t_5b74d0d67b86df 28
+tests/LiveLingo.Web.Tests/Fixtures/settings-dark.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 25,27
+  s_96f44aacef3575::t_5b74d0d67b86df 28
+src/LiveLingo.Desktop/Web/Assets/styles/settings.css
+  s_96f44aacef3575::t_b73a0e6e64ce32 40,44-48
+src/LiveLingo.Core/Dictation/DictationSession.cs
+  s_96f44aacef3575::t_b9380aa418681a 160,168,175-183,186,188-189,196-200,204-205,207,219-222,270,272,274-306,314-315,318-321,325-335,346,351-353,355,361-363
+  s_96f44aacef3575::t_2b979cc73d1780 434,437,441,453,489-495,497,506-519,533-536,538,541-562,571,573-587,590-591,604-609
+  s_96f44aacef3575::t_7211ac6633bf31 424,435-436,438-440,442-443,451,454,456,458,461,501-505,520-532,537,539-540,563-570,572,588-589,592-603,610-629
+  s_96f44aacef3575::t_688e1900aba661 187,193,195,206,208,210,216
+  s_96f44aacef3575::t_a8005485ca1a24 308-313
+  s_96f44aacef3575::t_05c09a809c3420 444-446
+  s_96f44aacef3575::t_ec4bb35481a876 4,16-19,26-27,57,62
+  s_96f44aacef3575::t_70bf04533aea88 169-171,201-203,425-433
+  s_96f44aacef3575::t_c7d59f48ab698f 630
+tests/LiveLingo.Web.Tests/Fixtures/translate-ready.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 100-101
+src/LiveLingo.Core/Translation/TranslationScheduler.cs
+  s_96f44aacef3575::t_584f09c8986cce 168,173,178-180,186-196
+  s_96f44aacef3575::t_cfb903260df29d 83-84,121,133,142
+  s_96f44aacef3575::t_69cb95593723af 197
+tests/LiveLingo.Web.Tests/Fixtures/polishing.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 100-101
+tests/LiveLingo.Core.Tests/Support/ScriptedSpeech.cs
+  s_96f44aacef3575::t_572127007a5fc4 18,37-40,54-69
+tests/LiveLingo.Web.Tests/Fixtures/settings-endpoint-delete.json
+  s_96f44aacef3575::t_5b74d0d67b86df 28
+  s_96f44aacef3575::t_0d0f25f17b4dfc 25,27
+tests/LiveLingo.Web.Tests/Fixtures/write-failed.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 106-107
+tests/LiveLingo.Web.Tests/Fixtures/settings-cloud-invalid.json
+  s_96f44aacef3575::t_0d0f25f17b4dfc 25,27
+  s_96f44aacef3575::t_5b74d0d67b86df 28
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "8aed52e92e27c1fecdcb22798c532df7eb29a58d",
+  "prompts": {},
+  "sessions": {
+    "s_96f44aacef3575": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "9bb10bac-3ed1-47ad-9e33-36be0a112e6b",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
