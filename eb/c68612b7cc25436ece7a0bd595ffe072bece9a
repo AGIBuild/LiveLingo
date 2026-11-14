@@ -1,0 +1,55 @@
+src/LiveLingo.Desktop/Composer/ComposerWindow.cs
+  s_9a1879c3907d84::t_31fbc1ad557f87 31,33,63,96-98,100,143-144,146-148,166-167,205,208,210-227,230-231,242-243,245-246,250-251,257-258,260,262-263,265,271-272,280-283,297-302,342
+  s_9a1879c3907d84::t_992fcd36aeacc1 34,85,89,101,228-229,244,247-249,320-322,334,336-340
+  s_9a1879c3907d84::t_03cd6b137b3fd5 26,28,35-36,45-46,57,64,72-75,102-103,109,111,121,142,145,149,163,165,168-169,178,181-184,191,194-197,202-203,207,232,235-236,252-256,259,261,264,266-270,285,296,309,311,315-319,324,326-327,329,331-332,343
+  s_9a1879c3907d84::t_ebe907bed8f0d6 209
+  s_9a1879c3907d84::t_b3b444cb7cb174 323
+tests/LiveLingo.Web.Tests/ComposerInteractionTests.cs
+  s_9a1879c3907d84::t_e5634a4544df77 1063,1065,1073-1074,1078-1183
+  s_9a1879c3907d84::t_b456bf1437c349 1186-1226
+  s_9a1879c3907d84::t_75b73e3c893748 1184,1227-1259
+  s_9a1879c3907d84::t_1138b52e869a22 1185
+tests/LiveLingo.Desktop.Tests/Composer/ComposerPlacementTests.cs
+  s_9a1879c3907d84::t_6ce1349574077c 188-189,191,193,195,212-214,216,218,226,240-242,244,258,268,277-284
+  s_9a1879c3907d84::t_9c27a282df9b0f 285-294
+  s_9a1879c3907d84::t_a467298bb9c139 190,192,194,196-211,215,217,219-225,227-239,243,245-257,259-267,269-276
+src/LiveLingo.Desktop/Platform/Windows/Win32WindowMover.cs
+  s_9a1879c3907d84::t_174ebccb7b32de 17,25,30
+src/LiveLingo.Desktop/Web/Assets/styles/composer.css
+  s_9a1879c3907d84::t_93cd5adb01d197 79
+  s_9a1879c3907d84::t_523f105d440797 10
+  s_9a1879c3907d84::t_c8b949a9a1190e 56-58,78,80
+  s_9a1879c3907d84::t_fcb91c965f93c6 48-50,54-55,65-66,71,154
+  s_9a1879c3907d84::t_a920012878dcff 130-132
+src/LiveLingo.Desktop/Web/Assets/app/21-composer-source.js
+  s_9a1879c3907d84::t_8138120409a242 25,54-56
+  s_9a1879c3907d84::t_d5411de5dc5f9d 10,12,15-16,18-19,26,36-41,74-78,115
+  s_9a1879c3907d84::t_83cf06cef41068 11,13,17,42-49,51,53,57
+src/LiveLingo.Desktop/Platform/macOS/MacWindowMover.cs
+  s_9a1879c3907d84::t_325029e015946c 3,10-12,18,20-27,33-34,37-38,41-42,44-48,51-53
+  s_9a1879c3907d84::t_8e9fdbfb4be4cb 40,49
+src/LiveLingo.Desktop/Composer/ComposerPlacement.cs
+  s_9a1879c3907d84::t_da5dfbf4ef075a 7-8,13-14,16,42,124-151,166-170,172-185,189-196,198-212,214-256
+  s_9a1879c3907d84::t_e7ba5eadf91df7 9-12,15,17,117-123,171,186-188,197,213
+  s_9a1879c3907d84::t_3c8e56624257e3 152-165
+src/LiveLingo.Desktop/Web/Assets/app/10-bridge.js
+  s_9a1879c3907d84::t_b104cdf47c90ac 54,57-62
+src/LiveLingo.Desktop/Platform/IWindowMover.cs
+  s_9a1879c3907d84::t_422fbabe76ce02 13,15
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "ebc68612b7cc25436ece7a0bd595ffe072bece9a",
+  "prompts": {},
+  "sessions": {
+    "s_9a1879c3907d84": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "d8c58241-549b-4ee1-b73f-a8777ae76a48",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
