@@ -10,8 +10,7 @@ namespace LiveLingo.Desktop.Platform;
 public interface IWindowMover
 {
     /// <summary>
-    /// Starts the drag from the mouse button that is held down right now. Returns when the button is released (the
-    /// system runs the drag in its own loop).
+    /// Starts the drag from the mouse button that is held down right now and completes once the button is released.
     /// </summary>
-    void BeginDrag(IPlatformHandle window);
+    Task DragAsync(IPlatformHandle window, CancellationToken cancellationToken = default);
 }

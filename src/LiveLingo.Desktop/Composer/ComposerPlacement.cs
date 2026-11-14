@@ -4,6 +4,17 @@ namespace LiveLingo.Desktop.Composer;
 
 public readonly record struct PixelBounds(int X, int Y, int Width, int Height);
 
+/// <summary>The complete geometry of the composer window and its web panel on the active screen.</summary>
+public readonly record struct WindowPlan(
+    double Width,
+    double Height,
+    double MaxWidth,
+    double MaxHeight,
+    int X,
+    int Y,
+    int MaxPanelHeight,
+    bool FixedHeight);
+
 /// <summary>Where the composer window goes: centered on the target window, just above its bottom edge, fully on screen.</summary>
 public static class ComposerPlacement
 {
@@ -28,7 +39,7 @@ public static class ComposerPlacement
     public const int ZoomedPanelWidth = 1100;
 
     /// <summary>Space kept between the window and the screen edges, in DIPs.</summary>
-    private const int ScreenGap = 8;
+    public const int ScreenGap = 8;
 
     /// <summary>The smallest window (shadow margin included) the user may drag to, in DIPs.</summary>
     public static (double Width, double Height) MinWindow(bool wide) =>
@@ -102,5 +113,145 @@ public static class ComposerPlacement
         var work = (int)(workHeightPx / scaling);
         var available = work - ShadowMargin - 2 * ScreenGap;
         return Math.Clamp(Math.Min(available, (int)Math.Round(work * PanelShare)), MinPanelHeight, Math.Max(MinPanelHeight, available));
+    }
+
+    /// <summary>
+    /// Where the middle of the draggable header sits in screen pixels, used to pick the screen the user dropped the
+    /// window onto even when the lower half of a tall window still hangs into the previous screen.
+    /// </summary>
+    public static (int X, int Y) HeaderAnchor(int x, int y, double widthDip, double desktopScaling) =>
+        (x + (int)Math.Round(widthDip * desktopScaling / 2), y + (int)Math.Round(ShadowMargin * desktopScaling));
+}
+
+/// <summary>
+/// Pure geometry state for one summon of the composer. Distinguishes where the user dragged the window
+/// (<c>_userPosition</c>, null while anchored to the target window) from a temporary size/pin override caused by
+/// edge-resizing or zooming (<c>_pinnedPosition</c>, <c>_userWidth</c>, <c>_userHeight</c>), and resolves every event
+/// through a single <see cref="Plan"/> calculation.
+/// </summary>
+public sealed class ComposerFrame(TargetWindowInfo? target, bool wide)
+{
+    public const double InitialHeight = 260;
+    public const double NarrowWidth = 620 + ComposerPlacement.ShadowMargin;
+    public const double WideWidth = 940 + ComposerPlacement.ShadowMargin;
+
+    private bool _wide = wide;
+    private double _contentHeight = InitialHeight;
+    private (int X, int Y)? _userPosition;
+    private (int X, int Y)? _pinnedPosition;
+    private double? _userWidth;
+    private double? _userHeight;
+
+    public bool Wide => _wide;
+    public double? UserWidth => _userWidth;
+    public double? UserHeight => _userHeight;
+    public double ContentHeight => _contentHeight;
+    public bool IsFreePlaced => (_pinnedPosition ?? _userPosition) is not null;
+    public bool FixedHeight => _userHeight is not null;
+
+    /// <summary>
+    /// Returns true when <paramref name="position"/> is an external move (for example, a window-manager shortcut on the
+    /// same or another screen) rather than a native echo of positions this frame itself issued.
+    /// </summary>
+    public static bool IsExternalMove((int X, int Y) position, ReadOnlySpan<(int X, int Y)> issuedPositions)
+    {
+        foreach (var issued in issuedPositions)
+        {
+            if (Math.Abs(position.X - issued.X) <= 1 && Math.Abs(position.Y - issued.Y) <= 1)
+                return false;
+        }
+        return true;
+    }
+
+    public void MeasureContent(int contentHeightCss)
+    {
+        if (_userHeight is null)
+            _contentHeight = contentHeightCss;
+    }
+
+    public void SetWide(bool wide) => _wide = wide;
+
+    public void MoveTo(int x, int y)
+    {
+        _userPosition = (x, y);
+        if (_pinnedPosition is not null)
+            _pinnedPosition = (x, y);
+    }
+
+    public void ResizeEdge(
+        int? widthCss,
+        int? heightCss,
+        (double Width, double Height) currentSize,
+        (int X, int Y) currentPosition,
+        PixelBounds work,
+        double scaling)
+    {
+        _pinnedPosition ??= currentPosition;
+        var (width, height) = ComposerPlacement.Resize(
+            currentSize, widthCss, heightCss, _wide, currentPosition.X, currentPosition.Y, work, scaling);
+        if (widthCss is not null)
+            _userWidth = width;
+        if (heightCss is not null)
+            _userHeight = height;
+    }
+
+    public void ToggleZoom(PixelBounds work, double scaling)
+    {
+        if (_userHeight is not null)
+        {
+            _userWidth = null;
+            _userHeight = null;
+            _pinnedPosition = null;
+            return;
+        }
+
+        var zoomed = ComposerPlacement.Zoomed(work, scaling);
+        _userWidth = zoomed.Width;
+        _userHeight = zoomed.Height;
+        _pinnedPosition = (zoomed.X, zoomed.Y);
+    }
+
+    public WindowPlan Plan(PixelBounds work, double scaling)
+    {
+        var maxWidth = work.Width / scaling;
+        var maxHeight = work.Height / scaling;
+        var maxPanelHeight = ComposerPlacement.MaxPanelHeight(work.Height, scaling);
+        var min = ComposerPlacement.MinWindow(_wide);
+
+        var userCapWidth = Math.Min(maxWidth, Math.Max(min.Width, maxWidth - 2 * ComposerPlacement.ScreenGap));
+        var userCapHeight = Math.Min(maxHeight, Math.Max(min.Height, maxHeight - 2 * ComposerPlacement.ScreenGap));
+
+        if (_userWidth is { } uw)
+            _userWidth = Math.Clamp(uw, Math.Min(min.Width, userCapWidth), userCapWidth);
+        if (_userHeight is { } uh)
+            _userHeight = Math.Clamp(uh, Math.Min(min.Height, userCapHeight), userCapHeight);
+
+        var defaultWidth = _wide ? WideWidth : NarrowWidth;
+        var width = Math.Min(_userWidth ?? defaultWidth, maxWidth);
+        var autoHeightCap = Math.Min(maxHeight, maxPanelHeight + ComposerPlacement.ShadowMargin);
+        var height = _userHeight ?? Math.Min(_contentHeight, autoHeightCap);
+
+        (int X, int Y) pos;
+        if ((_pinnedPosition ?? _userPosition) is { } anchor)
+        {
+            pos = ComposerPlacement.Clamp(anchor.X, anchor.Y, width, height, scaling, work);
+            if (_pinnedPosition is not null)
+                _pinnedPosition = pos;
+            else
+                _userPosition = pos;
+        }
+        else if (target is null)
+        {
+            pos = ComposerPlacement.Clamp(
+                work.X + (int)((work.Width - width * scaling) / 2),
+                work.Y + (int)((work.Height - height * scaling) / 3),
+                width, height, scaling, work);
+        }
+        else
+        {
+            pos = ComposerPlacement.For(target, width, height, scaling, work);
+        }
+
+        return new WindowPlan(width, height, maxWidth, maxHeight, pos.X, pos.Y, maxPanelHeight, FixedHeight);
     }
 }
