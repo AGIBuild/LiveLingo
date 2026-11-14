@@ -1,0 +1,19 @@
+CHANGELOG.md
+  s_96f44aacef3575::t_8e3cabb7651536 10-37,496
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "aae7a5e43151ab412d170a140fc61f29c3163bbb",
+  "prompts": {},
+  "sessions": {
+    "s_96f44aacef3575": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "9bb10bac-3ed1-47ad-9e33-36be0a112e6b",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
