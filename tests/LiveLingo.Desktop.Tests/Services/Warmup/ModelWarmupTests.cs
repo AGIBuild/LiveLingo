@@ -76,25 +76,25 @@ public sealed class ModelWarmupTests : IDisposable
     [Theory]
     [InlineData(ComposerOutput.Clean, InferenceRole.Cleaner, InferenceRole.Translator)]
     [InlineData(ComposerOutput.Translate, InferenceRole.Translator, InferenceRole.Cleaner)]
-    public async Task OnSummon_TheSpeechModelsThenTheStartingOutputAndSecondaryFastOutputAreLoaded(
+    public async Task OnSummon_SpeechAndStartingOutputLoadConcurrently_ThenSecondaryFastOutputLoadsAfter(
         ComposerOutput output, InferenceRole primary, InferenceRole secondary)
     {
-        var order = new List<string>();
-        _speech.WarmAsync(Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>()).Returns(_ =>
-        {
-            order.Add("speech");
-            return Task.CompletedTask;
-        });
-        _inference.WarmAsync(Arg.Any<InferenceRole>(), Arg.Any<CancellationToken>()).Returns(call =>
-        {
-            order.Add("inference:" + call.Arg<InferenceRole>());
-            return Task.CompletedTask;
-        });
+        var speechGate = new TaskCompletionSource();
+        var primaryGate = new TaskCompletionSource();
+        _speech.WarmAsync(Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>()).Returns(speechGate.Task);
+        _inference.WarmAsync(primary, Arg.Any<CancellationToken>()).Returns(primaryGate.Task);
+        _inference.WarmAsync(secondary, Arg.Any<CancellationToken>()).Returns(Task.CompletedTask);
 
         _sut.OnSummon(output);
 
-        await Wait.Until(() => order.Count == 3);
-        Assert.Equal(["speech", $"inference:{primary}", $"inference:{secondary}"], order);
+        // Both speech and primary output must already be warming concurrently before speech finishes.
+        await Wait.Until(() => SpeechWarms == 1 && InferenceWarms.SequenceEqual([primary]));
+        speechGate.SetResult();
+        await Task.Delay(30, TestContext.Current.CancellationToken);
+        Assert.Equal([primary], InferenceWarms);
+
+        primaryGate.SetResult();
+        await Wait.Until(() => InferenceWarms.Count() == 2);
         Assert.Equal([primary, secondary], InferenceWarms);
     }
 

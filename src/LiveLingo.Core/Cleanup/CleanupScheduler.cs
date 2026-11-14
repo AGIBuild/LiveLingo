@@ -128,7 +128,7 @@ public sealed class CleanupScheduler : IAsyncDisposable
 
             try
             {
-                var (text, rejection) = await CleanUnitAsync(request, cancel.Token).ConfigureAwait(false);
+                var (text, rejection) = await CleanUnitAsync(ticket, request, cancel.Token).ConfigureAwait(false);
                 _session.Mutate(draft => draft.Complete(ticket, UnitKind.Clean, text, rejection));
             }
             catch (OperationCanceledException) when (cancel.IsCancellationRequested)
@@ -159,10 +159,13 @@ public sealed class CleanupScheduler : IAsyncDisposable
 
     /// <summary>
     /// Cleans a unit and checks the result. A passage that fails the check is cleaned again sentence by sentence, each
-    /// sentence checked on its own, so one bad sentence does not cost the rest of the passage its cleanup. The unit
-    /// is refused (rejection set, original kept) only when nothing in it passed.
+    /// sentence checked on its own, so one bad sentence does not cost the rest of the passage its cleanup. While live
+    /// recording already has newer units queued behind this one, the multi-call fallback is skipped so real-time
+    /// previews never fall behind (stopping polishes the whole dictation again). The unit is refused (rejection set,
+    /// original kept) only when nothing in it passed.
     /// </summary>
-    private async Task<(string Text, GateRejection? Rejection)> CleanUnitAsync(CleanupRequest request, CancellationToken ct)
+    private async Task<(string Text, GateRejection? Rejection)> CleanUnitAsync(
+        JobTicket ticket, CleanupRequest request, CancellationToken ct)
     {
         var cleaned = (await _cleaner.CleanAsync(request, ct).ConfigureAwait(false)).Trim();
         var gate = FidelityGate.Check(request.Target, cleaned, _glossary, corrections: _corrections);
@@ -170,7 +173,7 @@ public sealed class CleanupScheduler : IAsyncDisposable
             return (cleaned, null);
 
         // A multi-line unit is a document whose layout would be lost by splitting it.
-        if (request.Target.Contains('\n'))
+        if (request.Target.Contains('\n') || HasLiveBacklogBehind(ticket))
             return (request.Target, gate.Rejection);
 
         var sentences = TextUnits.Split(request.Target);
@@ -194,6 +197,31 @@ public sealed class CleanupScheduler : IAsyncDisposable
             ? (TextUnits.Join(parts.Select(part => ("", part, ""))), null)
             : (request.Target, gate.Rejection);
     }
+
+    private bool HasLiveBacklogBehind(JobTicket ticket) =>
+        _session.Read(draft =>
+        {
+            if (!draft.Recording)
+                return false;
+            var at = -1;
+            for (var i = 0; i < draft.Units.Count; i++)
+            {
+                if (draft.Units[i].Id == ticket.UnitId)
+                {
+                    at = i;
+                    break;
+                }
+            }
+            if (at < 0)
+                return false;
+            for (var i = at + 1; i < draft.Units.Count; i++)
+            {
+                var next = draft.Units[i].Clean;
+                if (next.Text is null && next.Error.Length == 0)
+                    return true;
+            }
+            return false;
+        });
 
     /// <summary>The next unit to clean, or how long typing must stay still before the last unit is cleaned.</summary>
     private ((JobTicket Ticket, CleanupRequest Request)? Next, TimeSpan? Wait) Find(Draft draft, DateTimeOffset now)

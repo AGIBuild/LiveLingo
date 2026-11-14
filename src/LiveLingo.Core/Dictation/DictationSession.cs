@@ -53,6 +53,7 @@ public sealed class DictationSession : IAsyncDisposable
     private readonly List<Segment> _segments = [];
     private readonly List<SpeechSpan> _pending = [];
     private readonly List<string> _passage = [];
+    private int _emittedPassages;
     private string _tail = "";
     private char? _tailHeldTerminator;
     private string _openText = "";
@@ -450,13 +451,14 @@ public sealed class DictationSession : IAsyncDisposable
                         if (unit.IsComplete)
                         {
                             AddSentence(passages, unit.Body);
-                            _tailHeldTerminator = null;
                         }
                         else
                         {
                             remainder = unit.Body;
                         }
                     }
+                    if (remainder.Length == 0)
+                        _tailHeldTerminator = null;
                     _tail = remainder;
                     if ((segment.EndsSentence && (passageEnding || !IsDanglingClause(_tail))) || _tail.Length >= _options.MaxTailChars)
                         FlushTail(passages);
@@ -477,7 +479,9 @@ public sealed class DictationSession : IAsyncDisposable
     private void AddSentence(List<string> passages, string sentence)
     {
         _passage.Add(sentence);
-        if (PassageText().Length >= _options.PassageMaxChars)
+        var length = PassageText().Length;
+        var fastFirst = _emittedPassages == 0 && _options.FirstPassageMinChars > 0 && length >= _options.FirstPassageMinChars;
+        if (fastFirst || length >= _options.PassageMaxChars)
             EndPassage(passages);
     }
 
@@ -634,6 +638,7 @@ public sealed class DictationSession : IAsyncDisposable
         if (_passage.Count == 0)
             return;
         passages.Add(PassageText());
+        _emittedPassages++;
         _passage.Clear();
     }
 

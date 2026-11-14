@@ -55,6 +55,7 @@ public class DictationSessionTests
             int maxTailChars = 90,
             int passagePauseMs = 1500,
             int passageMaxChars = 1, // one sentence per unit, unless a test is about passages
+            int firstPassageMinChars = 0,
             int stopTimeoutMs = 5000)
         {
             Live = new ScriptedLive(script);
@@ -68,6 +69,7 @@ public class DictationSessionTests
                     MaxTailChars = maxTailChars,
                     PassagePauseMs = passagePauseMs,
                     PassageMaxChars = passageMaxChars,
+                    FirstPassageMinChars = firstPassageMinChars,
                     StopTimeoutMs = stopTimeoutMs
                 });
             Session.Start();
@@ -494,7 +496,8 @@ public class DictationSessionTests
                 HardPauseMs = 1000,
                 SoftMaxUtteranceMs = 8_000,
                 HardMaxUtteranceMs = 12_000,
-                PassageMaxChars = 500
+                PassageMaxChars = 500,
+                FirstPassageMinChars = 0
             });
         session.Start();
 
@@ -569,7 +572,8 @@ public class DictationSessionTests
                 HardPauseMs = 1000,
                 SoftMaxUtteranceMs = 8_000,
                 HardMaxUtteranceMs = 12_000,
-                PassageMaxChars = 500
+                PassageMaxChars = 500,
+                FirstPassageMinChars = 0
             });
         session.Start();
 
@@ -619,7 +623,7 @@ public class DictationSessionTests
             new ScriptedVad(script),
             secondPass,
             draft,
-            new DictationOptions { HardMaxUtteranceMs = 12_000, SoftMaxUtteranceMs = 8_000, PassageMaxChars = 500 });
+            new DictationOptions { HardMaxUtteranceMs = 12_000, SoftMaxUtteranceMs = 8_000, PassageMaxChars = 500, FirstPassageMinChars = 0 });
         session.Start();
 
         for (var pushed = 0; pushed < 13_000; pushed += 40)
@@ -709,5 +713,70 @@ public class DictationSessionTests
         release.Set();
         Assert.True(await Until(() => secondPass.Disposed));
         Assert.True(h.Live.Disposed);
+    }
+
+    [Fact]
+    public async Task DefaultOptions_EmitFirstCompleteSentenceImmediately_AndStreamSubsequentMicroPassagesWithoutWaitingForSilence()
+    {
+        // Speaker talks continuously with short 400 ms / 850 ms breath pauses — never reaching a 1.2 s passage silence.
+        // Default options must emit the opening sentence right away so live cleanup starts within ~1 s of the sentence end,
+        // while subsequent short sentences group up to PassageMaxChars (55 chars).
+        var draft = new DraftSession(hasTarget: true);
+        var script = new[]
+        {
+            new ScriptedSegment(200, 1800, "把下载接口的超时时间改成三十秒。"),
+            new ScriptedSegment(2700, 4200, "顺便检查一下重试策略。"),
+            new ScriptedSegment(4600, 6200, "不要改动鉴权逻辑。"),
+        };
+        await using var session = new DictationSession(
+            new ScriptedLive(script), new ScriptedVad(script), null, draft, new DictationOptions());
+        session.Start();
+
+        // Push up to 2650 ms (850 ms silence after first sentence >= HardPauseMs 800 ms, < PassagePauseMs 1200 ms).
+        for (var pushed = 0; pushed < 2680; pushed += 40)
+            session.Push(new float[AudioFormat.MsToSamples(40)]);
+
+        Assert.True(await Until(() => draft.Read(d => d.Units.Count) == 1));
+        Assert.Equal("把下载接口的超时时间改成三十秒。", draft.Read(d => d.Units[0].Raw));
+
+        // Tiny filler opening ("嗯。") below FirstPassageMinChars waits to group with the real sentence.
+        var draftWithFiller = new DraftSession(hasTarget: true);
+        var fillerScript = new[]
+        {
+            new ScriptedSegment(200, 600, "嗯。"),
+            new ScriptedSegment(1500, 3100, "把下载接口的超时时间改成三十秒。"),
+        };
+        await using var fillerSession = new DictationSession(
+            new ScriptedLive(fillerScript), new ScriptedVad(fillerScript), null, draftWithFiller, new DictationOptions());
+        fillerSession.Start();
+        for (var pushed = 0; pushed < 1480; pushed += 40)
+            fillerSession.Push(new float[AudioFormat.MsToSamples(40)]);
+        await Task.Delay(50);
+        Assert.Empty(draftWithFiller.Read(d => d.Units));
+
+        for (var pushed = 1480; pushed < 4000; pushed += 40)
+            fillerSession.Push(new float[AudioFormat.MsToSamples(40)]);
+        Assert.True(await Until(() => draftWithFiller.Read(d => d.Units.Count) == 1));
+        Assert.Equal("嗯。把下载接口的超时时间改成三十秒。", draftWithFiller.Read(d => d.Units[0].Raw));
+
+        // Multi-sentence mid-speech slice emits completed earlier sentences immediately and joins the held clause seamlessly.
+        var midCutDraft = new DraftSession(hasTarget: true);
+        var midCutScript = new[] { new ScriptedSegment(0, 9_000, "连续口述不喘气") };
+        var midCalls = 0;
+        await using var midCutSession = new DictationSession(
+            new ScriptedLive(midCutScript),
+            new ScriptedVad(midCutScript),
+            new ScriptedSegmentRecognizer(() => Interlocked.Increment(ref midCalls) == 1 ? "第一句已经说完了。第二句切在" : "半路也接上了。"),
+            midCutDraft,
+            new DictationOptions());
+        midCutSession.Start();
+        for (var pushed = 0; pushed < 8_200; pushed += 40)
+            midCutSession.Push(new float[AudioFormat.MsToSamples(40)]);
+
+        Assert.True(await Until(() => midCutDraft.Read(d => d.Units.Count) == 1));
+        Assert.Equal("第一句已经说完了。", midCutDraft.Read(d => d.Units[0].Raw));
+
+        await midCutSession.StopAsync();
+        Assert.Equal(["第一句已经说完了。", "第二句切在半路也接上了。"], midCutDraft.Read(d => d.Units.Select(u => u.Raw).ToList()));
     }
 }
