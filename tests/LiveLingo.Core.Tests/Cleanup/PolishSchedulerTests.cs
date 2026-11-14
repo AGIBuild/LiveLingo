@@ -88,7 +88,25 @@ public class PolishSchedulerTests
         Assert.Equal(["呃，先改接口。嗯，然后补测试。那个，最后更新文档。"], Raws(session));
         Assert.Equal("先改接口。补测试。最后更新文档。", session.Read(d => d.Units[0].Clean.Text));
         Assert.Equal(PolishStyle.Default, cleaner.Requests.Single().Style);
+        // Whole dictation already fits in one polish group, so no redundant pre-summary call is issued.
+        Assert.Empty(cleaner.Summaries);
+    }
+
+    [Fact]
+    public async Task LongDictationSpanningMultipleGroups_SummarizesOnceBeforePolishing()
+    {
+        var partA = new string('甲', 500) + "。";
+        var partB = new string('乙', 500) + "。";
+        var session = Dictated([(partA, partA), (partB, partB)]);
+        var cleaner = new FakeCleaner(request => request.Target);
+        await using var polish = new PolishScheduler(session, cleaner, [], PolishStyle.Default, contextChars: 300);
+
+        session.Mutate(d => d.Recording = false);
+        await WaitUntil(() => !session.Read(d => d.Polishing));
+
         Assert.Single(cleaner.Summaries);
+        Assert.Equal(2, cleaner.Requests.Count);
+        Assert.All(cleaner.Requests, r => Assert.Equal("The whole dictation.", r.Summary));
     }
 
     [Fact]

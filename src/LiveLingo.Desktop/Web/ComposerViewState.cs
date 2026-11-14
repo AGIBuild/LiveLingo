@@ -44,8 +44,12 @@ internal sealed record RowState(
     int I, string State, string Text, string Note, string Time, bool Warn, bool Owned, bool Editing,
     bool CanEdit, bool CanUseOriginal, string UseOriginalAria, string EditAria);
 
+internal sealed record CorrectionHintState(string Spoken, string Canonical, string Label);
+
 /// <param name="EditText">The page takes it once, when a sentence starts being edited.</param>
-internal sealed record ResultState(bool Visible, string Label, IReadOnlyList<RowState> Rows, string EditText);
+/// <param name="RememberCorrection">Offered inside the active row editor when the user fixed a concise misrecognition.</param>
+internal sealed record ResultState(
+    bool Visible, string Label, IReadOnlyList<RowState> Rows, string EditText, CorrectionHintState? RememberCorrection = null);
 
 internal sealed record MicState(bool Recording, string Aria, bool Enabled);
 
@@ -150,7 +154,10 @@ internal sealed record ComposerViewState(
                     ? texts.CleanupPreview
                     : texts.ResultLabel(vm.Output, vm.TargetLanguage),
                 hasResult ? [.. vm.Lines.Select(line => Row(line, vm, texts))] : [],
-                vm.EditText),
+                vm.EditText,
+                vm.SuggestedCorrection is { } corr
+                    ? new CorrectionHintState(corr.Spoken, corr.Canonical, texts.RememberCorrectionLabel(corr))
+                    : null),
             Footer: new FooterState(
                 new MicState(vm.IsListening, vm.IsListening ? texts.MicStop : texts.MicStart,
                     !vm.IsClearing),

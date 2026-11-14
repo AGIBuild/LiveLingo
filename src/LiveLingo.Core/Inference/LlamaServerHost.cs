@@ -8,7 +8,7 @@ public sealed record LlamaServerHostOptions(
     TimeSpan IdleTimeout,
     TimeSpan StartTimeout,
     TimeSpan PollInterval,
-    int ContextSize = 8192)
+    int ContextSize = 4096)
 {
     public static LlamaServerHostOptions Default { get; } =
         new(TimeSpan.FromMinutes(10), TimeSpan.FromSeconds(90), TimeSpan.FromMilliseconds(150));

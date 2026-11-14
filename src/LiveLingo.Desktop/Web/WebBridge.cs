@@ -96,9 +96,9 @@ internal sealed class WebBridge : IDisposable
 
     private void Flush()
     {
+        var timer = Interlocked.Exchange(ref _timer, null);
+        timer?.Dispose();
         _scheduled = false;
-        _timer?.Dispose();
-        _timer = null;
         Push();
     }
 

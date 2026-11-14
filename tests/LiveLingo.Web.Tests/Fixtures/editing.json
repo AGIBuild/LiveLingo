@@ -97,7 +97,8 @@
         "editAria": "编辑第 2 句"
       }
     ],
-    "editText": "C:先检查缓存。"
+    "editText": "C:先检查缓存。",
+    "rememberCorrection": null
   },
   "footer": {
     "mic": {

@@ -80,6 +80,8 @@ public sealed class TranslationScheduler : IAsyncDisposable
         }
     }
 
+    private const int ContextChars = 300;
+
     private void OnChanged()
     {
         lock (_gate)
@@ -116,6 +118,7 @@ public sealed class TranslationScheduler : IAsyncDisposable
         {
             JobTicket ticket;
             string source;
+            string context;
             TargetLanguage target;
             CancellationTokenSource cancel;
             lock (_gate)
@@ -127,7 +130,7 @@ public sealed class TranslationScheduler : IAsyncDisposable
                     return;
                 }
 
-                (ticket, source) = next.Value;
+                (ticket, source, context) = next.Value;
                 target = _target;
                 cancel = CancellationTokenSource.CreateLinkedTokenSource(_stop.Token);
                 _inFlight = (ticket, cancel);
@@ -136,7 +139,7 @@ public sealed class TranslationScheduler : IAsyncDisposable
             try
             {
                 var translated = await _translator
-                    .TranslateAsync(new TranslationRequest(source, target, _glossary.TermsFor(target)), cancel.Token)
+                    .TranslateAsync(new TranslationRequest(source, target, _glossary.TermsFor(target), context), cancel.Token)
                     .ConfigureAwait(false);
                 _session.Mutate(draft => draft.Complete(ticket, UnitKind.Translation, translated.Text));
             }
@@ -162,22 +165,35 @@ public sealed class TranslationScheduler : IAsyncDisposable
         }
     }
 
-    private (JobTicket Ticket, string Source)? FindNext(Draft draft)
+    private static (JobTicket Ticket, string Source, string Context)? FindNext(Draft draft, int flushRevision)
     {
         if (draft.Snapshot is not null || draft.Output != OutputKind.Translation)
             return null;
 
-        var flushTail = draft.SourceRevision == _flushRevision;
+        var flushTail = draft.SourceRevision == flushRevision;
         for (var i = 0; i < draft.Units.Count; i++)
         {
             var unit = draft.Units[i];
             var needsTranslation = unit.Translation.Text is null && unit.Translation.Error.Length == 0;
-            if (needsTranslation && unit.Raw.Length > 0 && (unit.IsComplete || flushTail))
-                return (draft.TicketFor(i), unit.Raw);
+            var source = SourceForTranslation(unit);
+            if (needsTranslation && source.Length > 0 && (unit.IsComplete || flushTail))
+                return (draft.TicketFor(i), source, draft.PrecedingText(i, ContextChars));
         }
 
         return null;
     }
+
+    private (JobTicket Ticket, string Source, string Context)? FindNext(Draft draft) =>
+        FindNext(draft, _flushRevision);
+
+    /// <summary>
+    /// Uses an accepted or user-edited cleanup when available so stutters, fillers and repaired homophones are not
+    /// re-introduced when switching from Clean to Translate; falls back to raw text otherwise.
+    /// </summary>
+    private static string SourceForTranslation(DraftUnit unit) =>
+        unit.Clean.Text is { Length: > 0 } clean && (unit.Clean.IsOwned || unit.Clean.Rejection is null)
+            ? clean
+            : unit.Raw;
 
     public async ValueTask DisposeAsync()
     {

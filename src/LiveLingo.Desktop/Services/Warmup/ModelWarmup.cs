@@ -69,6 +69,8 @@ public sealed class ModelWarmup : IDisposable
         {
             await WarmSpeechAsync().ConfigureAwait(false);
             await WarmOutputAsync(output).ConfigureAwait(false);
+            if (SecondaryOutputToWarm(output) is { } secondary)
+                await WarmOutputAsync(secondary).ConfigureAwait(false);
         });
 
     /// <summary>The user (or a banner) changed the output of an open composer.</summary>
@@ -83,7 +85,24 @@ public sealed class ModelWarmup : IDisposable
     }
 
     private Task WarmSpeechAsync() =>
-        Warm("speech models", () => _speech.WarmAsync(Glossary.Parse(_settings.Current.Composer.Glossary).Terms));
+        Warm("speech models", () => _speech.WarmAsync(_settings.Current.Composer.EffectiveGlossary().SpeechHotwords()));
+
+    /// <summary>
+    /// Warms the opposite local role right after the starting output when the fast translator tier is selected, so
+    /// switching between Clean and Translate inside an open composer never waits for a cold llama-server startup.
+    /// Skipped for the 7B quality translator so a 16 GB machine never speculatively keeps both large models in memory.
+    /// </summary>
+    private ComposerOutput? SecondaryOutputToWarm(ComposerOutput primary)
+    {
+        var current = _settings.Current;
+        var fastTier = !Enum.TryParse<TranslatorTier>(current.Composer.TranslatorTier, out var tier) || tier == TranslatorTier.Fast;
+        return primary switch
+        {
+            ComposerOutput.Clean when current.Composer.CleanupEnabled && !current.Cloud.Translate && fastTier => ComposerOutput.Translate,
+            ComposerOutput.Translate when current.Composer.CleanupEnabled && !current.Cloud.Clean && (current.Cloud.Translate || fastTier) => ComposerOutput.Clean,
+            _ => null
+        };
+    }
 
     private Task WarmOutputAsync(ComposerOutput output)
     {

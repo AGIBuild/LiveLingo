@@ -73,6 +73,44 @@
     }
   }
 
+  class Corrections extends preact.Component {
+    state = { spoken: '', canonical: '' };
+
+    add = () => {
+      const spoken = this.state.spoken.trim();
+      const canonical = this.state.canonical.trim();
+      if (!spoken || !canonical || spoken === canonical) return;
+      this.setState({ spoken: '', canonical: '' });
+      LL.send('addCorrection', { spoken, canonical });
+    };
+
+    onKeyDown = (e) => {
+      if (e.key === 'Enter' && !e.isComposing && e.keyCode !== 229) {
+        e.preventDefault();
+        this.add();
+      }
+    };
+
+    render({ corrections }, { spoken, canonical }) {
+      return html`<section class="corrections" aria-labelledby="corrections-title">
+        <h2 id="corrections-title">${LL.t('corrections')}</h2>
+        <div class="term-form">
+          <label>${LL.t('corrections.spoken')}<input id="corr-spoken" value=${spoken} placeholder=${LL.t('corrections.spokenExample')} spellcheck="false"
+            onInput=${(e) => this.setState({ spoken: e.target.value })} onKeyDown=${this.onKeyDown}/></label>
+          <label>${LL.t('corrections.canonical')}<input id="corr-canonical" value=${canonical} placeholder=${LL.t('corrections.canonicalExample')} spellcheck="false"
+            onInput=${(e) => this.setState({ canonical: e.target.value })} onKeyDown=${this.onKeyDown}/></label>
+          <button type="button" id="corr-add" class="btn" disabled=${!spoken.trim() || !canonical.trim() || spoken.trim() === canonical.trim()} onClick=${this.add}>${LL.t('corrections.add')}</button>
+        </div>
+        <p class="hint">${LL.t('corrections.hint')}</p>
+        <ul class="corr-list">${corrections.map((item) => html`<li class="corr-item" key=${item.i}>
+          <span>${item.spoken}</span><span class="arrow" aria-hidden="true">→</span><span>${item.canonical}</span>
+          <button type="button" class="danger" aria-label=${LL.t('corrections.remove') + ' ' + item.spoken}
+            onClick=${() => LL.send('removeCorrection', { index: item.i })}>${LL.t('corrections.remove')}</button>
+        </li>`)}</ul>
+      </section>`;
+    }
+  }
+
   // The polish requirements: a text box of its own (a full-width block, not a row), saved when it loses the focus so one
   // edit is one stored value. Where nothing is customized it shows the built-in text to start from.
   class Polish extends preact.Component {
@@ -122,7 +160,11 @@
     <${Row} id="preload" title=${LL.t('preload')} desc=${LL.t('preload.desc')}>
       <${Switch} id="preload" checked=${v.preloadSpeech} onChange=${(on) => set('preloadSpeech')(String(on))}/>
     <//>
+    <${Row} id="builtin-terms" title=${LL.t('builtInTerms')} desc=${LL.t('builtInTerms.desc')}>
+      <${Switch} id="builtin-terms" checked=${v.builtInGlossary} onChange=${(on) => set('builtInGlossary')(String(on))}/>
+    <//>
     <${Polish} p=${{ text: v.polishPrompt, isDefault: v.polishPromptIsDefault, invalid: v.polishPromptInvalid }}/>
+    <${Corrections} corrections=${v.corrections}/>
     <${Terms} terms=${v.terms}/>
   </div>`;
 

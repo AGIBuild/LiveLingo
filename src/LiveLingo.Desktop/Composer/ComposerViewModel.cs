@@ -27,6 +27,7 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
     private readonly TargetWindowInfo? _target;
     private readonly SynchronizationContext? _notifyOn;
     private readonly TimeProvider _time;
+    private readonly object _refreshGate = new();
     private CommitSnapshot? _committed;
     private bool _applyingDraftText;
     private bool _wantsVoice;
@@ -627,35 +628,38 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
 
     private void Refresh()
     {
-        var times = Enumerable.Range(0, _segments.Count).Select(TimeLabel).ToList();
-        var snapshot = _session.Read(draft => (
-            Lines: BuildLines(draft),
-            SourceLines: IsListening || IsStartingListening || HasTimeline ? BuildSourceLines(draft, times) : [],
-            Content: draft.ContentReadiness(),
-            Count: draft.Units.Count,
-            Whole: draft.Route == DraftRoute.Whole,
-            HasPending: draft.Pending.Length > 0,
-            Polishing: draft.Polishing && draft.Output == OutputKind.Clean && draft.Snapshot is null,
-            TargetLost: draft.TargetLost));
+        lock (_refreshGate)
+        {
+            var times = Enumerable.Range(0, _segments.Count).Select(TimeLabel).ToList();
+            var snapshot = _session.Read(draft => (
+                Lines: BuildLines(draft),
+                SourceLines: IsListening || IsStartingListening || HasTimeline ? BuildSourceLines(draft, times) : [],
+                Content: draft.ContentReadiness(),
+                Count: draft.Units.Count,
+                Whole: draft.Route == DraftRoute.Whole,
+                HasPending: draft.Pending.Length > 0,
+                Polishing: draft.Polishing && draft.Output == OutputKind.Clean && draft.Snapshot is null,
+                TargetLost: draft.TargetLost));
 
-        Lines = snapshot.Lines;
-        SourceLines = snapshot.SourceLines;
-        IsWholeRoute = snapshot.Whole;
-        IsPolishing = snapshot.Polishing;
-        IsTargetLost = snapshot.TargetLost;
-        IsWide = ForceWide || HasTimeline || snapshot.Whole;
-        var status = StatusOf(snapshot.Count + (snapshot.HasPending ? 1 : 0), snapshot.Content);
-        // The countdown exists before "working" is published, so whoever sees the status can rely on it.
-        UpdateSlowTimer(status);
-        Status = status;
-        CanCopy = _committed is not null || Status == ComposerStatus.Ready;
-        CanWrite = CanCopy && _committed is null;
-        OnPropertyChanged(nameof(CanReplaceDraft));
-        OnPropertyChanged(nameof(CanEditRows));
+            Lines = snapshot.Lines;
+            SourceLines = snapshot.SourceLines;
+            IsWholeRoute = snapshot.Whole;
+            IsPolishing = snapshot.Polishing;
+            IsTargetLost = snapshot.TargetLost;
+            IsWide = ForceWide || HasTimeline || snapshot.Whole;
+            var status = StatusOf(snapshot.Count + (snapshot.HasPending ? 1 : 0), snapshot.Content);
+            // The countdown exists before "working" is published, so whoever sees the status can rely on it.
+            UpdateSlowTimer(status);
+            Status = status;
+            CanCopy = _committed is not null || Status == ComposerStatus.Ready;
+            CanWrite = CanCopy && _committed is null;
+            OnPropertyChanged(nameof(CanReplaceDraft));
+            OnPropertyChanged(nameof(CanEditRows));
 
-        var needsModels = !ModelsReady && Output != ComposerOutput.Original;
-        if (needsModels && Banner.Kind is BannerKind.None && DownloadProgress is null)
-            Banner = new BannerState(BannerKind.ModelMissing, MissingSizeLabel());
+            var needsModels = !ModelsReady && Output != ComposerOutput.Original;
+            if (needsModels && Banner.Kind is BannerKind.None && DownloadProgress is null)
+                Banner = new BannerState(BannerKind.ModelMissing, MissingSizeLabel());
+        }
     }
 
     private string MissingSizeLabel()

@@ -57,33 +57,50 @@ internal sealed class FakeClock : TimeProvider
         }
     }
 
+    private readonly object _gate = new();
     private DateTimeOffset _now = new(2026, 10, 31, 12, 0, 0, TimeSpan.Zero);
     private readonly List<FakeTimer> _timers = [];
 
-    public override DateTimeOffset GetUtcNow() => _now;
+    public override DateTimeOffset GetUtcNow()
+    {
+        lock (_gate)
+            return _now;
+    }
 
     public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
     {
-        var timer = new FakeTimer(this, callback, state, dueTime, period);
-        _timers.Add(timer);
-        return timer;
+        lock (_gate)
+        {
+            var timer = new FakeTimer(this, callback, state, dueTime, period);
+            _timers.Add(timer);
+            return timer;
+        }
     }
 
     public void Advance(TimeSpan by)
     {
-        var target = _now + by;
+        DateTimeOffset target;
+        lock (_gate)
+            target = _now + by;
+
         while (true)
         {
-            _timers.RemoveAll(t => t.Disposed);
-            var next = _timers.OrderBy(t => t.Next).FirstOrDefault();
-            if (next is null || next.Next > target)
-                break;
+            FakeTimer? next;
+            lock (_gate)
+            {
+                _timers.RemoveAll(t => t.Disposed);
+                next = _timers.OrderBy(t => t.Next).FirstOrDefault();
+                if (next is null || next.Next > target)
+                {
+                    _now = target;
+                    break;
+                }
 
-            _now = next.Next;
+                _now = next.Next;
+            }
+
             next.Fire();
         }
-
-        _now = target;
     }
 }
 

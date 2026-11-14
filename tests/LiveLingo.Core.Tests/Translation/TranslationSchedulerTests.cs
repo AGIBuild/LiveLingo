@@ -308,6 +308,34 @@ public class TranslationSchedulerTests
     }
 
     [Fact]
+    public async Task SwitchingFromCleanToTranslate_UsesAcceptedCleanText_AndPassesPrecedingContext()
+    {
+        await using var h = new Harness();
+        h.Session.Mutate(draft =>
+        {
+            var first = draft.Append("呃，先检查缓存。");
+            draft.Complete(first, UnitKind.Clean, "先检查缓存。");
+            var second = draft.Append("嗯，再更新 Scale 机制。");
+            draft.Complete(second, UnitKind.Clean, "再更新 Skill 机制。");
+        });
+
+        h.Output(OutputKind.Translation);
+
+        var firstCall = await h.NextCall(1);
+        Assert.Equal("先检查缓存。", firstCall.Request.Source);
+        Assert.Equal("", firstCall.Request.Context);
+        firstCall.Result.SetResult(Done("Check the cache first."));
+
+        var secondCall = await h.NextCall(2);
+        Assert.Equal("再更新 Skill 机制。", secondCall.Request.Source);
+        Assert.Equal("先检查缓存。", secondCall.Request.Context);
+        secondCall.Result.SetResult(Done("Then update the Skill mechanism."));
+
+        await WaitUntil(() => h.TranslationOf(1) is not null);
+        Assert.Equal("Then update the Skill mechanism.", h.TranslationOf(1));
+    }
+
+    [Fact]
     public async Task RetryingAFailedUnit_TranslatesItAgain()
     {
         await using var h = new Harness();

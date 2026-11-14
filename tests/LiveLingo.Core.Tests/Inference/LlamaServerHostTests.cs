@@ -99,7 +99,7 @@ public class LlamaServerHostTests
         Assert.Equal("http://127.0.0.1:41000/", launch.Endpoint.ToString());
         Assert.Equal(
             ["--model", Path.Combine("/models", Fast.Id, "Hy-MT2-1.8B-Q4_K_M.gguf"),
-             "--host", "127.0.0.1", "--port", "41000", "--ctx-size", "8192", "--parallel", "1",
+             "--host", "127.0.0.1", "--port", "41000", "--ctx-size", "4096", "--parallel", "1",
              "--n-gpu-layers", "99", "--reasoning-budget", "0"],
             launch.Arguments);
         Assert.NotNull(lease.Client);

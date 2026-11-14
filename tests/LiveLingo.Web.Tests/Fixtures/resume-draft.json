@@ -71,7 +71,8 @@
     "visible": false,
     "label": "将写入",
     "rows": [],
-    "editText": ""
+    "editText": "",
+    "rememberCorrection": null
   },
   "footer": {
     "mic": {

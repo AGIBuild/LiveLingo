@@ -255,6 +255,30 @@ public class SettingsViewModelTests
         Assert.Empty(f.Saved);
     }
 
+    [Fact]
+    public void BuiltInGlossaryAndAccentCorrections_RoundTripWithoutPollutingPlainTerms()
+    {
+        var initial = new SettingsModel();
+        initial.Composer.Glossary = "Redis\n缓存穿透=cache penetration\nScale=>Skill";
+        var f = new Fixture(initial);
+
+        Assert.True(f.Vm.BuiltInGlossary);
+        Assert.Equal([new TermEntry("Redis", "Redis"), new TermEntry("缓存穿透", "cache penetration")], f.Vm.Terms);
+        Assert.Equal([new GlossaryCorrection("Scale", "Skill")], f.Vm.Corrections);
+
+        f.Vm.NewCorrectionSpoken = " 六零九 ";
+        f.Vm.NewCorrectionCanonical = " LiveLingo ";
+        f.Vm.AddCorrectionCommand.Execute(null);
+        Assert.Equal("Redis\n缓存穿透=cache penetration\nScale=>Skill\n六零九=>LiveLingo", f.Last.Composer.Glossary);
+
+        f.Vm.BuiltInGlossary = false;
+        Assert.False(f.Last.Composer.BuiltInGlossary);
+
+        f.Vm.RemoveCorrectionCommand.Execute(f.Vm.Corrections[0]);
+        Assert.Equal([new GlossaryCorrection("六零九", "LiveLingo")], f.Vm.Corrections);
+        Assert.Equal("Redis\n缓存穿透=cache penetration\n六零九=>LiveLingo", f.Last.Composer.Glossary);
+    }
+
     // ---- cloud ------------------------------------------------------------------
 
     [Fact]

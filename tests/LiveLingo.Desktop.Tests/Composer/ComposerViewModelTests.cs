@@ -353,4 +353,41 @@ public class ComposerViewModelTests
         Assert.All(h.Vm.Lines, line => Assert.Equal(LineState.Pending, line.State));
         Assert.False(h.Vm.CanExportAs(ExportFormat.Txt));
     }
+
+    [Fact]
+    public async Task InlineEdit_DetectsConciseMisrecognition_AndSaveAndRememberRecordsItOnce()
+    {
+        await using var h = new Harness(output: ComposerOutput.Clean);
+        var remembered = new List<GlossaryCorrection>();
+        var toasts = new List<ToastKind>();
+        h.Vm.CorrectionRemembered += remembered.Add;
+        h.Vm.ToastRaised += toasts.Add;
+
+        h.Session.Mutate(d =>
+        {
+            var ticket = d.Append("或者说Scale机制。");
+            d.Complete(ticket, UnitKind.Clean, "或者说Scale机制。");
+        });
+        await Wait.Until(() => h.Vm.Lines.Count == 1 && h.Vm.Lines[0].State == LineState.Ready);
+
+        h.Vm.StartEditCommand.Execute(0);
+        Assert.Null(h.Vm.SuggestedCorrection);
+
+        h.Vm.EditText = "或者说Skill机制。";
+        Assert.Equal(new GlossaryCorrection("Scale", "Skill"), h.Vm.SuggestedCorrection);
+
+        h.Vm.SaveEditAndRememberCommand.Execute(null);
+
+        Assert.Equal("或者说Skill机制。", h.Vm.Lines[0].Text);
+        Assert.Equal([new GlossaryCorrection("Scale", "Skill")], remembered);
+        Assert.Equal([ToastKind.CorrectionSaved], toasts);
+
+        // Editing the same word again does not re-suggest a rule already in ActiveGlossary.
+        h.Vm.StartEditCommand.Execute(0);
+        h.Vm.EditText = "或者说Scale机制。";
+        h.Vm.SaveEditCommand.Execute(null);
+        h.Vm.StartEditCommand.Execute(0);
+        h.Vm.EditText = "或者说Skill机制。";
+        Assert.Null(h.Vm.SuggestedCorrection);
+    }
 }

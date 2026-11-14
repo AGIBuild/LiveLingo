@@ -28,7 +28,7 @@ public class LlmTranslatorTests
         Assert.EndsWith(":\n\n不要重试。", request.Prompt);
         Assert.Equal(0, request.Temperature);
         Assert.Equal(20, request.Extra["top_k"]);
-        Assert.Equal(false, request.Extra["cache_prompt"]);
+        Assert.Equal(true, request.Extra["cache_prompt"]);
         Assert.Equal(10, result.FirstVisibleMs);
         Assert.Equal(20, result.TotalMs);
     }

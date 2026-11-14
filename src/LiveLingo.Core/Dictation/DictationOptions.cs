@@ -5,12 +5,19 @@ public sealed class DictationOptions
 {
     /// <summary>
     /// Silence after speech that ends an utterance and therefore a sentence, and resets the live stream.
-    /// Shorter pauses (a comma, a breath) never reset the stream: a fresh stream starting mid-sentence recognizes badly.
+    /// Shorter pauses (a comma, a breath, switching between Chinese and an English term) never reset the stream:
+    /// a fresh stream starting mid-sentence recognizes badly.
     /// </summary>
-    public int HardPauseMs { get; init; } = 800;
+    public int HardPauseMs { get; init; } = 1000;
 
     /// <summary>An utterance this long is cut at the next short pause instead of waiting for a hard pause.</summary>
-    public int SoftMaxUtteranceMs { get; init; } = 12_000;
+    public int SoftMaxUtteranceMs { get; init; } = 8_000;
+
+    /// <summary>
+    /// Upper bound on an open utterance when the speaker never pauses (or background noise keeps VAD active),
+    /// sized to stay well within Qwen3-ASR's 512-token total KV budget (~13 s of audio + prompt + decoded text).
+    /// </summary>
+    public int HardMaxUtteranceMs { get; init; } = 12_000;
 
     /// <summary>A tail this long becomes a sentence at the next segment even without sentence punctuation.</summary>
     public int MaxTailChars { get; init; } = 90;
@@ -19,7 +26,7 @@ public sealed class DictationOptions
     /// Silence after speech that ends a passage. Sentences are collected into passages because the recognizer cuts
     /// speech at every pause, so a single sentence is often half a thought and cannot be cleaned or translated well.
     /// </summary>
-    public int PassagePauseMs { get; init; } = 2000;
+    public int PassagePauseMs { get; init; } = 2500;
 
     /// <summary>A passage this long ends at its next sentence boundary, so cleanup of a long monologue is not postponed.</summary>
     public int PassageMaxChars { get; init; } = 200;

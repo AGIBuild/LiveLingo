@@ -1,5 +1,6 @@
 using LiveLingo.Core.Dictation;
 using LiveLingo.Core.Drafting;
+using LiveLingo.Core.Translation;
 
 namespace LiveLingo.Core.Tests.Dictation;
 
@@ -240,5 +241,93 @@ public class FidelityGateTests
         var gate = FidelityGate.Check("把接口改掉，然后补测试。", "把 Kubernetes 接口改掉，然后补测试。", ["Avalonia"]);
         Assert.False(gate.Accepted);
         Assert.Equal(new GateRejection(GateReason.TermNotInGlossary, "kubernetes"), gate.Rejection);
+    }
+
+    [Fact]
+    public void Accepts_the_real_bilingual_agent_skill_dictation_polish()
+    {
+        const string raw =
+            "我觉得啊，这个翻译语音输入工具最大的问题还是识别率不高，呃，特别是中英混杂的情况，比如说我说使用agent或者skill，呃。" +
+            "那么就会跟我的原原原话不一致。我觉得最好的办法。可能还是你需要从根子上去解决一下这个问题，怎么去修。" +
+            "有可能你需要一定的语音输入压力，所以我说的这一段就是语音输入压力。如果说你还需要更强的。呃，Agent用色描述，或者说Scale机制。也可以澄清出来。" +
+            "因为你现在，在我输入过程中，你会把我的没说完的一句话给回车换行，可能会本身导致呃理解错位。" +
+            "我不确定会不会有这样的问题，但是你可能需要去关注一下，分析一下，是不是会有这样的问题。" +
+            "另外，现在从语音润色切换到翻译的时候，需要较长时间的等待，才才能把翻译结果给你。" +
+            "或者说，从翻译切换到润色的时候，也是有类似问题。那为什么花这么长时间才能切换过来呢？原因是什么？也需要给我分析一下。" +
+            "你可以不必急于开发，但是呢，先给我方案和定位，分析出来的原因。";
+
+        const string polished =
+            "我觉得翻译语音输入工具最大的问题还是识别率不高，特别是中英混杂的情况，比如说使用Agent或者Skill，就会跟我的原话不一致。" +
+            "我觉得最好的办法是你需要从根子上解决这个问题，怎么去修，可能需要语音输入样例，所以我说的这段就是语音输入样例，" +
+            "如果你还需要更强的Agent润色描述，或者SKILL机制也可以澄清出来，因为现在在我输入过程中，你会把我的没说完的一句话给回车换行，可能会本身导致理解错位。" +
+            "我不确定会不会有这样的问题，但是你可能需要去关注一下，分析一下是不是会有这样的问题。" +
+            "另外，现在从语音润色切换到翻译的时候，需要较长时间的等待才能把翻译结果给你，或者说从翻译切换到润色的时候也是有类似问题，" +
+            "那为什么花这么长时间才能切换过来呢？原因是什么？也需要给我分析一下，你可以不必急于开发，但是先给我方案和定位，分析出来的原因。";
+
+        var gateWithBuiltIn = FidelityGate.Check(raw, polished, Glossary.BuiltInTerms, allowParagraphs: true);
+        Assert.True(gateWithBuiltIn.Accepted, gateWithBuiltIn.Rejection?.ToString());
+
+        // Even with built-in glossary disabled, "skill" was already spoken in sentence 1 so repairing "Scale" -> "SKILL" in sentence 7 is accepted.
+        var gateWithoutGlossary = FidelityGate.Check(raw, polished, [], allowParagraphs: true);
+        Assert.True(gateWithoutGlossary.Accepted, gateWithoutGlossary.Rejection?.ToString());
+    }
+
+    [Fact]
+    public void Accepts_interrogative_a_not_a_rewritten_to_shifou_without_excusing_dropped_negations()
+    {
+        var accepted = FidelityGate.Check(
+            "我不确定会不会有这样的问题，但是你可能需要去关注一下，分析一下，是不是会有这样的问题。",
+            "我不确定是否会有这样的问题，但你可能需要关注一下，分析一下是否会有这样的问题。");
+        Assert.True(accepted.Accepted, accepted.Rejection?.ToString());
+
+        var rejected = FidelityGate.Check("我不确定会不会有这样的问题。", "我确定会有这样的问题。");
+        Assert.Equal(GateReason.Deleted, rejected.Rejection?.Reason);
+    }
+
+    [Fact]
+    public void Accepts_triple_stutter_and_explicit_accent_corrections()
+    {
+        Assert.True(FidelityGate.Check("那么就会跟我的原原原话不一致。", "那样就会和我的原话不一致。").Accepted);
+
+        var corrected = FidelityGate.Check(
+            "下个阶段把六零九里面的隐秘命令修一下。",
+            "下个阶段把 LiveLingo 里面的 init 命令修一下。",
+            corrections: [new GlossaryCorrection("六零九", "LiveLingo"), new GlossaryCorrection("隐秘", "init")]);
+        Assert.True(corrected.Accepted, corrected.Rejection?.ToString());
+    }
+
+    [Fact]
+    public void Prefix_glossary_terms_do_not_double_count_longer_identifiers()
+    {
+        // "GitHub" alone must not count as both "GitHub" and "Git" to excuse deleting an unrelated English word "Redis".
+        var gate = FidelityGate.Check(
+            "把代码推到 Gethub，然后清理 Redis 缓存。",
+            "把代码推到 GitHub，然后清理缓存。",
+            ["Git", "GitHub"]);
+        Assert.Equal(GateReason.TermLost, gate.Rejection?.Reason);
+    }
+
+    [Theory]
+    [InlineData("他不光要按照学校节奏来，还要找到自己的节奏。", "他不仅不按照学校节奏来，还要找到自己的节奏。")]
+    [InlineData("今天留什么作业，他就写什么作业。", "今天留什么作业，他就不写什么作业。")]
+    public void Rejects_an_invented_negation_that_flips_clause_polarity(string raw, string cleaned)
+    {
+        var gate = FidelityGate.Check(raw, cleaned);
+        Assert.False(gate.Accepted);
+        Assert.Equal(GateReason.Added, gate.Rejection?.Reason);
+    }
+
+    [Fact]
+    public void Accepts_trimming_non_numeric_yi_aspect_words_while_protecting_counted_quantities()
+    {
+        var accepted = FidelityGate.Check(
+            "你看，他这会学那个方法，一会儿又去试别的。",
+            "他这会儿学那个方法，又去试别的。");
+        Assert.True(accepted.Accepted, accepted.Rejection?.ToString());
+
+        var rejected = FidelityGate.Check(
+            "坚持一个方法，这是一口深井。",
+            "坚持方法，这是深井。");
+        Assert.Equal(GateReason.Deleted, rejected.Rejection?.Reason);
     }
 }

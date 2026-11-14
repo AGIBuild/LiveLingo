@@ -15,6 +15,7 @@ public sealed class ScriptedLive : ILiveRecognizer
     private readonly IReadOnlyList<ScriptedSegment> _script;
     private long _total;
     private int _consumed;
+    private int _consumedChars;
 
     public ScriptedLive(IReadOnlyList<ScriptedSegment> script) => _script = script;
 
@@ -33,7 +34,10 @@ public sealed class ScriptedLive : ILiveRecognizer
             {
                 var s = _script[i];
                 var progress = Math.Min(1.0, (ms - s.StartMs) / (s.EndMs - s.StartMs));
-                text += s.Text[..(int)(s.Text.Length * progress)];
+                var revealed = (int)(s.Text.Length * progress);
+                var from = i == _consumed ? _consumedChars : 0;
+                if (revealed > from)
+                    text += s.Text[from..revealed];
             }
             return text;
         }
@@ -47,7 +51,22 @@ public sealed class ScriptedLive : ILiveRecognizer
         var ms = AudioFormat.SamplesToMs(_total);
         var text = "";
         while (_consumed < _script.Count && _script[_consumed].EndMs <= ms)
-            text += _script[_consumed++].Text;
+        {
+            text += _script[_consumed].Text[_consumedChars..];
+            _consumed++;
+            _consumedChars = 0;
+        }
+        if (_consumed < _script.Count && ms > _script[_consumed].StartMs)
+        {
+            var s = _script[_consumed];
+            var progress = Math.Min(1.0, (ms - s.StartMs) / (s.EndMs - s.StartMs));
+            var revealed = (int)(s.Text.Length * progress);
+            if (revealed > _consumedChars)
+            {
+                text += s.Text[_consumedChars..revealed];
+                _consumedChars = revealed;
+            }
+        }
         return text;
     }
 

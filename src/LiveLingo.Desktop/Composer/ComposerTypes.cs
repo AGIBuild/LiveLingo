@@ -166,7 +166,8 @@ public enum ToastKind
     Unavailable,
     Processing,
     Exported,
-    ExportUnfinished
+    ExportUnfinished,
+    CorrectionSaved
 }
 
 /// <summary>Everything the footer status line is built from.</summary>

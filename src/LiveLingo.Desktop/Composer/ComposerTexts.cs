@@ -139,6 +139,8 @@ public sealed class ComposerTexts(ILocalizationService loc, bool? mac = null)
     public string RowEdit => loc.T("composer.row.edit");
     public string RowUseOriginalAria(int index) => loc.T("composer.row.useOriginal.aria", index + 1);
     public string RowEditAria(int index) => loc.T("composer.row.edit.aria", index + 1);
+    public string RememberCorrectionLabel(GlossaryCorrection correction) =>
+        loc.T("composer.row.rememberCorrection", correction.Spoken, correction.Canonical);
 
     public string Line(ResultLine line) => line.State switch
     {
@@ -295,6 +297,7 @@ public sealed class ComposerTexts(ILocalizationService loc, bool? mac = null)
         ToastKind.Processing => "composer.toast.processing",
         ToastKind.Exported => "composer.toast.exported",
         ToastKind.ExportUnfinished => "composer.toast.exportUnfinished",
+        ToastKind.CorrectionSaved => "composer.toast.correctionSaved",
         _ => throw new ArgumentOutOfRangeException(nameof(kind))
     });
 

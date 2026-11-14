@@ -92,6 +92,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         _defaultOutputIndex = Math.Max(0, DefaultOutputs.ToList().IndexOf(current.Composer.DefaultOutput));
         _autoDictate = current.Composer.AutoDictate;
         _preloadSpeech = current.Composer.PreloadSpeech;
+        _builtInGlossary = current.Composer.BuiltInGlossary;
         _rememberChoices = current.Composer.RememberChoices;
         _polishPrompt = PolishStyle.IsUsable(current.Composer.PolishPrompt) ? current.Composer.PolishPrompt : "";
         _tierIndex = Math.Max(0, Tiers.ToList().IndexOf(current.Composer.TranslatorTier));
@@ -100,7 +101,9 @@ public sealed partial class SettingsViewModel : ObservableObject
         _cloudTranslate = current.Cloud.Translate;
         _cloudClean = current.Cloud.Clean;
         _endpoints = EntriesOf(current.Cloud);
-        Terms = new ObservableCollection<TermEntry>(ParseTerms(current.Composer.Glossary));
+        var (parsedTerms, parsedCorrections) = ParseGlossaryEntries(current.Composer.Glossary);
+        Terms = new ObservableCollection<TermEntry>(parsedTerms);
+        Corrections = new ObservableCollection<GlossaryCorrection>(parsedCorrections);
         _loading = false;
     }
 
@@ -135,6 +138,9 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     /// <summary>Whether the speech models are loaded when the application starts (see <c>ModelWarmup</c>).</summary>
     [ObservableProperty] private bool _preloadSpeech;
+
+    /// <summary>Whether LiveLingo's built-in bilingual developer glossary is active alongside the user's terms.</summary>
+    [ObservableProperty] private bool _builtInGlossary;
 
     /// <summary>Whether the output and direction last chosen for an application are used the next time it is the target.</summary>
     [ObservableProperty] private bool _rememberChoices;
@@ -172,6 +178,11 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     [ObservableProperty] private string _newTermSource = "";
     [ObservableProperty] private string _newTermTarget = "";
+
+    public ObservableCollection<GlossaryCorrection> Corrections { get; }
+
+    [ObservableProperty] private string _newCorrectionSpoken = "";
+    [ObservableProperty] private string _newCorrectionCanonical = "";
 
     // ---- privacy and cloud -----------------------------------------------------------------
 
@@ -222,6 +233,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     partial void OnDefaultOutputIndexChanged(int value) => ApplyIfSelected(value);
     partial void OnAutoDictateChanged(bool value) => Apply();
     partial void OnPreloadSpeechChanged(bool value) => Apply();
+    partial void OnBuiltInGlossaryChanged(bool value) => Apply();
     partial void OnRememberChoicesChanged(bool value) => Apply();
     partial void OnPolishPromptChanged(string value) => Apply();
     partial void OnTierIndexChanged(int value) => ApplyIfSelected(value);
@@ -259,6 +271,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         model.Composer.DefaultOutput = DefaultOutputs[DefaultOutputIndex];
         model.Composer.AutoDictate = AutoDictate;
         model.Composer.PreloadSpeech = PreloadSpeech;
+        model.Composer.BuiltInGlossary = BuiltInGlossary;
         model.Composer.RememberChoices = RememberChoices;
         if (PolishStyle.ToStored(PolishPrompt) is { } polish)
         {
@@ -272,7 +285,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         model.Composer.TranslatorTier = Tiers[TierIndex];
         if (_devicesLoaded)
             model.Composer.Microphone = MicrophoneIndex < MicrophoneNames.Count ? MicrophoneNames[MicrophoneIndex] : "";
-        model.Composer.Glossary = SerializeTerms(Terms);
+        model.Composer.Glossary = SerializeGlossary(Terms, Corrections);
         model.Cloud.Translate = CloudTranslate;
         model.Cloud.Clean = CloudClean;
         _settings.Replace(model);
@@ -315,17 +328,52 @@ public sealed partial class SettingsViewModel : ObservableObject
         Apply();
     }
 
-    private static IEnumerable<TermEntry> ParseTerms(string text)
+    [RelayCommand]
+    private void AddCorrection()
     {
-        var glossary = Glossary.Parse(text);
-        var pairs = glossary.Pairs.Select(pair => new TermEntry(pair.Source, pair.Target)).ToList();
-        var pairSources = pairs.Select(pair => pair.Source).ToHashSet();
-        var plain = glossary.Terms.Where(term => !pairSources.Contains(term)).Select(term => new TermEntry(term, term));
-        return plain.Concat(pairs);
+        var spoken = NewCorrectionSpoken.Trim();
+        var canonical = NewCorrectionCanonical.Trim();
+        if (spoken.Length == 0 || canonical.Length == 0 || string.Equals(spoken, canonical, StringComparison.Ordinal))
+            return;
+
+        var existing = Corrections.FirstOrDefault(c => string.Equals(c.Spoken, spoken, StringComparison.OrdinalIgnoreCase));
+        if (existing is not null)
+            Corrections[Corrections.IndexOf(existing)] = new GlossaryCorrection(spoken, canonical);
+        else
+            Corrections.Add(new GlossaryCorrection(spoken, canonical));
+        NewCorrectionSpoken = "";
+        NewCorrectionCanonical = "";
+        Apply();
     }
 
-    private static string SerializeTerms(IEnumerable<TermEntry> terms) =>
-        string.Join('\n', terms.Select(term => term.Source == term.Target ? term.Source : $"{term.Source}={term.Target}"));
+    [RelayCommand]
+    private void RemoveCorrection(GlossaryCorrection correction)
+    {
+        Corrections.Remove(correction);
+        Apply();
+    }
+
+    private static (List<TermEntry> Terms, List<GlossaryCorrection> Corrections) ParseGlossaryEntries(string text)
+    {
+        var corrections = Glossary.Parse(text).Corrections.ToList();
+        var nonCorrectionLines = string.Join('\n', (text ?? "")
+            .Split('\n')
+            .Select(line => line.TrimStart().StartsWith('#')
+                ? ""
+                : string.Join(',', line.Split([',', '，', ';', '；', '\r'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .Where(entry => !entry.Contains("=>", StringComparison.Ordinal) && !entry.Contains('⇒')))));
+        var termsOnly = Glossary.Parse(nonCorrectionLines);
+        var pairs = termsOnly.Pairs.Select(pair => new TermEntry(pair.Source, pair.Target)).ToList();
+        var pairSources = pairs.Select(pair => pair.Source).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var plain = termsOnly.Terms.Where(term => !pairSources.Contains(term)).Select(term => new TermEntry(term, term));
+        return (plain.Concat(pairs).ToList(), corrections);
+    }
+
+    private static string SerializeGlossary(IEnumerable<TermEntry> terms, IEnumerable<GlossaryCorrection> corrections) =>
+        string.Join(
+            '\n',
+            terms.Select(term => term.Source == term.Target ? term.Source : $"{term.Source}={term.Target}")
+                .Concat(corrections.Select(c => $"{c.Spoken}=>{c.Canonical}")));
 
     // ---- cloud ------------------------------------------------------------------------------
 

@@ -45,6 +45,15 @@ internal sealed class SettingsIntents : IIntentHandler
                 if (remove.Index < _vm.Terms.Count)
                     _vm.RemoveTermCommand.Execute(_vm.Terms[remove.Index]);
                 break;
+            case AddCorrectionIntent addCorrection:
+                _vm.NewCorrectionSpoken = addCorrection.Spoken;
+                _vm.NewCorrectionCanonical = addCorrection.Canonical;
+                _vm.AddCorrectionCommand.Execute(null);
+                break;
+            case RemoveCorrectionIntent removeCorrection:
+                if (removeCorrection.Index < _vm.Corrections.Count)
+                    _vm.RemoveCorrectionCommand.Execute(_vm.Corrections[removeCorrection.Index]);
+                break;
             case CloudToggleIntent toggle: _vm.SetCloud(toggle.Step, toggle.On); break;
             case ConsentIntent consent: _vm.AnswerConsent(consent.Allow); break;
             case OpenEndpointFormIntent open: _vm.OpenEndpointForm(open.Id); break;
@@ -86,6 +95,7 @@ internal sealed class SettingsIntents : IIntentHandler
             case SettingIntent.Names.DefaultOutput: _vm.DefaultOutputIndex = IndexOf(SettingsViewModel.DefaultOutputs, value); break;
             case SettingIntent.Names.AutoDictate: _vm.AutoDictate = value == "true"; break;
             case SettingIntent.Names.PreloadSpeech: _vm.PreloadSpeech = value == "true"; break;
+            case SettingIntent.Names.BuiltInGlossary: _vm.BuiltInGlossary = value == "true"; break;
             case SettingIntent.Names.RememberChoices: _vm.RememberChoices = value == "true"; break;
             case SettingIntent.Names.PolishPrompt: _vm.PolishPrompt = value; break;
             case SettingIntent.Names.ReduceMotion: _vm.ReduceMotion = value == "true"; break;

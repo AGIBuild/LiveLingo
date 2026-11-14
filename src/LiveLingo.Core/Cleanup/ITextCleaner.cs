@@ -1,3 +1,5 @@
+using LiveLingo.Core.Translation;
+
 namespace LiveLingo.Core.Cleanup;
 
 /// <param name="Target">The only text the cleaner may rewrite.</param>
@@ -7,11 +9,13 @@ namespace LiveLingo.Core.Cleanup;
 /// a small model copies read-only text into its output, and a partial hypothesis changes from moment to moment.
 /// </param>
 /// <param name="Glossary">Terms that must be kept exactly as written.</param>
+/// <param name="Corrections">Recurring speech/accent misrecognitions (<c>spoken =&gt; canonical</c>) to repair.</param>
 public sealed record CleanupRequest(
     string Target,
     string Preceding,
     bool Continues,
-    IReadOnlyList<string> Glossary);
+    IReadOnlyList<string> Glossary,
+    IReadOnlyList<GlossaryCorrection>? Corrections = null);
 
 public interface ITextCleaner
 {

@@ -1,6 +1,7 @@
 using LiveLingo.Core.Dictation;
 using LiveLingo.Core.Drafting;
 using LiveLingo.Core.Inference;
+using LiveLingo.Core.Translation;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -29,6 +30,7 @@ public sealed class PolishScheduler : IAsyncDisposable
     private readonly DraftSession _session;
     private readonly IDictationPolisher _polisher;
     private readonly IReadOnlyList<string> _glossary;
+    private readonly IReadOnlyList<GlossaryCorrection> _corrections;
     private readonly string _style;
     private readonly int _contextChars;
     private readonly ILogger<PolishScheduler> _logger;
@@ -49,11 +51,13 @@ public sealed class PolishScheduler : IAsyncDisposable
     /// <param name="style">The polish requirements, already resolved (<see cref="PolishStyle.Resolve"/>).</param>
     public PolishScheduler(
         DraftSession session, IDictationPolisher polisher, IReadOnlyList<string> glossary, string style, int contextChars,
-        ILogger<PolishScheduler>? logger = null)
+        ILogger<PolishScheduler>? logger = null,
+        IReadOnlyList<GlossaryCorrection>? corrections = null)
     {
         _session = session;
         _polisher = polisher;
         _glossary = glossary;
+        _corrections = corrections ?? [];
         _style = PolishStyle.Resolve(style);
         _contextChars = contextChars;
         _logger = logger ?? NullLogger<PolishScheduler>.Instance;
@@ -207,7 +211,7 @@ public sealed class PolishScheduler : IAsyncDisposable
 
     private async Task PolishAsync(Polish polish, CancellationToken ct)
     {
-        var request = new PolishRequest(polish.Target, polish.Preceding, _summary ?? "", _glossary, _style);
+        var request = new PolishRequest(polish.Target, polish.Preceding, _summary ?? "", _glossary, _style, _corrections);
         string? text = null;
         try
         {
@@ -219,14 +223,14 @@ public sealed class PolishScheduler : IAsyncDisposable
             _logger.LogWarning("Custom polish response incomplete; retrying default requirements.");
         }
 
-        var gate = FidelityGate.Check(polish.Target, text ?? "", _glossary, allowParagraphs: true);
+        var gate = FidelityGate.Check(polish.Target, text ?? "", _glossary, allowParagraphs: true, corrections: _corrections);
         if (!gate.Accepted && _style != PolishStyle.Default)
         {
             _logger.LogWarning("Custom polish refused ({Reason}); retrying default requirements.", gate.Rejection?.Reason);
             Report(PolishOutcome.DefaultRequirements);
             text = (await _polisher.PolishAsync(request with { Style = PolishStyle.Default }, ct).ConfigureAwait(false)).Trim();
             ct.ThrowIfCancellationRequested();
-            gate = FidelityGate.Check(polish.Target, text, _glossary, allowParagraphs: true);
+            gate = FidelityGate.Check(polish.Target, text, _glossary, allowParagraphs: true, corrections: _corrections);
         }
         if (!gate.Accepted)
         {
@@ -284,13 +288,15 @@ public sealed class PolishScheduler : IAsyncDisposable
             return new Idle();
 
         var runs = Runs(draft);
+        var source = draft.SourceText();
+        var needsSummary = runs.Count > 1 || source.Length > MaxGroupChars;
         foreach (var (first, count) in runs)
         {
             if (Untried(draft, first, count) is not { } polish)
                 continue;
 
-            if (_summary is null)
-                return new Summarize(draft.SourceText(), draft.DictationRevision, draft.SourceRevision);
+            if (needsSummary && _summary is null)
+                return new Summarize(source, draft.DictationRevision, draft.SourceRevision);
 
             return polish;
         }

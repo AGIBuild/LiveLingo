@@ -429,6 +429,259 @@ public class DictationSessionTests
     }
 
     [Fact]
+    public async Task DanglingClauseAtHardPause_HoldsItsPeriodAsACommaUntilTheClauseCompletes()
+    {
+        var script = new[]
+        {
+            new ScriptedSegment(200, 1400, "如果说你还需要更强的。"),
+            new ScriptedSegment(2000, 3600, "Agent 润色描述，也可以澄清出来。"),
+        };
+        var calls = 0;
+        await using var h = new Harness(script, hardPauseMs: 400, passagePauseMs: 4000, passageMaxChars: 1,
+            secondPass: new ScriptedSegmentRecognizer(() =>
+                Interlocked.Increment(ref calls) == 1 ? "如果说你还需要更强的。" : "Agent 润色描述，也可以澄清出来。"));
+
+        h.Push(1900); // past hard pause after segment 1, before segment 2
+        Assert.True(await Until(() => h.Session.Segments.Count == 1));
+        Assert.Empty(h.Raws); // dangling clause held in tail instead of breaking mid-sentence
+
+        h.Push(2200);
+        await h.Session.StopAsync();
+
+        Assert.Equal(["如果说你还需要更强的，Agent 润色描述，也可以澄清出来。"], h.Raws);
+    }
+
+    [Fact]
+    public async Task DanglingClauseFollowedByStop_RestoresItsFinalPeriod()
+    {
+        var script = new[] { new ScriptedSegment(200, 1400, "如果说你还需要更强的。") };
+        await using var h = new Harness(script, hardPauseMs: 400, passagePauseMs: 4000, passageMaxChars: 1,
+            secondPass: new ScriptedSegmentRecognizer(() => "如果说你还需要更强的。"));
+
+        h.Push(1900);
+        await h.Session.StopAsync();
+
+        Assert.Equal(["如果说你还需要更强的。"], h.Raws);
+    }
+
+    [Fact]
+    public async Task CompleteShortAffirmationEndingWithDe_SettlesImmediatelyWithoutHolding()
+    {
+        var script = new[] { new ScriptedSegment(200, 1000, "好的。") };
+        await using var h = new Harness(script, hardPauseMs: 300, passagePauseMs: 4000, passageMaxChars: 1,
+            secondPass: new ScriptedSegmentRecognizer(() => "好的。"));
+
+        h.Push(1500);
+
+        Assert.True(await Until(() => h.Raws.Count == 1));
+        Assert.Equal("好的。", h.Raws[0]);
+    }
+
+    [Fact]
+    public async Task UninterruptedLongSpeech_CutsSoftlyAtHardMax_SoSecondPassSlicesNeverExceedQwen3Window()
+    {
+        // Reproduces 26.4 s of continuous speech with no VAD pause (formerly 660 audio tokens > 512 KV limit).
+        var draft = new DraftSession(hasTarget: true);
+        var script = new[] { new ScriptedSegment(200, 26_600, new string('字', 120) + "。") };
+        var recorder = new AudioLengthRecorder("一段连续口述");
+        await using var session = new DictationSession(
+            new ScriptedLive(script),
+            new ScriptedVad(script),
+            recorder,
+            draft,
+            new DictationOptions
+            {
+                HardPauseMs = 1000,
+                SoftMaxUtteranceMs = 8_000,
+                HardMaxUtteranceMs = 12_000,
+                PassageMaxChars = 500
+            });
+        session.Start();
+
+        for (var pushed = 0; pushed < 27_000; pushed += 40)
+            session.Push(new float[AudioFormat.MsToSamples(40)]);
+        await session.StopAsync();
+
+        Assert.True(recorder.Milliseconds.Count >= 2);
+        Assert.All(recorder.Milliseconds, ms => Assert.True(ms <= 16_000, $"slice was {ms} ms"));
+    }
+
+    private sealed class LaggedLiveRecognizer(int lagMs) : ILiveRecognizer
+    {
+        private long _acceptedSamples;
+        private long _emittedChunks;
+        public List<int> ClosedSampleCounts { get; } = [];
+        public string CurrentText => _emittedChunks > 0 ? $"流式{_emittedChunks}" : "";
+
+        public void Accept(ReadOnlySpan<float> samples)
+        {
+            _acceptedSamples += samples.Length;
+            var lagSamples = AudioFormat.MsToSamples(lagMs);
+            if (_acceptedSamples > lagSamples)
+                _emittedChunks = (_acceptedSamples - lagSamples) / AudioFormat.MsToSamples(480);
+        }
+
+        public string CloseSegment()
+        {
+            ClosedSampleCounts.Add((int)_acceptedSamples);
+            var text = _acceptedSamples > 0 ? "流式片段" : "";
+            _acceptedSamples = 0;
+            _emittedChunks = 0;
+            return text;
+        }
+
+        public void Dispose() { }
+    }
+
+    private sealed class SliceVerifyingRecognizer(Func<int, ReadOnlySpan<float>, string> decode) : ISegmentRecognizer
+    {
+        private int _call;
+        public List<float[]> Slices { get; } = [];
+
+        public string Recognize(ReadOnlySpan<float> samples)
+        {
+            var copy = samples.ToArray();
+            Slices.Add(copy);
+            return decode(_call++, samples);
+        }
+
+        public void Dispose() { }
+    }
+
+    [Fact]
+    public async Task MidSpeechForcedCut_ConservesEverySampleAtQuietestValley_EvenWhenLiveStreamLagsBy600Ms()
+    {
+        // Continuous speech from 0 ms to 13,200 ms with a 600 ms transducer output lag and a single quiet 20 ms valley
+        // at [11,360 ms, 11,400 ms). Verifies zero dropped samples, zero double-decoded samples, and seamless phrase join.
+        var draft = new DraftSession(hasTarget: true);
+        var script = new[] { new ScriptedSegment(0, 13_200, "持续说话无停顿") };
+        var live = new LaggedLiveRecognizer(lagMs: 600);
+        var secondPass = new SliceVerifyingRecognizer((idx, _) =>
+            idx == 0 ? "慢慢慢慢的语料库在。" : "我脑中大量积累。");
+
+        await using var session = new DictationSession(
+            live,
+            new ScriptedVad(script),
+            secondPass,
+            draft,
+            new DictationOptions
+            {
+                HardPauseMs = 1000,
+                SoftMaxUtteranceMs = 8_000,
+                HardMaxUtteranceMs = 12_000,
+                PassageMaxChars = 500
+            });
+        session.Start();
+
+        var totalSamples = (int)AudioFormat.MsToSamples(13_200);
+        var valleyStart = (int)AudioFormat.MsToSamples(11_360);
+        var valleyEnd = (int)AudioFormat.MsToSamples(11_400);
+        var fullWaveform = new float[totalSamples];
+        for (var i = 0; i < totalSamples; i++)
+        {
+            var amplitude = i >= valleyStart && i < valleyEnd ? 0.001f : 0.25f;
+            // Monotonic sample tag inside amplitude variation so exact sample continuity across slices can be proven.
+            fullWaveform[i] = amplitude + (i % 997) * 1e-6f;
+        }
+
+        var frameSamples = (int)AudioFormat.MsToSamples(40);
+        for (var offset = 0; offset < totalSamples; offset += frameSamples)
+            session.Push(fullWaveform[offset..Math.Min(totalSamples, offset + frameSamples)]);
+        await session.StopAsync();
+
+        Assert.Equal(2, secondPass.Slices.Count);
+        var firstSlice = secondPass.Slices[0];
+        var secondSlice = secondPass.Slices[1];
+
+        // Cut landed inside the quiet valley rather than mid-syllable at 12,000 ms or lagging at 11,400 - 600 ms.
+        Assert.InRange(firstSlice.Length, valleyStart, valleyEnd);
+        Assert.Equal(totalSamples, firstSlice.Length + secondSlice.Length);
+
+        // Exact sample-by-sample partition: slice 0 + slice 1 reconstructs the entire spoken waveform with 0 gap and 0 overlap.
+        var reconstructed = firstSlice.Concat(secondSlice).ToArray();
+        Assert.Equal(fullWaveform, reconstructed);
+
+        // Isolated period on mid-phrase preposition "在。" was stripped seamlessly without breaking or inserting a comma.
+        Assert.Equal(["慢慢慢慢的语料库在我脑中大量积累。"], draft.Read(d => d.Units.Select(u => u.Raw).ToList()));
+    }
+
+    [Fact]
+    public async Task MidSpeechForcedCutOnEnglish_StripsSyntheticPeriodAndKeepsWordSpace()
+    {
+        var draft = new DraftSession(hasTarget: true);
+        var script = new[] { new ScriptedSegment(0, 13_000, "continuous english dictation") };
+        var live = new LaggedLiveRecognizer(lagMs: 480);
+        var secondPass = new SliceVerifyingRecognizer((idx, _) =>
+            idx == 0 ? "We are testing the speech pipeline." : "inside a noisy coffee shop.");
+
+        await using var session = new DictationSession(
+            live,
+            new ScriptedVad(script),
+            secondPass,
+            draft,
+            new DictationOptions { HardMaxUtteranceMs = 12_000, SoftMaxUtteranceMs = 8_000, PassageMaxChars = 500 });
+        session.Start();
+
+        for (var pushed = 0; pushed < 13_000; pushed += 40)
+            session.Push(new float[AudioFormat.MsToSamples(40)]);
+        await session.StopAsync();
+
+        Assert.Equal(
+            ["We are testing the speech pipeline inside a noisy coffee shop."],
+            draft.Read(d => d.Units.Select(u => u.Raw).ToList()));
+    }
+
+    [Fact]
+    public async Task SoftMaxUtterance_WaitsForActualSilencePause_InsteadOfCuttingActiveSpeech()
+    {
+        var script = new[]
+        {
+            new ScriptedSegment(200, 1400, "第一小句"),
+            new ScriptedSegment(1700, 5200, "第二小句正在连续发音不能从中间劈开"),
+        };
+        await using var h = new Harness(script, hardPauseMs: 5000, softMaxUtteranceMs: 2500, passageMaxChars: 200);
+
+        // At 3600 ms, elapsed since first.StartSample is 3400 ms (> softMax 2500 ms), but speaker is mid-sentence in segment 2.
+        h.Push(3600);
+        await Task.Delay(50);
+        Assert.Empty(h.Session.Segments);
+
+        // Once segment 2 finishes and enters its short pause at 5450+ ms, soft cut closes cleanly in silence.
+        h.Push(2000);
+        Assert.True(await Until(() => h.Session.Segments.Count == 1));
+        Assert.False(h.Session.Segments[0].EndsSentence);
+        await h.Session.StopAsync();
+        Assert.Equal(["第一小句第二小句正在连续发音不能从中间劈开"], h.Raws);
+    }
+
+    [Fact]
+    public async Task HesitationDanglingClauses_HoldPeriods_WhileShortPredicateRepliesKeepPeriods()
+    {
+        var script = new[]
+        {
+            new ScriptedSegment(200, 1200, "另外一群孩子怎么来，他就。"),
+            new ScriptedSegment(1800, 2800, "按照学校节奏来。"),
+            new ScriptedSegment(3400, 4200, "我不喜欢这种。"),
+            new ScriptedSegment(4800, 5600, "差很多。"),
+        };
+        var idx = 0;
+        string[] decoded = ["另外一群孩子怎么来，他就。", "按照学校节奏来。", "我不喜欢这种。", "差很多。"];
+        await using var h = new Harness(
+            script,
+            hardPauseMs: 400,
+            passagePauseMs: 4000,
+            passageMaxChars: 1,
+            secondPass: new ScriptedSegmentRecognizer(() => decoded[idx++]));
+
+        h.Push(6200);
+        await h.Session.StopAsync();
+
+        Assert.Equal(
+            ["另外一群孩子怎么来，他就，按照学校节奏来。", "我不喜欢这种。", "差很多。"],
+            h.Raws);
+    }
+
+    [Fact]
     public async Task Dispose_ReleasesTheRecognizersItWasGiven()
     {
         var secondPass = new ScriptedSegmentRecognizer(() => "好的。");

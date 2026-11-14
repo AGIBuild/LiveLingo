@@ -1,6 +1,7 @@
 using System.Text;
 using LiveLingo.Core.Dictation;
 using LiveLingo.Core.Inference;
+using LiveLingo.Core.Translation;
 
 namespace LiveLingo.Core.Cleanup;
 
@@ -16,11 +17,11 @@ public sealed class LlmTextCleaner(IChatCompletionClient client) : ITextCleaner
 
     internal const string SystemPrompt = """
         你是语音输入法的文字整理器。输入是语音识别的原文，你只整理“目标”部分，它可能包含多个句子。识别器按停顿把话切碎，所以目标里常有半句话、重复、口头语和同音错字。请整理成通顺、可以直接发送的文字：
-        1. 把被切碎的半句话接成完整的句子，重新加标点。
+        1. 把被切碎的半句话接成完整的句子，重新加标点；句首用于反驳前文的“不是”后面补上逗号，避免误读成反义。
         2. 删除口头语（呃、嗯、那个、就是、然后呢）、犹豫、重复，以及说到一半就放弃的半句。
         3. 说话人自我纠正时（例如“十秒，不对，三十秒”），只保留纠正后的内容。
-        4. 根据上下文改正明显的同音错字和技术名词的误识别；词表里的写法优先，识别成乱码的术语按词表还原。拿不准的词保留原样，不要删除。
-        5. 所有英文单词和技术名词都要保留，只可以改正大小写和空格。
+        4. 根据上下文改正明显的同音/近音错字、补全口语快读漏掉的固定成语或虚词，并修正技术名词的误识别；词表里的写法优先，识别成乱码或近音词的术语按词表还原；若给出“常见误识别纠正”，将原文中的左侧误识别词替换为右侧正确写法。拿不准的词保留原样，不要删除。
+        5. 正确的英文单词和技术名词都要保留（不要翻译成中文），可以改正大小写、空格，以及按前文、词表或“常见误识别纠正”修正明显的近音误识别。
 
         严禁：
         - 添加原文没有的任何信息、原因、结论或建议。
@@ -35,7 +36,8 @@ public sealed class LlmTextCleaner(IChatCompletionClient client) : ITextCleaner
 
     private static readonly IReadOnlyDictionary<string, object> Sampling = new Dictionary<string, object>
     {
-        ["seed"] = 42
+        ["seed"] = 42,
+        ["cache_prompt"] = true
     };
 
     public async Task<string> CleanAsync(CleanupRequest request, CancellationToken ct)
@@ -51,11 +53,12 @@ public sealed class LlmTextCleaner(IChatCompletionClient client) : ITextCleaner
 
     internal static string BuildUserMessage(CleanupRequest request)
     {
+        var target = Glossary.ApplyCorrections(request.Target, request.Corrections);
         var user = new StringBuilder();
         if (request.Glossary.Count > 0)
             user.Append("词表：").AppendJoin("、", request.Glossary).Append('\n');
         user.Append("前文（只读）：").Append(request.Preceding.Length > 0 ? request.Preceding : "（无）").Append('\n');
-        user.Append("目标：").Append(request.Target).Append('\n');
+        user.Append("目标：").Append(target).Append('\n');
         user.Append("后文：").Append(request.Continues ? "（说话人还在继续说下去）" : "（无，说话已经结束）");
         return user.ToString();
     }

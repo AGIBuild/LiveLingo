@@ -47,7 +47,7 @@ public static class FileTranscriber
                 var end = (int)Math.Clamp(span.EndSample, start, samples.Length);
                 while (end - start > MaxSpanSamples)
                 {
-                    var cut = QuietestPoint(samples, start + MaxSpanSamples - CutSearchSamples, start + MaxSpanSamples);
+                    var cut = QuietestPoint(samples.AsSpan(), start + MaxSpanSamples - CutSearchSamples, start + MaxSpanSamples);
                     Recognize(start, cut);
                     start = cut;
                 }
@@ -69,7 +69,7 @@ public static class FileTranscriber
     }
 
     /// <summary>The middle of the quietest 20 ms frame in [from, to): where a long stretch can be cut with the least damage.</summary>
-    private static int QuietestPoint(float[] samples, int from, int to)
+    internal static int QuietestPoint(ReadOnlySpan<float> samples, int from, int to)
     {
         var best = from;
         var bestEnergy = double.MaxValue;

@@ -1,6 +1,7 @@
 using LiveLingo.Core.Dictation;
 using LiveLingo.Core.Drafting;
 using LiveLingo.Core.Inference;
+using LiveLingo.Core.Translation;
 
 namespace LiveLingo.Core.Cleanup;
 
@@ -15,6 +16,7 @@ public sealed class CleanupScheduler : IAsyncDisposable
     private readonly DraftSession _session;
     private readonly ITextCleaner _cleaner;
     private readonly IReadOnlyList<string> _glossary;
+    private readonly IReadOnlyList<GlossaryCorrection> _corrections;
     private readonly int _contextChars;
     private readonly TimeProvider _time;
     /// <summary>How long the source must be still before typed text is cleaned: shorter than a sentence, longer than a keystroke.</summary>
@@ -36,11 +38,13 @@ public sealed class CleanupScheduler : IAsyncDisposable
         ITextCleaner cleaner,
         IReadOnlyList<string> glossary,
         int contextChars,
-        TimeProvider? time = null)
+        TimeProvider? time = null,
+        IReadOnlyList<GlossaryCorrection>? corrections = null)
     {
         _session = session;
         _cleaner = cleaner;
         _glossary = glossary;
+        _corrections = corrections ?? [];
         _contextChars = contextChars;
         _time = time ?? TimeProvider.System;
         _typingTimer = _time.CreateTimer(_ => Wake(), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
@@ -161,7 +165,7 @@ public sealed class CleanupScheduler : IAsyncDisposable
     private async Task<(string Text, GateRejection? Rejection)> CleanUnitAsync(CleanupRequest request, CancellationToken ct)
     {
         var cleaned = (await _cleaner.CleanAsync(request, ct).ConfigureAwait(false)).Trim();
-        var gate = FidelityGate.Check(request.Target, cleaned, _glossary);
+        var gate = FidelityGate.Check(request.Target, cleaned, _glossary, corrections: _corrections);
         if (gate.Accepted)
             return (cleaned, null);
 
@@ -179,9 +183,9 @@ public sealed class CleanupScheduler : IAsyncDisposable
         {
             var sentence = sentences[i].Body;
             var preceding = TextUnits.Join(parts.Prepend(request.Preceding).Select(part => ("", part, "")));
-            var one = new CleanupRequest(sentence, preceding, i < sentences.Count - 1 || request.Continues, request.Glossary);
+            var one = new CleanupRequest(sentence, preceding, i < sentences.Count - 1 || request.Continues, request.Glossary, request.Corrections);
             var text = (await _cleaner.CleanAsync(one, ct).ConfigureAwait(false)).Trim();
-            var accepted = FidelityGate.Check(sentence, text, _glossary).Accepted;
+            var accepted = FidelityGate.Check(sentence, text, _glossary, corrections: _corrections).Accepted;
             anyCleaned |= accepted;
             parts.Add(accepted ? text : sentence);
         }
@@ -212,7 +216,7 @@ public sealed class CleanupScheduler : IAsyncDisposable
             if (!continues && typing > TimeSpan.Zero)
                 return (null, typing);
 
-            return ((draft.TicketFor(i), new CleanupRequest(unit.Raw, draft.PrecedingText(i, _contextChars), continues, _glossary)), null);
+            return ((draft.TicketFor(i), new CleanupRequest(unit.Raw, draft.PrecedingText(i, _contextChars), continues, _glossary, _corrections)), null);
         }
 
         return (null, null);
