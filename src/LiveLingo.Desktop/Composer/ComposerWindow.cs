@@ -17,30 +17,23 @@ namespace LiveLingo.Desktop.Composer;
 /// </summary>
 internal sealed class ComposerWindow : Window
 {
-    /// <summary>The page keeps an 18 px margin around the panel for its shadow.</summary>
-    private const double ShadowMargin = 36;
-    private const double NarrowWidth = 620 + ShadowMargin;
-    private const double WideWidth = 940 + ShadowMargin;
     private static readonly PixelPoint ParkedAt = new(-20000, -20000);
 
     private readonly WebSurface _web;
     private readonly IWindowMover _mover;
     private readonly ILogger _logger;
     private readonly ComposerGeometryLog _geometryLog;
+    private readonly ModelUsage _modelUsage;
     private ComposerWebSession? _session;
+    private ComposerFrame? _frame;
     private TargetWindowInfo? _target;
     private TaskCompletionSource? _dismissed;
+    private CancellationTokenSource? _dragCts;
     private bool _placed;
-    private readonly ModelUsage _modelUsage;
-
-    // The user moved the window by its header or sized it: it stays where it is (kept on screen) until the next summon.
-    private bool _moved;
-
-    // The size the user chose by dragging an edge or zooming; null while the window follows the page's content (height)
-    // or the layout (width). The last height the page asked for is kept so the window can go back to it.
-    private double? _userWidth;
-    private double? _userHeight;
-    private double _contentHeight;
+    private bool _dragging;
+    private readonly Queue<(int X, int Y)> _issuedPositions = new(8);
+    private int? _appliedPanelLimit;
+    private bool _appliedFixedHeight;
 
     public ComposerWindow(ILogger logger, IWindowMover mover, ModelUsage modelUsage)
     {
@@ -49,8 +42,8 @@ internal sealed class ComposerWindow : Window
         _geometryLog = new ComposerGeometryLog(logger);
         _mover = mover;
         _web = new WebSurface(WebPage.ComposerEntry, logger);
-        Width = NarrowWidth;
-        Height = 260;
+        Width = ComposerFrame.NarrowWidth;
+        Height = ComposerFrame.InitialHeight;
         CanResize = false;
         ShowInTaskbar = false;
         ShowActivated = false;
@@ -61,11 +54,14 @@ internal sealed class ComposerWindow : Window
         WindowStartupLocation = WindowStartupLocation.Manual;
         Title = "LiveLingo";
         Content = _web.View;
+        Opened += (_, _) => Screens.Changed += (_, _) => OnDisplayChanged();
         Resized += (_, _) =>
         {
             if (_session is not null)
                 _geometryLog.SystemResized(Geometry());
         };
+        PositionChanged += (_, _) => OnPositionChanged();
+        ScalingChanged += (_, _) => OnDisplayChanged();
     }
 
     /// <summary>The window's geometry as it is now, for the log.</summary>
@@ -73,8 +69,10 @@ internal sealed class ComposerWindow : Window
     {
         var screen = CurrentScreen();
         return new ComposerGeometry(
-            Width, Height, ClientSize, Position.X, Position.Y, MaxHeight, _userWidth, _userHeight, _contentHeight,
-            _moved, _session?.Wide ?? false, screen?.Scaling ?? RenderScaling, screen?.WorkingArea);
+            Width, Height, ClientSize, Position.X, Position.Y, MaxHeight,
+            _frame?.UserWidth, _frame?.UserHeight, _frame?.ContentHeight ?? 0,
+            _frame?.IsFreePlaced ?? false, _session?.Wide ?? false,
+            screen?.Scaling ?? RenderScaling, screen?.WorkingArea);
     }
 
     public bool IsPresenting => _session is not null;
@@ -84,26 +82,33 @@ internal sealed class ComposerWindow : Window
     {
         Opacity = 0;
         _placed = false;
+        _issuedPositions.Clear();
         // Show before moving: a window whose first position is far off screen comes up 0 x 0 on macOS.
         if (!IsVisible)
             Show();
+        RecordIssuedPosition(ParkedAt);
         Position = ParkedAt;
     }
 
     /// <summary>Puts the composer in front of the user; completes when it was dismissed (written, hidden, or toggled away).</summary>
     public Task PresentAsync(ComposerViewModel vm, ComposerTexts texts, RecentDrafts recent, TargetWindowInfo? target)
     {
+        _dragCts?.Cancel();
+        _dragCts?.Dispose();
+        _dragCts = new CancellationTokenSource();
         _target = target;
-        _moved = false;
-        _userWidth = null;
-        _userHeight = null;
+        _dragging = false;
+        _issuedPositions.Clear();
+        _appliedPanelLimit = null;
+        _appliedFixedHeight = false;
         _dismissed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         _session = new ComposerWebSession(
             vm, texts, recent, new StorageFileDialogs(StorageProvider, texts), _web,
             SynchronizationContext.Current ?? throw new InvalidOperationException("The composer is shown from the UI thread."),
             TimeProvider.System, _logger, _modelUsage);
+        _frame = new ComposerFrame(target, _session.Wide);
         _session.SizeChanged += OnSize;
-        _session.WideChanged += ApplyWidth;
+        _session.WideChanged += OnWideChanged;
         _session.Dragged += OnDrag;
         _session.Resized += OnResize;
         _session.Zoomed += OnZoom;
@@ -113,9 +118,7 @@ internal sealed class ComposerWindow : Window
 
         // On screen but still transparent: WebKit does not run animation frames for an off-screen page, and the page
         // can only report its size from one.
-        ApplyWidth();
-        LimitToScreen();
-        Place();
+        Apply();
         _geometryLog.SummonStarted(
             target is null ? "none" : $"{target.ProcessName} rect=({target.Left},{target.Top},{target.Width}x{target.Height})",
             Geometry());
@@ -136,10 +139,14 @@ internal sealed class ComposerWindow : Window
 
     private void OnSize(SizeIntent size)
     {
-        _contentHeight = size.Height;
-        if (_userHeight is null)
-            Height = size.Height;
-        Place();
+        if (_session is null || _frame is null)
+            return;
+
+        _frame.MeasureContent(size.Height);
+        if (_dragging)
+            return;
+
+        Apply();
         var geometry = Geometry();
         _geometryLog.Sized(size.Width, size.Height, geometry);
         _geometryLog.CheckOnScreen(geometry);
@@ -153,11 +160,13 @@ internal sealed class ComposerWindow : Window
         _web.View.Focus();
     }
 
-    private void ApplyWidth()
+    private void OnWideChanged()
     {
-        Width = _userWidth ?? (_session!.Wide ? WideWidth : NarrowWidth);
-        if (_placed)
-            Place();
+        if (_session is null || _frame is null)
+            return;
+
+        _frame.SetWide(_session.Wide);
+        Apply();
     }
 
     /// <summary>
@@ -166,76 +175,99 @@ internal sealed class ComposerWindow : Window
     /// </summary>
     private void OnResize(ResizeIntent resize)
     {
-        if (_session is null || CurrentScreen() is not { } screen)
+        if (_session is null || _frame is null || _dragging || CurrentScreen() is not { } screen)
             return;
 
-        _moved = true;
-        var work = screen.WorkingArea;
-        var (width, height) = ComposerPlacement.Resize(
-            (Width, Height), resize.Width, resize.Height, _session.Wide, Position.X, Position.Y,
-            new PixelBounds(work.X, work.Y, work.Width, work.Height), screen.Scaling);
-        if (resize.Width is not null)
-        {
-            _userWidth = width;
-            Width = width;
-        }
-        if (resize.Height is not null)
-        {
-            _userHeight = height;
-            Height = height;
-            _session.SetFixedHeight(true);
-        }
+        _frame.ResizeEdge(
+            resize.Width, resize.Height, (Width, Height), (Position.X, Position.Y),
+            BoundsOf(screen.WorkingArea), screen.Scaling);
+        Apply();
         _geometryLog.InfoThrottled("user-resize", Geometry(), $"asked={resize.Width?.ToString() ?? "-"}x{resize.Height?.ToString() ?? "-"}css");
     }
 
     /// <summary>Like zooming a window by its title bar: a large window that shows much text, and back to the size that fits the content.</summary>
     private void OnZoom()
     {
-        if (_session is null || CurrentScreen() is not { } screen)
+        if (_session is null || _frame is null || _dragging || CurrentScreen() is not { } screen)
             return;
 
-        if (_userHeight is not null)
-        {
-            _userWidth = null;
-            _userHeight = null;
-            _moved = false;
-            _session.SetFixedHeight(false);
-            ApplyWidth();
-            Height = _contentHeight;
-            Place();
-            _geometryLog.Info("unzoom", Geometry());
-            return;
-        }
-
-        var work = screen.WorkingArea;
-        var zoomed = ComposerPlacement.Zoomed(new PixelBounds(work.X, work.Y, work.Width, work.Height), screen.Scaling);
-        _moved = true;
-        _userWidth = zoomed.Width;
-        _userHeight = zoomed.Height;
-        Width = zoomed.Width;
-        Height = zoomed.Height;
-        Position = new PixelPoint(zoomed.X, zoomed.Y);
-        _session.SetFixedHeight(true);
-        _geometryLog.Info("zoom", Geometry());
+        var unzooming = _frame.FixedHeight;
+        _frame.ToggleZoom(BoundsOf(screen.WorkingArea), screen.Scaling);
+        Apply();
+        _geometryLog.Info(unzooming ? "unzoom" : "zoom", Geometry());
     }
 
     /// <summary>
     /// The header is the window's handle: the system moves the window (the page cannot, and its pointer coordinates
-    /// are not reliable across web engines). The drag runs until the button is released; the window is then brought
-    /// back on screen, with the page limited to the screen it was dropped on.
+    /// are not reliable across web engines). The drag runs until the button is released; the window is then reconciled
+    /// to the working area of the screen it was dropped on.
     /// </summary>
-    private void OnDrag()
+    private async void OnDrag()
     {
-        if (_session is null || TryGetPlatformHandle() is not { } handle)
+        if (_session is null || _frame is null || _dragging || _dragCts is null || TryGetPlatformHandle() is not { } handle)
             return;
 
-        _mover.BeginDrag(handle);
-        _moved = true;
-        LimitToScreen();
-        Place();
+        var session = _session;
+        var token = _dragCts.Token;
+        _dragging = true;
+        try
+        {
+            await _mover.DragAsync(handle, token);
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Window drag failed: {Exception}", ex.GetType().Name);
+            return;
+        }
+        finally
+        {
+            if (_session == session)
+                _dragging = false;
+        }
+
+        if (_session != session || _frame is null || token.IsCancellationRequested)
+            return;
+
+        _frame.MoveTo(Position.X, Position.Y);
+        Apply();
         var geometry = Geometry();
         _geometryLog.Info("dragged", geometry);
         _geometryLog.CheckOnScreen(geometry);
+    }
+
+    private void OnPositionChanged()
+    {
+        if (_session is null || _frame is null || !_placed || _dragging)
+            return;
+
+        // Native frame changes arrive asynchronously on macOS; ignore echoes of positions Apply() itself issued, and
+        // treat any other move (e.g. a window-manager shortcut on the same or another screen) as an external move.
+        if (!ComposerFrame.IsExternalMove((Position.X, Position.Y), [.. _issuedPositions]))
+            return;
+
+        _frame.MoveTo(Position.X, Position.Y);
+        Apply();
+        var geometry = Geometry();
+        _geometryLog.InfoThrottled("screen-reconciled", geometry);
+        _geometryLog.CheckOnScreen(geometry);
+    }
+
+    private void OnDisplayChanged()
+    {
+        if (_session is null || _frame is null || _dragging)
+            return;
+
+        Apply();
+        if (_placed)
+        {
+            var geometry = Geometry();
+            _geometryLog.InfoThrottled("display-changed", geometry);
+            _geometryLog.CheckOnScreen(geometry);
+        }
     }
 
     private void Dismiss()
@@ -245,7 +277,12 @@ internal sealed class ComposerWindow : Window
             return;
 
         _geometryLog.Info("dismiss", Geometry());
+        _dragCts?.Cancel();
+        _dragCts?.Dispose();
+        _dragCts = null;
+        _dragging = false;
         _session = null;
+        _frame = null;
         session.Vm.Completed -= Dismiss;
         session.Vm.CloseRequested -= Dismiss;
         session.Dispose();
@@ -256,51 +293,52 @@ internal sealed class ComposerWindow : Window
 
     private Screen? CurrentScreen()
     {
-        if (_moved)
-            return Screens.ScreenFromWindow(this) ?? Screens.Primary;
+        if (_frame is { IsFreePlaced: true })
+        {
+            var (ax, ay) = ComposerPlacement.HeaderAnchor(Position.X, Position.Y, Width, DesktopScaling);
+            return Screens.ScreenFromPoint(new PixelPoint(ax, ay))
+                ?? Screens.ScreenFromWindow(this)
+                ?? Screens.Primary;
+        }
 
         return _target is null
             ? Screens.Primary
             : Screens.ScreenFromPoint(new PixelPoint(_target.Left + _target.Width / 2, _target.Top + _target.Height / 2)) ?? Screens.Primary;
     }
 
-    /// <summary>
-    /// The page never grows beyond the working area of the screen it is on (no dock, menu bar or screen edge hides its
-    /// buttons): the page scrolls inside its panel, and the window is capped as well.
-    /// </summary>
-    private void LimitToScreen()
+    private void Apply()
     {
-        if (CurrentScreen() is not { } screen)
-            return;
-
-        MaxHeight = screen.WorkingArea.Height / screen.Scaling;
-        _session?.LimitPanelHeight(ComposerPlacement.MaxPanelHeight(screen.WorkingArea.Height, screen.Scaling));
-    }
-
-    private void Place()
-    {
-        if (CurrentScreen() is not { } screen)
+        if (_session is null || _frame is null || _dragging || CurrentScreen() is not { } screen)
             return;
 
         var work = screen.WorkingArea;
-        var bounds = new PixelBounds(work.X, work.Y, work.Width, work.Height);
-        (int X, int Y) at;
-        if (_moved)
-        {
-            at = ComposerPlacement.Clamp(Position.X, Position.Y, Width, Height, screen.Scaling, bounds);
-        }
-        else if (_target is null)
-        {
-            at = ComposerPlacement.Clamp(
-                work.X + (int)((work.Width - Width * screen.Scaling) / 2),
-                work.Y + (int)((work.Height - Height * screen.Scaling) / 3),
-                Width, Height, screen.Scaling, bounds);
-        }
-        else
-        {
-            at = ComposerPlacement.For(_target, Width, Height, screen.Scaling, bounds);
-        }
+        var plan = _frame.Plan(BoundsOf(work), screen.Scaling);
+        MaxWidth = plan.MaxWidth;
+        MaxHeight = plan.MaxHeight;
+        Width = plan.Width;
+        Height = plan.Height;
+        var target = new PixelPoint(plan.X, plan.Y);
+        RecordIssuedPosition(target);
+        Position = target;
 
-        Position = new PixelPoint(at.X, at.Y);
+        if (_appliedPanelLimit != plan.MaxPanelHeight)
+        {
+            _appliedPanelLimit = plan.MaxPanelHeight;
+            _session.LimitPanelHeight(plan.MaxPanelHeight);
+        }
+        if (_appliedFixedHeight != plan.FixedHeight)
+        {
+            _appliedFixedHeight = plan.FixedHeight;
+            _session.SetFixedHeight(plan.FixedHeight);
+        }
     }
+
+    private void RecordIssuedPosition(PixelPoint point)
+    {
+        if (_issuedPositions.Count >= 8)
+            _issuedPositions.Dequeue();
+        _issuedPositions.Enqueue((point.X, point.Y));
+    }
+
+    private static PixelBounds BoundsOf(PixelRect rect) => new(rect.X, rect.Y, rect.Width, rect.Height);
 }

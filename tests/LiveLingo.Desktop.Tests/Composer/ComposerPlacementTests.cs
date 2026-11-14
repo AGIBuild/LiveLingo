@@ -185,4 +185,111 @@ public class ComposerPlacementTests
         Assert.Equal(8, zoomed.X);
         Assert.Equal(25 + 8, zoomed.Y);
     }
+
+    [Fact]
+    public void ComposerFrame_ShrinksPortraitWindowOnDropToSmallerScreen_AndIgnoresStaleOversizedMeasurement()
+    {
+        var portrait = new PixelBounds(1512, -1548, 1440, 2468);
+        var macbook = new PixelBounds(0, 33, 1512, 949);
+        var frame = new ComposerFrame(Target(0, 33, 1512, 887), wide: true);
+
+        frame.MoveTo(1723, -147);
+        frame.MeasureContent(1764);
+        var onPortrait = frame.Plan(portrait, scaling: 1);
+        Assert.Equal(1764, onPortrait.Height);
+
+        frame.MoveTo(242, -156);
+        var dropped = frame.Plan(macbook, scaling: 1);
+        // A late in-flight SizeIntent from the portrait display before CSS receives the new --panel-max must not bounce Height to MaxHeight.
+        frame.MeasureContent(1764);
+        var afterLateSize = frame.Plan(macbook, scaling: 1);
+
+        Assert.Equal(664, dropped.MaxPanelHeight);
+        Assert.Equal(976, dropped.Width);
+        Assert.Equal(700, dropped.Height);
+        Assert.Equal((242, 33), (dropped.X, dropped.Y));
+        Assert.Equal(dropped, afterLateSize);
+    }
+
+    [Fact]
+    public void ComposerFrame_ZoomDraggedToSmallerScreen_ClampsZoomedSizeAndUnzoomsOnTheNewScreen()
+    {
+        var portrait = new PixelBounds(1512, -1548, 1440, 2468);
+        var small = new PixelBounds(0, 25, 1024, 743);
+        var frame = new ComposerFrame(Target(1600, -500, 1200, 900), wide: true);
+        frame.MeasureContent(320);
+
+        frame.ToggleZoom(portrait, scaling: 1);
+        var zoomedBig = frame.Plan(portrait, scaling: 1);
+        Assert.True(zoomedBig.FixedHeight);
+        Assert.Equal(2468 - 16, zoomedBig.Height);
+
+        frame.MoveTo(600, 500);
+        var zoomedSmall = frame.Plan(small, scaling: 1);
+        Assert.Equal(1024 - 16, zoomedSmall.Width);
+        Assert.Equal(743 - 16, zoomedSmall.Height);
+        Assert.InRange(zoomedSmall.X, small.X, small.X + small.Width - (int)zoomedSmall.Width);
+        Assert.InRange(zoomedSmall.Y, small.Y, small.Y + small.Height - (int)zoomedSmall.Height);
+
+        frame.ToggleZoom(small, scaling: 1);
+        var unzoomed = frame.Plan(small, scaling: 1);
+        Assert.False(unzoomed.FixedHeight);
+        Assert.Equal(320, unzoomed.Height);
+        Assert.InRange(unzoomed.X, small.X, small.X + small.Width - (int)unzoomed.Width);
+        Assert.InRange(unzoomed.Y, small.Y, small.Y + small.Height - (int)unzoomed.Height);
+    }
+
+    [Fact]
+    public void ComposerFrame_AnchoredEdgeResizeThenZoomAndUnzoom_RestoresToTargetAnchor()
+    {
+        var target = Target(200, 100, 1000, 800);
+        var frame = new ComposerFrame(target, wide: false);
+        frame.MeasureContent(240);
+        var initial = frame.Plan(Screen, scaling: 1);
+
+        frame.ResizeEdge(800, null, (initial.Width, initial.Height), (initial.X, initial.Y), Screen, scaling: 1);
+        var widened = frame.Plan(Screen, scaling: 1);
+        Assert.Equal(800, widened.Width);
+        Assert.Equal((initial.X, initial.Y), (widened.X, widened.Y));
+        Assert.False(widened.FixedHeight);
+
+        frame.ToggleZoom(Screen, scaling: 1);
+        Assert.True(frame.Plan(Screen, scaling: 1).FixedHeight);
+
+        frame.ToggleZoom(Screen, scaling: 1);
+        var restored = frame.Plan(Screen, scaling: 1);
+        Assert.Equal(initial, restored);
+        Assert.False(frame.IsFreePlaced);
+    }
+
+    [Fact]
+    public void ComposerFrame_CapsDefaultWideWidthOnANarrowScaledDisplay()
+    {
+        var narrowPortrait = new PixelBounds(0, 0, 1600, 2560);
+        var frame = new ComposerFrame(target: null, wide: true);
+        frame.MeasureContent(400);
+
+        var plan = frame.Plan(narrowPortrait, scaling: 2);
+
+        Assert.Equal(800, plan.MaxWidth);
+        Assert.Equal(800, plan.Width);
+        Assert.Equal(400, plan.Height);
+    }
+
+    [Fact]
+    public void HeaderAnchor_ProbesTheDraggableHeaderCenterInDesktopCoordinates()
+    {
+        Assert.Equal((242 + 488, 40 + 36), ComposerPlacement.HeaderAnchor(242, 40, 976, desktopScaling: 1));
+        Assert.Equal((100 + 656, 50 + 72), ComposerPlacement.HeaderAnchor(100, 50, 656, desktopScaling: 2));
+    }
+
+    [Fact]
+    public void IsExternalMove_FiltersIssuedEchoesWithinOnePixel_AndDetectsSameScreenWindowManagerMoves()
+    {
+        ReadOnlySpan<(int X, int Y)> issued = [(428, 708), (428, 520)];
+
+        Assert.False(ComposerFrame.IsExternalMove((428, 708), issued));
+        Assert.False(ComposerFrame.IsExternalMove((429, 519), issued));
+        Assert.True(ComposerFrame.IsExternalMove((24, 33), issued));
+    }
 }

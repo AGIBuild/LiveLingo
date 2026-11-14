@@ -51,11 +51,15 @@
     // The page keeps an 18 px margin all around for the panel's shadow.
     const width = Math.ceil(rect.width + 2 * MARGIN);
     const height = Math.ceil(bottom + MARGIN);
-    const key = width + 'x' + height;
-    if (key === lastSize || width < 1 || height < 1) return;
-    lastSize = key;
+    if (width < 1 || height < 1) return;
     content = { width, height };
     watchClipping();
+    // While fixed-h is active, the panel fills 100vh rather than natural content; never cache that forced height as
+    // lastSize so restoring natural height always reports the real content size back to the host.
+    if (LL.state.fixed) return;
+    const key = width + 'x' + height;
+    if (key === lastSize) return;
+    lastSize = key;
     LL.send('size', { width, height });
   }
 

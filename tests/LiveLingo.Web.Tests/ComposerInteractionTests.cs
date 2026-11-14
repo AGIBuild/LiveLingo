@@ -1060,9 +1060,9 @@ public sealed class ComposerInteractionTests(BrowserFixture browsers)
 
     [Theory]
     [MemberData(nameof(Engines))]
-    public async Task ThePanelLimitOfTheHost_ShortensThePanelAndTheBodyScrolls(string engine)
+    public async Task ThePanelLimitOfTheHost_ShortensThePanelAndEachColumnScrollsIndependently(string engine)
     {
-        await using var page = await browsers.OpenAsync(engine, "whole-wide");
+        await using var page = await browsers.OpenAsync(engine, "whole-wide", BrowserFixture.WideWidth);
         var before = (await page.Page.Locator("#composer").BoundingBoxAsync())!.Height;
 
         await page.ReceiveAsync("limit", new JsonObject { ["maxHeight"] = 200 });
@@ -1070,8 +1070,191 @@ public sealed class ComposerInteractionTests(BrowserFixture browsers)
         var after = (await page.Page.Locator("#composer").BoundingBoxAsync())!.Height;
         Assert.True(before > 200, $"The fixture must be taller than the limit to prove anything (was {before}).");
         Assert.True(after <= 200, $"The panel is {after} px tall with a limit of 200.");
-        Assert.True(await page.Page.EvaluateAsync<bool>("(() => { const b = document.querySelector('.c-body'); return b.scrollHeight > b.clientHeight; })()"));
+        Assert.True(await page.Page.EvaluateAsync<bool>(
+            "(() => { const b = document.querySelector('.c-body'), s = document.getElementById('src'), r = document.getElementById('rows'); return b.scrollHeight <= b.clientHeight + 1 && s.scrollHeight > s.clientHeight && r.scrollHeight > r.clientHeight; })()"));
         Assert.True(await page.Page.Locator("#commit").IsVisibleAsync());
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public async Task InWideMode_ColumnsUseFullPaneHeight_AlignScrollbarsToPaneEdges_AndNeverScrollEachOther(string engine)
+    {
+        await using var page = await browsers.OpenAsync(engine, "listening", BrowserFixture.WideWidth);
+        await page.ReceiveAsync("limit", new JsonObject { ["maxHeight"] = 360 });
+        await page.PushAsync("listening", s =>
+        {
+            s["layout"]!["wide"] = true;
+            var lines = new JsonArray();
+            for (var i = 0; i < 30; i++)
+                lines.Add(new JsonObject { ["time"] = null, ["text"] = $"实时识别第 {i + 1} 句长文本内容用于验证独立滚动。", ["tail"] = i == 29 });
+            s["source"]!["lines"] = lines;
+            s["result"]!["visible"] = true;
+            var rows = new JsonArray();
+            for (var i = 0; i < 24; i++)
+            {
+                rows.Add(new JsonObject
+                {
+                    ["i"] = i, ["state"] = "ready", ["text"] = $"整理后第 {i + 1} 段文本内容用于验证右栏独立滚动。",
+                    ["note"] = null, ["time"] = null, ["warn"] = false, ["owned"] = false, ["editing"] = false,
+                    ["canEdit"] = false, ["canUseOriginal"] = false, ["useOriginalAria"] = "u", ["editAria"] = "e",
+                });
+            }
+            s["result"]!["rows"] = rows;
+        });
+
+        var metrics = await page.Page.EvaluateAsync<double[]>(@"() => {
+            const body = document.querySelector('.c-body');
+            const srcPane = document.querySelector('.src');
+            const srcHead = srcPane.querySelector('.pane-label');
+            const live = document.getElementById('src-live');
+            const rows = document.getElementById('rows');
+            const srcRect = srcPane.getBoundingClientRect();
+            const liveRect = live.getBoundingClientRect();
+            const beforeSrcHeadY = srcHead.getBoundingClientRect().top;
+            const beforeLiveY = liveRect.top;
+
+            // Scroll the right column: the left column and both headers must not budge.
+            rows.scrollTop = 300;
+            const afterSrcHeadY = srcHead.getBoundingClientRect().top;
+            const afterLiveY = live.getBoundingClientRect().top;
+
+            return [
+                body.scrollHeight - body.clientHeight,
+                srcRect.bottom - liveRect.bottom,
+                srcRect.right - liveRect.right,
+                rows.scrollTop,
+                Math.abs(afterSrcHeadY - beforeSrcHeadY),
+                Math.abs(afterLiveY - beforeLiveY)
+            ];
+        }");
+
+        Assert.True(metrics[0] <= 1, $"Outer .c-body must not scroll (diff={metrics[0]}).");
+        Assert.True(Math.Abs(metrics[1]) <= 1, $"Source scrollport must fill 100% of the source pane bottom (gap={metrics[1]}).");
+        Assert.True(metrics[2] <= 1.5, $"Source scrollport right edge must align with the pane divider (gap={metrics[2]}).");
+        Assert.True(metrics[3] > 100, "Right column #rows must scroll on its own.");
+        Assert.Equal(0, metrics[4]);
+        Assert.Equal(0, metrics[5]);
+
+        // Scroll left live pane up manually: new speech updates must not yank it back to the bottom until scrolled back down.
+        await page.Page.EvaluateAsync("() => { document.getElementById('src-live').scrollTop = 10; }");
+        await page.Page.EvaluateAsync("() => new Promise(done => requestAnimationFrame(done))");
+        await page.PushAsync("listening", s =>
+        {
+            s["layout"]!["wide"] = true;
+            var lines = new JsonArray();
+            for (var i = 0; i < 32; i++)
+                lines.Add(new JsonObject { ["time"] = null, ["text"] = $"实时识别第 {i + 1} 句长文本内容用于验证独立滚动。", ["tail"] = i == 31 });
+            s["source"]!["lines"] = lines;
+        });
+        Assert.Equal(10, await page.Page.EvaluateAsync<int>("Math.round(document.getElementById('src-live').scrollTop)"));
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public async Task InWideMode_ShrinkingATallResultColumn_LetsTheShortSourceTextareaShrinkBack(string engine)
+    {
+        await using var page = await browsers.OpenAsync(engine, "whole-wide", BrowserFixture.WideWidth);
+        await page.ReceiveAsync("limit", new JsonObject { ["maxHeight"] = 700 });
+
+        await page.PushAsync("whole-wide", s =>
+        {
+            s["source"]!["text"] = "一行短原文。";
+            s["source"]!["sourceRev"] = 10;
+            var rows = new JsonArray();
+            for (var i = 0; i < 10; i++)
+            {
+                var row = s["result"]!["rows"]![0]!.DeepClone().AsObject();
+                row["i"] = i;
+                rows.Add(row);
+            }
+            s["result"]!["rows"] = rows;
+        });
+        var tall = (await page.Page.Locator("#composer").BoundingBoxAsync())!.Height;
+
+        await page.PushAsync("whole-wide", s =>
+        {
+            s["source"]!["text"] = "一行短原文。";
+            s["source"]!["sourceRev"] = 11;
+            var one = s["result"]!["rows"]![0]!.DeepClone().AsObject();
+            s["result"]!["rows"] = new JsonArray { one };
+        });
+        var shrunk = (await page.Page.Locator("#composer").BoundingBoxAsync())!.Height;
+
+        Assert.True(tall > shrunk + 150, $"Panel did not shrink back after result shortened (tall={tall}, shrunk={shrunk}).");
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public async Task InNarrowStackedMode_AnOverflowingPaneNeverCrushesItsSiblingPane_AndWideningViewportRewrapsTextarea(string engine)
+    {
+        await using var page = await browsers.OpenAsync(engine, "translate-ready");
+        await page.ReceiveAsync("limit", new JsonObject { ["maxHeight"] = 420 });
+        await page.PushAsync("translate-ready", s =>
+        {
+            s["source"]!["text"] = "短原文一行。";
+            s["source"]!["sourceRev"] = 10;
+            var rows = new JsonArray();
+            for (var i = 0; i < 30; i++)
+            {
+                var row = s["result"]!["rows"]![0]!.DeepClone().AsObject();
+                row["i"] = i;
+                row["text"] = $"第 {i + 1} 段长译文内容，验证单列上下布局时不会把上方的短原文面板挤压消失。";
+                rows.Add(row);
+            }
+            s["result"]!["rows"] = rows;
+        });
+
+        var srcHeight = (await page.Page.Locator(".src").BoundingBoxAsync())!.Height;
+        Assert.True(srcHeight >= 72, $"Short source pane was crushed to {srcHeight} px by tall stacked result.");
+
+        // Switch to Original-only with wrapped paragraph, then widen viewport: ResizeObserver must re-autosize textarea shorter.
+        await page.ReceiveAsync("limit", new JsonObject { ["maxHeight"] = 700 });
+        await page.PushAsync("empty", s =>
+        {
+            s["source"]!["text"] = string.Concat(Enumerable.Repeat("这是一段随窗口宽度重新折行计算高度的原文文本。", 12));
+            s["source"]!["sourceRev"] = 20;
+            s["source"]!["hint"] = false;
+        });
+        var narrowPanel = (await page.Page.Locator("#composer").BoundingBoxAsync())!.Height;
+
+        await page.Page.SetViewportSizeAsync(1100, 900);
+        await page.ClearIntentsAsync();
+        var widePanel = (await page.Page.Locator("#composer").BoundingBoxAsync())!.Height;
+
+        Assert.True(narrowPanel > widePanel + 40, $"Widening viewport did not re-wrap textarea height ({narrowPanel} -> {widePanel}).");
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public async Task FixedHeight_NeverCachesForcedViewportAsLastSize_AndWideOriginalSpansFullWidth(string engine)
+    {
+        await using var page = await browsers.OpenAsync(engine, "empty", BrowserFixture.WideWidth);
+        await page.ReceiveAsync("limit", new JsonObject { ["maxHeight"] = 500 });
+        await page.ClearIntentsAsync();
+
+        // Enter fixed-h in a 500px window (matching --panel-max + 36 = 536 after margin), type overflowing text, then restore.
+        await page.Page.SetViewportSizeAsync(BrowserFixture.WideWidth, 536);
+        await page.ReceiveAsync("frame", new JsonObject { ["fixedHeight"] = true });
+        await page.PushAsync("empty", s =>
+        {
+            s["layout"]!["wide"] = true;
+            s["source"]!["text"] = string.Join("\n", Enumerable.Range(1, 30).Select(i => $"第 {i} 行在放大固定高度期间录入的长原文。"));
+            s["source"]!["sourceRev"] = 10;
+            s["source"]!["hint"] = false;
+        });
+        await page.ClearIntentsAsync();
+
+        // Wide mode without .has-res (Original output) must span full panel width without a blank right column.
+        var spansFullWidth = await page.Page.EvaluateAsync<bool>(
+            "(() => { const c = document.getElementById('composer').getBoundingClientRect(), s = document.querySelector('.src').getBoundingClientRect(); return Math.abs(c.width - s.width) <= 3; })()");
+        Assert.True(spansFullWidth, "Wide composer without result column left half the panel blank.");
+
+        // Restoring natural height must emit a fresh SizeIntent so the host never stays stuck at the pre-zoom height.
+        await page.ReceiveAsync("frame", new JsonObject { ["fixedHeight"] = false });
+        await page.Page.EvaluateAsync("() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done)))");
+
+        var reported = await page.LastIntentAsync<SizeIntent>();
+        Assert.Equal(536, reported.Height);
     }
 
     private static async Task OpenDialogAsync(ComposerPage page, string item)

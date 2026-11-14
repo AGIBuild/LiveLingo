@@ -7,13 +7,23 @@
 
   function autosize(el) {
     if (el.hidden) return;
+    const top = el.scrollTop;
+    // Measure natural content height without flex-grow stretching or classic-scrollbar width shrinkage during collapse.
+    el.style.flex = '0 0 auto';
+    el.style.overflowY = 'hidden';
     el.style.height = 'auto';
-    el.style.height = el.scrollHeight + 'px';
+    const natural = el.scrollHeight;
+    el.style.flex = '';
+    el.style.overflowY = '';
+    el.style.height = natural + 'px';
+    el.scrollTop = top;
   }
 
   class Source extends preact.Component {
     composing = false;
     lastSent = '';
+    lastWidth = 0;
+    stickLive = true;
 
     setBox = (el) => {
       this.box = el;
@@ -23,8 +33,28 @@
       this.live = el;
     };
 
+    onLiveScroll = () => {
+      const el = this.live;
+      if (!el) return;
+      this.stickLive = el.scrollHeight - el.scrollTop - el.clientHeight <= 32;
+    };
+
+    onWindowResize = () => {
+      const w = this.box?.clientWidth ?? 0;
+      if (w > 0 && w !== this.lastWidth) {
+        this.lastWidth = w;
+        autosize(this.box);
+      }
+    };
+
     componentDidMount() {
+      window.addEventListener('resize', this.onWindowResize);
       this.sync();
+      this.lastWidth = this.box?.clientWidth ?? 0;
+    }
+
+    componentWillUnmount() {
+      window.removeEventListener('resize', this.onWindowResize);
     }
 
     componentDidUpdate() {
@@ -41,7 +71,11 @@
         this.lastSent = box.value;
       }
       autosize(box);
-      if (this.live) this.live.scrollTop = this.live.scrollHeight;
+      if (source.mode !== 'live') {
+        this.stickLive = true;
+      } else if (this.live && this.stickLive) {
+        this.live.scrollTop = this.live.scrollHeight;
+      }
     }
 
     // Composition updates are not text yet; the confirmed text is sent once, whichever of input/compositionend comes last.
@@ -78,7 +112,7 @@
         <textarea id="src" ref=${this.setBox} rows="2" spellcheck="false" placeholder=${LL.t('placeholder')} aria-label=${source.label}
           hidden=${live} readOnly=${!source.editable} onInput=${this.onInput} oncompositionstart=${this.onCompositionStart}
           oncompositionend=${this.onCompositionEnd}></textarea>
-        ${live && html`<div id="src-live" class=${'src-live' + (timed ? '' : ' prose')} ref=${this.setLive}>${source.lines.map((line, i) => html`<div class=${'line' + (line.tail ? ' tail' : '')} key=${i}>
+        ${live && html`<div id="src-live" class=${'src-live' + (timed ? '' : ' prose')} ref=${this.setLive} onScroll=${this.onLiveScroll}>${source.lines.map((line, i) => html`<div class=${'line' + (line.tail ? ' tail' : '')} key=${i}>
           ${line.time && html`<time>${line.time}</time>`}<span>${line.text}</span>${line.tail && html`<i class="caret"></i>`}</div>`)}</div>`}
         ${source.hint && html`<p id="hint" class="hint">${LL.t('hintMic')} · <kbd>${options.commitKeyCap}</kbd> ${LL.t('hintWrite')} · <kbd>${options.newlineKeyCap}</kbd> ${LL.t('hintNewline')} · <kbd>Esc</kbd> ${LL.t('hintHide')}</p>`}
         ${source.remembered && html`<p id="remembered" class="remembered"><span>${source.remembered.text}</span>
