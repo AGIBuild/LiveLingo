@@ -1,0 +1,40 @@
+src/LiveLingo.Core/Dictation/DictationSession.cs
+  s_9a1879c3907d84::t_2afa32921c6974 460-461
+  s_9a1879c3907d84::t_ffa95af7ab0c27 641
+  s_9a1879c3907d84::t_d2004f304abceb 56,482-484
+src/LiveLingo.Desktop/Services/Warmup/ModelWarmup.cs
+  s_9a1879c3907d84::t_8f92cbf3672c66 16-17,70
+tests/LiveLingo.Core.Tests/Cleanup/CleanupSchedulerTests.cs
+  s_9a1879c3907d84::t_91992dbf6a2566 360-376
+  s_9a1879c3907d84::t_886c49ec7c56fa 359
+tests/LiveLingo.Core.Tests/Dictation/DictationSessionTests.cs
+  s_9a1879c3907d84::t_08cac377b2faee 761,763-764,766-768,770-779
+  s_9a1879c3907d84::t_11329e5b69d3c9 762,769,780
+  s_9a1879c3907d84::t_272e4c3888d8ea 58,72,575-576,626,717-760
+  s_9a1879c3907d84::t_7d9b8a8abe2e13 499-500
+  s_9a1879c3907d84::t_1fabfb988fc0d2 765
+  s_9a1879c3907d84::t_dcc390adac7fc4 781
+src/LiveLingo.Core/Dictation/DictationOptions.cs
+  s_9a1879c3907d84::t_84656b7596c65d 11,14,18,20,23,26-27,29,31-39
+src/LiveLingo.Core/Cleanup/CleanupScheduler.cs
+  s_9a1879c3907d84::t_bbdd0da9bcbde8 131,162-165,167-168,176
+  s_9a1879c3907d84::t_041f520a010e6a 201-225
+tests/LiveLingo.Desktop.Tests/Services/Warmup/ModelWarmupTests.cs
+  s_9a1879c3907d84::t_fc9088f6fbc76b 79,82-86,90-97
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "e219805351c519964451df3de1f2d86d6d502901",
+  "prompts": {},
+  "sessions": {
+    "s_9a1879c3907d84": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "d8c58241-549b-4ee1-b73f-a8777ae76a48",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
