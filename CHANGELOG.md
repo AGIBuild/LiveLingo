@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-11-14
+
+Bilingual dictation and polish recognize mixed Chinese-English technical speech far more reliably, learn user accent
+corrections inline, keep continuous speech seamless without mid-phrase breaks or dropped audio, and switch between
+polish and translation without cold-reload delays.
+
+### Added
+- **Built-in technical glossary**: 48 common developer and AI terms (`Agent`, `Skill`, `MCP`, `GitHub`, `Copilot`,
+  `Prompt`, `Token`, `API`, `SDK`, `CLI`, `PR`, etc.), enabled by default and toggleable in *Settings → Voice*.
+- **Accent and misrecognition corrections (`spoken => canonical`)**: add rules in *Settings → Voice* or save a single
+  correction inline from any edited sentence in the composer (*Save & remember*). Canonical terms bias speech hotwords,
+  and matched spoken variants are normalized deterministically before cleanup and polish while keeping the raw
+  transcript intact.
+
+### Fixed
+- **Continuous speech no longer splits mid-phrase, drops trailing syllables or overflows `Qwen3-ASR`'s 512-token KV
+  window**: speech hotwords are bounded within the prompt budget, long continuous speech cuts at quietest local energy
+  valleys (8 s on pause, 12 s mid-speech, 13 s recognizer chunks) while replaying lookahead carryover so zero audio
+  samples are lost, and premature periods after mid-speech cuts or grammatically unfinished clauses are held back.
+- **Dictation polish keeps valid edits while blocking polarity flips**: `FidelityGate` accepts net glossary hits,
+  phonetic English repairs (`Scale → Skill`), aspect words (`一会儿`, `一旦`, `一下`), repeated stutters (`原原原话`)
+  and `X不X → 是否` rewrites, while rejecting invented negations; the polisher stitches broken clauses without
+  summarizing away examples or temporal phrases.
+- **Faster polish ↔ translate switching**: Fast-tier warmup keeps both local cleanup and translation models resident
+  when memory allows, enables `llama-server` prompt caching with a 4096-token context window, skips redundant whole-text
+  summarization on single-group dictations, and feeds accepted cleaned text plus 300 characters of preceding context
+  into translation.
+
 ## [2.2.1] - 2026-11-05
 
 Fixes garbled text in the target app on macOS and the failing update check, and releases fewer files.
@@ -465,6 +493,7 @@ process-wide task with shared progress and dedup across every UI surface.
 
 See `git log v0.1.4` for the pre-CHANGELOG history.
 
+[2.3.0]: https://github.com/AGIBuild/LiveLingo/releases/tag/v2.3.0
 [2.2.1]: https://github.com/AGIBuild/LiveLingo/releases/tag/v2.2.1
 [2.2.0]: https://github.com/AGIBuild/LiveLingo/releases/tag/v2.2.0
 [2.1.2]: https://github.com/AGIBuild/LiveLingo/releases/tag/v2.1.2
