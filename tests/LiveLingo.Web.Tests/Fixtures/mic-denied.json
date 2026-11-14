@@ -83,7 +83,8 @@
     "visible": false,
     "label": "将写入 · English",
     "rows": [],
-    "editText": ""
+    "editText": "",
+    "rememberCorrection": null
   },
   "footer": {
     "mic": {

@@ -97,7 +97,8 @@
         "editAria": "编辑第 2 句"
       }
     ],
-    "editText": ""
+    "editText": "",
+    "rememberCorrection": null
   },
   "footer": {
     "mic": {

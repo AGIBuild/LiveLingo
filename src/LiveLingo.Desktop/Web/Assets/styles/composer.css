@@ -61,6 +61,7 @@ button.chip:hover { background: var(--line); }
 .src textarea { display: block; width: 100%; border: 0; background: transparent; padding: 2px 0; resize: none; outline: none; font-size: 16px; line-height: 1.6; max-height: calc(var(--panel-max, 470px) * .4); }
 .src-live { font-size: 16px; line-height: 1.6; max-height: calc(var(--panel-max, 470px) * .45); overflow-y: auto; }
 .src-live .line { display: flex; gap: 10px; }
+.src-live.prose .line { display: inline; }
 .src-live time { font: 12px/2.1 var(--mono); color: var(--faint); flex: none; width: 42px; }
 .src-live .tail { color: var(--faint); }
 .caret { display: inline-block; width: 2px; height: 1.1em; margin-left: 2px; vertical-align: -2px; background: var(--accent-ink); animation: blink 1s steps(1) infinite; }
@@ -98,7 +99,8 @@ button.chip:hover { background: var(--line); }
 @media (hover: none) { .row-tools { opacity: 1; } }
 .row-tools .icon-btn { width: 30px; height: 30px; }
 .edit { display: block; width: 100%; font-size: 16px; line-height: 1.6; resize: vertical; min-height: 64px; }
-.edit-actions { display: flex; gap: 6px; margin-top: 6px; }
+.edit-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.edit-actions .remember-corr { background: var(--accent-soft); color: var(--accent-ink); }
 .skel { height: 14px; border-radius: 7px; margin: 7px 0; background: linear-gradient(90deg, var(--line) 25%, var(--line-strong) 50%, var(--line) 75%); background-size: 200% 100%; animation: shimmer 1.3s linear infinite; }
 .skel.short { width: 55%; }
 @keyframes shimmer { to { background-position: -200% 0; } }

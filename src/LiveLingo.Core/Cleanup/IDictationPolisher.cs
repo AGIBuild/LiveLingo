@@ -1,3 +1,5 @@
+using LiveLingo.Core.Translation;
+
 namespace LiveLingo.Core.Cleanup;
 
 /// <param name="Target">The original text of the passages being polished, in order.</param>
@@ -5,12 +7,14 @@ namespace LiveLingo.Core.Cleanup;
 /// <param name="Summary">Read-only summary of the whole dictation; empty when the polish sees the whole dictation itself.</param>
 /// <param name="Glossary">Terms that must be written as given.</param>
 /// <param name="Style">The polish requirements (<see cref="PolishStyle"/>).</param>
+/// <param name="Corrections">Recurring speech/accent misrecognitions (<c>spoken =&gt; canonical</c>) to repair.</param>
 public sealed record PolishRequest(
     string Target,
     string Preceding,
     string Summary,
     IReadOnlyList<string> Glossary,
-    string Style);
+    string Style,
+    IReadOnlyList<GlossaryCorrection>? Corrections = null);
 
 /// <summary>
 /// The polish of a finished dictation: a longer text than one passage, read in one piece. Unlike

@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 using LiveLingo.Core.Drafting;
+using LiveLingo.Core.Translation;
 
 namespace LiveLingo.Core.Dictation;
 
@@ -38,7 +39,7 @@ public static partial class FidelityGate
 
     private static readonly string[] Fillers =
     [
-        "然后呢", "所以说", "对吧", "那个", "这个", "就是", "的话", "那么", "然后", "其实", "一下",
+        "怎么说呢", "然后呢", "所以说", "对吧", "你看", "那个", "这个", "就是", "的话", "那么", "然后", "其实", "一下",
         "呃", "嗯", "啊", "哦", "额", "呢", "呀", "吧", "嘛"
     ];
     private static readonly string[] CorrectionMarkers = ["不对", "不是", "说错了", "错了", "我是说", "应该是", "改成", "更正"];
@@ -46,12 +47,25 @@ public static partial class FidelityGate
     /// <summary>Phrases that only ever announce a self-correction; "不是" or "改成" also occur in ordinary statements.</summary>
     private static readonly string[] SpokenCorrections = ["不对", "说错了", "我是说", "更正"];
 
+    /// <summary>Fixed lexical words containing "一" that express degree, aspect or manner rather than a counted quantity.</summary>
+    private static readonly string[] NonNumericOneWords =
+    [
+        "一会儿", "一下子", "一定的", "一方面",
+        "一定", "一般", "一些", "一点", "一直", "一旦", "一并", "一同", "一块",
+        "一会", "一下", "一样", "一边", "一起", "一共", "一味", "一再"
+    ];
+
     /// <summary>A deleted run counts as restated when this share of its character pairs still occurs in the cleaned text.</summary>
     private const double RestatedCoverage = 0.6;
 
     private const string Negations = "不没别无非未否";
 
-    public static GateResult Check(string raw, string cleaned, IReadOnlyList<string>? glossary = null, bool allowParagraphs = false)
+    public static GateResult Check(
+        string raw,
+        string cleaned,
+        IReadOnlyList<string>? glossary = null,
+        bool allowParagraphs = false,
+        IReadOnlyList<GlossaryCorrection>? corrections = null)
     {
         if (string.IsNullOrWhiteSpace(cleaned))
             return GateResult.Refuse(GateReason.Empty);
@@ -67,30 +81,58 @@ public static partial class FidelityGate
         var rawNorm = Normalize(raw);
         var cleanedNorm = Normalize(cleaned);
         glossary ??= [];
-        var glossaryNorm = glossary.Select(Normalize).Where(g => g.Length > 0).ToList();
+        corrections ??= [];
+
+        var activeCorrections = corrections
+            .Where(c => c.Spoken.Length > 0 && c.Canonical.Length > 0
+                        && rawNorm.Contains(Normalize(c.Spoken), StringComparison.Ordinal)
+                        && cleanedNorm.Contains(Normalize(c.Canonical), StringComparison.Ordinal))
+            .ToList();
+
+        var effectiveGlossary = glossary
+            .Concat(activeCorrections.Select(c => c.Canonical))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var glossaryNorm = effectiveGlossary.Select(Normalize).Where(g => g.Length > 0).Distinct(StringComparer.Ordinal).ToList();
 
         foreach (Match digits in DigitRun().Matches(raw))
-            if (!cleanedNorm.Contains(digits.Value, StringComparison.Ordinal))
-                return GateResult.Refuse(GateReason.NumberLost, digits.Value);
+        {
+            if (cleanedNorm.Contains(digits.Value, StringComparison.Ordinal))
+                continue;
+            if (activeCorrections.Any(c => Normalize(c.Spoken).Contains(digits.Value, StringComparison.Ordinal)))
+                continue;
+            return GateResult.Refuse(GateReason.NumberLost, digits.Value);
+        }
 
         // Numbers are never invented: turning garbled Chinese numerals into digits is a guess, so it is left to the recognizer.
         foreach (Match digits in DigitRun().Matches(cleaned))
-            if (!rawNorm.Contains(digits.Value, StringComparison.Ordinal))
-                return GateResult.Refuse(GateReason.NumberInvented, digits.Value);
+        {
+            if (rawNorm.Contains(digits.Value, StringComparison.Ordinal))
+                continue;
+            if (effectiveGlossary.Any(g => Normalize(g).Contains(digits.Value, StringComparison.Ordinal)))
+                continue;
+            return GateResult.Refuse(GateReason.NumberInvented, digits.Value);
+        }
 
-        // An English word the cleaner removed is acceptable only when a glossary term took its place.
-        // A run of adjacent English words ("Max Oce") is one phonetic guess, so it needs one replacement.
-        // A word the speaker corrects right after saying it ("click 事件，不对，是 command 属性") is dropped on purpose.
+        // An English word the cleaner removed is acceptable when a glossary term, an explicit accent correction,
+        // or a phonetically close English term already spoken elsewhere in the same dictation took its place.
+        var correctedSpokenNorms = activeCorrections.Select(c => Normalize(c.Spoken)).Where(s => s.Length > 0).ToList();
         var lostRuns = AsciiRun().Matches(raw)
             .Where(run => !IsCorrectedAway(raw, run))
-            .Select(run => Words(run.Value).FirstOrDefault(w => !cleanedNorm.Contains(w, StringComparison.Ordinal)))
+            .Select(run => Words(run.Value).FirstOrDefault(w =>
+                !cleanedNorm.Contains(w, StringComparison.Ordinal)
+                && !correctedSpokenNorms.Any(s => s.Contains(w, StringComparison.Ordinal))))
             .Where(w => w is not null)
+            .Select(w => w!)
             .ToList();
-        var replacements = glossaryNorm.Count(g => cleanedNorm.Contains(g, StringComparison.Ordinal) && !rawNorm.Contains(g, StringComparison.Ordinal));
-        if (lostRuns.Count > replacements)
-            return GateResult.Refuse(GateReason.TermLost, lostRuns[0]!);
 
-        // An English word the cleaner introduced must come from the glossary.
+        var glossaryGains = CountGainedGlossaryTerms(raw, cleaned, effectiveGlossary);
+        var contextRepairs = CountInContextEnglishRepairs(raw, cleaned, lostRuns);
+        var replacements = glossaryGains + activeCorrections.Count;
+        if (lostRuns.Count > replacements + contextRepairs)
+            return GateResult.Refuse(GateReason.TermLost, lostRuns[0]);
+
+        // An English word the cleaner introduced must come from the original speech or the glossary/corrections.
         foreach (var word in Words(cleaned))
             if (!rawNorm.Contains(word, StringComparison.Ordinal) && !glossaryNorm.Any(g => g.Contains(word, StringComparison.Ordinal)))
                 return GateResult.Refuse(GateReason.TermNotInGlossary, word);
@@ -101,14 +143,34 @@ public static partial class FidelityGate
 
         var ratio = (double)cleanedCjk.Length / rawCjk.Length;
         var shown = (ratio * 100).ToString("F0", CultureInfo.InvariantCulture) + "%";
-        if (ratio < MinLengthRatio) return GateResult.Refuse(GateReason.TooShort, shown);
+        if (ratio < MinLengthRatio && activeCorrections.Count == 0 && glossaryGains == 0)
+            return GateResult.Refuse(GateReason.TooShort, shown);
+        if (ratio < 0.35)
+            return GateResult.Refuse(GateReason.TooShort, shown);
         if (ratio > MaxLengthRatio) return GateResult.Refuse(GateReason.TooLong, shown);
 
-        var (dropped, added) = Align(rawCjk, cleanedCjk);
-        if (added > Math.Max(6, cleanedCjk.Length / 5))
+        var (dropped, added, addedRuns) = Align(rawCjk, cleanedCjk);
+        var correctionAddedBudget = activeCorrections.Sum(c => Cjk(c.Canonical).Length);
+        if (added > Math.Max(6, cleanedCjk.Length / 5) + correctionAddedBudget)
             return GateResult.Refuse(GateReason.Added, added.ToString(CultureInfo.InvariantCulture));
 
-        var garbageBudget = replacements * GlossaryDropPerReplacement;
+        foreach (var (cleanedStart, length, rawAnchor) in addedRuns)
+        {
+            var addedSpan = cleanedCjk.Substring(cleanedStart, length);
+            foreach (var ch in addedSpan)
+            {
+                if (!Negations.Contains(ch))
+                    continue;
+                if (ch == '否' && IsInterrogativeShifouAddition(rawCjk, rawAnchor, cleanedCjk, cleanedStart, length))
+                    continue;
+                if (effectiveGlossary.Any(g => Cjk(g).Contains(ch)))
+                    continue;
+                return GateResult.Refuse(GateReason.Added, addedSpan);
+            }
+        }
+
+        var garbageBudget = glossaryGains * GlossaryDropPerReplacement
+                            + activeCorrections.Sum(c => Math.Max(GlossaryDropPerReplacement, Cjk(c.Spoken).Length));
         var slack = Math.Max(MinSmallDrops, (int)(rawCjk.Length * SmallDropShare));
         foreach (var (start, length) in dropped)
         {
@@ -143,7 +205,18 @@ public static partial class FidelityGate
     private static int SmallDrop(string text)
     {
         var rest = WithoutFillers(text);
-        return rest.Length is > 0 and <= MaxSmallDrop && !rest.Any(c => Negations.Contains(c) || SpokenDigits.Contains(c)) ? rest.Length : 0;
+        if (rest.Length is <= 0 or > MaxSmallDrop || rest.Any(c => Negations.Contains(c)))
+            return 0;
+
+        var digitCheck = WithoutNonNumericOneWords(rest);
+        return !digitCheck.Any(c => SpokenDigits.Contains(c)) ? rest.Length : 0;
+    }
+
+    private static string WithoutNonNumericOneWords(string text)
+    {
+        foreach (var idiom in NonNumericOneWords)
+            text = text.Replace(idiom, "", StringComparison.Ordinal);
+        return text;
     }
 
     /// <summary>Chinese numerals: a trim that removes one changes a number the digit check cannot see.</summary>
@@ -157,6 +230,7 @@ public static partial class FidelityGate
     private static bool IsExplainedDeletion(string raw, int start, int length, string cleaned)
     {
         var text = raw.Substring(start, length);
+        if (IsInterrogativeShifouRewrite(raw, start, length, cleaned)) return true;
         if (length <= 1) return !Negations.Contains(text[0]);
 
         var rest = WithoutFillers(text);
@@ -164,6 +238,50 @@ public static partial class FidelityGate
         if (IsRepetition(raw, start, length)) return true;
         if (length <= MaxCorrectionRun && CorrectionMarkers.Any(m => text.Contains(m, StringComparison.Ordinal))) return true;
         return IsRestated(rest, cleaned);
+    }
+
+    /// <summary>
+    /// Rewriting a spoken A-not-A question ("会不会" / "是不是" / "能不能" / "有没有") to "是否" preserves neutral
+    /// interrogative polarity; character LCS otherwise sees "不"/"没" dropped and "否" added separately.
+    /// </summary>
+    private static bool IsInterrogativeShifouRewrite(string raw, int start, int length, string cleaned)
+    {
+        if (length > 4 || !cleaned.Contains("是否", StringComparison.Ordinal))
+            return false;
+
+        var windowStart = Math.Max(0, start - 2);
+        var windowEnd = Math.Min(raw.Length, start + length + 2);
+        var window = raw.AsSpan(windowStart, windowEnd - windowStart);
+        if (window.Contains("有没有", StringComparison.Ordinal))
+            return true;
+
+        for (var i = 0; i + 2 < window.Length; i++)
+        {
+            if (window[i + 1] == '不' && window[i] == window[i + 2] && window[i] != '不')
+                return true;
+        }
+        return false;
+    }
+
+    private static bool IsInterrogativeShifouAddition(string raw, int rawAnchor, string cleaned, int cleanedStart, int length)
+    {
+        var cStart = Math.Max(0, cleanedStart - 1);
+        var cEnd = Math.Min(cleaned.Length, cleanedStart + length + 1);
+        if (!cleaned.AsSpan(cStart, cEnd - cStart).Contains("是否", StringComparison.Ordinal))
+            return false;
+
+        var rStart = Math.Max(0, rawAnchor - 4);
+        var rEnd = Math.Min(raw.Length, rawAnchor + 4);
+        var window = raw.AsSpan(rStart, rEnd - rStart);
+        if (window.Contains("有没有", StringComparison.Ordinal))
+            return true;
+
+        for (var i = 0; i + 2 < window.Length; i++)
+        {
+            if (window[i + 1] == '不' && window[i] == window[i + 2] && window[i] != '不')
+                return true;
+        }
+        return false;
     }
 
     private static string WithoutFillers(string text)
@@ -198,20 +316,201 @@ public static partial class FidelityGate
         return false;
     }
 
-    /// <summary>The deleted text is a stutter: the same characters stand right before or right after it.</summary>
+    /// <summary>
+    /// The deleted text is a stutter: one or more repetitions of a motif ("我们" in "我们我们", or "原原" in "原原原")
+    /// whose motif stands immediately before or after the deleted span.
+    /// </summary>
     private static bool IsRepetition(string raw, int start, int length)
     {
-        var text = raw.Substring(start, length);
-        var before = start >= length && raw.AsSpan(start - length, length).SequenceEqual(text);
-        var after = start + 2 * length <= raw.Length && raw.AsSpan(start + length, length).SequenceEqual(text);
-        return before || after;
+        var text = raw.AsSpan(start, length);
+        for (var period = 1; period <= length; period++)
+        {
+            if (length % period != 0)
+                continue;
+            var motif = text[..period];
+            var periodic = true;
+            for (var offset = period; offset < length; offset += period)
+            {
+                if (!text.Slice(offset, period).SequenceEqual(motif))
+                {
+                    periodic = false;
+                    break;
+                }
+            }
+            if (!periodic)
+                continue;
+
+            var before = start >= period && raw.AsSpan(start - period, period).SequenceEqual(motif);
+            var after = start + length + period <= raw.Length && raw.AsSpan(start + length, period).SequenceEqual(motif);
+            if (before || after)
+                return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Counts how many additional glossary term occurrences appeared in <paramref name="cleaned"/> compared with
+    /// <paramref name="raw"/>, matching whole ASCII identifiers so "GitHub" never double-counts "Git" and a term
+    /// already spoken once earlier in the dictation ("skill") still counts when a second misheard occurrence ("Scale") is repaired.
+    /// </summary>
+    private static int CountGainedGlossaryTerms(string raw, string cleaned, IReadOnlyList<string> glossary)
+    {
+        if (glossary.Count == 0)
+            return 0;
+
+        var rawScan = CollapseIntraAsciiTermSpaces(raw, glossary);
+        var cleanedScan = CollapseIntraAsciiTermSpaces(cleaned, glossary);
+        var rawUsed = new bool[rawScan.Length];
+        var cleanedUsed = new bool[cleanedScan.Length];
+        var gains = 0;
+
+        foreach (var term in glossary.Select(NormalizeTermForBoundaryScan).Where(t => t.Length > 0)
+                     .Distinct(StringComparer.OrdinalIgnoreCase)
+                     .OrderByDescending(t => t.Length))
+        {
+            var inRaw = CountBoundaryMatches(rawScan, term, rawUsed);
+            var inCleaned = CountBoundaryMatches(cleanedScan, term, cleanedUsed);
+            if (inCleaned > inRaw)
+                gains += inCleaned - inRaw;
+        }
+
+        return gains;
+    }
+
+    private static string CollapseIntraAsciiTermSpaces(string text, IReadOnlyList<string> glossary)
+    {
+        var result = text;
+        foreach (var multiWord in glossary.Where(g => g.Contains(' ')).OrderByDescending(g => g.Length))
+            result = Regex.Replace(result, Regex.Escape(multiWord).Replace(@"\ ", @"\s+"), multiWord.Replace(" ", ""), RegexOptions.IgnoreCase);
+        return result;
+    }
+
+    private static string NormalizeTermForBoundaryScan(string term) =>
+        new(term.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
+
+    private static int CountBoundaryMatches(string text, string term, bool[] consumed)
+    {
+        var asciiStart = IsAsciiAlphaNum(term[0]);
+        var asciiEnd = IsAsciiAlphaNum(term[^1]);
+        var count = 0;
+        for (var i = 0; i <= text.Length - term.Length; i++)
+        {
+            if (consumed[i])
+                continue;
+            if (asciiStart && i > 0 && IsAsciiAlphaNum(text[i - 1]))
+                continue;
+            if (asciiEnd && i + term.Length < text.Length && IsAsciiAlphaNum(text[i + term.Length]))
+                continue;
+
+            var matched = true;
+            for (var k = 0; k < term.Length; k++)
+            {
+                if (consumed[i + k] || char.ToLowerInvariant(text[i + k]) != term[k])
+                {
+                    matched = false;
+                    break;
+                }
+            }
+            if (!matched)
+                continue;
+
+            for (var k = 0; k < term.Length; k++)
+                consumed[i + k] = true;
+            count++;
+            i += term.Length - 1;
+        }
+        return count;
+    }
+
+    private static bool IsAsciiAlphaNum(char c) =>
+        c is (>= 'A' and <= 'Z') or (>= 'a' and <= 'z') or (>= '0' and <= '9');
+
+    /// <summary>
+    /// Counts lost English words that were replaced by a phonetically close English word already spoken elsewhere in
+    /// the same dictation (for example "skill" spoken in sentence 1, misheard as "Scale" in sentence 7, and repaired to "Skill").
+    /// </summary>
+    private static int CountInContextEnglishRepairs(string raw, string cleaned, IReadOnlyList<string> lostRuns)
+    {
+        if (lostRuns.Count == 0)
+            return 0;
+
+        var rawCounts = Words(raw).GroupBy(w => w, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.Count(), StringComparer.Ordinal);
+        var cleanedCounts = Words(cleaned).GroupBy(w => w, StringComparer.Ordinal).ToDictionary(g => g.Key, g => g.Count(), StringComparer.Ordinal);
+        var availableGains = cleanedCounts
+            .Where(kv => rawCounts.TryGetValue(kv.Key, out var r) && r > 0 && kv.Value > r)
+            .ToDictionary(kv => kv.Key, kv => kv.Value - rawCounts[kv.Key], StringComparer.Ordinal);
+
+        var repaired = 0;
+        foreach (var lost in lostRuns)
+        {
+            var match = availableGains.Keys.FirstOrDefault(candidate => availableGains[candidate] > 0 && ArePhoneticallyCloseAscii(lost, candidate));
+            if (match is null)
+                continue;
+            availableGains[match]--;
+            repaired++;
+        }
+        return repaired;
+    }
+
+    private static bool ArePhoneticallyCloseAscii(string a, string b)
+    {
+        if (a.Length < 3 || b.Length < 3)
+            return false;
+        var skelA = ConsonantSkeleton(a);
+        var skelB = ConsonantSkeleton(b);
+        if (skelA.Length < 2 || skelB.Length < 2 || skelA[0] != skelB[0])
+            return false;
+        if (skelA == skelB)
+            return Math.Abs(a.Length - b.Length) <= 2;
+        return EditDistance(a, b) <= (Math.Min(a.Length, b.Length) >= 5 ? 2 : 1);
+    }
+
+    private static string ConsonantSkeleton(string word)
+    {
+        var sb = new StringBuilder(word.Length);
+        char prev = '\0';
+        for (var i = 0; i < word.Length; i++)
+        {
+            var c = word[i] switch
+            {
+                'c' or 'q' => 'k',
+                _ => word[i]
+            };
+            var isVowel = c is 'a' or 'e' or 'i' or 'o' or 'u' or 'y';
+            if (i > 0 && isVowel)
+                continue;
+            if (c == prev)
+                continue;
+            sb.Append(c);
+            prev = c;
+        }
+        return sb.ToString();
+    }
+
+    private static int EditDistance(string a, string b)
+    {
+        var dp = new int[b.Length + 1];
+        for (var j = 0; j <= b.Length; j++) dp[j] = j;
+        for (var i = 1; i <= a.Length; i++)
+        {
+            var prev = dp[0];
+            dp[0] = i;
+            for (var j = 1; j <= b.Length; j++)
+            {
+                var temp = dp[j];
+                dp[j] = a[i - 1] == b[j - 1] ? prev : 1 + Math.Min(prev, Math.Min(dp[j], dp[j - 1]));
+                prev = temp;
+            }
+        }
+        return dp[b.Length];
     }
 
     /// <summary>
     /// Aligns raw and cleaned by longest common subsequence.
-    /// Returns the runs of raw characters absent from the cleaned text and the number of cleaned characters absent from the raw text.
+    /// Returns the runs of raw characters absent from the cleaned text, the number of cleaned characters absent from
+    /// the raw text, and the added spans in cleaned paired with their anchor index in raw.
     /// </summary>
-    private static (List<(int Start, int Length)> Dropped, int Added) Align(string raw, string cleaned)
+    private static (List<(int Start, int Length)> Dropped, int Added, List<(int CleanedStart, int Length, int RawAnchor)> AddedRuns) Align(string raw, string cleaned)
     {
         var n = raw.Length;
         var m = cleaned.Length;
@@ -221,28 +520,40 @@ public static partial class FidelityGate
                 lcs[i, j] = raw[i] == cleaned[j] ? lcs[i + 1, j + 1] + 1 : Math.Max(lcs[i + 1, j], lcs[i, j + 1]);
 
         var dropped = new List<(int, int)>();
+        var addedRuns = new List<(int, int, int)>();
         var runStart = -1;
-        for (int i = 0, j = 0; i < n; )
+        var addStart = -1;
+        var addAnchor = 0;
+        int iIdx = 0, jIdx = 0;
+        while (iIdx < n || jIdx < m)
         {
-            if (j < m && raw[i] == cleaned[j] && lcs[i, j] == lcs[i + 1, j + 1] + 1)
+            if (iIdx < n && jIdx < m && raw[iIdx] == cleaned[jIdx] && lcs[iIdx, jIdx] == lcs[iIdx + 1, jIdx + 1] + 1)
             {
-                if (runStart >= 0) dropped.Add((runStart, i - runStart));
+                if (runStart >= 0) dropped.Add((runStart, iIdx - runStart));
+                if (addStart >= 0) addedRuns.Add((addStart, jIdx - addStart, addAnchor));
                 runStart = -1;
-                i++;
-                j++;
+                addStart = -1;
+                iIdx++;
+                jIdx++;
             }
-            else if (j < m && lcs[i, j + 1] >= lcs[i + 1, j])
+            else if (jIdx < m && (iIdx == n || lcs[iIdx, jIdx + 1] >= lcs[iIdx + 1, jIdx]))
             {
-                j++;
+                if (addStart < 0)
+                {
+                    addStart = jIdx;
+                    addAnchor = iIdx;
+                }
+                jIdx++;
             }
             else
             {
-                if (runStart < 0) runStart = i;
-                i++;
+                if (runStart < 0) runStart = iIdx;
+                iIdx++;
             }
         }
         if (runStart >= 0) dropped.Add((runStart, n - runStart));
-        return (dropped, m - lcs[0, 0]);
+        if (addStart >= 0) addedRuns.Add((addStart, m - addStart, addAnchor));
+        return (dropped, m - lcs[0, 0], addedRuns);
     }
 
     /// <summary>Lower-cases and drops punctuation and whitespace.</summary>

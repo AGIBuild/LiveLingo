@@ -256,8 +256,9 @@ public partial class App : Application
 
         var services = _serviceProvider!;
         var context = SynchronizationContext.Current;
-        var settings = services.GetRequiredService<ISettingsService>().Current;
-        var glossary = Glossary.Parse(settings.Composer.Glossary);
+        var settingsService = services.GetRequiredService<ISettingsService>();
+        var settings = settingsService.Current;
+        var glossary = settings.Composer.EffectiveGlossary();
         var session = new DraftSession(hasTarget: target is not null, notifyOn: context);
         var options = new ComposerOptions(
             settings.Cloud.Translate, settings.Cloud.Clean,
@@ -271,13 +272,14 @@ public partial class App : Application
         // With cleanup off no scheduler listens to the draft, so nothing is ever sent to a cleaner.
         var cleaner = services.GetRequiredService<ITextCleaner>();
         var cleanup = settings.Composer.CleanupEnabled
-            ? new CleanupScheduler(session, cleaner, glossary.Terms, contextChars: CleanupContextChars)
+            ? new CleanupScheduler(session, cleaner, glossary.Terms, contextChars: CleanupContextChars, corrections: glossary.Corrections)
             : null;
         var polish = settings.Composer.CleanupEnabled
             ? new PolishScheduler(
                 session, services.GetRequiredService<IDictationPolisher>(), glossary.Terms,
                 PolishStyle.Resolve(settings.Composer.PolishPrompt), CleanupContextChars,
-                services.GetRequiredService<ILogger<PolishScheduler>>())
+                services.GetRequiredService<ILogger<PolishScheduler>>(),
+                corrections: glossary.Corrections)
             : null;
         platform.Microphone.PreferredDevice = settings.Composer.Microphone;
         // Before the voice input is made: the models that are not in memory start loading now, and the composer shows that.
@@ -297,11 +299,15 @@ public partial class App : Application
             platform,
             voice,
             services.GetRequiredService<IAudioFileTranscriber>(),
-            glossary.Terms,
+            glossary.SpeechHotwords(),
             options,
             target,
-            context);
+            context)
+        {
+            ActiveGlossary = glossary
+        };
         vm.SettingsRequested += section => ShowSettings(section);
+        vm.CorrectionRemembered += corr => RememberCorrection(settingsService, corr);
         vm.Begin(start);
         vm.PropertyChanged += (_, e) =>
         {
@@ -327,6 +333,20 @@ public partial class App : Application
         if (polish is not null)
             await polish.DisposeAsync();
         await scheduler.DisposeAsync();
+    }
+
+    private static void RememberCorrection(ISettingsService settingsService, GlossaryCorrection correction)
+    {
+        var model = settingsService.CloneCurrent();
+        var current = Glossary.Parse(model.Composer.Glossary);
+        if (current.Corrections.Any(c => string.Equals(c.Spoken, correction.Spoken, StringComparison.OrdinalIgnoreCase)))
+            return;
+
+        var entry = $"{correction.Spoken}=>{correction.Canonical}";
+        model.Composer.Glossary = string.IsNullOrWhiteSpace(model.Composer.Glossary)
+            ? entry
+            : model.Composer.Glossary.TrimEnd() + "\n" + entry;
+        settingsService.Replace(model);
     }
 
     private void ShowSettings(string section = "general")

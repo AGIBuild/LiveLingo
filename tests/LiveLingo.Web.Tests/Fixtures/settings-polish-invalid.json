@@ -22,7 +22,9 @@
     "defaultOutput": "Clean",
     "autoDictate": false,
     "preloadSpeech": true,
+    "builtInGlossary": true,
     "terms": [],
+    "corrections": [],
     "polishPrompt": "bad",
     "polishPromptIsDefault": false,
     "polishPromptInvalid": true

@@ -22,7 +22,9 @@
     "defaultOutput": "Clean",
     "autoDictate": false,
     "preloadSpeech": true,
+    "builtInGlossary": true,
     "terms": [],
+    "corrections": [],
     "polishPrompt": "保留我的口语风格，修正明显错字，按完整意思分段，不要添加信息。",
     "polishPromptIsDefault": false,
     "polishPromptInvalid": false

@@ -95,6 +95,7 @@ internal sealed class ComposerIntents : IIntentHandler
             case EditIntent edit: _vm.StartEditCommand.Execute(edit.I); break;
             case EditTextIntent edit: _vm.EditText = edit.Text; break;
             case SaveEditIntent: _vm.SaveEditCommand.Execute(null); break;
+            case SaveEditAndRememberIntent: _vm.SaveEditAndRememberCommand.Execute(null); break;
             case CancelEditIntent: _vm.CancelEditCommand.Execute(null); break;
             case UseOriginalIntent original: _vm.UseOriginalCommand.Execute(original.I); break;
             case NewDraftIntent:

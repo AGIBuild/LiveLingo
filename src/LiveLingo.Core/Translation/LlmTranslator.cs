@@ -14,7 +14,7 @@ public sealed class LlmTranslator(IChatCompletionClient client) : ITranslator
         ["top_k"] = 20,
         ["repeat_penalty"] = 1.05,
         ["seed"] = 42,
-        ["cache_prompt"] = false
+        ["cache_prompt"] = true
     };
 
     public async Task<TranslatedText> TranslateAsync(TranslationRequest request, CancellationToken ct)

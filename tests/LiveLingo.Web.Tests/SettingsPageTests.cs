@@ -400,10 +400,18 @@ public sealed class SettingsPageTests(BrowserFixture browsers)
         await page.Page.Locator("#mic").SelectOptionAsync("Built-in");
         await page.Page.Locator("#direction").SelectOptionAsync("Chinese");
         await page.Page.Locator("#cleanup").ClickAsync();
+        await page.Page.Locator("#builtin-terms").ClickAsync();
 
         Assert.Equal(
-            [("microphone", "Built-in"), ("direction", "Chinese"), ("cleanup", "true")],
+            [("microphone", "Built-in"), ("direction", "Chinese"), ("cleanup", "true"), ("builtInGlossary", "false")],
             (await page.IntentsAsync()).OfType<SettingIntent>().Select(s => (s.Key, s.Value)));
+
+        await page.ClearIntentsAsync();
+        Assert.True(await page.Page.Locator("#corr-add").IsDisabledAsync());
+        await page.Page.Locator("#corr-spoken").FillAsync("Scale");
+        await page.Page.Locator("#corr-canonical").FillAsync("Skill");
+        await page.Page.Locator("#corr-add").ClickAsync();
+        Assert.Equal(new AddCorrectionIntent("Scale", "Skill") { V = 1 }, await page.LastIntentAsync<AddCorrectionIntent>());
     }
 
     [Theory]

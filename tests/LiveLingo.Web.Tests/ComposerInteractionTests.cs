@@ -460,6 +460,30 @@ public sealed class ComposerInteractionTests(BrowserFixture browsers)
 
     [Theory]
     [MemberData(nameof(Engines))]
+    public async Task LiveListeningWithoutTimestamps_FlowsInlineAsProse_WhileRowEditorOffersOneClickRememberCorrection(string engine)
+    {
+        await using var live = await browsers.OpenAsync(engine, "listening");
+        Assert.Equal(1, await live.Page.Locator("#src-live.prose").CountAsync());
+        Assert.Equal("inline", await live.Page.Locator("#src-live .line").First.EvaluateAsync<string>("el => getComputedStyle(el).display"));
+
+        await using var editing = await browsers.OpenAsync(engine, "editing");
+        Assert.Equal(0, await editing.Page.Locator(".remember-corr").CountAsync());
+
+        await editing.PushAsync("editing", s => s["result"]!["rememberCorrection"] = new JsonObject
+        {
+            ["spoken"] = "Scale",
+            ["canonical"] = "Skill",
+            ["label"] = "保存并记入纠错：Scale → Skill"
+        });
+        var button = editing.Page.Locator(".remember-corr");
+        Assert.Equal("保存并记入纠错：Scale → Skill", (await button.InnerTextAsync()).Trim());
+        await editing.ClearIntentsAsync();
+        await button.ClickAsync();
+        Assert.Equal(1, await editing.CountAsync<SaveEditAndRememberIntent>());
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
     public async Task AShortcutWhileAMenuIsOpen_ClosesTheMenuAndRuns(string engine)
     {
         await using var page = await browsers.OpenAsync(engine, "translate-ready");

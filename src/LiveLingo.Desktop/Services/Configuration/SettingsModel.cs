@@ -133,6 +133,12 @@ public partial class ComposerSettings : ObservableObject
     /// <summary>The user's terms, one per line (see <see cref="LiveLingo.Core.Translation.Glossary"/>).</summary>
     [ObservableProperty] private string _glossary = "";
 
+    /// <summary>
+    /// Whether LiveLingo's built-in bilingual technical vocabulary (Agent, Skill, Prompt, API, VS Code…) is merged
+    /// with the user's glossary for speech hotwords, cleanup and the fidelity gate.
+    /// </summary>
+    [ObservableProperty] private bool _builtInGlossary = true;
+
     /// <summary>"Enter" or "CtrlEnter": the key that writes the result; Shift+Enter always inserts a line break.</summary>
     [ObservableProperty] private string _commitKey = "Enter";
 
@@ -172,6 +178,9 @@ public partial class ComposerSettings : ObservableObject
     /// </summary>
     [ObservableProperty] private string _polishPrompt = "";
 
+    public LiveLingo.Core.Translation.Glossary EffectiveGlossary() =>
+        LiveLingo.Core.Translation.Glossary.Parse(Glossary, BuiltInGlossary);
+
     public ComposerSettings DeepClone() => new()
     {
         CleanupEnabled = CleanupEnabled,
@@ -182,6 +191,7 @@ public partial class ComposerSettings : ObservableObject
         PolishPrompt = PolishPrompt,
         TranslatorTier = TranslatorTier,
         Glossary = Glossary,
+        BuiltInGlossary = BuiltInGlossary,
         CommitKey = CommitKey,
         TargetLanguage = TargetLanguage,
         Microphone = Microphone

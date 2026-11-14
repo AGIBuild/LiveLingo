@@ -3,6 +3,7 @@ using LiveLingo.Core.Drafting;
 using LiveLingo.Core.Models;
 using LiveLingo.Core.Inference;
 using LiveLingo.Core.Transcription;
+using LiveLingo.Core.Translation;
 using Microsoft.Extensions.Logging;
 using SherpaOnnx;
 
@@ -15,8 +16,11 @@ namespace LiveLingo.Core.Speech.Native;
 /// </summary>
 public sealed class SherpaSpeechEngine : IDictationSessionFactory, ISpeechWarmup, IAudioFileTranscriber, IAsyncDisposable
 {
-    /// <summary>The detector reports a span after this much silence; shorter than the hard pause so pauses are seen early.</summary>
-    private const float LiveVadMinSilenceSeconds = 0.3f;
+    /// <summary>
+    /// The detector reports a span after this much silence; tuned (~240 ms, matching the 250 ms POC baseline) so natural
+    /// breath pauses during fast continuous speech register clean soft-cut points without resetting the live stream early.
+    /// </summary>
+    private const float LiveVadMinSilenceSeconds = 0.24f;
 
     /// <summary>A recording is cut at shorter pauses than live dictation so subtitles stay short.</summary>
     private const float FileVadMinSilenceSeconds = 0.5f;
@@ -135,7 +139,8 @@ public sealed class SherpaSpeechEngine : IDictationSessionFactory, ISpeechWarmup
     private SherpaSileroVad NewVad(float minSilenceSeconds) =>
         new(Path.Combine(_models.GetModelDirectory(ModelCatalog.SpeechVad.Id), "silero_vad.onnx"), minSilenceSeconds);
 
-    private static string Hotwords(IReadOnlyList<string> glossary) => string.Join("\n", glossary);
+    private static string Hotwords(IReadOnlyList<string> glossary) =>
+        string.Join(", ", Glossary.BoundHotwords(glossary));
 
     private void EnsureInstalled(IEnumerable<ModelDescriptor> required)
     {

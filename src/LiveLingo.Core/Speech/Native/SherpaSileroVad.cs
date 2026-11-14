@@ -11,7 +11,7 @@ public sealed class SherpaSileroVad : IVoiceActivityDetector
 
     private readonly VoiceActivityDetector _vad;
 
-    public SherpaSileroVad(string modelPath, float minSilenceSeconds = 0.3f, float threshold = DefaultThreshold, float maxSpeechSeconds = 20f)
+    public SherpaSileroVad(string modelPath, float minSilenceSeconds = 0.24f, float threshold = DefaultThreshold, float maxSpeechSeconds = 15f)
     {
         var config = new VadModelConfig();
         config.SileroVad.Model = modelPath;

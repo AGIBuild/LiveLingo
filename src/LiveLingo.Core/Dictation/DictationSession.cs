@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Threading.Channels;
 using LiveLingo.Core.Drafting;
+using LiveLingo.Core.Transcription;
 
 namespace LiveLingo.Core.Dictation;
 
@@ -12,12 +13,18 @@ namespace LiveLingo.Core.Dictation;
 /// </summary>
 public sealed class DictationSession : IAsyncDisposable
 {
+    private const int MidSpeechCutSearchMs = 1200;
+    private const int MidSpeechCutTailGuardMs = 80;
+    private const int MinMidSpeechSegmentMs = 500;
+
     private sealed class Segment
     {
         public int Id { get; init; }
         public SpeechSpan Speech { get; init; }
         public SpeechSpan Audio { get; init; }
         public bool EndsSentence { get; init; }
+        /// <summary>Set when the utterance hit <see cref="DictationOptions.HardMaxUtteranceMs"/> without a silence pause and was sliced at an energy valley.</summary>
+        public bool CutMidSpeech { get; init; }
         /// <summary>Set when the speaker stayed silent after this segment long enough to end the passage.</summary>
         public bool EndsPassage { get; set; }
         public string LiveFinal { get; init; } = "";
@@ -47,10 +54,12 @@ public sealed class DictationSession : IAsyncDisposable
     private readonly List<SpeechSpan> _pending = [];
     private readonly List<string> _passage = [];
     private string _tail = "";
+    private char? _tailHeldTerminator;
     private string _openText = "";
     private string _publishedPending = "";
     private int _nextToSettle;
     private long _streamStartSample;
+    private bool _continuesSpeech;
     private long _openFirstTextSample = -1;
     private long _openLastTextSample = -1;
 
@@ -148,7 +157,7 @@ public sealed class DictationSession : IAsyncDisposable
                 _vad.Accept(frame);
                 OnLiveText(TextTidy.Apply(_live.CurrentText));
                 while (_vad.TryTake(out var span))
-                    _pending.Add(span);
+                    AddPendingSpan(span);
                 CloseUtteranceIfEnded();
                 EndPassageIfSilent();
             }
@@ -156,29 +165,61 @@ public sealed class DictationSession : IAsyncDisposable
 
         _vad.Flush();
         while (_vad.TryTake(out var span))
-            _pending.Add(span);
-        // Text the detector did not attribute to any speech span is closed too, so it is never lost.
-        if (_pending.Count > 0 || _openText.Length > 0)
+            AddPendingSpan(span);
+        // Text the detector did not attribute to any speech span (or trailing speech right after a mid-speech cut
+        // whose streaming lookahead has not ticked yet) is closed too, so it is never lost.
+        if (_pending.Count > 0 || _openText.Length > 0 || (_continuesSpeech && _audio.TotalSamples > _streamStartSample))
             CloseUtterance(endsSentence: true);
+    }
+
+    private void AddPendingSpan(SpeechSpan span)
+    {
+        if (span.EndSample <= _streamStartSample)
+            return;
+        _pending.Add(span.StartSample < _streamStartSample
+            ? new SpeechSpan(_streamStartSample, span.EndSample)
+            : span);
     }
 
     /// <summary>
     /// Short pauses only collect speech spans. A hard pause ends the utterance; so does a span that makes the
-    /// utterance too long, because that span was reported at a short pause and is a natural place to cut.
+    /// utterance too long once the speaker actually enters a pause (<c>!_vad.IsSpeechActive</c>). When speech
+    /// continues without any detected pause beyond <see cref="DictationOptions.HardMaxUtteranceMs"/>, the segment is
+    /// sliced at the quietest 20 ms frame near the end so the second-pass 512-token KV window never overflows and no
+    /// spoken frames are dropped or double-decoded between segments.
     /// </summary>
     private void CloseUtteranceIfEnded()
     {
+        var hardMaxMs = Math.Max(_options.HardMaxUtteranceMs, _options.SoftMaxUtteranceMs);
         if (_pending.Count == 0)
+        {
+            if (!_vad.IsSpeechActive && _openText.Length == 0)
+                _continuesSpeech = false;
+
+            var activeSince = _continuesSpeech && _vad.IsSpeechActive
+                ? _streamStartSample
+                : _openFirstTextSample >= 0
+                    ? Math.Max(_streamStartSample, _openFirstTextSample - AudioFormat.MsToSamples(_options.SpeechOnsetMarginMs))
+                    : -1;
+            if (activeSince >= 0
+                && AudioFormat.SamplesToMs(_audio.TotalSamples - activeSince) >= hardMaxMs)
+            {
+                CloseUtterance(endsSentence: false, cutMidSpeech: true);
+            }
             return;
+        }
 
         var first = _pending[0];
         var last = _pending[^1];
         var silenceMs = AudioFormat.SamplesToMs(_audio.TotalSamples - last.EndSample);
         var lengthMs = AudioFormat.SamplesToMs(last.EndSample - first.StartSample);
+        var openElapsedMs = AudioFormat.SamplesToMs(_audio.TotalSamples - first.StartSample);
 
         var hard = !_vad.IsSpeechActive && silenceMs >= _options.HardPauseMs;
-        if (hard || lengthMs >= _options.SoftMaxUtteranceMs)
-            CloseUtterance(endsSentence: hard);
+        var softPause = !_vad.IsSpeechActive && lengthMs >= _options.SoftMaxUtteranceMs;
+        var forcedMax = openElapsedMs >= hardMaxMs;
+        if (hard || softPause || forcedMax)
+            CloseUtterance(endsSentence: hard, cutMidSpeech: !hard && !softPause);
     }
 
     /// <summary>
@@ -226,27 +267,72 @@ public sealed class DictationSession : IAsyncDisposable
     /// words the live stream recognized. Leading silence is trimmed to the first evidence of speech, from either the
     /// detector or the text.
     /// </summary>
-    private void CloseUtterance(bool endsSentence)
+    private void CloseUtterance(bool endsSentence, bool cutMidSpeech = false)
     {
+        var totalNow = _audio.TotalSamples;
         var previousCut = _streamStartSample;
-        var evidence = long.MaxValue;
-        var lastEvidence = 0L;
-        if (_pending.Count > 0)
-        {
-            evidence = _pending[0].StartSample;
-            lastEvidence = _pending[^1].EndSample + AudioFormat.MsToSamples(_options.SpeechOffsetMarginMs);
-        }
-        if (_openFirstTextSample >= 0)
-            evidence = Math.Min(evidence, _openFirstTextSample - AudioFormat.MsToSamples(_options.SpeechOnsetMarginMs));
-        lastEvidence = Math.Max(lastEvidence, _openLastTextSample);
+        var wasContinuing = _continuesSpeech;
 
-        // Trailing silence is trimmed: a recognizer decoding it tends to invent words. Without any evidence nothing is trimmed.
-        var end = lastEvidence > 0 ? Math.Min(_audio.TotalSamples, lastEvidence) : _audio.TotalSamples;
-        var audio = new SpeechSpan(Math.Max(_streamStartSample, evidence == long.MaxValue ? _streamStartSample : evidence), end);
-        var speech = _pending.Count > 0 ? new SpeechSpan(_pending[0].StartSample, _pending[^1].EndSample) : audio;
+        long start;
+        if (wasContinuing)
+        {
+            start = previousCut;
+        }
+        else
+        {
+            var evidence = long.MaxValue;
+            if (_pending.Count > 0)
+                evidence = _pending[0].StartSample;
+            if (_openFirstTextSample >= 0)
+                evidence = Math.Min(evidence, _openFirstTextSample - AudioFormat.MsToSamples(_options.SpeechOnsetMarginMs));
+            start = Math.Max(previousCut, evidence == long.MaxValue ? previousCut : evidence);
+        }
+
+        long end;
+        if (cutMidSpeech)
+        {
+            var searchFrom = Math.Max(start + AudioFormat.MsToSamples(MinMidSpeechSegmentMs), totalNow - AudioFormat.MsToSamples(MidSpeechCutSearchMs));
+            var searchTo = totalNow - AudioFormat.MsToSamples(MidSpeechCutTailGuardMs);
+            if (searchTo - searchFrom >= AudioFormat.SampleRate / 50)
+            {
+                var window = _audio.Slice(searchFrom, searchTo);
+                end = searchFrom + FileTranscriber.QuietestPoint(window, 0, window.Length);
+            }
+            else
+            {
+                end = totalNow;
+            }
+        }
+        else
+        {
+            // Trailing silence is trimmed once the detector observed speech end: a recognizer decoding long silence
+            // tends to invent words. When the user stops before any pause was detected (_pending is empty), nothing is
+            // trimmed because _openLastTextSample lags live speech by the streaming transducer's lookahead.
+            var lastEvidence = _pending.Count > 0
+                ? Math.Max(_pending[^1].EndSample + AudioFormat.MsToSamples(_options.SpeechOffsetMarginMs), _openLastTextSample)
+                : 0L;
+            end = lastEvidence > 0 ? Math.Min(totalNow, lastEvidence) : totalNow;
+            end = Math.Max(start, end);
+        }
+
+        var audio = new SpeechSpan(start, end);
+        var speech = !cutMidSpeech && _pending.Count > 0
+            ? new SpeechSpan(_pending[0].StartSample, Math.Min(end, _pending[^1].EndSample))
+            : audio;
 
         _pending.Clear();
         var finalText = TextTidy.Apply(_live.CloseSegment());
+        var carryText = "";
+        if (cutMidSpeech && end < totalNow)
+        {
+            var carryover = _audio.Slice(end, totalNow);
+            if (carryover.Length > 0)
+            {
+                _live.Accept(carryover);
+                carryText = TextTidy.Apply(_live.CurrentText);
+            }
+        }
+
         Segment segment;
         var needsSecondPass = _secondPass is not null && !string.IsNullOrWhiteSpace(finalText);
         lock (_gate)
@@ -257,20 +343,24 @@ public sealed class DictationSession : IAsyncDisposable
                 Speech = speech,
                 Audio = audio,
                 EndsSentence = endsSentence,
+                CutMidSpeech = cutMidSpeech,
                 LiveFinal = finalText,
                 SettledText = needsSecondPass ? null : finalText
             };
             _segments.Add(segment);
-            _openText = "";
-            _openFirstTextSample = -1;
-            _openLastTextSample = -1;
+            _openText = carryText;
+            _openFirstTextSample = carryText.Length > 0 ? end : -1;
+            _openLastTextSample = carryText.Length > 0 ? totalNow : -1;
             _streamStartSample = end;
+            _continuesSpeech = cutMidSpeech;
         }
 
         if (needsSecondPass)
         {
             var pad = AudioFormat.MsToSamples(_options.SecondPassPaddingMs);
-            var samples = _audio.Slice(Math.Max(previousCut, audio.StartSample - pad), audio.EndSample + pad);
+            var sliceStart = wasContinuing ? audio.StartSample : Math.Max(previousCut, audio.StartSample - pad);
+            var sliceEnd = cutMidSpeech ? audio.EndSample : audio.EndSample + pad;
+            var samples = _audio.Slice(sliceStart, sliceEnd);
             _secondPassJobs.Writer.TryWrite((segment, samples));
         }
 
@@ -331,17 +421,44 @@ public sealed class DictationSession : IAsyncDisposable
                 while (_nextToSettle < _segments.Count && _segments[_nextToSettle].SettledText is { } text)
                 {
                     var segment = _segments[_nextToSettle++];
-                    var units = TextUnits.Split(JoinText(_tail, text));
+                    var passageEnding = endPassage || segment.EndsPassage;
+                    if (text.Length == 0)
+                    {
+                        if (segment.EndsSentence && (passageEnding || !IsDanglingClause(_tail)))
+                            FlushTail(passages);
+                        if (segment.EndsPassage)
+                            EndPassage(passages);
+                        continue;
+                    }
+
+                    if (!passageEnding && HoldPrematurePeriod(text, segment.CutMidSpeech, out var held, out var heldTerminator))
+                    {
+                        text = held;
+                        _tailHeldTerminator = heldTerminator;
+                    }
+                    else
+                    {
+                        _tailHeldTerminator = null;
+                    }
+
+                    var combined = JoinText(_tail, text);
+                    _tail = "";
+                    var units = TextUnits.Split(combined);
                     var remainder = "";
                     foreach (var unit in units)
                     {
                         if (unit.IsComplete)
+                        {
                             AddSentence(passages, unit.Body);
+                            _tailHeldTerminator = null;
+                        }
                         else
+                        {
                             remainder = unit.Body;
+                        }
                     }
                     _tail = remainder;
-                    if (segment.EndsSentence || _tail.Length >= _options.MaxTailChars)
+                    if ((segment.EndsSentence && (passageEnding || !IsDanglingClause(_tail))) || _tail.Length >= _options.MaxTailChars)
                         FlushTail(passages);
                     if (segment.EndsPassage)
                         EndPassage(passages);
@@ -369,8 +486,146 @@ public sealed class DictationSession : IAsyncDisposable
         if (_tail.Length == 0)
             return;
         var tail = _tail;
+        if (_tailHeldTerminator is { } terminator)
+        {
+            if (tail.EndsWith('，'))
+                tail = tail[..^1] + terminator;
+            else if (!tail.EndsWith(terminator))
+                tail += terminator;
+        }
         _tail = "";
+        _tailHeldTerminator = null;
         AddSentence(passages, tail);
+    }
+
+    private static readonly string[] DanglingClauseEndings =
+    [
+        "如果说", "如果", "因为", "所以", "但是", "不过", "而且", "并且", "或者说", "或者",
+        "比如说", "比如", "例如", "特别是", "尤其是", "对于", "关于", "按照", "通过", "根据",
+        "应该以", "以及", "要求的是", "意思是", "问题是", "最好的办法", "一个办法",
+        "把", "被", "将", "向", "往", "从", "和", "跟", "与",
+        "他就", "我就", "你就", "她就", "它就", "我们就", "他们就", "咱们就",
+        "他还", "我还", "他都", "我都", "他才", "的这种", "的那种"
+    ];
+
+    private static readonly string[] DanglingStandaloneClauses =
+    [
+        "这种", "那种", "有这种", "有那种", "是这种", "像这种", "这类", "那类", "他每天", "我每天", "你每天"
+    ];
+
+    private static readonly string[] SeamlessMidPhraseEndings =
+    [
+        "的", "地", "得", "在", "从", "向", "往", "把", "被", "将", "对", "给", "用", "按", "比", "和", "跟", "与",
+        "这种", "那种", "这个", "那个", "这些", "那些", "这类", "那类", "他就", "我就", "你就"
+    ];
+
+    private static readonly string[] CompleteDeReplies =
+    [
+        "好的", "对的", "是的", "行的", "可以的", "没问题的", "真的", "有的", "会的", "不会的", "不是的"
+    ];
+
+    private static readonly string[] IncompleteClauseOpeners =
+    [
+        "如果", "因为", "虽然", "尽管", "当", "在", "把", "对", "从", "按"
+    ];
+
+    /// <summary>
+    /// Isolated second-pass decoding appends a period either when an utterance was sliced mid-speech at
+    /// <see cref="DictationOptions.HardMaxUtteranceMs"/>, or after a hesitation on a syntactically incomplete
+    /// function word ("如果说你还需要更强的。", "他就。", "有这种。"). Holding that premature period while speech
+    /// continues lets the next segment complete the sentence; stopping restores the period.
+    /// </summary>
+    private static bool HoldPrematurePeriod(string text, bool cutMidSpeech, out string held, out char? terminator)
+    {
+        held = text;
+        terminator = null;
+
+        if (cutMidSpeech)
+        {
+            if (text.EndsWith('。'))
+            {
+                var midCore = text[..^1].TrimEnd();
+                if (midCore.Length == 0)
+                    return false;
+                held = EndsSeamlessMidPhrase(midCore) ? midCore : midCore + "，";
+                terminator = '。';
+                return true;
+            }
+
+            if (text.EndsWith('.') && text.Length >= 2 && IsAsciiLetter(text[^2]))
+            {
+                held = text[..^1].TrimEnd();
+                terminator = '.';
+                return true;
+            }
+        }
+
+        if (!text.EndsWith('。'))
+            return false;
+
+        var core = text[..^1].TrimEnd();
+        if (!IsDanglingCore(core))
+            return false;
+
+        held = core + "，";
+        terminator = '。';
+        return true;
+    }
+
+    internal static bool EndsSeamlessMidPhrase(string core)
+    {
+        if (core.Length == 0)
+            return false;
+        var clause = LastClause(core);
+        if (CompleteDeReplies.Any(reply => clause.Equals(reply, StringComparison.Ordinal)))
+            return false;
+        foreach (var ending in SeamlessMidPhraseEndings)
+        {
+            if (clause.EndsWith(ending, StringComparison.Ordinal))
+                return true;
+        }
+        return false;
+    }
+
+    private static bool IsAsciiLetter(char c) => c is (>= 'A' and <= 'Z') or (>= 'a' and <= 'z');
+
+    private static bool IsDanglingClause(string tail)
+    {
+        var core = tail.TrimEnd('，', ',', '、', ' ');
+        return IsDanglingCore(core);
+    }
+
+    private static bool IsDanglingCore(string core)
+    {
+        if (core.Length == 0)
+            return false;
+
+        var clause = LastClause(core);
+        foreach (var standalone in DanglingStandaloneClauses)
+        {
+            if (clause.Equals(standalone, StringComparison.Ordinal))
+                return true;
+        }
+
+        foreach (var ending in DanglingClauseEndings)
+        {
+            if (clause.EndsWith(ending, StringComparison.Ordinal))
+                return true;
+        }
+
+        if (clause.EndsWith('的') && !CompleteDeReplies.Any(reply => clause.Equals(reply, StringComparison.Ordinal) || clause.EndsWith("，" + reply, StringComparison.Ordinal)))
+        {
+            if (clause.Length <= 14 || IncompleteClauseOpeners.Any(opener => clause.StartsWith(opener, StringComparison.Ordinal)))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static string LastClause(string text)
+    {
+        var cut = text.LastIndexOfAny(['，', ',', '。', '！', '？', '；']);
+        return cut >= 0 ? text[(cut + 1)..].Trim() : text.Trim();
     }
 
     private void EndPassage(List<string> passages)

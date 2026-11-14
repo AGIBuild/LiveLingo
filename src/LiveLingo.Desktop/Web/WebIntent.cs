@@ -30,6 +30,7 @@ namespace LiveLingo.Desktop.Web;
 [JsonDerivedType(typeof(EditIntent), "edit")]
 [JsonDerivedType(typeof(EditTextIntent), "editText")]
 [JsonDerivedType(typeof(SaveEditIntent), "saveEdit")]
+[JsonDerivedType(typeof(SaveEditAndRememberIntent), "saveEditAndRemember")]
 [JsonDerivedType(typeof(CancelEditIntent), "cancelEdit")]
 [JsonDerivedType(typeof(UseOriginalIntent), "useOriginal")]
 [JsonDerivedType(typeof(NewDraftIntent), "newDraft")]
@@ -45,6 +46,8 @@ namespace LiveLingo.Desktop.Web;
 [JsonDerivedType(typeof(SettingIntent), "setting")]
 [JsonDerivedType(typeof(AddTermIntent), "addTerm")]
 [JsonDerivedType(typeof(RemoveTermIntent), "removeTerm")]
+[JsonDerivedType(typeof(AddCorrectionIntent), "addCorrection")]
+[JsonDerivedType(typeof(RemoveCorrectionIntent), "removeCorrection")]
 [JsonDerivedType(typeof(CloudToggleIntent), "cloudToggle")]
 [JsonDerivedType(typeof(ConsentIntent), "consent")]
 [JsonDerivedType(typeof(OpenEndpointFormIntent), "openEndpointForm")]
@@ -207,6 +210,8 @@ internal sealed record EditTextIntent(string Text) : WebIntent;
 
 internal sealed record SaveEditIntent : WebIntent;
 
+internal sealed record SaveEditAndRememberIntent : WebIntent;
+
 internal sealed record CancelEditIntent : WebIntent;
 
 internal sealed record UseOriginalIntent(int I) : WebIntent
@@ -257,6 +262,7 @@ internal sealed record SettingIntent(string Key, string Value) : WebIntent
         public const string DefaultOutput = "defaultOutput";
         public const string AutoDictate = "autoDictate";
         public const string PreloadSpeech = "preloadSpeech";
+        public const string BuiltInGlossary = "builtInGlossary";
         public const string RememberChoices = "rememberChoices";
         public const string PolishPrompt = "polishPrompt";
     }
@@ -274,7 +280,7 @@ internal sealed record SettingIntent(string Key, string Value) : WebIntent
         Names.Direction => SettingsViewModel.Targets.Contains(Value),
         Names.Tier => SettingsViewModel.Tiers.Contains(Value),
         Names.DefaultOutput => SettingsViewModel.DefaultOutputs.Contains(Value),
-        Names.ReduceMotion or Names.Cleanup or Names.AutoDictate or Names.PreloadSpeech or Names.RememberChoices => Value is "true" or "false",
+        Names.ReduceMotion or Names.Cleanup or Names.AutoDictate or Names.PreloadSpeech or Names.BuiltInGlossary or Names.RememberChoices => Value is "true" or "false",
         _ => false
     };
 }
@@ -285,6 +291,16 @@ internal sealed record AddTermIntent(string Source, string Target) : WebIntent
 }
 
 internal sealed record RemoveTermIntent(int Index) : WebIntent
+{
+    protected override bool IsValid => IsIndex(Index);
+}
+
+internal sealed record AddCorrectionIntent(string Spoken, string Canonical) : WebIntent
+{
+    protected override bool IsValid => Spoken.Length <= 200 && Canonical.Length <= 200;
+}
+
+internal sealed record RemoveCorrectionIntent(int Index) : WebIntent
 {
     protected override bool IsValid => IsIndex(Index);
 }

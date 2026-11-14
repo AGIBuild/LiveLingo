@@ -27,6 +27,19 @@ public class LlmTextCleanerTests
     }
 
     [Fact]
+    public void UserMessage_PreNormalizesAccentCorrectionsOnWholeWordBoundaries()
+    {
+        var message = LlmTextCleaner.BuildUserMessage(new CleanupRequest(
+            "或者说Scale机制，支持Autoscaling和六零九。",
+            "",
+            Continues: false,
+            ["Skill", "LiveLingo"],
+            [new LiveLingo.Core.Translation.GlossaryCorrection("Scale", "Skill"), new LiveLingo.Core.Translation.GlossaryCorrection("六零九", "LiveLingo")]));
+
+        Assert.Contains("目标：或者说Skill机制，支持Autoscaling和LiveLingo。\n", message);
+    }
+
+    [Fact]
     public void UserMessage_MarksMissingContextAndTheEndOfSpeech()
     {
         var message = LlmTextCleaner.BuildUserMessage(new CleanupRequest("好的。", "", Continues: false, []));

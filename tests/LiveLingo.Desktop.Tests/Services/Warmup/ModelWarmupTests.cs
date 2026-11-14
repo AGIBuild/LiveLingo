@@ -74,9 +74,10 @@ public sealed class ModelWarmupTests : IDisposable
     }
 
     [Theory]
-    [InlineData(ComposerOutput.Clean, InferenceRole.Cleaner)]
-    [InlineData(ComposerOutput.Translate, InferenceRole.Translator)]
-    public async Task OnSummon_TheSpeechModelsAndThenTheModelOfTheStartingOutputAreLoaded(ComposerOutput output, InferenceRole role)
+    [InlineData(ComposerOutput.Clean, InferenceRole.Cleaner, InferenceRole.Translator)]
+    [InlineData(ComposerOutput.Translate, InferenceRole.Translator, InferenceRole.Cleaner)]
+    public async Task OnSummon_TheSpeechModelsThenTheStartingOutputAndSecondaryFastOutputAreLoaded(
+        ComposerOutput output, InferenceRole primary, InferenceRole secondary)
     {
         var order = new List<string>();
         _speech.WarmAsync(Arg.Any<IReadOnlyList<string>>(), Arg.Any<CancellationToken>()).Returns(_ =>
@@ -84,17 +85,29 @@ public sealed class ModelWarmupTests : IDisposable
             order.Add("speech");
             return Task.CompletedTask;
         });
-        _inference.WarmAsync(Arg.Any<InferenceRole>(), Arg.Any<CancellationToken>()).Returns(_ =>
+        _inference.WarmAsync(Arg.Any<InferenceRole>(), Arg.Any<CancellationToken>()).Returns(call =>
         {
-            order.Add("inference");
+            order.Add("inference:" + call.Arg<InferenceRole>());
             return Task.CompletedTask;
         });
 
         _sut.OnSummon(output);
 
-        await Wait.Until(() => order.Count == 2);
-        Assert.Equal(["speech", "inference"], order);
-        Assert.Equal([role], InferenceWarms);
+        await Wait.Until(() => order.Count == 3);
+        Assert.Equal(["speech", $"inference:{primary}", $"inference:{secondary}"], order);
+        Assert.Equal([primary, secondary], InferenceWarms);
+    }
+
+    [Fact]
+    public async Task OnSummon_QualityTranslatorTier_DoesNotSpeculativelyLoadSecondaryLargeModel()
+    {
+        _settings.Composer.TranslatorTier = nameof(TranslatorTier.Quality);
+
+        _sut.OnSummon(ComposerOutput.Clean);
+
+        await Wait.Until(() => SpeechWarms == 1 && InferenceWarms.Any());
+        await Task.Delay(50, TestContext.Current.CancellationToken);
+        Assert.Equal([InferenceRole.Cleaner], InferenceWarms);
     }
 
     [Fact]
@@ -149,7 +162,7 @@ public sealed class ModelWarmupTests : IDisposable
 
         _sut.OnSummon(ComposerOutput.Translate);
 
-        await Wait.Until(() => InferenceWarms.Count() == 1);
+        await Wait.Until(() => InferenceWarms.Contains(InferenceRole.Translator));
     }
 
     [Fact]
@@ -160,7 +173,7 @@ public sealed class ModelWarmupTests : IDisposable
 
         _sut.OnSummon(ComposerOutput.Translate);
 
-        await Wait.Until(() => InferenceWarms.Count() == 1);
+        await Wait.Until(() => InferenceWarms.Contains(InferenceRole.Translator));
     }
 
     [Fact]

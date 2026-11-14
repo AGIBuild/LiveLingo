@@ -35,13 +35,14 @@
       this.send();
     };
 
-    render({ row, options }) {
+    render({ row, options, rememberCorrection }) {
       const id = 'edit-' + row.i;
       return html`<label class="sr-only" for=${id}>${row.editAria}</label>
         <textarea class="edit" id=${id} rows="3" ref=${this.setBox} onInput=${this.onInput} oncompositionstart=${this.onCompositionStart}
           oncompositionend=${this.onCompositionEnd}></textarea>
         <div class="edit-actions">
           <button type="button" onClick=${() => LL.send('saveEdit')}>${LL.t('rowSave')} <kbd>${options.commitKeyCap}</kbd></button>
+          ${rememberCorrection && html`<button type="button" class="remember-corr" onClick=${() => LL.send('saveEditAndRemember')}>${rememberCorrection.label}</button>`}
           <button type="button" onClick=${() => LL.send('cancelEdit')}>${LL.t('rowCancel')} <kbd>Esc</kbd></button>
         </div>`;
     }
@@ -76,7 +77,7 @@
     return html`<section id="res" class="pane res" aria-label=${LL.t('resultAria')}>
       <div class="pane-label"><span id="res-label">${result.label}</span></div>
       <div id="rows" class="rows">${result.rows.map((row) => html`<article key=${row.i} class=${'unit' + (row.warn ? ' warn' : '') + (row.owned ? ' owned' : '')}>
-        ${row.editing ? html`<${EditRow} row=${row} text=${result.editText} options=${options}/>` : html`<${Body} row=${row}/>`}
+        ${row.editing ? html`<${EditRow} row=${row} text=${result.editText} options=${options} rememberCorrection=${result.rememberCorrection}/>` : html`<${Body} row=${row}/>`}
         ${row.canEdit && !row.editing && html`<${Tools} row=${row} canUseOriginal=${row.canUseOriginal}/>`}
       </article>`)}</div>
     </section>`;
