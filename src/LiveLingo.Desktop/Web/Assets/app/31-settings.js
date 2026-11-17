@@ -6,12 +6,29 @@
   const html = LL.html;
   const { Row, Select, Switch, HotkeyField } = LL;
 
-  const SECTIONS = [['general', 'nav.general'], ['voice', 'nav.voice'], ['privacy', 'nav.privacy'], ['models', 'nav.models']];
+  const SECTIONS = [
+    ['general', 'nav.general'],
+    ['voice', 'nav.voice'],
+    ['models', 'nav.models'],
+    ['about', 'nav.about']
+  ];
 
   const set = (key) => (value) => LL.send('setting', { key, value });
 
   // Menu labels follow the interface language, except the names of the languages themselves (as in the composer).
   const choices = (values, labelKeys) => values.map((value, i) => [value, LL.t(labelKeys[i])]);
+
+  const Apps = ({ apps }) => html`<section class="apps" aria-labelledby="apps-title">
+    <div class="apps-head"><div><h2 id="apps-title">${LL.t('apps')}</h2><p class="hint">${LL.t('apps.desc')}</p></div>
+      <button type="button" id="apps-clear" class="btn" disabled=${apps.length === 0} onClick=${() => LL.send('clearApps')}>${LL.t('apps.clear')}</button></div>
+    ${apps.length === 0
+      ? html`<p id="apps-empty" class="hint">${LL.t('apps.empty')}</p>`
+      : html`<ul class="app-list">${apps.map((app) => html`<li class="app" key=${app.id}>
+          <span class="app-name">${app.name}</span><span class="app-summary">${app.summary}</span><time>${app.used}</time>
+          <button type="button" class="danger" aria-label=${LL.t('apps.forget') + ' ' + app.name}
+            onClick=${() => LL.send('forgetApp', { appId: app.id })}>${LL.t('apps.forget')}</button>
+        </li>`)}</ul>`}
+  </section>`;
 
   const General = ({ g }) => html`<div>
     <${Row} id="hotkey" title=${LL.t('hotkey')} desc=${LL.t('hotkey.desc')}
@@ -30,9 +47,13 @@
     <${Row} id="motion" title=${LL.t('motion')} desc=${LL.t('motion.desc')}>
       <${Switch} id="motion" checked=${g.reduceMotion} onChange=${(on) => set('reduceMotion')(String(on))}/>
     <//>
+    <${Row} id="recent-clear" title=${LL.t('recent')} desc=${LL.t('recent.desc')}>
+      <button type="button" id="recent-clear" class="btn" onClick=${() => LL.send('clearRecent')}>${LL.t('recent.clear')}</button>
+    <//>
     <${Row} id="remember" title=${LL.t('remember')} desc=${LL.t('remember.desc')}>
       <${Switch} id="remember" checked=${g.rememberChoices} onChange=${(on) => set('rememberChoices')(String(on))}/>
     <//>
+    <${Apps} apps=${g.apps}/>
   </div>`;
 
   class Terms extends preact.Component {
@@ -168,84 +189,25 @@
     <${Terms} terms=${v.terms}/>
   </div>`;
 
-  const Apps = ({ apps }) => html`<section class="apps" aria-labelledby="apps-title">
-    <div class="apps-head"><div><h2 id="apps-title">${LL.t('apps')}</h2><p class="hint">${LL.t('apps.desc')}</p></div>
-      <button type="button" id="apps-clear" class="btn" disabled=${apps.length === 0} onClick=${() => LL.send('clearApps')}>${LL.t('apps.clear')}</button></div>
-    ${apps.length === 0
-      ? html`<p id="apps-empty" class="hint">${LL.t('apps.empty')}</p>`
-      : html`<ul class="app-list">${apps.map((app) => html`<li class="app" key=${app.id}>
-          <span class="app-name">${app.name}</span><span class="app-summary">${app.summary}</span><time>${app.used}</time>
-          <button type="button" class="danger" aria-label=${LL.t('apps.forget') + ' ' + app.name}
-            onClick=${() => LL.send('forgetApp', { appId: app.id })}>${LL.t('apps.forget')}</button>
-        </li>`)}</ul>`}
-  </section>`;
-
-  const cloudToggle = (step) => (on) => LL.send('cloudToggle', { step, on });
-
   // The page only has the strings; the placeholders ({0}, {1}…) are filled here.
   const fmt = (key, ...args) => args.reduce((text, arg, i) => text.split('{' + i + '}').join(arg), LL.t(key));
 
-  // The cloud steps that are on, in the words of their switches.
-  const stepNames = (p) => [p.cloudTranslate && LL.t('cloud.translate'), p.cloudClean && LL.t('cloud.clean')].filter(Boolean).join(' / ');
-
   const FORM_FIELD = { nameMissing: 'ep-name', nameTaken: 'ep-name', urlInvalid: 'ep-url', modelMissing: 'ep-model', keyMissing: 'ep-key' };
-
-  const Endpoint = ({ e }) => html`<li class=${'endpoint' + (e.active ? ' on' : '')}>
-    <div class="ep-main">
-      <div class="ep-title"><b>${e.name}</b>${e.active && html`<span class="chip ok">${LL.t('cloud.enabled')}</span>`}</div>
-      <p class="ep-meta">${e.host} · ${e.model} · ${e.hasKey ? LL.t('cloud.keySaved') : LL.t('cloud.keyMissing')}</p>
-    </div>
-    <div class="ep-actions">
-      <button type="button" id=${'endpoint-edit-' + e.id} class="link" aria-label=${LL.t('cloud.edit') + ' ' + e.name}
-        onClick=${() => LL.send('openEndpointForm', { id: e.id })}>${LL.t('cloud.edit')}</button>
-      <button type="button" id=${'endpoint-delete-' + e.id} class="link danger" aria-label=${LL.t('cloud.delete') + ' ' + e.name}
-        onClick=${() => LL.send('deleteEndpoint', { id: e.id })}>${LL.t('cloud.delete')}</button>
-      <${Switch} id=${'endpoint-on-' + e.id} label=${LL.t('cloud.enable') + ' ' + e.name} checked=${e.active}
-        onChange=${(on) => LL.send('enableEndpoint', { id: e.id, on })}/>
-    </div>
-  </li>`;
-
-  // Any number of endpoints can be kept; the switch of one turns the others off (C# decides, the page only draws it).
-  const Endpoints = ({ p }) => {
-    const active = p.endpoints.find((e) => e.active);
-    return html`<section class="endpoints" aria-labelledby="endpoints-title">
-      <div class="endpoints-head">
-        <div><h2 id="endpoints-title">${LL.t('cloud.endpoints')}</h2>
-          <p id="endpoints-hint" class="hint">${active ? fmt('cloud.endpoints.active', active.name) : LL.t('cloud.endpoints.none')}</p>
-          ${p.invalid && html`<p class="err" role="alert">${LL.t('cloud.invalid')}</p>`}</div>
-        <button type="button" id="endpoint-add" class="btn" onClick=${() => LL.send('openEndpointForm', { id: null })}>${LL.t('cloud.add')}</button>
-      </div>
-      ${p.endpoints.length === 0
-        ? html`<p id="endpoints-empty" class="hint">${LL.t('cloud.endpoints.empty')}</p>`
-        : html`<ul class="endpoint-list">${p.endpoints.map((e) => html`<${Endpoint} key=${e.id} e=${e}/>`)}</ul>`}
-    </section>`;
-  };
-
-  const Privacy = ({ p }) => html`<div>
-    <${Row} id="cloud-translate" title=${LL.t('cloud.translate')} desc=${LL.t('cloud.translate.desc')}>
-      <${Switch} id="cloud-translate" checked=${p.cloudTranslate} onChange=${cloudToggle('translate')}/>
-    <//>
-    <${Row} id="cloud-clean" title=${LL.t('cloud.clean')} desc=${LL.t('cloud.clean.desc')}>
-      <${Switch} id="cloud-clean" checked=${p.cloudClean} onChange=${cloudToggle('clean')}/>
-    <//>
-    <${Endpoints} p=${p}/>
-    <${Row} id="recent-clear" title=${LL.t('recent')} desc=${LL.t('recent.desc')}>
-      <button type="button" id="recent-clear" class="btn" onClick=${() => LL.send('clearRecent')}>${LL.t('recent.clear')}</button>
-    <//>
-    <${Apps} apps=${p.apps}/>
-  </div>`;
 
   // A modal dialog: keeps the focus inside, closes on Escape and gives the focus back to what opened it.
   // The child marked data-initial takes the focus first; it is the safe answer.
   class Modal extends preact.Component {
     componentDidMount() {
+      this.opener = document.activeElement;
       this.pane.querySelector('[data-initial]').focus();
       document.addEventListener('keydown', this.onKeyDown);
     }
 
     componentWillUnmount() {
       document.removeEventListener('keydown', this.onKeyDown);
-      document.getElementById(this.props.returnTo)?.focus();
+      const explicit = this.props.returnTo ? document.getElementById(this.props.returnTo) : null;
+      const fallback = this.opener && this.opener.isConnected && !this.pane?.contains(this.opener) ? this.opener : null;
+      (explicit || fallback)?.focus();
     }
 
     onKeyDown = (e) => {
@@ -302,28 +264,296 @@
     ${u.canDownload && html`<button type="button" id="update-action" class="btn primary" onClick=${() => LL.send('openDownloads')}>${LL.t('update.download')}</button>`}
   <//>`;
 
-  const Models = ({ m }) => html`<div>
-    <div class="chips">${['models.speech', 'models.clean', 'models.translate'].map((key) => html`<span class="chip" key=${key}>${LL.t(key)}</span>`)}</div>
-    <${Row} id="tier" title=${LL.t('model')} desc=${LL.t('model.desc')}>
-      <${Select} id="tier" value=${m.tier} options=${choices(['Quality', 'Fast'], ['model.quality', 'model.fast'])} onChange=${set('tier')}/>
-    <//>
-    ${m.legacy.count > 0 && html`<${Row} id="legacy-remove" title=${LL.t('legacy')} desc=${m.legacy.text}>
-      <button type="button" id="legacy-remove" class="btn" onClick=${() => LL.send('removeLegacyModels')}>${LL.t('legacy.remove')}</button>
-    <//>`}
-    <${Diagnostics} lines=${m.diagnostics}/>
-    <${Row} id="version" title=${LL.t('version')} desc=${LL.t('version.desc')}>
-      <span id="version" class="chip">${m.version}</span>
-    <//>
-    <${Update} u=${m.update}/>
-  </div>`;
+  const Stars = ({ label, count }) => {
+    const filled = '●'.repeat(count) + '○'.repeat(Math.max(0, 3 - count));
+    return html`<span class="mmetric" aria-label=${label + ' ' + count + '/3'}>${label} <span class="mdots" aria-hidden="true">${filled}</span></span>`;
+  };
 
-  // Turning a cloud step on needs the user's consent every time. C# says when to ask; the safe answer is the first button.
+  const fitChipClass = (fit) =>
+    fit === 'recommended' ? 'chip mini rec'
+    : fit === 'heavy' ? 'chip mini warn'
+    : fit === 'unsupported' ? 'chip mini off'
+    : 'chip mini';
+
+  const ModelCard = ({ stage, opt }) => {
+    const radioId = 'model-radio-' + opt.id;
+    const choose = () => {
+      if (opt.canSelectImmediate) LL.send('selectModel', { modelId: opt.id });
+    };
+    return html`<li id=${'model-card-' + opt.id}
+      class=${'mcard' + (opt.active ? ' active' : '') + (opt.fit === 'unsupported' ? ' unsupported' : '') + (opt.canSelectImmediate ? ' selectable' : '')}
+      onClick=${(e) => {
+        if (!e.target.closest('button, input, label')) choose();
+      }}>
+      <div class="mcard-top">
+        <input type="radio" class="mradio" id=${radioId} name=${'stage-' + stage}
+          aria-label=${opt.name} checked=${opt.active} disabled=${!opt.canSelectImmediate && !opt.active}
+          onChange=${(e) => {
+            e.target.checked = opt.active;
+            choose();
+          }}/>
+        <div class="mcard-body">
+          <div class="mcard-head">
+            <span class="mrank">${'#' + opt.rank}</span>
+            <label class="mname" for=${radioId}>${opt.name}</label>
+            <span class=${fitChipClass(opt.fit)}>${opt.fitBadge}</span>
+            ${opt.active && opt.installed && html`<span class="chip mini ok">${LL.t('models.state.activeInstalled')}</span>`}
+            ${opt.active && !opt.installed && html`<span class="chip mini ok">${LL.t('models.state.selected')}</span>`}
+            ${!opt.active && opt.pendingActivation && opt.downloading && html`<span class="chip mini rec">${LL.t('models.state.activating')}</span>`}
+            ${!opt.active && opt.installed && html`<span class="chip mini">${LL.t('models.state.installed')}</span>`}
+          </div>
+          <p class="mcard-desc">
+            <${Stars} label=${LL.t('models.metric.quality')} count=${opt.quality}/>
+            <${Stars} label=${LL.t('models.metric.speed')} count=${opt.speed}/>
+            <span>${opt.summary}</span>
+          </p>
+          <p class="mcard-foot">
+            <span>${opt.footprint}</span>
+            ${opt.fitDetail && html`<span class=${'mfit-note ' + opt.fit}> · ${opt.fitDetail}</span>`}
+          </p>
+        </div>
+        <div class="mcard-actions">
+          ${opt.downloading && html`<button type="button" id=${'model-cancel-' + opt.id} class="btn compact"
+            aria-label=${LL.t('models.action.cancel') + ' ' + opt.name}
+            onClick=${() => LL.send('cancelModelDownload', { modelId: opt.id })}>${LL.t('models.action.cancel')}</button>`}
+          ${opt.canDownload && html`<button type="button" id=${'model-download-' + opt.id}
+            class=${'btn compact' + (opt.active ? ' primary' : '')}
+            aria-label=${opt.downloadActionLabel + ' ' + opt.name}
+            onClick=${() => LL.send('downloadModel', { modelId: opt.id })}>${opt.downloadActionLabel}</button>`}
+          ${opt.canSelectImmediate && opt.installed && html`<button type="button" id=${'model-use-' + opt.id} class="btn compact"
+            aria-label=${LL.t('models.action.enable') + ' ' + opt.name}
+            onClick=${choose}>${LL.t('models.action.enable')}</button>`}
+          ${opt.canDelete && html`<button type="button" id=${'model-delete-' + opt.id} class="link danger"
+            aria-label=${(opt.deleteActionLabel || LL.t('models.action.delete')) + ' ' + opt.name}
+            onClick=${() => LL.send('deleteModel', { modelId: opt.id })}>${opt.deleteActionLabel || LL.t('models.action.delete')}</button>`}
+        </div>
+      </div>
+      ${opt.downloading && html`<div class="mcard-progress">
+        <div class=${'progress' + (opt.downloadPercent === null ? ' indeterminate' : '')} role="progressbar" aria-label=${opt.name}
+          aria-valuemin="0" aria-valuemax="100" aria-valuenow=${opt.downloadPercent === null ? undefined : opt.downloadPercent}>
+          <span style=${opt.downloadPercent === null ? undefined : { width: opt.downloadPercent + '%' }}></span>
+        </div>
+        <span class="mprog-text" role="status" aria-live="polite">${opt.downloadText}</span>
+      </div>`}
+      ${opt.error && html`<p class="err mcard-err" role="alert">${opt.error}</p>`}
+    </li>`;
+  };
+
+  const CloudModelCard = ({ stage, step, ep }) => {
+    const radioId = 'model-cloud-' + step + '-' + ep.id;
+    const canChoose = ep.usable && !ep.active;
+    const choose = () => {
+      if (canChoose) LL.send('selectCloudModel', { step, endpointId: ep.id });
+    };
+    return html`<li id=${'model-cloud-card-' + step + '-' + ep.id}
+      class=${'mcard cloud' + (ep.active ? ' active' : '') + (!ep.usable && !ep.active ? ' unsupported' : '') + (canChoose ? ' selectable' : '')}
+      onClick=${(e) => {
+        if (!e.target.closest('button, input, label')) choose();
+      }}>
+      <div class="mcard-top">
+        <input type="radio" class="mradio" id=${radioId} name=${'stage-' + stage}
+          aria-label=${ep.name + ' · ' + ep.model} checked=${ep.active} disabled=${!canChoose && !ep.active}
+          onChange=${(e) => {
+            e.target.checked = ep.active;
+            choose();
+          }}/>
+        <div class="mcard-body">
+          <div class="mcard-head">
+            <span class="mrank cloud">${LL.t('models.cloud.badge')}</span>
+            <label class="mname" for=${radioId}>${ep.name}</label>
+            <span class="chip mini">${ep.model}</span>
+            ${ep.active && html`<span class="chip mini ok">${LL.t('models.state.activeInstalled')}</span>`}
+            ${ep.peerBadge && html`<span class="chip mini">${ep.peerBadge}</span>`}
+            ${!ep.usable && html`<span class="chip mini warn">${LL.t('models.cloud.incomplete')}</span>`}
+          </div>
+          <p class="mcard-desc">
+            <span>${ep.host} · ${ep.hasKey ? LL.t('cloud.keySaved') : LL.t('cloud.keyMissing')}</span>
+          </p>
+          <p class="mcard-foot">
+            <span>${LL.t('models.cloud.footprint')}</span>
+          </p>
+        </div>
+        <div class="mcard-actions">
+          ${ep.active && html`<button type="button" id=${'model-cloud-local-' + step + '-' + ep.id} class="btn compact"
+            aria-label=${LL.t('models.cloud.useLocal') + ' ' + ep.name}
+            onClick=${() => LL.send('useLocalStage', { step })}>${LL.t('models.cloud.useLocal')}</button>`}
+          ${canChoose && html`<button type="button" id=${'model-cloud-use-' + step + '-' + ep.id} class="btn compact"
+            aria-label=${LL.t('models.action.enable') + ' ' + ep.name}
+            onClick=${choose}>${LL.t('models.action.enable')}</button>`}
+          <div class="mcard-links">
+            <button type="button" id=${'stage-cloud-edit-' + stage + '-' + ep.id} class="link"
+              aria-label=${LL.t('cloud.edit') + ' ' + ep.name}
+              onClick=${() => LL.send('openEndpointForm', { id: ep.id })}>${LL.t('cloud.edit')}</button>
+            <button type="button" id=${'stage-cloud-delete-' + stage + '-' + ep.id} class="link danger"
+              aria-label=${LL.t('cloud.delete') + ' ' + ep.name}
+              onClick=${() => LL.send('deleteEndpoint', { id: ep.id })}>${LL.t('cloud.delete')}</button>
+          </div>
+        </div>
+      </div>
+    </li>`;
+  };
+
+  const ModelStageSection = ({ group }) => html`<section id=${'stage-' + group.stage} class="mstage"
+    role="tabpanel" aria-labelledby=${'model-tab-' + group.stage}>
+    <div class="mstage-head">
+      <h2 id=${'stage-title-' + group.stage}>${group.title}</h2>
+      <p class="hint">${group.desc}</p>
+    </div>
+    ${group.localOnly && html`<div id="speech-local-only" class="mstage-local-pill" role="note">
+      <span class="chip mini ok">${LL.t('privacy.badge.alwaysLocal')}</span>
+      <span>${LL.t('models.speech.localOnly')}</span>
+    </div>`}
+    ${group.notice && html`<div class="mstage-notice" role="status">
+      <span>${group.notice}</span>
+    </div>`}
+    ${group.cloudStep && html`<div class="msource-group">
+      <div class="msource-head">
+        <h3 class="msource-title">${LL.t('models.group.cloud.title')}</h3>
+        <div class="msource-links">
+          <button type="button" id=${'stage-cloud-add-' + group.stage} class="link"
+            onClick=${() => LL.send('openEndpointForm', { id: null })}>+ ${LL.t('models.cloud.add')}</button>
+        </div>
+      </div>
+      ${group.cloudInvalid && html`<p class="err msource-err" role="alert">${LL.t('cloud.invalid')}</p>`}
+      ${group.cloudOptions.length === 0
+        ? html`<div id=${'stage-cloud-empty-' + group.stage} class="mcloud-empty">
+            <span>${LL.t('models.cloud.empty')}</span>
+            <button type="button" id=${'stage-cloud-empty-add-' + group.stage} class="btn compact"
+              onClick=${() => LL.send('openEndpointForm', { id: null })}>${LL.t('models.cloud.add')}</button>
+          </div>`
+        : html`<ul class="mcard-list">${group.cloudOptions.map((ep) =>
+            html`<${CloudModelCard} key=${ep.id} stage=${group.stage} step=${group.cloudStep} ep=${ep}/>`)}</ul>`}
+    </div>`}
+    ${group.cloudStep && html`<div class="msource-head local">
+      <h3 class="msource-title">${LL.t('models.group.local.title')}</h3>
+    </div>`}
+    <ul class="mcard-list">${group.options.map((opt) => html`<${ModelCard} key=${opt.id} stage=${group.stage} opt=${opt}/>`)}</ul>
+  </section>`;
+
+  const DownloadCenter = ({ downloads }) => {
+    if (!downloads || downloads.length === 0) return null;
+    return html`<section id="models-downloads" class="mdl-center" aria-labelledby="models-dl-title">
+      <div class="mdl-head">
+        <h2 id="models-dl-title">${LL.t('models.dl.title')}</h2>
+        <span class="chip mini rec">${downloads.length}</span>
+      </div>
+      <ul class="mdl-list">${downloads.map((d) => html`<li id=${'dl-item-' + d.id} class=${'mdl-item' + (d.failed ? ' failed' : '')} key=${d.id}>
+        <div class="mdl-row">
+          <div class="mdl-title">
+            <span class="chip mini">${d.category}</span>
+            <b>${d.name}</b>
+          </div>
+          <div class="mdl-right">
+            <span class=${'mdl-status' + (d.failed ? ' err' : '')} role=${d.failed ? 'alert' : 'status'} aria-live="polite">${d.statusText}</span>
+            ${d.canCancel && html`<button type="button" id=${'dl-cancel-' + d.id} class="btn compact"
+              aria-label=${LL.t('models.action.cancel') + ' ' + d.name}
+              onClick=${() => LL.send('cancelModelDownload', { modelId: d.id })}>${LL.t('models.action.cancel')}</button>`}
+            ${d.canRetry && html`<button type="button" id=${'dl-retry-' + d.id} class="btn compact primary"
+              aria-label=${LL.t('models.action.retry') + ' ' + d.name}
+              onClick=${() => LL.send('downloadModel', { modelId: d.id })}>${LL.t('models.action.retry')}</button>`}
+          </div>
+        </div>
+        ${!d.failed && html`<div class=${'progress' + (d.percent === null ? ' indeterminate' : '')} role="progressbar"
+          aria-label=${d.name} aria-valuemin="0" aria-valuemax="100" aria-valuenow=${d.percent === null ? undefined : d.percent}>
+          <span style=${d.percent === null ? undefined : { width: d.percent + '%' }}></span>
+        </div>`}
+      </li>`)}</ul>
+    </section>`;
+  };
+
+  const ModelStorageSection = ({ s }) => html`<section id="models-storage" class="mstorage"
+    role="tabpanel" aria-labelledby="model-tab-storage">
+    <div class="mstage-head">
+      <h2 id="storage-title">${LL.t('models.storage.title')}</h2>
+      <p class="hint">${LL.t('models.storage.desc')}</p>
+    </div>
+    <div class="storage-summary">
+      <div class="storage-stat">
+        <span class="storage-kicker">${LL.t('models.storage.total')}</span>
+        <strong id="storage-total" class="storage-total">${s.totalSize}</strong>
+        <p class="storage-breakdown">${s.breakdown}</p>
+      </div>
+      ${s.path && html`<div class="storage-path">
+        <span class="storage-kicker">${LL.t('models.storage.path')}</span>
+        <code id="storage-path">${s.path}</code>
+      </div>`}
+    </div>
+    ${s.legacy.count > 0 && html`<div class="storage-legacy">
+      <${Row} id="legacy-remove" title=${LL.t('legacy')} desc=${s.legacy.text}>
+        <button type="button" id="legacy-remove" class="btn compact" onClick=${() => LL.send('removeLegacyModels')}>${LL.t('legacy.remove')}</button>
+      <//>
+    </div>`}
+    <div class="storage-inventory">
+      <h3 class="storage-subhead">${LL.t('models.storage.listTitle')}</h3>
+      ${s.items.length === 0
+        ? html`<p id="storage-empty" class="hint storage-empty">${LL.t('models.storage.empty')}</p>`
+        : html`<ul class="storage-list">${s.items.map((item) => html`<li id=${'storage-item-' + item.id} class="storage-item" key=${item.id}>
+            <div class="storage-main">
+              <div class="storage-item-head">
+                <span class="chip mini">${item.category}</span>
+                <b>${item.name}</b>
+                <span class=${'chip mini' + (item.inUse ? ' ok' : '')}>${item.statusBadge}</span>
+              </div>
+            </div>
+            <div class="storage-meta">
+              <span class="storage-size">${item.sizeText}</span>
+              ${item.canActivate && html`<button type="button" id=${'storage-use-' + item.id} class="btn compact"
+                aria-label=${LL.t('models.action.enable') + ' ' + item.name}
+                onClick=${() => LL.send('selectModel', { modelId: item.id })}>${LL.t('models.action.enable')}</button>`}
+              ${item.canDelete && html`<button type="button" id=${'storage-delete-' + item.id} class="link danger"
+                aria-label=${(item.deleteActionLabel || LL.t('models.action.delete')) + ' ' + item.name}
+                onClick=${() => LL.send('deleteModel', { modelId: item.id })}>${item.deleteActionLabel || LL.t('models.action.delete')}</button>`}
+            </div>
+          </li>`)}</ul>`}
+    </div>
+  </section>`;
+
+  const HardwareBanner = ({ hw, onOpenStorage }) => html`<section id="models-hw" class="mhw" aria-labelledby="models-hw-title">
+    <div class="mhw-top">
+      <div class="mhw-info">
+        <h2 id="models-hw-title">${LL.t('models.hw.title')}</h2>
+        <p id="models-hw-summary" class="mhw-summary">${hw.summary}</p>
+      </div>
+      <div class="mhw-cta">
+        ${hw.isRecommended
+          ? html`<span id="models-best-badge" class="chip rec">${LL.t('models.hw.matched')}</span>`
+          : hw.isRecommendedDownloading
+          ? html`<span id="models-best-preparing" class="chip rec" role="status">${LL.t('models.hw.preparing')}</span>`
+          : html`<button type="button" id="models-apply-best" class="btn primary compact"
+              onClick=${() => LL.send('applyRecommendedModels')}>${hw.recommendActionLabel}</button>`}
+      </div>
+    </div>
+    <div class="mhw-meter">
+      <div class=${'progress' + (hw.overBudget ? ' warn' : '')} role="progressbar" aria-label=${LL.t('models.hw.gaugeAria')}
+        aria-valuemin="0" aria-valuemax="100" aria-valuenow=${hw.budgetPercent}>
+        <span style=${{ width: hw.budgetPercent + '%' }}></span>
+      </div>
+      <div class="mhw-meta-row">
+        <p class="mhw-meta"><span>${hw.residency}</span></p>
+        <button type="button" id="models-disk-link" class="link mhw-disk-btn" onClick=${onOpenStorage}>${hw.diskUsed}</button>
+      </div>
+      <p class=${'mhw-note' + (hw.overBudget ? ' warn' : '')}>${hw.modeNote}</p>
+    </div>
+    <div id="models-privacy-strip" class="mhw-privacy">
+      <div class="mhw-privacy-status">
+        <span class=${'chip mini ' + (hw.anyCloud ? 'warn' : 'ok')}>${LL.t(hw.anyCloud ? 'privacy.badge.cloud' : 'privacy.badge.local')}</span>
+        <span>${hw.privacyStatus}</span>
+      </div>
+      ${hw.anyCloud && html`<button type="button" id="cloud-disable-all" class="btn compact"
+        onClick=${() => LL.send('disableAllCloud')}>${LL.t('privacy.routing.allLocal')}</button>`}
+    </div>
+  </section>`;
+
+  // Selecting a cloud endpoint for any text stage requires explicit user consent; the safe answer is always focused first.
   const answer = (allow) => LL.send('consent', { allow });
 
-  const Consent = ({ step, active }) => html`<${Modal} id="consent" title=${LL.t('consent.' + step)} returnTo=${'cloud-' + step} onClose=${() => answer(false)}>
-    <p>${fmt('consent.body', active.name, active.host)}</p>
+  const Consent = ({ c }) => html`<${Modal} id="consent" title=${LL.t('consent.' + c.step)}
+    returnTo=${'model-cloud-' + c.step + '-' + c.endpointId} onClose=${() => answer(false)}>
+    <p>${c.previousEndpointName
+      ? fmt('consent.switchBody', c.previousEndpointName, c.endpointName, c.host)
+      : fmt('consent.body', c.endpointName, c.host)}</p>
     <div class="dlg-actions">
-      <button type="button" id="consent-keep" class="btn" data-initial onClick=${() => answer(false)}>${LL.t('consent.keepLocal')}</button>
+      <button type="button" id="consent-keep" class="btn" data-initial onClick=${() => answer(false)}>${LL.t(c.previousEndpointName ? 'consent.keepCurrent' : 'consent.keepLocal')}</button>
       <button type="button" id="consent-allow" class="btn primary" onClick=${() => answer(true)}>${LL.t('consent.allow')}</button>
     </div>
   <//>`;
@@ -359,11 +589,12 @@
       if (e.key === 'Enter' && (e.isComposing || e.keyCode === 229)) e.preventDefault();
     };
 
-    render({ form, endpoint }, { name, url, model, key }) {
+    render({ form, endpoint, stage }, { name, url, model, key }) {
       const adding = form.id === null;
       const bad = (field) => (form.error && FORM_FIELD[form.error] === field ? 'true' : undefined);
+      const returnTo = adding ? ('stage-cloud-add-' + stage) : ('stage-cloud-edit-' + stage + '-' + form.id);
       return html`<${Modal} id="endpoint-form" title=${LL.t(adding ? 'cloud.form.add' : 'cloud.form.edit')}
-        returnTo=${adding ? 'endpoint-add' : 'endpoint-edit-' + form.id} onClose=${() => LL.send('closeEndpointForm')}
+        returnTo=${returnTo} onClose=${() => LL.send('closeEndpointForm')}
         ref=${(modal) => (this.pane = modal?.pane)}>
         <form class="endpoint-form" onSubmit=${this.submit} onKeyDown=${this.onKeyDown} novalidate>
           <label>${LL.t('cloud.name')}<input id="ep-name" value=${name} maxlength="40" placeholder=${LL.t('cloud.name.example')} data-initial
@@ -387,41 +618,118 @@
     }
   }
 
-  // Switching the enabled endpoint while a step is on, and deleting one, ask first; the safe answer is the first button.
+  // Deleting an endpoint asks first and explains if any active cloud step will return to local models.
   const endpointAnswer = (allow) => LL.send('endpointAnswer', { allow });
 
-  const EndpointChange = ({ p }) => {
-    const endpoint = p.endpoints.find((e) => e.id === p.change.id);
-    const active = p.endpoints.find((e) => e.active);
-    if (!endpoint) return null;
-    const switching = p.change.kind === 'switch';
-    const steps = stepNames(p);
-    return html`<${Modal} id="endpoint-change" title=${switching ? LL.t('cloud.switch.title') : fmt('cloud.delete.title', endpoint.name)}
-      returnTo=${switching ? 'endpoint-on-' + endpoint.id : 'endpoint-delete-' + endpoint.id} onClose=${() => endpointAnswer(false)}>
-      <p>${switching ? fmt('cloud.switch.body', steps, active.name, endpoint.name, endpoint.host)
-        : LL.t('cloud.delete.body') + (endpoint.active && steps ? ' ' + fmt('cloud.delete.steps', steps) : '')}</p>
-      <div class="dlg-actions">
-        <button type="button" id="endpoint-keep" class="btn" data-initial onClick=${() => endpointAnswer(false)}>${LL.t(switching ? 'cloud.switch.keep' : 'cloud.delete.keep')}</button>
-        <button type="button" id="endpoint-confirm" class=${'btn primary' + (switching ? '' : ' destructive')} onClick=${() => endpointAnswer(true)}>${LL.t(switching ? 'cloud.switch.confirm' : 'cloud.delete.confirm')}</button>
+  const DeleteEndpointDialog = ({ d, stage }) => html`<${Modal} id="endpoint-change" title=${fmt('cloud.delete.title', d.name)}
+    returnTo=${'stage-cloud-delete-' + stage + '-' + d.id} onClose=${() => endpointAnswer(false)}>
+    <p>${LL.t('cloud.delete.body') + (d.affectedSteps ? ' ' + fmt('cloud.delete.steps', d.affectedSteps) : '')}</p>
+    <div class="dlg-actions">
+      <button type="button" id="endpoint-keep" class="btn" data-initial onClick=${() => endpointAnswer(false)}>${LL.t('cloud.delete.keep')}</button>
+      <button type="button" id="endpoint-confirm" class="btn primary destructive" onClick=${() => endpointAnswer(true)}>${LL.t('cloud.delete.confirm')}</button>
+    </div>
+  <//>`;
+
+  class Models extends preact.Component {
+    constructor(props) {
+      super(props);
+      this.state = { tab: props.m.tab || 'speech' };
+    }
+
+    componentDidUpdate(before) {
+      if (this.props.m.tab && this.props.m.tab !== before.m.tab && this.props.m.tab !== this.state.tab) {
+        this.setState({ tab: this.props.m.tab });
+      }
+    }
+
+    selectTab = (tab) => this.setState({ tab });
+
+    onTabKeyDown = (tabs) => (e) => {
+      const idx = tabs.findIndex((t) => t.id === this.state.tab);
+      let next = -1;
+      if (e.key === 'ArrowRight') next = (idx + 1) % tabs.length;
+      else if (e.key === 'ArrowLeft') next = (idx - 1 + tabs.length) % tabs.length;
+      else if (e.key === 'Home') next = 0;
+      else if (e.key === 'End') next = tabs.length - 1;
+      if (next >= 0) {
+        e.preventDefault();
+        const targetId = tabs[next].id;
+        this.setState({ tab: targetId }, () => document.getElementById('model-tab-' + targetId)?.focus());
+      }
+    };
+
+    render({ m }, { tab }) {
+      const tabs = [
+        ...m.stages.map((g) => ({
+          id: g.stage,
+          title: g.tabTitle,
+          summary: g.tabSummary,
+          busy: g.busy,
+          panelId: 'stage-' + g.stage
+        })),
+        {
+          id: 'storage',
+          title: m.storage.tabTitle,
+          summary: m.storage.tabSummary,
+          busy: false,
+          panelId: 'models-storage'
+        }
+      ];
+      const activeStage = m.stages.find((g) => g.stage === tab);
+      const cloudStage = tab === 'cleaner' ? 'cleaner' : 'translator';
+      const cloudEndpoints = m.stages.find((g) => g.cloudStep)?.cloudOptions ?? [];
+
+      return html`<div class="models-page">
+        <${HardwareBanner} hw=${m.hardware} onOpenStorage=${() => this.selectTab('storage')}/>
+        <${DownloadCenter} downloads=${m.downloads}/>
+        <div id="models-tabs" class="mtabs" role="tablist" aria-label=${LL.t('models.tabs.aria')}
+          onKeyDown=${this.onTabKeyDown(tabs)}>
+          ${tabs.map((t) => html`<button type="button" role="tab" key=${t.id} id=${'model-tab-' + t.id}
+            class=${'mtab' + (tab === t.id ? ' on' : '') + (t.busy ? ' busy' : '')}
+            aria-selected=${String(tab === t.id)} aria-controls=${t.panelId}
+            tabIndex=${tab === t.id ? 0 : -1}
+            onClick=${() => this.selectTab(t.id)}>
+            <span class="mtab-title">${t.busy && html`<i class="dot" aria-hidden="true"></i>`}${t.title}</span>
+            <span class="mtab-sub">${t.summary}</span>
+          </button>`)}
+        </div>
+        ${activeStage ? html`<${ModelStageSection} key=${activeStage.stage} group=${activeStage}/>`
+          : html`<${ModelStorageSection} s=${m.storage}/>`}
+        ${m.consent && html`<${Consent} c=${m.consent}/>`}
+        ${m.form && html`<${EndpointForm} form=${m.form} stage=${cloudStage} endpoint=${cloudEndpoints.find((e) => e.id === m.form.id)}/>`}
+        ${m.deleteConfirm && html`<${DeleteEndpointDialog} d=${m.deleteConfirm} stage=${cloudStage}/>`}
+      </div>`;
+    }
+  }
+
+  const About = ({ a }) => html`<div class="about-page">
+    <section class="about-hero" aria-labelledby="about-app-name">
+      <div>
+        <h2 id="about-app-name" class="about-title">${LL.t('appName')}</h2>
+        <p class="hint">${LL.t('about.subtitle')}</p>
       </div>
-    <//>`;
-  };
+      <span id="version" class="chip rec">${a.version}</span>
+    </section>
+    <${Update} u=${a.update}/>
+    <${Diagnostics} lines=${a.diagnostics}/>
+  </div>`;
 
   LL.Settings = () => {
     const s = LL.state.settings;
     if (!s) return null;
     return html`<div class="settings">
       <nav aria-label=${LL.t('nav.aria')}>${SECTIONS.map(([id, key]) => html`<button type="button" key=${id} id=${'nav-' + id}
-        aria-current=${s.section === id ? 'page' : undefined} onClick=${() => LL.send('openSettings', { section: id })}>${LL.t(key)}</button>`)}</nav>
-      <main id="panel">
+        class=${id === 'about' ? 'nav-about' : undefined}
+        aria-current=${s.section === id ? 'page' : undefined} onClick=${() => LL.send('openSettings', { section: id })}>
+        <span>${LL.t(key)}</span>
+        ${id === 'models' && s.models.navBadge && html`<span id="nav-models-badge" class="nav-badge">${s.models.navBadge}</span>`}
+      </button>`)}</nav>
+      <main id="panel"><div class="panel-body">
         ${s.section === 'general' && html`<${General} g=${s.general}/>`}
         ${s.section === 'voice' && html`<${Voice} v=${s.voice}/>`}
-        ${s.section === 'privacy' && html`<${Privacy} p=${s.privacy}/>`}
         ${s.section === 'models' && html`<${Models} m=${s.models}/>`}
-      </main>
-      ${s.privacy.consent && html`<${Consent} step=${s.privacy.consent} active=${s.privacy.endpoints.find((e) => e.active)}/>`}
-      ${s.privacy.form && html`<${EndpointForm} form=${s.privacy.form} endpoint=${s.privacy.endpoints.find((e) => e.id === s.privacy.form.id)}/>`}
-      ${s.privacy.change && html`<${EndpointChange} p=${s.privacy}/>`}
+        ${s.section === 'about' && html`<${About} a=${s.about}/>`}
+      </div></main>
     </div>`;
   };
 })();

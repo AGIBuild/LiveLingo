@@ -1,12 +1,24 @@
 using System.Globalization;
+using LiveLingo.Core.Inference;
+using LiveLingo.Core.Models;
 using LiveLingo.Desktop.Settings;
 using LiveLingo.Desktop.Services.Update;
 
 namespace LiveLingo.Desktop.Web;
 
+/// <summary>One application the composer remembers a choice for; the summary reads like the output menu ("Translate to English").</summary>
+internal sealed record AppPreferenceState(string Id, string Name, string Summary, string Used);
+
 /// <param name="Theme">One of <see cref="SettingsViewModel.Themes"/>.</param>
 internal sealed record GeneralSettingsState(
-    string Hotkey, bool HotkeyInvalid, string CommitKey, string Language, string Theme, bool ReduceMotion, bool RememberChoices);
+    string Hotkey,
+    bool HotkeyInvalid,
+    string CommitKey,
+    string Language,
+    string Theme,
+    bool ReduceMotion,
+    bool RememberChoices,
+    IReadOnlyList<AppPreferenceState> Apps);
 
 internal sealed record TermState(int I, string Source, string Target);
 
@@ -22,20 +34,17 @@ internal sealed record VoiceSettingsState(
     bool PreloadSpeech, bool BuiltInGlossary, IReadOnlyList<TermState> Terms, IReadOnlyList<CorrectionState> Corrections,
     string PolishPrompt, bool PolishPromptIsDefault, bool PolishPromptInvalid);
 
-/// <summary>One application the composer remembers a choice for; the summary reads like the output menu ("Translate to English").</summary>
-internal sealed record AppPreferenceState(string Id, string Name, string Summary, string Used);
+internal sealed record ConsentModalState(
+    CloudStep Step,
+    string EndpointId,
+    string EndpointName,
+    string Host,
+    string? PreviousEndpointName);
 
-/// <summary>One saved cloud endpoint. There is no key here, only whether one is stored: the key itself never goes back to the page.</summary>
-/// <param name="Host">What the address points at, for lists and questions where the whole URL is too long.</param>
-/// <param name="Active">The one endpoint the cloud steps use; at most one is.</param>
-internal sealed record EndpointState(string Id, string Name, string Url, string Host, string Model, bool HasKey, bool Active);
-
-/// <param name="Form">The add or edit form while it is open, with why its last submission was refused.</param>
-/// <param name="Change">A switch of the enabled endpoint or a deletion the user is being asked about.</param>
-/// <param name="Consent">The step the user is being asked to authorize, or null.</param>
-internal sealed record PrivacySettingsState(
-    bool CloudTranslate, bool CloudClean, IReadOnlyList<EndpointState> Endpoints, EndpointForm? Form, PendingEndpointChange? Change,
-    bool Invalid, CloudStep? Consent, IReadOnlyList<AppPreferenceState> Apps);
+internal sealed record DeleteEndpointModalState(
+    string Id,
+    string Name,
+    string? AffectedSteps);
 
 /// <param name="Text">What the old models are and how much room they take; empty when there are none.</param>
 internal sealed record LegacyModelsState(int Count, string Text);
@@ -43,8 +52,116 @@ internal sealed record LegacyModelsState(int Count, string Text);
 /// <summary>One line of the status the user can read out when asking for help; values never contain what the user wrote.</summary>
 internal sealed record DiagnosticLine(string Label, string Value);
 
+internal sealed record HardwareSummaryState(
+    string Summary,
+    string Residency,
+    int BudgetPercent,
+    bool OverBudget,
+    string ModeNote,
+    string DiskUsed,
+    bool AnyCloud,
+    string PrivacyStatus,
+    bool IsRecommended,
+    bool IsRecommendedDownloading,
+    string? RecommendActionLabel);
+
+internal sealed record DownloadItemState(
+    string Id,
+    string Category,
+    string Name,
+    string StatusText,
+    int? Percent,
+    bool Queued,
+    bool Failed,
+    bool CanCancel,
+    bool CanRetry);
+
+internal sealed record ModelOptionState(
+    string Id,
+    int Rank,
+    string Name,
+    string Summary,
+    int Quality,
+    int Speed,
+    string Footprint,
+    ModelFit Fit,
+    string FitBadge,
+    string? FitDetail,
+    bool Active,
+    bool PendingActivation,
+    bool Installed,
+    bool Downloading,
+    int? DownloadPercent,
+    string? DownloadText,
+    string? Error,
+    bool CanSelectImmediate,
+    bool CanDownload,
+    string? DownloadActionLabel,
+    bool CanDelete,
+    string? DeleteActionLabel);
+
+/// <summary>One saved cloud endpoint shown in a text stage's radio list; never exposes the stored API key.</summary>
+internal sealed record StageCloudOptionState(
+    string Id,
+    string Name,
+    string Url,
+    string Host,
+    string Model,
+    bool HasKey,
+    bool Usable,
+    bool Active,
+    string? PeerBadge);
+
+internal sealed record ModelStageGroupState(
+    string Stage,
+    string TabTitle,
+    string TabSummary,
+    bool Busy,
+    string Title,
+    string Desc,
+    bool LocalOnly,
+    string? Notice,
+    CloudStep? CloudStep,
+    bool CloudRouted,
+    bool CloudInvalid,
+    IReadOnlyList<StageCloudOptionState> CloudOptions,
+    IReadOnlyList<ModelOptionState> Options);
+
+internal sealed record InstalledModelItemState(
+    string Id,
+    string Name,
+    string Category,
+    string SizeText,
+    bool InUse,
+    string StatusBadge,
+    bool CanActivate,
+    bool CanDelete,
+    string? DeleteActionLabel);
+
+internal sealed record ModelStorageState(
+    string TabTitle,
+    string TabSummary,
+    string TotalSize,
+    string Breakdown,
+    string Path,
+    IReadOnlyList<InstalledModelItemState> Items,
+    LegacyModelsState Legacy);
+
 internal sealed record ModelsSettingsState(
-    string Tier, LegacyModelsState Legacy, string Version, UpdateViewState Update, IReadOnlyList<DiagnosticLine> Diagnostics);
+    string Tab,
+    string? NavBadge,
+    HardwareSummaryState Hardware,
+    IReadOnlyList<DownloadItemState> Downloads,
+    IReadOnlyList<ModelStageGroupState> Stages,
+    ModelStorageState Storage,
+    EndpointForm? Form,
+    DeleteEndpointModalState? DeleteConfirm,
+    ConsentModalState? Consent);
+
+internal sealed record AboutSettingsState(
+    string Version,
+    UpdateViewState Update,
+    IReadOnlyList<DiagnosticLine> Diagnostics);
 
 /// <summary>What the update row draws: a sentence, the download progress while there is one, and which buttons make sense.</summary>
 /// <param name="Percent">The download progress; null when nothing is being downloaded.</param>
@@ -76,11 +193,17 @@ internal sealed record SettingsViewState(
     string Section,
     GeneralSettingsState General,
     VoiceSettingsState Voice,
-    PrivacySettingsState Privacy,
     ModelsSettingsState Models,
+    AboutSettingsState About,
     SettingsOptionsState Options)
 {
-    public static SettingsViewState From(SettingsViewModel vm, SettingsTexts texts, string section, AppInfo app, UpdateViewState update)
+    public static SettingsViewState From(
+        SettingsViewModel vm,
+        SettingsTexts texts,
+        string section,
+        AppInfo app,
+        UpdateViewState update,
+        string modelsTab = "speech")
     {
         var theme = SettingsViewModel.Themes[vm.ThemeIndex];
         return new SettingsViewState(
@@ -93,7 +216,8 @@ internal sealed record SettingsViewState(
                 SettingsViewModel.Languages[vm.LanguageIndex],
                 theme,
                 vm.ReduceMotion,
-                vm.RememberChoices),
+                vm.RememberChoices,
+                [.. vm.Apps.Select(a => new AppPreferenceState(a.AppId, texts.AppName(a.Name), texts.AppSummary(a.Output, a.Target), texts.Date(a.UsedAt)))]),
             new VoiceSettingsState(
                 vm.MicrophoneNames,
                 vm.MicrophoneNames[vm.MicrophoneIndex],
@@ -108,35 +232,284 @@ internal sealed record SettingsViewState(
                 vm.PolishPromptShown,
                 vm.PolishPromptIsDefault,
                 vm.PolishPromptInvalid),
-            new PrivacySettingsState(
-                vm.CloudTranslate, vm.CloudClean,
-                [.. vm.Endpoints.Select(endpoint => new EndpointState(
-                    endpoint.Id, endpoint.Name, endpoint.BaseUrl, HostOf(endpoint.BaseUrl), endpoint.Model, endpoint.HasKey, endpoint.Active))],
-                vm.Form, vm.PendingChange, vm.CloudInvalid, vm.PendingConsent,
-                [.. vm.Apps.Select(app => new AppPreferenceState(app.AppId, texts.AppName(app.Name), texts.AppSummary(app.Output, app.Target), texts.Date(app.UsedAt)))]),
-            new ModelsSettingsState(
-                SettingsViewModel.Tiers[vm.TierIndex],
-                new LegacyModelsState(vm.LegacyCount, vm.HasLegacyModels ? texts.LegacyDescription(vm.LegacyCount, vm.LegacyBytes) : ""),
-                app.Version,
-                update,
-                Diagnostics(vm, texts, app)),
+            BuildModelsState(vm, texts, modelsTab),
+            new AboutSettingsState(app.Version, update, Diagnostics(vm, texts, app)),
             new SettingsOptionsState(!vm.ReduceMotion, theme));
+    }
+
+    private static ModelsSettingsState BuildModelsState(
+        SettingsViewModel vm,
+        SettingsTexts texts,
+        string modelsTab)
+    {
+        var coordinator = vm.ModelCoordinator;
+        var hardware = coordinator.Hardware;
+        var active = coordinator.ActiveSelection;
+        var assessment = ModelAdvisor.AssessPlan(
+            active,
+            hardware,
+            cleanInCloud: vm.CloudClean,
+            translateInCloud: vm.CloudTranslate,
+            cleanupEnabled: vm.CleanupEnabled);
+        var budgetPercent = assessment.SafeBudgetBytes > 0
+            ? Math.Clamp((int)Math.Round(assessment.ActiveCoResidentBytes * 100d / assessment.SafeBudgetBytes), 0, 100)
+            : 100;
+
+        var inventory = coordinator.GetInstalledInventory();
+        var catalogDiskBytes = inventory.Sum(item => item.SizeBytes);
+        var totalDiskBytes = catalogDiskBytes + vm.LegacyBytes;
+
+        var anyCloud = vm.CloudClean || vm.CloudTranslate;
+        var isRecommended = coordinator.IsRecommendedActive;
+        var isRecommendedDownloading = coordinator.IsRecommendedDownloading;
+        var hardwareView = new HardwareSummaryState(
+            texts.HardwareSummary(hardware),
+            texts.ResidencySummary(assessment),
+            budgetPercent,
+            assessment.ExceedsSafeBudget,
+            texts.ResidencyMode(assessment),
+            texts.DiskUsedSummary(totalDiskBytes),
+            anyCloud,
+            texts.ModelsPrivacyStatus(vm.CloudClean, vm.CloudTranslate),
+            isRecommended,
+            isRecommendedDownloading,
+            isRecommended || isRecommendedDownloading ? null : texts.RecommendActionLabel(coordinator.MissingBytesForRecommended()));
+
+        var activeDownloads = coordinator.GetActiveDownloads();
+        var downloadRows = activeDownloads.Select(task =>
+        {
+            var isConnectingOrQueued = task.Queued || (task.State.IsDownloading && task.State.BytesDownloaded <= 0 && task.State.Percentage < 0.5);
+            int? percent = task.State.IsDownloading && !isConnectingOrQueued
+                ? Math.Clamp((int)Math.Round(task.State.Percentage), 0, 100)
+                : null;
+            var statusText = task.State.IsFailed
+                ? texts.DownloadError(task.State) ?? ""
+                : texts.DownloadProgressLabel(task.State, task.Model.SizeBytes, task.Queued);
+
+            return new DownloadItemState(
+                task.Model.Id,
+                texts.CategoryBadge(task.Stage),
+                texts.CatalogArtifactName(task.Model),
+                statusText,
+                percent,
+                task.Queued,
+                task.State.IsFailed,
+                CanCancel: task.State.IsDownloading || task.Queued,
+                CanRetry: task.State.IsFailed);
+        }).ToArray();
+
+        var primaryRunning = downloadRows.FirstOrDefault(row => !row.Failed && row.Percent is not null);
+        var anyBusyDownload = downloadRows.Any(row => !row.Failed);
+        var navBadge = texts.NavDownloadBadge(primaryRunning?.Percent, anyBusyDownload);
+
+        ModelStage[] stages = [ModelStage.Speech, ModelStage.Cleaner, ModelStage.Translator];
+        var groups = stages.Select(stage =>
+        {
+            var evaluations = ModelAdvisor.EvaluateStage(
+                stage,
+                hardware,
+                active,
+                cleanInCloud: vm.CloudClean,
+                translateInCloud: vm.CloudTranslate);
+            var activeDescriptor = active.DescriptorFor(stage);
+            var activeId = activeDescriptor.Id;
+            var pendingId = coordinator.PendingModelId(stage);
+            var currentStageInstalled = coordinator.IsInstalled(activeDescriptor);
+
+            CloudStep? cloudStep = stage switch
+            {
+                ModelStage.Cleaner => CloudStep.Clean,
+                ModelStage.Translator => CloudStep.Translate,
+                _ => null
+            };
+            var stageEndpoint = stage switch
+            {
+                ModelStage.Cleaner => vm.CleanerEndpoint,
+                ModelStage.Translator => vm.TranslatorEndpoint,
+                _ => null
+            };
+            var cloudRouted = stage switch
+            {
+                ModelStage.Cleaner => vm.CloudClean,
+                ModelStage.Translator => vm.CloudTranslate,
+                _ => false
+            };
+            var cloudOptions = cloudStep is null
+                ? []
+                : vm.Endpoints.Select(endpoint =>
+                {
+                    var activeHere = cloudRouted && endpoint.Id == stageEndpoint?.Id;
+                    return new StageCloudOptionState(
+                        endpoint.Id,
+                        endpoint.Name,
+                        endpoint.BaseUrl,
+                        HostOf(endpoint.BaseUrl),
+                        endpoint.Model,
+                        endpoint.HasKey,
+                        endpoint.Usable,
+                        Active: activeHere,
+                        texts.PeerStageBadge(stage, activeHere, endpoint.UsedForClean, endpoint.UsedForTranslate));
+                }).ToArray();
+
+            var notice = texts.StageNotice(stage, vm.CleanupEnabled);
+            var hasWorkingCurrent = cloudRouted || currentStageInstalled;
+
+            ModelDownloadState? stageRunningDownload = null;
+            var stageQueued = false;
+            var options = evaluations.Select(eval =>
+            {
+                var model = eval.Model;
+                var profile = model.Profile!;
+                var download = coordinator.GetOptionDownloadState(model);
+                var isQueued = coordinator.IsQueued(model.Id);
+                var isActive = !cloudRouted && model.Id == activeId;
+                var isInstalled = download.IsInstalled;
+                var isDownloading = download.IsDownloading;
+                if (isDownloading && stageRunningDownload is null)
+                {
+                    stageRunningDownload = download;
+                    stageQueued = isQueued;
+                }
+
+                var isIndeterminate = isDownloading && (isQueued || (download.BytesDownloaded <= 0 && download.Percentage < 0.5));
+                var canSelectImmediate = eval.IsSelectable && !isActive && (isInstalled || !hasWorkingCurrent);
+                var canDownload = eval.IsSelectable && !isInstalled && !isDownloading;
+                var canDelete = isInstalled && !isActive && !isDownloading;
+                var installedSize = inventory.FirstOrDefault(i => i.Model.Id == model.Id)?.SizeBytes ?? model.SizeBytes;
+
+                return new ModelOptionState(
+                    model.Id,
+                    profile.Rank,
+                    texts.OptionName(model),
+                    texts.OptionDescription(model),
+                    profile.QualityStars,
+                    profile.SpeedStars,
+                    texts.OptionFootprint(model),
+                    eval.Fit,
+                    texts.FitBadge(eval.Fit),
+                    texts.FitDetail(eval, hardware),
+                    isActive,
+                    PendingActivation: model.Id == pendingId,
+                    isInstalled,
+                    isDownloading,
+                    isDownloading && !isIndeterminate ? Math.Clamp((int)Math.Round(download.Percentage), 0, 100) : null,
+                    isDownloading ? texts.DownloadProgressLabel(download, model.SizeBytes, isQueued) : null,
+                    texts.DownloadError(download),
+                    canSelectImmediate,
+                    canDownload,
+                    canDownload ? texts.DownloadActionLabel(model, isActive, download.IsFailed) : null,
+                    canDelete,
+                    canDelete ? texts.DeleteWithSizeLabel(installedSize) : null);
+            }).ToArray();
+
+            return new ModelStageGroupState(
+                stage.ToString().ToLowerInvariant(),
+                texts.StageTabTitle(stage),
+                texts.StageTabSummary(
+                    stage,
+                    activeDescriptor,
+                    currentStageInstalled,
+                    stageRunningDownload,
+                    stageQueued,
+                    vm.CleanupEnabled,
+                    cloudRouted,
+                    stageEndpoint?.Name),
+                Busy: stageRunningDownload is not null,
+                texts.StageTitle(stage),
+                texts.StageDescription(stage),
+                LocalOnly: stage == ModelStage.Speech,
+                notice,
+                cloudStep,
+                cloudRouted,
+                CloudInvalid: cloudStep is not null && vm.CloudInvalid,
+                cloudOptions,
+                options);
+        }).ToArray();
+
+        var inUseBytes = inventory.Where(i => i.InUse).Sum(i => i.SizeBytes);
+        var idleBytes = inventory.Where(i => !i.InUse).Sum(i => i.SizeBytes) + vm.LegacyBytes;
+        var totalItemCount = inventory.Count + vm.LegacyCount;
+        var storageItems = inventory.Select(item => new InstalledModelItemState(
+            item.Model.Id,
+            texts.CatalogArtifactName(item.Model),
+            texts.CategoryBadge(item.Stage),
+            texts.FormatSize(item.SizeBytes),
+            item.InUse,
+            texts.StorageStatusBadge(item.InUse),
+            item.CanActivate,
+            item.CanDelete,
+            item.CanDelete ? texts.DeleteWithSizeLabel(item.SizeBytes) : null)).ToArray();
+
+        var storageView = new ModelStorageState(
+            texts.StorageTabTitle,
+            texts.StorageTabSummary(totalItemCount, totalDiskBytes),
+            texts.FormatSize(totalDiskBytes),
+            texts.StorageBreakdown(totalItemCount, inUseBytes, idleBytes),
+            coordinator.StorageDirectory,
+            storageItems,
+            new LegacyModelsState(vm.LegacyCount, vm.HasLegacyModels ? texts.LegacyDescription(vm.LegacyCount, vm.LegacyBytes) : ""));
+
+        ConsentModalState? consentModal = null;
+        if (vm.PendingConsent is { } pending
+            && vm.Endpoints.FirstOrDefault(item => item.Id == pending.EndpointId) is { } targetEndpoint)
+        {
+            var previousName = pending.PreviousEndpointId is null
+                ? null
+                : vm.Endpoints.FirstOrDefault(item => item.Id == pending.PreviousEndpointId)?.Name;
+            consentModal = new ConsentModalState(
+                pending.Step,
+                targetEndpoint.Id,
+                targetEndpoint.Name,
+                HostOf(targetEndpoint.BaseUrl),
+                previousName);
+        }
+
+        DeleteEndpointModalState? deleteModal = null;
+        if (vm.PendingDeleteEndpoint is { } deleting)
+        {
+            deleteModal = new DeleteEndpointModalState(
+                deleting.Id,
+                deleting.Name,
+                texts.AffectedCloudSteps(deleting.UsedForClean, deleting.UsedForTranslate));
+        }
+
+        return new ModelsSettingsState(
+            modelsTab,
+            navBadge,
+            hardwareView,
+            downloadRows,
+            groups,
+            storageView,
+            vm.Form,
+            deleteModal,
+            consentModal);
     }
 
     private static string HostOf(string url) => Uri.TryCreate(url, UriKind.Absolute, out var uri) ? uri.Authority : url;
 
     /// <summary>Only settings that are switches or closed choices: terms, endpoints, device names and keys never go in.</summary>
-    private static DiagnosticLine[] Diagnostics(SettingsViewModel vm, SettingsTexts texts, AppInfo app) =>
-    [
-        new(texts.Label("version"), app.Version),
-        new(texts.Label("diag.platform"), app.Platform),
-        new(texts.Label("language"), SettingsViewModel.Languages[vm.LanguageIndex]),
-        new(texts.Label("model"), SettingsViewModel.Tiers[vm.TierIndex]),
-        new(texts.Label("cleanup"), texts.OnOff(vm.CleanupEnabled)),
-        new(texts.Label("cloud.translate"), texts.OnOff(vm.CloudTranslate)),
-        new(texts.Label("cloud.clean"), texts.OnOff(vm.CloudClean)),
-        new(texts.Label("cloud.endpoints"), vm.Endpoints.Count.ToString(CultureInfo.InvariantCulture)),
-        new(texts.Label("cloud.apiKey"), texts.Stored(vm.ActiveEndpoint?.HasKey == true)),
-        new(texts.Label("legacy"), vm.LegacyCount.ToString(CultureInfo.InvariantCulture))
-    ];
+    private static DiagnosticLine[] Diagnostics(SettingsViewModel vm, SettingsTexts texts, AppInfo app)
+    {
+        var active = vm.ActiveModels;
+        var activeCloudEndpoints = new[] { vm.CleanerEndpoint, vm.TranslatorEndpoint }.Where(e => e is not null).ToArray();
+        var keyStored = activeCloudEndpoints.Length > 0
+            ? activeCloudEndpoints.All(e => e!.HasKey)
+            : vm.Endpoints.Any(e => e.HasKey);
+        return
+        [
+            new(texts.Label("version"), app.Version),
+            new(texts.Label("diag.platform"), app.Platform),
+            new(texts.Label("diag.backend"), texts.BackendDiagnostic(vm.Hardware)),
+            new(texts.Label("language"), SettingsViewModel.Languages[vm.LanguageIndex]),
+            new(texts.Label("diag.model.speech"), active.Speech.ShortName),
+            new(texts.Label("diag.model.cleaner"), active.Cleaner.ShortName),
+            new(texts.Label("diag.model.translator"), active.Translator.ShortName),
+            new(texts.Label("cleanup"), texts.OnOff(vm.CleanupEnabled)),
+            new(texts.Label("cloud.translate"), texts.OnOff(vm.CloudTranslate)),
+            new(texts.Label("cloud.clean"), texts.OnOff(vm.CloudClean)),
+            new(texts.Label("cloud.endpoints"), vm.Endpoints.Count.ToString(CultureInfo.InvariantCulture)),
+            new(texts.Label("cloud.apiKey"), texts.Stored(keyStored)),
+            new(texts.Label("legacy"), vm.LegacyCount.ToString(CultureInfo.InvariantCulture))
+        ];
+    }
 }

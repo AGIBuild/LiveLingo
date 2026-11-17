@@ -227,9 +227,11 @@ internal sealed class Harness : IAsyncDisposable
         bool hasTarget = true,
         SynchronizationContext? notifyOn = null,
         ComposerOutput? output = ComposerOutput.Translate,
-        ComposerOptions? options = null)
+        ComposerOptions? options = null,
+        bool documentMode = false)
     {
         Session = new DraftSession(hasTarget, notifyOn);
+        Session.Mutate(d => d.DocumentMode = documentMode);
         Scheduler = new TranslationScheduler(Session, Translator, TargetLanguage.English, TimeSpan.FromHours(1));
         Cleanup = new CleanupScheduler(Session, Cleaner, [], contextChars: 300);
         Models.HasAllExpectedLocalAssets(Arg.Any<ModelDescriptor>()).Returns(modelsInstalled);

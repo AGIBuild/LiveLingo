@@ -41,12 +41,28 @@ internal sealed class InstalledModelStore
                 continue;
             }
 
+            var diskBytes = MeasurePayloadBytes(dir);
             models.Add(new InstalledModel(
                 manifest.Id, manifest.DisplayName, dir,
-                manifest.SizeBytes, manifest.Type, manifest.DownloadedAt));
+                diskBytes > 0 ? diskBytes : manifest.SizeBytes,
+                manifest.Type, manifest.DownloadedAt));
         }
 
         return models;
+    }
+
+    private static long MeasurePayloadBytes(string dir)
+    {
+        try
+        {
+            return Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories)
+                .Where(path => !string.Equals(Path.GetFileName(path), "manifest.json", StringComparison.OrdinalIgnoreCase))
+                .Sum(path => new FileInfo(path).Length);
+        }
+        catch
+        {
+            return 0;
+        }
     }
 
     public bool HasAllExpectedLocalAssets(ModelDescriptor descriptor)

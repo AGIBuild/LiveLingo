@@ -52,6 +52,11 @@ button.chip:hover { background: var(--line); }
 .clear-button:hover:not(:disabled) { color: var(--danger); background: var(--hover); }
 .toast { white-space: pre-line; overflow-wrap: anywhere; max-height: calc(100% - 80px); overflow-y: auto; }
 .src { flex: 1 1 auto; }
+.source-content { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.source-content[hidden] { display: none; }
+.composer:not(.wide).has-res .src.collapsed { flex: none; min-height: 0; }
+.source-toggle { color: var(--accent-ink); padding: 2px 6px; border-radius: 6px; }
+.source-toggle:hover { background: var(--hover); }
 .composer:not(.wide).has-res .src { flex: 0 1 auto; }
 .composer:not(.wide).has-res .pane { min-height: max(0px, min(76px, calc((var(--panel-max, 470px) - 124px) * .45))); }
 .src textarea { flex: 1 1 auto; min-height: 0; display: block; width: 100%; border: 0; background: transparent; padding: 2px 18px 6px; resize: none; outline: none; font-size: 16px; line-height: 1.6; overflow-y: auto; }
@@ -97,6 +102,13 @@ button.chip:hover { background: var(--line); }
 .edit { display: block; width: 100%; font-size: 16px; line-height: 1.6; resize: vertical; min-height: 64px; }
 .edit-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .edit-actions .remember-corr { background: var(--accent-soft); color: var(--accent-ink); }
+.document-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 8px 14px 12px; }
+.document-text { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 16px; line-height: 1.6; user-select: text; }
+.document-notice, .edit-hint { color: var(--muted); font-size: 12px; margin-top: 8px; }
+.document-notice.warn { color: var(--warn); }
+.document-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.document-actions button { padding: 4px 8px; border-radius: 6px; background: var(--hover); font-size: 13px; }
+.document-edit { min-height: 160px; }
 .skel { height: 14px; border-radius: 7px; margin: 7px 0; background: linear-gradient(90deg, var(--line) 25%, var(--line-strong) 50%, var(--line) 75%); background-size: 200% 100%; animation: shimmer 1.3s linear infinite; }
 .skel.short { width: 55%; }
 @keyframes shimmer { to { background-position: -200% 0; } }

@@ -99,15 +99,42 @@ public sealed class ModelWarmupTests : IDisposable
     }
 
     [Fact]
-    public async Task OnSummon_QualityTranslatorTier_DoesNotSpeculativelyLoadSecondaryLargeModel()
+    public async Task OnSummon_Heavy7BTranslatorOn16Gb_DoesNotSpeculativelyLoadSecondaryLargeModel()
     {
-        _settings.Composer.TranslatorTier = nameof(TranslatorTier.Quality);
+        _settings.Composer.TranslatorModel = ModelCatalog.TranslatorQuality.Id;
 
         _sut.OnSummon(ComposerOutput.Clean);
 
         await Wait.Until(() => SpeechWarms == 1 && InferenceWarms.Any());
         await Task.Delay(50, TestContext.Current.CancellationToken);
         Assert.Equal([InferenceRole.Cleaner], InferenceWarms);
+    }
+
+    [Fact]
+    public async Task OnSummon_36GbWorkstation_SpeculativelyLoadsBothFlagshipModels()
+    {
+        var settings = Substitute.For<ISettingsService>();
+        settings.Current.Returns(_settings);
+        var probe = Substitute.For<IHardwareProbe>();
+        probe.Detect().Returns(new HardwareProfile("Apple M3 Pro", ComputeBackend.AppleMetal, 36L * 1024 * 1024 * 1024, 12));
+        using var workstation = new ModelWarmup(_speech, _inference, settings, _downloads, NullLogger<ModelWarmup>.Instance, _time, probe);
+
+        workstation.OnSummon(ComposerOutput.Clean);
+
+        await Wait.Until(() => SpeechWarms == 1 && InferenceWarms.Count() == 2);
+        Assert.Equal([InferenceRole.Cleaner, InferenceRole.Translator], InferenceWarms);
+    }
+
+    [Fact]
+    public async Task OnSpeechModelChanged_WarmsSelectedSpeechModelsWhenPreloadIsEnabled()
+    {
+        _sut.OnSpeechModelChanged();
+        await Wait.Until(() => SpeechWarms == 1);
+
+        _settings.Composer.PreloadSpeech = false;
+        _sut.OnSpeechModelChanged();
+        await Task.Delay(30, TestContext.Current.CancellationToken);
+        Assert.Equal(1, SpeechWarms);
     }
 
     [Fact]

@@ -27,6 +27,9 @@ internal sealed class SettingsIntents : IIntentHandler
     /// <summary>The group the page shows. Owned here, so the window can also ask for one (the composer's "settings" item).</summary>
     public string Section { get; set; }
 
+    /// <summary>The initially focused sub-tab inside the Models section when navigated from another section.</summary>
+    public string ModelsTab { get; set; } = "speech";
+
     /// <summary>The intent may have changed what the page shows; not every change is a property of the view model.</summary>
     public event Action? Changed;
 
@@ -34,7 +37,11 @@ internal sealed class SettingsIntents : IIntentHandler
     {
         switch (intent)
         {
-            case OpenSettingsIntent open: Section = open.Section; break;
+            case OpenSettingsIntent open:
+                Section = open.Section;
+                if (open.Tab is not null)
+                    ModelsTab = open.Tab;
+                break;
             case SettingIntent setting: Apply(setting); break;
             case AddTermIntent add:
                 _vm.NewTermSource = add.Source;
@@ -54,17 +61,23 @@ internal sealed class SettingsIntents : IIntentHandler
                 if (removeCorrection.Index < _vm.Corrections.Count)
                     _vm.RemoveCorrectionCommand.Execute(_vm.Corrections[removeCorrection.Index]);
                 break;
-            case CloudToggleIntent toggle: _vm.SetCloud(toggle.Step, toggle.On); break;
+            case SelectCloudModelIntent selectCloud: _vm.SelectCloudEndpoint(selectCloud.Step, selectCloud.EndpointId); break;
+            case UseLocalStageIntent useLocal: _vm.SwitchStageToLocal(useLocal.Step); break;
+            case DisableAllCloudIntent: _vm.DisableAllCloud(); break;
             case ConsentIntent consent: _vm.AnswerConsent(consent.Allow); break;
             case OpenEndpointFormIntent open: _vm.OpenEndpointForm(open.Id); break;
             case CloseEndpointFormIntent: _vm.CloseEndpointForm(); break;
             case SaveEndpointIntent save: Run(() => _vm.SaveEndpointAsync(save.Label, save.BaseUrl, save.Model, save.ApiKey)); break;
-            case EnableEndpointIntent enable: _vm.SetEndpointEnabled(enable.Id, enable.On); break;
             case DeleteEndpointIntent delete: _vm.DeleteEndpoint(delete.Id); break;
-            case EndpointAnswerIntent answer: Run(() => _vm.AnswerChangeAsync(answer.Allow)); break;
+            case EndpointAnswerIntent answer: Run(() => _vm.AnswerDeleteEndpointAsync(answer.Allow)); break;
             case ClearRecentIntent: _vm.ClearRecentCommand.Execute(null); break;
             case ForgetAppIntent forget: _vm.ForgetApp(forget.AppId); break;
             case ClearAppsIntent: _vm.ClearApps(); break;
+            case SelectModelIntent selectModel: _vm.SelectModel(selectModel.ModelId); break;
+            case DownloadModelIntent downloadModel: _vm.DownloadModel(downloadModel.ModelId); break;
+            case CancelModelDownloadIntent cancelDownload: _vm.CancelModelDownload(cancelDownload.ModelId); break;
+            case DeleteModelIntent deleteModel: Run(() => _vm.DeleteModelAsync(deleteModel.ModelId)); break;
+            case ApplyRecommendedModelsIntent: _vm.ApplyRecommendedModels(); break;
             case RemoveLegacyModelsIntent: Run(() => _vm.RemoveLegacyModelsCommand.ExecuteAsync(null)); break;
             case CheckUpdatesIntent:
                 if (_updates is not null)
@@ -91,7 +104,6 @@ internal sealed class SettingsIntents : IIntentHandler
             case SettingIntent.Names.Language: _vm.LanguageIndex = IndexOf(SettingsViewModel.Languages, value); break;
             case SettingIntent.Names.Theme: _vm.ThemeIndex = IndexOf(SettingsViewModel.Themes, value); break;
             case SettingIntent.Names.Direction: _vm.TargetIndex = IndexOf(SettingsViewModel.Targets, value); break;
-            case SettingIntent.Names.Tier: _vm.TierIndex = IndexOf(SettingsViewModel.Tiers, value); break;
             case SettingIntent.Names.DefaultOutput: _vm.DefaultOutputIndex = IndexOf(SettingsViewModel.DefaultOutputs, value); break;
             case SettingIntent.Names.AutoDictate: _vm.AutoDictate = value == "true"; break;
             case SettingIntent.Names.PreloadSpeech: _vm.PreloadSpeech = value == "true"; break;

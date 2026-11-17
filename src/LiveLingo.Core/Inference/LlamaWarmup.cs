@@ -9,6 +9,6 @@ public sealed class LlamaWarmup(LlamaServerHost host, ICloudRoutes routes, CoreO
         if (await routes.GetAsync(role, ct).ConfigureAwait(false) is not null)
             return;
 
-        await host.WarmAsync(role, InferenceModels.For(role, options.TranslatorTier), ct).ConfigureAwait(false);
+        await host.WarmAsync(role, InferenceModels.For(role, options.Models), ct).ConfigureAwait(false);
     }
 }

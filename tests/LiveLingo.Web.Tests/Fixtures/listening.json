@@ -30,7 +30,7 @@
     "menu": [
       {
         "id": "clean",
-        "label": "保持中文（整理）",
+        "label": "整理原话（保持原语言）",
         "checked": false,
         "enabled": true
       },
@@ -47,7 +47,7 @@
         "enabled": true
       }
     ],
-    "swap": "语言：中文 → English\u3000⇄ 互换",
+    "swap": "翻译目标改为 中文",
     "note": null
   },
   "banner": null,
@@ -73,7 +73,8 @@
     ],
     "resume": null,
     "remembered": null,
-    "canClear": true
+    "canClear": true,
+    "collapsible": false
   },
   "result": {
     "visible": true,
@@ -95,7 +96,8 @@
       }
     ],
     "editText": "",
-    "rememberCorrection": null
+    "rememberCorrection": null,
+    "document": null
   },
   "footer": {
     "mic": {

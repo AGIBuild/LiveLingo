@@ -36,8 +36,7 @@ internal static class SettingsScenarios
         ["settings-polish-custom"] = () => Open("voice", model: m =>
             m.Composer.PolishPrompt = "保留我的口语风格，修正明显错字，按完整意思分段，不要添加信息。"),
         ["settings-polish-invalid"] = () => Open("voice", then: f => f.Vm.PolishPrompt = "bad"),
-        ["settings-privacy"] = () => Open("privacy"),
-        ["settings-apps"] = () => Open("privacy", remembered: new PreferencesData
+        ["settings-apps"] = () => Open("general", remembered: new PreferencesData
         {
             Apps =
             [
@@ -46,32 +45,72 @@ internal static class SettingsScenarios
                 new AppChoice(ComposerPreferences.ClipboardId, "", ComposerOutput.Translate, TargetLanguage.Chinese, new DateTimeOffset(2026, 10, 30, 12, 0, 0, TimeSpan.Zero))
             ]
         }),
-        ["settings-cloud"] = () => Open("privacy", Cloud, key: "sk-stored"),
-        ["settings-consent"] = () => Open("privacy", Cloud, key: "sk-stored", then: f => f.Vm.SetCloud(CloudStep.Clean, on: true)),
-        ["settings-cloud-invalid"] = () => Open("privacy", then: f => f.Vm.SetCloud(CloudStep.Translate, on: true)),
-        ["settings-endpoint-add"] = () => Open("privacy", then: f => f.Vm.OpenEndpointForm(null)),
-        ["settings-endpoint-edit"] = () => Open("privacy", Cloud, key: "sk-stored", then: f => f.Vm.OpenEndpointForm("main")),
-        ["settings-endpoint-error"] = () => Open("privacy", Cloud, key: "sk-stored", then: f =>
+        ["settings-cloud"] = () => Open("models", m => m.Cloud = CloudTestData.WithEndpoints(translatorId: "main", cleanerId: "main").Cloud, key: "sk-stored", modelsTab: "translator"),
+        ["settings-consent"] = () => Open("models", Cloud, key: "sk-stored", modelsTab: "cleaner", then: f => f.Vm.SelectCloudEndpoint(CloudStep.Clean, "main")),
+        ["settings-cloud-invalid"] = () => Open("models", m => m.Cloud = CloudTestData.WithEndpoints().Cloud, key: null, modelsTab: "translator", then: f => f.Vm.SelectCloudEndpoint(CloudStep.Translate, "main")),
+        ["settings-endpoint-add"] = () => Open("models", modelsTab: "translator", then: f => f.Vm.OpenEndpointForm(null)),
+        ["settings-endpoint-edit"] = () => Open("models", Cloud, key: "sk-stored", modelsTab: "translator", then: f => f.Vm.OpenEndpointForm("main")),
+        ["settings-endpoint-error"] = () => Open("models", Cloud, key: "sk-stored", modelsTab: "translator", then: f =>
         {
             f.Vm.OpenEndpointForm(null);
             f.Vm.SaveEndpointAsync("Contoso", "http://api.example.com/v1", "m", "sk").GetAwaiter().GetResult();
         }),
-        ["settings-endpoint-switch"] = () => Open("privacy", Cloud, key: "sk-stored", then: f => f.Vm.SetEndpointEnabled("other", on: true)),
-        ["settings-endpoint-delete"] = () => Open("privacy", Cloud, key: "sk-stored", then: f => f.Vm.DeleteEndpoint("other")),
-        ["settings-diagnostics"] = () => Open("models", model: m =>
+        ["settings-endpoint-switch"] = () => Open(
+            "models",
+            Cloud,
+            key: "sk-stored",
+            modelsTab: "translator",
+            before: f => f.Models.ListInstalled().Returns([Legacy(ModelCatalog.TranslatorFast.Id, ModelCatalog.TranslatorFast.SizeBytes)]),
+            then: f => f.Vm.SelectCloudEndpoint(CloudStep.Translate, "other")),
+        ["settings-endpoint-delete"] = () => Open("models", Cloud, key: "sk-stored", modelsTab: "translator", then: f => f.Vm.DeleteEndpoint("main")),
+        ["settings-diagnostics"] = () => Open("about", model: m =>
         {
             Cloud(m);
             m.Composer.Glossary = "Redis\n缓存穿透=cache penetration";
             m.Composer.Microphone = "USB Mic";
         }, key: "sk-stored"),
-        ["settings-models"] = () => Open("models", before: f => f.Models.ListInstalled().Returns([Legacy("old-a", 5_500_000_000), Legacy("old-b", 3_000_000_000)])),
-        ["settings-update-checking"] = () => Open("models", update: new UpdateState(UpdatePhase.Checking)),
-        ["settings-update-downloading"] = () => Open("models", update: new UpdateState(UpdatePhase.Downloading, "2.2.0", 42)),
-        ["settings-update-ready"] = () => Open("models", update: new UpdateState(UpdatePhase.Ready, "2.2.0")),
-        ["settings-update-latest"] = () => Open("models", update: new UpdateState(UpdatePhase.UpToDate, At: CheckedAt)),
-        ["settings-update-failed"] = () => Open("models", update: new UpdateState(UpdatePhase.Failed, At: CheckedAt, Error: "Unable to connect to github.com")),
-        ["settings-update-unsupported"] = () => Open("models", update: new UpdateState(UpdatePhase.Unsupported), downloadPage: true),
-        ["settings-update-off"] = () => Open("models", update: UpdateState.Off),
+        ["settings-models"] = () => Open("models", before: f => f.Models.ListInstalled().Returns([
+            Legacy(ModelCatalog.SpeechLive.Id, ModelCatalog.SpeechLive.SizeBytes),
+            Legacy(ModelCatalog.SpeechSecondPass.Id, ModelCatalog.SpeechSecondPass.SizeBytes),
+            Legacy(ModelCatalog.SpeechVad.Id, ModelCatalog.SpeechVad.SizeBytes),
+            Legacy(ModelCatalog.LlamaRuntimeFor("osx-arm64").Id, ModelCatalog.LlamaRuntimeFor("osx-arm64").SizeBytes),
+            Legacy(ModelCatalog.Cleaner.Id, ModelCatalog.Cleaner.SizeBytes),
+            Legacy(ModelCatalog.CleanerFast.Id, ModelCatalog.CleanerFast.SizeBytes),
+            Legacy(ModelCatalog.TranslatorFast.Id, ModelCatalog.TranslatorFast.SizeBytes),
+            Legacy("old-a", 5_500_000_000),
+            Legacy("old-b", 3_000_000_000)])),
+        ["settings-models-downloading"] = () => Open(
+            "models",
+            model: m =>
+            {
+                m.Composer.SpeechModel = ModelCatalog.SpeechSecondPass.Id;
+                m.Composer.CleanerModel = ModelCatalog.Cleaner.Id;
+                m.Composer.TranslatorModel = ModelCatalog.TranslatorFast.Id;
+            },
+            hardware: new HardwareProfile("Apple M3 Pro", ComputeBackend.AppleMetal, 36L * 1024 * 1024 * 1024, 12),
+            before: f =>
+            {
+                f.Models.ListInstalled().Returns([
+                    Legacy(ModelCatalog.LlamaRuntimeFor("osx-arm64").Id, ModelCatalog.LlamaRuntimeFor("osx-arm64").SizeBytes),
+                    Legacy(ModelCatalog.SpeechSecondPass.Id, ModelCatalog.SpeechSecondPass.SizeBytes),
+                    Legacy(ModelCatalog.Cleaner.Id, ModelCatalog.Cleaner.SizeBytes),
+                    Legacy(ModelCatalog.TranslatorFast.Id, ModelCatalog.TranslatorFast.SizeBytes)]);
+                f.Downloads.GetState(ModelCatalog.TranslatorQuality.Id).Returns(new ModelDownloadState(
+                    ModelCatalog.TranslatorQuality.Id,
+                    ModelDownloadStatus.Downloading,
+                    42,
+                    null,
+                    1_942_352_536,
+                    ModelCatalog.TranslatorQuality.SizeBytes));
+            },
+            then: f => f.Vm.DownloadModel(ModelCatalog.TranslatorQuality.Id)),
+        ["settings-update-checking"] = () => Open("about", update: new UpdateState(UpdatePhase.Checking)),
+        ["settings-update-downloading"] = () => Open("about", update: new UpdateState(UpdatePhase.Downloading, "2.2.0", 42)),
+        ["settings-update-ready"] = () => Open("about", update: new UpdateState(UpdatePhase.Ready, "2.2.0")),
+        ["settings-update-latest"] = () => Open("about", update: new UpdateState(UpdatePhase.UpToDate, At: CheckedAt)),
+        ["settings-update-failed"] = () => Open("about", update: new UpdateState(UpdatePhase.Failed, At: CheckedAt, Error: "Unable to connect to github.com")),
+        ["settings-update-unsupported"] = () => Open("about", update: new UpdateState(UpdatePhase.Unsupported), downloadPage: true),
+        ["settings-update-off"] = () => Open("about", update: UpdateState.Off),
     };
 
     public static AppInfo App { get; } = new("2.0.0", "macOS 15.0 Arm64");
@@ -79,10 +118,16 @@ internal static class SettingsScenarios
     // Built from a local time so the text does not depend on the time zone the tests run in.
     private static DateTimeOffset CheckedAt { get; } = new(new DateTime(2026, 11, 3, 19, 5, 0, DateTimeKind.Local));
 
-    public static SettingsViewState State(SettingsViewModel vm, string section = "general", UpdateState? update = null, bool downloadPage = false) =>
+    public static SettingsViewState State(
+        SettingsViewModel vm,
+        string section = "general",
+        UpdateState? update = null,
+        bool downloadPage = false,
+        string modelsTab = "speech") =>
         SettingsViewState.From(
             vm, Texts.ChineseSettings(), section, App,
-            UpdateViewState.From(update ?? new UpdateState(UpdatePhase.Idle), downloadPage, Texts.ChineseSettings(), App.Version)) with { Rev = 1 };
+            UpdateViewState.From(update ?? new UpdateState(UpdatePhase.Idle), downloadPage, Texts.ChineseSettings(), App.Version),
+            modelsTab) with { Rev = 1 };
 
     private static void Cloud(SettingsModel model) => model.Cloud = CloudTestData.WithEndpoints(translate: true).Cloud;
 
@@ -99,14 +144,16 @@ internal static class SettingsScenarios
         Action<SettingsViewModelTests.Fixture>? before = null,
         Action<SettingsViewModelTests.Fixture>? then = null,
         UpdateState? update = null,
-        bool downloadPage = false)
+        bool downloadPage = false,
+        HardwareProfile? hardware = null,
+        string modelsTab = "speech")
     {
         var current = new SettingsModel();
         model?.Invoke(current);
-        var f = new SettingsViewModelTests.Fixture(current, key, remembered);
+        var f = new SettingsViewModelTests.Fixture(current, key, remembered, hardware);
         before?.Invoke(f);
         await f.Vm.InitializeAsync();
         then?.Invoke(f);
-        return State(f.Vm, section, update, downloadPage);
+        return State(f.Vm, section, update, downloadPage, modelsTab);
     }
 }

@@ -18,7 +18,6 @@ public class SettingsCloudRoutesTests
             CloudTestData.Endpoint("a", "Foundry", "https://example.openai.azure.com/openai/v1", "gpt-4.1-mini"),
             CloudTestData.Endpoint("b", "Other", "https://other.example.com/v1", "other-model")
         ];
-        model.Cloud.ActiveEndpointId = "a";
         var settings = Substitute.For<ISettingsService>();
         settings.Current.Returns(_ => model);
         var secrets = Substitute.For<ISecretStore>();
@@ -38,10 +37,10 @@ public class SettingsCloudRoutesTests
     }
 
     [Fact]
-    public async Task OnlyTheEnabledRoles_GoToTheCloud()
+    public async Task OnlyTheAssignedRoles_GoToTheCloud()
     {
         var (routes, model, _) = Create();
-        model.Cloud.Translate = true;
+        model.Cloud.TranslatorEndpointId = "a";
 
         var translator = await routes.GetAsync(InferenceRole.Translator, CancellationToken.None);
 
@@ -52,20 +51,25 @@ public class SettingsCloudRoutesTests
     }
 
     [Fact]
-    public async Task TheCleanerFollowsItsOwnSwitch()
+    public async Task CleanerAndTranslator_CanIndependentlyUseDifferentCloudEndpoints()
     {
         var (routes, model, _) = Create();
-        model.Cloud.Clean = true;
+        model.Cloud.TranslatorEndpointId = "a";
+        model.Cloud.CleanerEndpointId = "b";
 
-        Assert.NotNull(await routes.GetAsync(InferenceRole.Cleaner, CancellationToken.None));
-        Assert.Null(await routes.GetAsync(InferenceRole.Translator, CancellationToken.None));
+        var translator = await routes.GetAsync(InferenceRole.Translator, CancellationToken.None);
+        var cleaner = await routes.GetAsync(InferenceRole.Cleaner, CancellationToken.None);
+
+        Assert.Equal(("gpt-4.1-mini", "sk-test"), (translator!.Model, translator.ApiKey));
+        Assert.Equal("https://other.example.com/v1/chat/completions", cleaner!.Endpoint.ToString());
+        Assert.Equal(("other-model", "sk-other"), (cleaner.Model, cleaner.ApiKey));
     }
 
     [Fact]
     public async Task AnEnabledRouteWithoutAKey_IsAnExplicitError_NotASilentLocalFallback()
     {
         var (routes, model, _) = Create(key: null);
-        model.Cloud.Translate = true;
+        model.Cloud.TranslatorEndpointId = "a";
 
         var ex = await Assert.ThrowsAsync<CloudNotConfiguredException>(
             () => routes.GetAsync(InferenceRole.Translator, CancellationToken.None));
@@ -77,7 +81,7 @@ public class SettingsCloudRoutesTests
     public async Task AnEnabledRouteWithAnUnusableUrl_IsAnExplicitError()
     {
         var (routes, model, _) = Create();
-        model.Cloud.Translate = true;
+        model.Cloud.TranslatorEndpointId = "a";
         model.Cloud.Endpoints[0].BaseUrl = "http://not-secure.example.com/v1";
 
         await Assert.ThrowsAsync<CloudNotConfiguredException>(
@@ -85,30 +89,15 @@ public class SettingsCloudRoutesTests
     }
 
     [Fact]
-    public async Task OnlyTheEnabledEndpoint_IsUsed_WithItsOwnKey()
-    {
-        var (routes, model, _) = Create();
-        model.Cloud.Translate = true;
-        model.Cloud.ActiveEndpointId = "b";
-
-        var route = await routes.GetAsync(InferenceRole.Translator, CancellationToken.None);
-
-        Assert.Equal("https://other.example.com/v1/chat/completions", route!.Endpoint.ToString());
-        Assert.Equal("other-model", route.Model);
-        Assert.Equal("sk-other", route.ApiKey);
-    }
-
-    [Fact]
-    public async Task AStepOnWithNoEnabledEndpoint_IsAnExplicitError_NotAnotherEndpoint()
+    public async Task ADanglingEndpointReference_IsAnExplicitError_NotAnotherEndpointOrLocal()
     {
         var (routes, model, secrets) = Create();
-        model.Cloud.Translate = true;
-        model.Cloud.ActiveEndpointId = "";
+        model.Cloud.TranslatorEndpointId = "missing";
 
         var ex = await Assert.ThrowsAsync<CloudNotConfiguredException>(
             () => routes.GetAsync(InferenceRole.Translator, CancellationToken.None));
 
-        Assert.Contains("no cloud endpoint is enabled", ex.Message);
+        Assert.Contains("does not exist", ex.Message);
         await secrets.DidNotReceiveWithAnyArgs().GetSecretAsync(default!, TestContext.Current.CancellationToken);
     }
 
@@ -118,10 +107,10 @@ public class SettingsCloudRoutesTests
         var (routes, model, _) = Create();
         Assert.Null(await routes.GetAsync(InferenceRole.Translator, CancellationToken.None));
 
-        model.Cloud.Translate = true;
+        model.Cloud.TranslatorEndpointId = "a";
         Assert.NotNull(await routes.GetAsync(InferenceRole.Translator, CancellationToken.None));
 
-        model.Cloud.Translate = false;
+        model.Cloud.TranslatorEndpointId = "";
         Assert.Null(await routes.GetAsync(InferenceRole.Translator, CancellationToken.None));
     }
 }

@@ -5,7 +5,7 @@ namespace LiveLingo.Core.Drafting;
 /// and translation result, plus the rules that decide when the text may be written out.
 /// Not thread-safe; one serial owner drives it and results arrive through <see cref="JobTicket"/>s.
 /// </summary>
-public sealed class Draft
+public sealed partial class Draft
 {
     private readonly List<DraftUnit> _units = [];
     private int _nextUnitId;
@@ -33,8 +33,10 @@ public sealed class Draft
         get => _recording;
         set
         {
+            if (DocumentMode && value != _recording)
+                InvalidateDocuments();
             if (_recording && !value && PolishExpected)
-                Polishing = true;
+                Polishing = !DocumentMode;
             else if (value)
             {
                 Polishing = false;
@@ -89,6 +91,7 @@ public sealed class Draft
         PolishOutcome = PolishOutcome.None;
         Pending = "";
         Snapshot = null;
+        ResetDocuments();
     }
 
     public void SetPending(string text)
@@ -103,6 +106,7 @@ public sealed class Draft
         SourceRevision++;
         var unit = NewUnit(new SourceUnit(raw));
         _units.Add(unit);
+        SourceChanged();
         return TicketFor(unit);
     }
 
@@ -116,7 +120,9 @@ public sealed class Draft
     public IReadOnlyList<JobTicket> SyncSource(IReadOnlyList<SourceUnit> source, DraftRoute route)
     {
         EnsureEditable();
-        SourceRevision++;
+        var changed = !DocumentMode || SourceText() != TextUnits.Join(source.Select(u => (u.Lead, u.Body, u.Trail)));
+        if (changed)
+            SourceRevision++;
         EditRevision++;
         var pool = new Dictionary<string, Queue<DraftUnit>>();
         foreach (var unit in _units)
@@ -149,6 +155,8 @@ public sealed class Draft
         _units.Clear();
         _units.AddRange(next);
         Route = route;
+        if (changed)
+            SourceChanged();
         return created;
     }
 
@@ -184,7 +192,7 @@ public sealed class Draft
     /// </summary>
     public int? Collapse(IReadOnlyList<int> unitIds, string clean)
     {
-        if (Snapshot is not null || unitIds.Count == 0)
+        if (DocumentMode || Snapshot is not null || unitIds.Count == 0)
             return null;
 
         var first = _units.FindIndex(unit => unit.Id == unitIds[0]);
@@ -231,6 +239,8 @@ public sealed class Draft
         result.Text = rejection is null ? text : unit.Raw;
         result.Error = "";
         result.Rejection = rejection;
+        if (kind == UnitKind.Clean)
+            CleanUnitChanged(unit);
         return true;
     }
 
@@ -242,6 +252,8 @@ public sealed class Draft
         var result = unit.Result(kind);
         result.Text = null;
         result.Error = reason;
+        if (kind == UnitKind.Clean)
+            CleanUnitChanged(unit);
         return true;
     }
 
@@ -254,7 +266,11 @@ public sealed class Draft
         EnsureEditable();
         var result = _units[index].Result(kind);
         if (!result.IsOwned)
+        {
             result.Clear();
+            if (kind == UnitKind.Clean)
+                CleanUnitChanged(_units[index]);
+        }
     }
 
     /// <summary>
@@ -281,6 +297,15 @@ public sealed class Draft
         result.Text = text;
         result.IsOwned = true;
         result.Error = "";
+        result.Rejection = null;
+        if (kind == UnitKind.Clean)
+            CleanUnitChanged(_units[index]);
+        if (DocumentMode)
+        {
+            InvalidateDocument(kind);
+            if (kind == UnitKind.Clean)
+                InvalidateDocument(UnitKind.Translation);
+        }
     }
 
     public void UseRaw(int index) => Edit(index, UnitKind.Clean, _units[index].Raw);
@@ -292,6 +317,8 @@ public sealed class Draft
             return;
 
         _translationRevision++;
+        if (DocumentMode)
+            InvalidateDocument(UnitKind.Translation);
         foreach (var unit in _units)
             if (!preserveEdits || !unit.Translation.IsOwned)
                 unit.Translation.Clear();
@@ -321,13 +348,29 @@ public sealed class Draft
         TextUnits.Join(_units.Select(unit => (unit.Lead, unit.Raw, unit.Trail)).Append(("", Pending, "")));
 
     public string Text() =>
-        TextUnits.Join(_units.Select(unit => (unit.Lead, BodyOf(unit, Output), unit.Trail)));
+        DocumentMode && Output != OutputKind.Raw && ValidFinal(ToKind(Output))
+            ? Final(ToKind(Output)).Text!
+            : Output == OutputKind.Raw
+                ? TextUnits.Join(_units.Select(unit => (unit.Lead, unit.Raw, unit.Trail)))
+                : PreviewText(ToKind(Output));
 
     /// <summary>Content readiness is shared by copy, export and insertion; insertion additionally needs a live target.</summary>
     public Readiness ContentReadiness()
     {
         if (_units.Count == 0)
             return Readiness.Blocked(BlockReason.Empty);
+        if (DocumentEditing)
+            return Readiness.Blocked(BlockReason.Processing);
+        if (DocumentMode && Output != OutputKind.Raw)
+        {
+            var final = Final(ToKind(Output));
+            if (final.State is DocumentState.Failed or DocumentState.Stale)
+                return Readiness.Blocked(BlockReason.Unavailable);
+            if (!ValidFinal(ToKind(Output)))
+                return Readiness.Blocked(BlockReason.Processing);
+            return string.IsNullOrWhiteSpace(final.Text)
+                ? Readiness.Blocked(BlockReason.Empty) : Readiness.Ready;
+        }
         if (Polishing && Output == OutputKind.Clean)
             return Readiness.Blocked(BlockReason.Processing);
 
@@ -368,18 +411,20 @@ public sealed class Draft
 
     private DraftUnit NewUnit(SourceUnit source) => new(++_nextUnitId, source);
 
-    private JobTicket TicketFor(DraftUnit unit) => new(_epoch, unit.Id, _translationRevision);
+    private JobTicket TicketFor(DraftUnit unit) => new(_epoch, unit.Id, _translationRevision, unit.TranslationRevision, _editGeneration);
 
     private bool TryResolve(JobTicket ticket, UnitKind kind, out DraftUnit unit)
     {
         unit = null!;
-        if (Snapshot is not null || ticket.Epoch != _epoch)
+        if (Snapshot is not null || DocumentEditing || ticket.Epoch != _epoch || ticket.EditGeneration != _editGeneration)
             return false;
         if (kind == UnitKind.Translation && ticket.TranslationRevision != _translationRevision)
             return false;
 
         var found = _units.Find(candidate => candidate.Id == ticket.UnitId);
         if (found is null || found.Result(kind).IsOwned)
+            return false;
+        if (kind == UnitKind.Translation && ticket.UnitTranslationRevision != found.TranslationRevision)
             return false;
 
         unit = found;

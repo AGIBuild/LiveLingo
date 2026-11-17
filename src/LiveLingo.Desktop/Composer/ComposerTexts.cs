@@ -53,25 +53,25 @@ public sealed class ComposerTexts(ILocalizationService loc, bool? mac = null)
     /// <summary>English stays "English" and Chinese stays "中文" in every interface language, as in the prototype.</summary>
     public string LanguageName(TargetLanguage language) => loc.T("composer.language." + language);
 
-    public static TargetLanguage SourceLanguage(TargetLanguage target) =>
+    public static TargetLanguage OtherLanguage(TargetLanguage target) =>
         target == TargetLanguage.English ? TargetLanguage.Chinese : TargetLanguage.English;
 
     public string OutputPill(ComposerOutput output, TargetLanguage target) => output switch
     {
-        ComposerOutput.Clean => loc.T("composer.out.clean", LanguageName(SourceLanguage(target))),
+        ComposerOutput.Clean => loc.T("composer.out.clean"),
         ComposerOutput.Translate => loc.T("composer.out.translate", LanguageName(target)),
         _ => loc.T("composer.out.raw")
     };
 
     public string OutputMenu(ComposerOutput output, TargetLanguage target) => output switch
     {
-        ComposerOutput.Clean => loc.T("composer.out.menu.clean", LanguageName(SourceLanguage(target))),
+        ComposerOutput.Clean => loc.T("composer.out.menu.clean"),
         ComposerOutput.Translate => loc.T("composer.out.menu.translate", LanguageName(target)),
         _ => loc.T("composer.out.menu.raw")
     };
 
     public string SwapMenu(TargetLanguage target) =>
-        loc.T("composer.out.swap", LanguageName(SourceLanguage(target)), LanguageName(target));
+        loc.T("composer.out.swap", LanguageName(OtherLanguage(target)));
 
     public string MoreNew => loc.T("composer.menu.new");
     public string MoreRecent => loc.T("composer.menu.recent");
@@ -201,6 +201,21 @@ public sealed class ComposerTexts(ILocalizationService loc, bool? mac = null)
     public string ModelCloudAria => loc.T("composer.model.cloud.aria");
     public string CleanupPreview => loc.T("composer.result.preview");
 
+    public string DocumentNotice(DocumentState state, bool owned, bool translating = false) =>
+        loc.T(state switch
+        {
+            DocumentState.Failed => "composer.document.failed",
+            DocumentState.Stale => "composer.document.stale",
+            DocumentState.Ready when owned => "composer.document.owned",
+            DocumentState.Ready => "composer.document.ready",
+            _ => "composer.document.pending"
+        }) + (translating && state == DocumentState.Failed ? " " + loc.T("composer.document.translateHint") : "");
+
+    public string DocumentStatus(DocumentState state, bool editing, bool armed) =>
+        editing ? loc.T("composer.document.editing")
+        : armed ? loc.T("composer.status.armed")
+        : DocumentNotice(state, owned: false);
+
     public string Status(StatusInfo info)
     {
         if (info.Written)
@@ -251,13 +266,18 @@ public sealed class ComposerTexts(ILocalizationService loc, bool? mac = null)
     // ---- banners -----------------------------------------------------------------
 
     /// <summary>The footer's line for models that are downloading while the banner is out of the way.</summary>
-    public string FooterDownload(double percent) => loc.T("composer.footer.download", Math.Round(percent));
+    public string FooterDownload(double percent, string modelName = "") =>
+        string.IsNullOrEmpty(modelName)
+            ? loc.T("composer.footer.download", Math.Round(percent))
+            : loc.T("composer.footer.downloadNamed", modelName, Math.Round(percent));
 
     public string BannerMessage(BannerState banner) => banner.Kind switch
     {
         BannerKind.None => "",
         BannerKind.ModelMissing => loc.T("composer.banner.modelMissing", banner.Detail),
-        BannerKind.Downloading => loc.T("composer.banner.downloading", Math.Round(banner.Progress)),
+        BannerKind.Downloading => string.IsNullOrEmpty(banner.Detail)
+            ? loc.T("composer.banner.downloading", Math.Round(banner.Progress))
+            : loc.T("composer.banner.downloadingNamed", banner.Detail, Math.Round(banner.Progress)),
         BannerKind.DownloadFailed => loc.T("composer.banner.downloadFailed", banner.Detail),
         BannerKind.TargetLost => loc.T("composer.banner.targetLost"),
         BannerKind.WriteFailed => loc.T("composer.banner.writeFailed", banner.Detail),
@@ -297,6 +317,7 @@ public sealed class ComposerTexts(ILocalizationService loc, bool? mac = null)
         ToastKind.Processing => "composer.toast.processing",
         ToastKind.Exported => "composer.toast.exported",
         ToastKind.ExportUnfinished => "composer.toast.exportUnfinished",
+        ToastKind.EditExpired => "composer.toast.editExpired",
         ToastKind.CorrectionSaved => "composer.toast.correctionSaved",
         _ => throw new ArgumentOutOfRangeException(nameof(kind))
     });
@@ -338,6 +359,14 @@ public sealed class ComposerTexts(ILocalizationService loc, bool? mac = null)
         ["rowSave"] = RowSave,
         ["rowCancel"] = RowCancel,
         ["rowProcessing"] = RowProcessing,
+        ["documentEdit"] = loc.T("composer.document.edit"),
+        ["documentRetry"] = loc.T("composer.document.retry"),
+        ["documentAccept"] = loc.T("composer.document.accept"),
+        ["documentOriginal"] = loc.T("composer.document.original"),
+        ["documentClean"] = loc.T("composer.out.clean"),
+        ["documentSaveHint"] = loc.T("composer.document.saveHint"),
+        ["sourceExpand"] = loc.T("composer.source.expand"),
+        ["sourceCollapse"] = loc.T("composer.source.collapse"),
         ["rowUseOriginal"] = RowUseOriginal,
         ["rowEdit"] = RowEdit,
         ["progressAria"] = BannerProgressAria,

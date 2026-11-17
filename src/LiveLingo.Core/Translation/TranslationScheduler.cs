@@ -27,6 +27,7 @@ public sealed class TranslationScheduler : IAsyncDisposable
     private bool _disposed;
     private Task _worker = Task.CompletedTask;
     private (JobTicket Ticket, CancellationTokenSource Cancel)? _inFlight;
+    private readonly DocumentScheduler _documents;
 
     public TranslationScheduler(
         DraftSession session,
@@ -42,8 +43,24 @@ public sealed class TranslationScheduler : IAsyncDisposable
         _target = target;
         _tailDelay = tailDelay;
         _time = time ?? TimeProvider.System;
+        _documents = new DocumentScheduler(session, UnitKind.Translation, TranslateDocumentAsync, _time);
         _tailTimer = _time.CreateTimer(_ => FlushTail(), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
         _session.Changed += OnChanged;
+    }
+
+    private Task<string> TranslateDocumentAsync(DocumentWork work, CancellationToken ct)
+    {
+        TargetLanguage target;
+        lock (_gate)
+            target = _target;
+        return work.TransformAsync(async (source, context, token) =>
+        {
+            var result = await _translator.TranslateAsync(
+                new TranslationRequest(source, target, _glossary.TermsFor(target), context, FinalDocument: true), token).ConfigureAwait(false);
+            if (string.IsNullOrWhiteSpace(result.Text))
+                throw new InvalidDataException("Empty final translation.");
+            return result.Text;
+        }, ContextChars, ct);
     }
 
     public TargetLanguage Target
@@ -167,7 +184,8 @@ public sealed class TranslationScheduler : IAsyncDisposable
 
     private static (JobTicket Ticket, string Source, string Context)? FindNext(Draft draft, int flushRevision)
     {
-        if (draft.Snapshot is not null || draft.Output != OutputKind.Translation)
+        if (draft.Snapshot is not null || draft.Output != OutputKind.Translation || draft.DocumentEditing
+            || (draft.DocumentMode && !draft.Recording))
             return null;
 
         var flushTail = draft.SourceRevision == flushRevision;
@@ -205,6 +223,7 @@ public sealed class TranslationScheduler : IAsyncDisposable
         }
 
         _session.Changed -= OnChanged;
+        await _documents.DisposeAsync().ConfigureAwait(false);
         await _stop.CancelAsync().ConfigureAwait(false);
         await _tailTimer.DisposeAsync().ConfigureAwait(false);
         await worker.ConfigureAwait(false);

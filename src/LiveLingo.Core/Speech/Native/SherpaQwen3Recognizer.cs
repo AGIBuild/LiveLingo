@@ -6,10 +6,60 @@ using SherpaOnnx;
 
 namespace LiveLingo.Core.Speech.Native;
 
+/// <summary>Strategy for configuring and loading a second-pass <see cref="OfflineRecognizer"/> from an extracted catalog directory.</summary>
+internal interface ISecondPassRecognizerStrategy
+{
+    string ModelId { get; }
+    bool SupportsHotwords { get; }
+    OfflineRecognizer Load(string modelDir, string hotwords, int threads = 4);
+}
+
+internal static class SecondPassRecognizerStrategies
+{
+    private static readonly IReadOnlyDictionary<string, ISecondPassRecognizerStrategy> ById =
+        new ISecondPassRecognizerStrategy[]
+        {
+            new Qwen3AsrStrategy(),
+            new XAsrOfflineStrategy()
+        }.ToDictionary(s => s.ModelId, StringComparer.Ordinal);
+
+    public static ISecondPassRecognizerStrategy For(string modelId) =>
+        ById.TryGetValue(modelId, out var strategy) ? strategy : ById[ModelCatalog.SpeechSecondPass.Id];
+
+    private sealed class Qwen3AsrStrategy : ISecondPassRecognizerStrategy
+    {
+        public string ModelId => ModelCatalog.SpeechSecondPass.Id;
+        public bool SupportsHotwords => true;
+        public OfflineRecognizer Load(string modelDir, string hotwords, int threads = 4) =>
+            SherpaQwen3Recognizer.Load(modelDir, hotwords, threads);
+    }
+
+    private sealed class XAsrOfflineStrategy : ISecondPassRecognizerStrategy
+    {
+        public string ModelId => ModelCatalog.SpeechFast.Id;
+        public bool SupportsHotwords => false;
+
+        public OfflineRecognizer Load(string modelDir, string hotwords, int threads = 4)
+        {
+            var config = new OfflineRecognizerConfig();
+            config.FeatConfig.SampleRate = AudioFormat.SampleRate;
+            config.FeatConfig.FeatureDim = 80;
+            config.ModelConfig.NumThreads = threads;
+            config.ModelConfig.Provider = "cpu";
+            config.DecodingMethod = "greedy_search";
+            config.ModelConfig.Transducer.Encoder = Path.Combine(modelDir, "encoder-epoch-99-avg-1.int8.onnx");
+            config.ModelConfig.Transducer.Decoder = Path.Combine(modelDir, "decoder-epoch-99-avg-1.onnx");
+            config.ModelConfig.Transducer.Joiner = Path.Combine(modelDir, "joiner-epoch-99-avg-1.int8.onnx");
+            config.ModelConfig.Tokens = Path.Combine(modelDir, "tokens.txt");
+            return new OfflineRecognizer(config);
+        }
+    }
+}
+
 /// <summary>
-/// Qwen3-ASR second pass: re-decodes one closed segment. Glossary terms are given as hotwords, which are part of the
-/// loaded model. The loaded model is lent by <see cref="SherpaSpeechEngine"/>, to one user at a time (a dictation and a
-/// file transcription never run together), and given back when this recognizer is disposed.
+/// Offline second-pass recognizer: re-decodes one closed segment using the active <see cref="OfflineRecognizer"/>
+/// strategy (Qwen3-ASR 0.6B with hotwords, or lightweight X-ASR Offline transducer). The loaded model is lent by
+/// <see cref="SherpaSpeechEngine"/> to one user at a time and returned when disposed.
 /// </summary>
 public sealed class SherpaQwen3Recognizer(ResidentModel<OfflineRecognizer>.Lease model) : ISegmentRecognizer
 {

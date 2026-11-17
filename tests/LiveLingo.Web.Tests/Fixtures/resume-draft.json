@@ -25,12 +25,12 @@
   },
   "output": {
     "value": "clean",
-    "pill": "中文 · 整理",
+    "pill": "整理原话",
     "globe": false,
     "menu": [
       {
         "id": "clean",
-        "label": "保持中文（整理）",
+        "label": "整理原话（保持原语言）",
         "checked": true,
         "enabled": true
       },
@@ -47,7 +47,7 @@
         "enabled": true
       }
     ],
-    "swap": "语言：中文 → English\u3000⇄ 互换",
+    "swap": "翻译目标改为 中文",
     "note": null
   },
   "banner": null,
@@ -65,14 +65,16 @@
       "label": "嗯，这个 PR 先不要合并，等 CI 跑完再说。"
     },
     "remembered": null,
-    "canClear": false
+    "canClear": false,
+    "collapsible": false
   },
   "result": {
     "visible": false,
     "label": "将写入",
     "rows": [],
     "editText": "",
-    "rememberCorrection": null
+    "rememberCorrection": null,
+    "document": null
   },
   "footer": {
     "mic": {

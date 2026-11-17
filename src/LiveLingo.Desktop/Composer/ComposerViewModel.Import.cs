@@ -115,7 +115,11 @@ public sealed partial class ComposerViewModel
         var units = segments
             .Select((segment, i) => new SourceUnit(segment.Text, Trail: i < segments.Count - 1 ? "\n" : ""))
             .ToList();
-        _session.Mutate(draft => draft.SyncSource(units, DraftRoute.Units));
+        _session.Mutate(draft =>
+        {
+            draft.DocumentMode = false;
+            draft.SyncSource(units, DraftRoute.Units);
+        });
         HasTimeline = true;
         ShowDraftSource();
         Refresh();

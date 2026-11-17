@@ -167,6 +167,7 @@ public enum ToastKind
     Processing,
     Exported,
     ExportUnfinished,
+    EditExpired,
     CorrectionSaved
 }
 

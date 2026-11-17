@@ -20,6 +20,7 @@
   }
 
   class Source extends preact.Component {
+    state = { expanded: false };
     composing = false;
     lastSent = '';
     lastWidth = 0;
@@ -105,10 +106,14 @@
     render({ source, options }) {
       const live = source.mode === 'live';
       const timed = source.lines.some((line) => line.time);
-      return html`<section class="pane src" aria-label=${source.label}>
+      const collapsed = source.collapsible && !this.state.expanded;
+      return html`<section class=${'pane src' + (collapsed ? ' collapsed' : '')} aria-label=${source.label}>
         <div class="pane-label"><span id="src-label">${source.label}</span>${source.routeChip && html`<span id="route-chip" class="chip mini">${LL.t('routeChip')}</span>`}
+          ${source.collapsible && html`<button type="button" class="source-toggle" aria-expanded=${!collapsed} aria-controls="source-content"
+            onClick=${() => this.setState({ expanded: !this.state.expanded })}>${LL.t(collapsed ? 'sourceExpand' : 'sourceCollapse')}</button>`}
           <button type="button" id="clear" class="clear-button" disabled=${!source.canClear} title=${LL.t('clearAria')}
             aria-label=${LL.t('clearAria')} onClick=${() => LL.send('newDraft')}>${LL.t('clear')}</button></div>
+        <div id="source-content" class="source-content" hidden=${collapsed}>
         <textarea id="src" ref=${this.setBox} rows="2" spellcheck="false" placeholder=${LL.t('placeholder')} aria-label=${source.label}
           hidden=${live} readOnly=${!source.editable} onInput=${this.onInput} oncompositionstart=${this.onCompositionStart}
           oncompositionend=${this.onCompositionEnd}></textarea>
@@ -119,6 +124,7 @@
           <button type="button" id="restore-defaults" class="link" onClick=${() => LL.send('restoreDefaults')}>${source.remembered.action}</button></p>`}
         ${source.resume && html`<button type="button" id="resume" class="resume" onClick=${() => LL.send('restoreRecent', { index: source.resume.index })}>
           <${LL.Icon} name="undo"/><span class="resume-lbl">${LL.t('resume')}</span><span class="resume-txt">${source.resume.label}</span></button>`}
+        </div>
       </section>`;
     }
   }

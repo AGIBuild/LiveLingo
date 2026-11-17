@@ -130,21 +130,23 @@ public class ComposerTextsTests
         var texts = Create();
 
         Assert.Equal("[composer.out.translate:[composer.language.English]]", texts.OutputPill(ComposerOutput.Translate, TargetLanguage.English));
-        Assert.Equal("[composer.out.clean:[composer.language.English]]", texts.OutputPill(ComposerOutput.Clean, TargetLanguage.Chinese));
+        Assert.Equal("[composer.out.clean]", texts.OutputPill(ComposerOutput.Clean, TargetLanguage.Chinese));
+        Assert.Equal(texts.OutputPill(ComposerOutput.Clean, TargetLanguage.Chinese),
+            texts.OutputPill(ComposerOutput.Clean, TargetLanguage.English));
         Assert.Equal("[composer.out.raw]", texts.OutputPill(ComposerOutput.Original, TargetLanguage.English));
         Assert.Equal("[composer.out.menu.translate:[composer.language.Chinese]]", texts.OutputMenu(ComposerOutput.Translate, TargetLanguage.Chinese));
-        Assert.Equal("[composer.out.menu.clean:[composer.language.Chinese]]", texts.OutputMenu(ComposerOutput.Clean, TargetLanguage.English));
+        Assert.Equal("[composer.out.menu.clean]", texts.OutputMenu(ComposerOutput.Clean, TargetLanguage.English));
         Assert.Equal("[composer.out.menu.raw]", texts.OutputMenu(ComposerOutput.Original, TargetLanguage.English));
         Assert.Equal(
-            "[composer.out.swap:[composer.language.Chinese],[composer.language.English]]",
+            "[composer.out.swap:[composer.language.Chinese]]",
             texts.SwapMenu(TargetLanguage.English));
     }
 
     [Fact]
-    public void SourceLanguage_IsTheOtherSideOfTheTarget()
+    public void SwitchingTarget_DoesNotClaimToKnowTheSourceLanguage()
     {
-        Assert.Equal(TargetLanguage.Chinese, ComposerTexts.SourceLanguage(TargetLanguage.English));
-        Assert.Equal(TargetLanguage.English, ComposerTexts.SourceLanguage(TargetLanguage.Chinese));
+        Assert.Equal(TargetLanguage.Chinese, ComposerTexts.OtherLanguage(TargetLanguage.English));
+        Assert.Equal(TargetLanguage.English, ComposerTexts.OtherLanguage(TargetLanguage.Chinese));
     }
 
     [Fact]
@@ -193,6 +195,7 @@ public class ComposerTextsTests
     [Theory]
     [InlineData(BannerKind.ModelMissing, "x", 0, "[composer.banner.modelMissing:x]")]
     [InlineData(BannerKind.Downloading, "", 42.4, "[composer.banner.downloading:42]")]
+    [InlineData(BannerKind.Downloading, "Qwen3.5 9B", 42.4, "[composer.banner.downloadingNamed:Qwen3.5 9B,42]")]
     [InlineData(BannerKind.DownloadFailed, "disk full", 0, "[composer.banner.downloadFailed:disk full]")]
     [InlineData(BannerKind.TargetLost, "", 0, "[composer.banner.targetLost]")]
     [InlineData(BannerKind.WriteFailed, "no focus", 0, "[composer.banner.writeFailed:no focus]")]

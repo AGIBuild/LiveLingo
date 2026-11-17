@@ -1,4 +1,6 @@
 using System.Globalization;
+using LiveLingo.Core.Inference;
+using LiveLingo.Core.Models;
 using LiveLingo.Core.Translation;
 using LiveLingo.Desktop.Composer;
 using LiveLingo.Desktop.Services.Localization;
@@ -14,7 +16,7 @@ public sealed class SettingsTexts(ILocalizationService loc)
     /// <summary>The static labels of the page, by their key without the "settings." prefix.</summary>
     private static readonly string[] Keys =
     [
-        "title", "nav.aria", "nav.general", "nav.voice", "nav.privacy", "nav.models",
+        "title", "nav.aria", "nav.general", "nav.voice", "nav.models", "nav.about",
         "hotkey", "hotkey.desc", "hotkey.invalid", "hotkey.prompt",
         "commit", "commit.desc", "commit.enter", "commit.ctrlEnter",
         "language", "language.desc",
@@ -30,19 +32,27 @@ public sealed class SettingsTexts(ILocalizationService loc)
         "corrections", "corrections.spoken", "corrections.canonical", "corrections.spokenExample", "corrections.canonicalExample",
         "corrections.add", "corrections.remove", "corrections.hint",
         "terms", "terms.source", "terms.target", "terms.sourceExample", "terms.targetExample", "terms.add", "terms.remove", "terms.hint",
-        "cloud.translate", "cloud.translate.desc", "cloud.clean", "cloud.clean.desc",
+        "privacy.badge.alwaysLocal", "privacy.badge.local", "privacy.badge.cloud", "privacy.routing.allLocal",
+        "cloud.translate", "cloud.clean",
         "cloud.baseUrl", "cloud.baseUrl.desc", "cloud.model", "cloud.model.desc", "cloud.apiKey", "cloud.apiKey.desc",
         "cloud.keyStored", "cloud.invalid",
-        "cloud.endpoints", "cloud.endpoints.active", "cloud.endpoints.none", "cloud.endpoints.empty",
-        "cloud.add", "cloud.edit", "cloud.delete", "cloud.enabled", "cloud.enable", "cloud.keySaved", "cloud.keyMissing",
+        "cloud.edit", "cloud.delete", "cloud.keySaved", "cloud.keyMissing",
         "cloud.name", "cloud.name.example", "cloud.form.add", "cloud.form.edit", "cloud.form.save", "cloud.form.create", "cloud.form.cancel",
         "cloud.error.nameMissing", "cloud.error.nameTaken", "cloud.error.urlInvalid", "cloud.error.modelMissing", "cloud.error.keyMissing",
-        "cloud.switch.title", "cloud.switch.body", "cloud.switch.keep", "cloud.switch.confirm",
         "cloud.delete.title", "cloud.delete.body", "cloud.delete.steps", "cloud.delete.keep", "cloud.delete.confirm",
-        "consent.translate", "consent.clean", "consent.body", "consent.keepLocal", "consent.allow",
+        "consent.translate", "consent.clean", "consent.body", "consent.switchBody", "consent.keepLocal", "consent.keepCurrent", "consent.allow",
         "recent", "recent.desc", "recent.clear",
-        "models.speech", "models.clean", "models.translate",
-        "model", "model.desc", "model.quality", "model.fast",
+        "models.hw.title", "models.hw.matched", "models.hw.preparing", "models.hw.gaugeAria",
+        "models.speech.localOnly", "models.group.cloud.title", "models.group.local.title",
+        "models.cloud.empty", "models.cloud.add", "models.cloud.badge",
+        "models.cloud.footprint", "models.cloud.incomplete", "models.cloud.useLocal",
+        "models.tabs.aria", "models.dl.title",
+        "models.storage.title", "models.storage.desc", "models.storage.total", "models.storage.path",
+        "models.storage.listTitle", "models.storage.empty",
+        "models.metric.quality", "models.metric.speed",
+        "models.state.activeInstalled", "models.state.selected", "models.state.activating", "models.state.installed",
+        "models.action.enable", "models.action.cancel", "models.action.delete", "models.action.retry",
+        "about.subtitle",
         "legacy", "legacy.remove",
         "version", "version.desc",
         "update", "update.desc", "update.check", "update.restart", "update.download",
@@ -57,6 +67,7 @@ public sealed class SettingsTexts(ILocalizationService loc)
     public IReadOnlyDictionary<string, string> WebStrings()
     {
         var strings = Keys.ToDictionary(key => key, key => loc.T("settings." + key));
+        strings["appName"] = loc.T("app.name");
         strings["closeAria"] = loc.T("composer.close");
         return strings;
     }
@@ -70,7 +81,231 @@ public sealed class SettingsTexts(ILocalizationService loc)
 
     /// <summary>What the old models still on disk are and how much room they take.</summary>
     public string LegacyDescription(int count, long bytes) =>
-        loc.T("settings.legacy.desc", count, (bytes / 1_000_000_000d).ToString("0.0", CultureInfo.InvariantCulture));
+        loc.T("settings.legacy.desc", count, FormatDecimalGb(bytes));
+
+    public string HardwareSummary(HardwareProfile hardware) => hardware.Backend switch
+    {
+        ComputeBackend.AppleMetal => loc.T("settings.models.hw.metal", hardware.DeviceName, hardware.TotalMemoryGb),
+        ComputeBackend.DiscreteGpu => loc.T("settings.models.hw.dgpu", hardware.DeviceName, hardware.TotalMemoryGb, hardware.DedicatedVideoMemoryGb ?? 0),
+        _ => loc.T("settings.models.hw.cpu", hardware.DeviceName, hardware.TotalMemoryGb)
+    };
+
+    public string BackendDiagnostic(HardwareProfile hardware) => hardware.Backend switch
+    {
+        ComputeBackend.AppleMetal => loc.T("settings.diag.backend.metal", hardware.TotalMemoryGb),
+        ComputeBackend.DiscreteGpu => loc.T("settings.diag.backend.dgpu", hardware.DedicatedVideoMemoryGb ?? hardware.TotalMemoryGb),
+        _ => loc.T("settings.diag.backend.cpu", hardware.TotalMemoryGb)
+    };
+
+    public string ResidencySummary(ResidencyAssessment assessment) =>
+        loc.T("settings.models.hw.residency", FormatGib(assessment.ActiveCoResidentBytes), FormatGib(assessment.SafeBudgetBytes));
+
+    public string ResidencyMode(ResidencyAssessment assessment) =>
+        loc.T(assessment.CanCoResideBothLlms ? "settings.models.hw.mode.dual" : "settings.models.hw.mode.swap");
+
+    public string DiskUsedSummary(long bytes) =>
+        bytes > 0 ? loc.T("settings.models.hw.disk.some", FormatSize(bytes)) : loc.T("settings.models.hw.disk.none");
+
+    public string RecommendActionLabel(long missingBytes) =>
+        missingBytes > 0 ? loc.T("settings.models.hw.downloadApply", FormatSize(missingBytes)) : loc.T("settings.models.hw.apply");
+
+    public string StageTabTitle(ModelStage stage) => loc.T($"settings.models.tab.{StageKey(stage)}");
+
+    public string StorageTabTitle => loc.T("settings.models.tab.storage");
+
+    public string CategoryBadge(ModelStage? stage) => stage is { } s
+        ? StageTabTitle(s)
+        : loc.T("settings.models.tab.shared");
+
+    public string StageTabSummary(
+        ModelStage stage,
+        ModelDescriptor activeModel,
+        bool installed,
+        ModelDownloadState? activeStageDownload,
+        bool queued,
+        bool cleanupEnabled,
+        bool cloudRouted,
+        string? endpointName)
+    {
+        if (activeStageDownload is { IsDownloading: true } dl)
+        {
+            return queued || (dl.BytesDownloaded == 0 && dl.Percentage < 0.5)
+                ? loc.T("settings.models.tab.summary.queued")
+                : loc.T("settings.models.tab.summary.downloading", (int)Math.Round(dl.Percentage));
+        }
+
+        if (stage == ModelStage.Cleaner && !cleanupEnabled)
+            return loc.T("settings.models.tab.summary.off");
+        if (cloudRouted && !string.IsNullOrEmpty(endpointName))
+            return loc.T("settings.models.tab.summary.cloud", endpointName);
+
+        return installed
+            ? activeModel.ShortName
+            : loc.T("settings.models.tab.summary.pending", activeModel.ShortName);
+    }
+
+    public string StorageTabSummary(int itemCount, long totalBytes) =>
+        itemCount > 0 && totalBytes > 0
+            ? loc.T("settings.models.tab.summary.storage", itemCount, FormatSize(totalBytes))
+            : loc.T("settings.models.tab.summary.storageEmpty");
+
+    public string StorageBreakdown(int itemCount, long inUseBytes, long reclaimableBytes) =>
+        itemCount == 0
+            ? loc.T("settings.models.storage.breakdown.empty")
+            : reclaimableBytes > 0
+                ? loc.T("settings.models.storage.breakdown.reclaimable", FormatSize(inUseBytes), FormatSize(reclaimableBytes))
+                : loc.T("settings.models.storage.breakdown.allActive", itemCount);
+
+    public string StorageStatusBadge(bool inUse) =>
+        loc.T(inUse ? "settings.models.state.activeInstalled" : "settings.models.state.idle");
+
+    public string DeleteWithSizeLabel(long sizeBytes) =>
+        loc.T("settings.models.action.deleteSize", FormatSize(sizeBytes));
+
+    public string? NavDownloadBadge(int? activePercent, bool anyQueuedOrConnecting) =>
+        activePercent is { } pct
+            ? loc.T("settings.models.nav.downloading", pct)
+            : anyQueuedOrConnecting
+                ? loc.T("settings.models.nav.queued")
+                : null;
+
+    public string DownloadProgressLabel(ModelDownloadState state, long fallbackTotalBytes, bool queued)
+    {
+        var total = state.TotalBytes > 0 ? state.TotalBytes : fallbackTotalBytes;
+        if (queued)
+            return loc.T("settings.models.dl.queued", FormatSize(total));
+
+        var downloaded = state.BytesDownloaded > 0
+            ? state.BytesDownloaded
+            : (long)Math.Round(total * Math.Clamp(state.Percentage, 0, 100) / 100d);
+
+        if (downloaded <= 0 && state.Percentage < 0.5)
+            return loc.T("settings.models.dl.connecting", FormatSize(total));
+        if (total > 0 && downloaded >= total && state.Percentage >= 99.5)
+            return loc.T("settings.models.dl.verifying", FormatSize(total), FormatSize(total));
+
+        return loc.T(
+            "settings.models.dl.progress",
+            FormatSize(downloaded),
+            FormatSize(total),
+            (int)Math.Round(state.Percentage));
+    }
+
+    public string StageTitle(ModelStage stage) => loc.T($"settings.models.stage.{StageKey(stage)}.title");
+
+    public string StageDescription(ModelStage stage) => loc.T($"settings.models.stage.{StageKey(stage)}.desc");
+
+    public string? StageNotice(ModelStage stage, bool cleanupEnabled) => stage switch
+    {
+        ModelStage.Cleaner when !cleanupEnabled => loc.T("settings.models.notice.cleanupOff"),
+        _ => null
+    };
+
+    public string? PeerStageBadge(ModelStage currentStage, bool activeHere, bool usedForClean, bool usedForTranslate)
+    {
+        var usedByPeer = currentStage switch
+        {
+            ModelStage.Cleaner => usedForTranslate,
+            ModelStage.Translator => usedForClean,
+            _ => false
+        };
+        if (!usedByPeer)
+            return null;
+
+        var peerName = loc.T(currentStage == ModelStage.Cleaner ? "settings.output.translate" : "settings.output.clean");
+        return loc.T(activeHere ? "settings.cloud.alsoUsedBy" : "settings.cloud.usedBy", peerName);
+    }
+
+    public string ModelsPrivacyStatus(bool cloudClean, bool cloudTranslate)
+    {
+        var steps = AffectedCloudSteps(cloudClean, cloudTranslate);
+        return steps is null
+            ? loc.T("settings.models.privacy.allLocal")
+            : loc.T("settings.models.privacy.cloud", steps);
+    }
+
+    public string? AffectedCloudSteps(bool usedForClean, bool usedForTranslate)
+    {
+        var list = new List<string>(2);
+        if (usedForClean)
+            list.Add(loc.T("settings.cloud.clean"));
+        if (usedForTranslate)
+            list.Add(loc.T("settings.cloud.translate"));
+        return list.Count == 0 ? null : string.Join(loc.T("settings.cloud.stepJoin"), list);
+    }
+
+    public string CatalogArtifactName(ModelDescriptor descriptor) => descriptor.Profile is not null
+        ? OptionName(descriptor)
+        : descriptor.Type == ModelType.Runtime
+            ? loc.T("settings.models.shared.runtime.name")
+            : loc.T($"settings.models.shared.{descriptor.Id}.name");
+
+    public string OptionName(ModelDescriptor option) => loc.T($"settings.models.opt.{option.Id}.name");
+
+    public string OptionDescription(ModelDescriptor option) => loc.T($"settings.models.opt.{option.Id}.desc");
+
+    public string OptionFootprint(ModelDescriptor option) =>
+        loc.T("settings.models.footprint", FormatSize(option.SizeBytes), FormatGib(option.Profile!.ResidentBytes));
+
+    public string FitBadge(ModelFit fit) => fit switch
+    {
+        ModelFit.Recommended => loc.T("settings.models.fit.recommended"),
+        ModelFit.Supported => loc.T("settings.models.fit.supported"),
+        ModelFit.Heavy => loc.T("settings.models.fit.heavy"),
+        ModelFit.Unsupported => loc.T("settings.models.fit.unsupported"),
+        _ => throw new ArgumentOutOfRangeException(nameof(fit))
+    };
+
+    public string? FitDetail(ModelEvaluation evaluation, HardwareProfile hardware) => evaluation.Fit switch
+    {
+        ModelFit.Unsupported => evaluation.UnsupportedReason switch
+        {
+            ModelUnsupportedReason.InsufficientMemory => loc.T("settings.models.reason.ram", evaluation.RequiredMemoryGb ?? 16, hardware.TotalMemoryGb),
+            ModelUnsupportedReason.InsufficientVideoMemory => loc.T("settings.models.reason.vram", evaluation.RequiredMemoryGb ?? 8),
+            ModelUnsupportedReason.RequiresGpuAcceleration => loc.T("settings.models.reason.gpu"),
+            _ => null
+        },
+        ModelFit.Heavy => hardware.Backend == ComputeBackend.CpuOnly
+            ? loc.T("settings.models.heavy.cpu")
+            : loc.T("settings.models.heavy.swap"),
+        _ => null
+    };
+
+    public string DownloadActionLabel(ModelDescriptor option, bool active, bool failed)
+    {
+        if (failed)
+            return loc.T("settings.models.action.retry");
+        var size = FormatSize(option.SizeBytes);
+        return loc.T(active ? "settings.models.action.download" : "settings.models.action.downloadEnable", size);
+    }
+
+    public string? DownloadError(ModelDownloadState state) => !state.IsFailed
+        ? null
+        : state.ErrorMessage == ModelDownloadErrorCodes.HuggingFaceAuthorization
+            ? loc.T("settings.models.error.auth")
+            : loc.T("settings.models.error.failed", state.ErrorMessage ?? "");
+
+    public string FormatSize(long bytes) => bytes switch
+    {
+        >= 1_000_000_000 => $"{(bytes / 1_000_000_000d).ToString("0.00", CultureInfo.InvariantCulture)} GB",
+        >= 1_000_000 => $"{Math.Max(1, Math.Round(bytes / 1_000_000d)).ToString("0", CultureInfo.InvariantCulture)} MB",
+        > 0 => $"{Math.Max(1, Math.Round(bytes / 1_000d)).ToString("0", CultureInfo.InvariantCulture)} KB",
+        _ => "0 MB"
+    };
+
+    private static string StageKey(ModelStage stage) => stage switch
+    {
+        ModelStage.Speech => "speech",
+        ModelStage.Cleaner => "cleaner",
+        ModelStage.Translator => "translator",
+        _ => throw new ArgumentOutOfRangeException(nameof(stage))
+    };
+
+    private static string FormatDecimalGb(long bytes) =>
+        Math.Max(0.1, bytes / 1_000_000_000d).ToString("0.0", CultureInfo.InvariantCulture);
+
+    private static string FormatGib(long bytes) =>
+        Math.Max(0.1, bytes / (1024d * 1024 * 1024)).ToString("0.0", CultureInfo.InvariantCulture);
 
     /// <summary>The application's name; the context without an input box (copy only) has none.</summary>
     public string AppName(string name) => _composer.ContextName(name);

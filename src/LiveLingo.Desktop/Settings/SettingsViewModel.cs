@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using LiveLingo.Core.Cleanup;
 using LiveLingo.Core.Cloud;
+using LiveLingo.Core.Inference;
 using LiveLingo.Core.Models;
 using LiveLingo.Core.Translation;
 using LiveLingo.Desktop.Composer;
@@ -23,7 +24,15 @@ public enum CloudStep
 }
 
 /// <summary>One saved cloud endpoint as the page shows it; the API key is never part of it, only whether one is stored.</summary>
-public sealed record EndpointEntry(string Id, string Name, string BaseUrl, string Model, bool HasKey, bool Active);
+public sealed record EndpointEntry(
+    string Id,
+    string Name,
+    string BaseUrl,
+    string Model,
+    bool HasKey,
+    bool Usable,
+    bool UsedForTranslate,
+    bool UsedForClean);
 
 /// <summary>Why the add or edit form was not accepted; the page shows the reason beside the field.</summary>
 public enum EndpointError
@@ -38,26 +47,19 @@ public enum EndpointError
 /// <summary>The form that adds an endpoint (<paramref name="Id"/> null) or edits one, and why its last submission was refused.</summary>
 public sealed record EndpointForm(string? Id, EndpointError? Error);
 
-public enum EndpointChange
-{
-    Switch,
-    Delete
-}
-
-/// <summary>A change of where text goes, or of what is stored, that waits for the user's answer.</summary>
-public sealed record PendingEndpointChange(EndpointChange Kind, string Id);
+/// <summary>A stage routing request to a cloud endpoint waiting for the user's explicit privacy consent.</summary>
+public sealed record PendingCloudConsent(CloudStep Step, string EndpointId, string? PreviousEndpointId);
 
 /// <summary>
 /// The settings page of the prototype: there is no save button, every change is applied at once. A value that is not
 /// usable yet (a hotkey being typed, a half-filled cloud endpoint) is flagged and not stored.
 /// </summary>
-public sealed partial class SettingsViewModel : ObservableObject
+public sealed partial class SettingsViewModel : ObservableObject, IDisposable
 {
     public static readonly IReadOnlyList<string> Languages = ["zh-CN", "en-US"];
     public static readonly IReadOnlyList<string> CommitKeys = [nameof(CommitKey.Enter), nameof(CommitKey.CtrlEnter)];
     public static readonly IReadOnlyList<string> Themes = ["Auto", "Light", "Dark"];
     public static readonly IReadOnlyList<string> Targets = [nameof(TargetLanguage.English), nameof(TargetLanguage.Chinese)];
-    public static readonly IReadOnlyList<string> Tiers = [nameof(TranslatorTier.Quality), nameof(TranslatorTier.Fast)];
     public static readonly IReadOnlyList<string> DefaultOutputs = [nameof(ComposerOutput.Clean), nameof(ComposerOutput.Translate), nameof(ComposerOutput.Original)];
 
     private readonly ISettingsService _settings;
@@ -66,13 +68,19 @@ public sealed partial class SettingsViewModel : ObservableObject
     private readonly RecentDrafts _recent;
     private readonly IMicrophone _microphone;
     private readonly ComposerPreferences _preferences;
+    private readonly bool _ownsCoordinator;
     private IReadOnlyList<string> _legacyIds = [];
     private bool _loading = true;
     private bool _devicesLoaded;
 
     public SettingsViewModel(
-        ISettingsService settings, ISecretStore secrets, IModelManager models, RecentDrafts recent, IMicrophone microphone,
-        ComposerPreferences preferences)
+        ISettingsService settings,
+        ISecretStore secrets,
+        IModelManager models,
+        RecentDrafts recent,
+        IMicrophone microphone,
+        ComposerPreferences preferences,
+        ModelSelectionCoordinator? modelCoordinator = null)
     {
         _settings = settings;
         _secrets = secrets;
@@ -80,6 +88,10 @@ public sealed partial class SettingsViewModel : ObservableObject
         _recent = recent;
         _microphone = microphone;
         _preferences = preferences;
+        _ownsCoordinator = modelCoordinator is null;
+        ModelCoordinator = modelCoordinator ?? new ModelSelectionCoordinator(
+            settings, models, new InProcessModelDownloadCoordinator(models));
+        ModelCoordinator.Changed += OnModelsChanged;
 
         var current = settings.CloneCurrent();
         _summonHotkey = current.Hotkeys.Summon;
@@ -95,11 +107,10 @@ public sealed partial class SettingsViewModel : ObservableObject
         _builtInGlossary = current.Composer.BuiltInGlossary;
         _rememberChoices = current.Composer.RememberChoices;
         _polishPrompt = PolishStyle.IsUsable(current.Composer.PolishPrompt) ? current.Composer.PolishPrompt : "";
-        _tierIndex = Math.Max(0, Tiers.ToList().IndexOf(current.Composer.TranslatorTier));
         _microphoneNames = [""];
         _microphoneIndex = 0;
-        _cloudTranslate = current.Cloud.Translate;
-        _cloudClean = current.Cloud.Clean;
+        _translatorEndpointId = current.Cloud.TranslatorEndpointId;
+        _cleanerEndpointId = current.Cloud.CleanerEndpointId;
         _endpoints = EntriesOf(current.Cloud);
         var (parsedTerms, parsedCorrections) = ParseGlossaryEntries(current.Composer.Glossary);
         Terms = new ObservableCollection<TermEntry>(parsedTerms);
@@ -186,30 +197,64 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     // ---- privacy and cloud -----------------------------------------------------------------
 
-    [ObservableProperty] private bool _cloudTranslate;
-    [ObservableProperty] private bool _cloudClean;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CloudTranslate), nameof(TranslatorEndpoint))]
+    private string _translatorEndpointId;
 
-    /// <summary>True when a cloud step was asked for but the enabled endpoint is missing or unusable (no key, bad address).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CloudClean), nameof(CleanerEndpoint))]
+    private string _cleanerEndpointId;
+
+    public bool CloudTranslate => !string.IsNullOrEmpty(TranslatorEndpointId);
+
+    public bool CloudClean => !string.IsNullOrEmpty(CleanerEndpointId);
+
+    /// <summary>True when a cloud selection was asked for on an endpoint that is missing or unusable (no key, bad address).</summary>
     [ObservableProperty] private bool _cloudInvalid;
 
-    /// <summary>The saved endpoints, in the order they were added; at most one is the enabled one.</summary>
-    [ObservableProperty] private IReadOnlyList<EndpointEntry> _endpoints;
+    /// <summary>The saved endpoints, in the order they were added.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(TranslatorEndpoint), nameof(CleanerEndpoint), nameof(PendingDeleteEndpoint))]
+    private IReadOnlyList<EndpointEntry> _endpoints;
 
-    /// <summary>The endpoint the cloud steps use, or null while none is enabled.</summary>
-    public EndpointEntry? ActiveEndpoint => Endpoints.FirstOrDefault(endpoint => endpoint.Active);
+    public EndpointEntry? TranslatorEndpoint => Endpoints.FirstOrDefault(endpoint => endpoint.Id == TranslatorEndpointId);
+
+    public EndpointEntry? CleanerEndpoint => Endpoints.FirstOrDefault(endpoint => endpoint.Id == CleanerEndpointId);
 
     /// <summary>The add or edit form while it is open; the page draws it over the settings.</summary>
     [ObservableProperty] private EndpointForm? _form;
 
-    /// <summary>A switch of the enabled endpoint or a deletion waiting for the user's answer.</summary>
-    [ObservableProperty] private PendingEndpointChange? _pendingChange;
+    /// <summary>An endpoint deletion waiting for the user's confirmation.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PendingDeleteEndpoint))]
+    private string? _pendingDeleteId;
+
+    public EndpointEntry? PendingDeleteEndpoint =>
+        PendingDeleteId is null ? null : Endpoints.FirstOrDefault(endpoint => endpoint.Id == PendingDeleteId);
 
     // Endpoints whose API key is in the secret store; read when the window opens and kept up to date by the commands below.
     private readonly HashSet<string> _keyed = [];
 
     // ---- models ----------------------------------------------------------------------------
 
-    [ObservableProperty] private int _tierIndex;
+    public ModelSelectionCoordinator ModelCoordinator { get; }
+
+    public HardwareProfile Hardware => ModelCoordinator.Hardware;
+
+    public ModelSelection ActiveModels => ModelCoordinator.ActiveSelection;
+
+    /// <summary>Raised when model selection, download progress or disk state changes (possibly on a background thread).</summary>
+    public event Action? ModelsChanged;
+
+    public bool SelectModel(string modelId) => ModelCoordinator.SelectModel(modelId);
+
+    public bool DownloadModel(string modelId) => ModelCoordinator.RetryArtifactDownload(modelId);
+
+    public void CancelModelDownload(string modelId) => ModelCoordinator.CancelDownload(modelId);
+
+    public Task<bool> DeleteModelAsync(string modelId) => ModelCoordinator.DeleteModelAsync(modelId);
+
+    public void ApplyRecommendedModels() => ModelCoordinator.ApplyRecommended();
 
     /// <summary>Models that earlier versions downloaded and this one no longer uses; they are only removed on request.</summary>
     [ObservableProperty]
@@ -219,6 +264,19 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private long _legacyBytes;
 
     public bool HasLegacyModels => LegacyCount > 0;
+
+    public void Dispose()
+    {
+        ModelCoordinator.Changed -= OnModelsChanged;
+        if (_ownsCoordinator)
+            ModelCoordinator.Dispose();
+    }
+
+    private void OnModelsChanged()
+    {
+        SyncCloudSnapshot(_settings.Current.Cloud);
+        ModelsChanged?.Invoke();
+    }
 
     // ---- applying --------------------------------------------------------------------------
 
@@ -236,7 +294,6 @@ public sealed partial class SettingsViewModel : ObservableObject
     partial void OnBuiltInGlossaryChanged(bool value) => Apply();
     partial void OnRememberChoicesChanged(bool value) => Apply();
     partial void OnPolishPromptChanged(string value) => Apply();
-    partial void OnTierIndexChanged(int value) => ApplyIfSelected(value);
 
     /// <summary>A combo box reports -1 while its items are being replaced; that is not a choice.</summary>
     private void ApplyIfSelected(int index)
@@ -282,12 +339,9 @@ public sealed partial class SettingsViewModel : ObservableObject
         {
             PolishPromptInvalid = true;
         }
-        model.Composer.TranslatorTier = Tiers[TierIndex];
         if (_devicesLoaded)
             model.Composer.Microphone = MicrophoneIndex < MicrophoneNames.Count ? MicrophoneNames[MicrophoneIndex] : "";
         model.Composer.Glossary = SerializeGlossary(Terms, Corrections);
-        model.Cloud.Translate = CloudTranslate;
-        model.Cloud.Clean = CloudClean;
         _settings.Replace(model);
     }
 
@@ -377,67 +431,97 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     // ---- cloud ------------------------------------------------------------------------------
 
-    /// <summary>The step the user asked to turn on and has not consented to yet; the page shows its consent dialog meanwhile.</summary>
-    [ObservableProperty] private CloudStep? _pendingConsent;
+    /// <summary>The cloud selection the user asked for and has not consented to yet; the page shows its consent dialog meanwhile.</summary>
+    [ObservableProperty] private PendingCloudConsent? _pendingConsent;
 
     /// <summary>
-    /// Turning a step on needs the user's consent every time (<see cref="AnswerConsent"/>) and an enabled, usable endpoint
-    /// to send to; turning it off is immediate.
+    /// Selecting a cloud endpoint for a stage always asks for explicit privacy consent naming that endpoint and host
+    /// (<see cref="AnswerConsent"/>), and refuses incomplete or keyless endpoints.
     /// </summary>
-    public void SetCloud(CloudStep step, bool on)
+    public void SelectCloudEndpoint(CloudStep step, string endpointId)
     {
-        var translation = step == CloudStep.Translate;
-        if (!on)
-            DisableCloud(translation);
-        else if (!(translation ? CloudTranslate : CloudClean))
+        if (Endpoints.FirstOrDefault(item => item.Id == endpointId) is not { } endpoint)
         {
-            if (IsConfigured(ActiveEndpoint))
-                PendingConsent = step;
-            else
-                CloudInvalid = true;
+            CloudInvalid = true;
+            return;
         }
+
+        var currentId = step == CloudStep.Translate ? TranslatorEndpointId : CleanerEndpointId;
+        if (string.Equals(currentId, endpointId, StringComparison.Ordinal))
+        {
+            CloudInvalid = false;
+            return;
+        }
+
+        if (!endpoint.Usable)
+        {
+            CloudInvalid = true;
+            return;
+        }
+
+        CloudInvalid = false;
+        PendingConsent = new PendingCloudConsent(
+            step,
+            endpointId,
+            currentId.Length > 0 ? currentId : null);
     }
 
     public void AnswerConsent(bool allow)
     {
-        if (PendingConsent is not { } step)
+        if (PendingConsent is not { } consent)
             return;
 
         PendingConsent = null;
         if (allow)
-            TryEnableCloud(step == CloudStep.Translate);
+            TryApplyCloudEndpoint(consent.Step, consent.EndpointId);
     }
 
-    /// <summary>Turns a cloud step on after the user consented; refused while no usable endpoint is enabled.</summary>
-    public bool TryEnableCloud(bool translation)
+    /// <summary>Binds <paramref name="step"/> to <paramref name="endpointId"/> after explicit consent; refused when unusable.</summary>
+    public bool TryApplyCloudEndpoint(CloudStep step, string endpointId)
     {
-        if (!IsConfigured(ActiveEndpoint))
+        if (Endpoints.FirstOrDefault(item => item.Id == endpointId) is not { Usable: true })
         {
             CloudInvalid = true;
             return false;
         }
 
-        if (translation)
-            CloudTranslate = true;
-        else
-            CloudClean = true;
-        Apply();
+        ModelCoordinator.ClearPendingActivation(step == CloudStep.Translate ? ModelStage.Translator : ModelStage.Cleaner);
+        Mutate(cloud =>
+        {
+            if (step == CloudStep.Translate)
+                cloud.TranslatorEndpointId = endpointId;
+            else
+                cloud.CleanerEndpointId = endpointId;
+        });
         return true;
     }
 
-    public void DisableCloud(bool translation)
+    /// <summary>Immediately returns <paramref name="step"/> to its local model without touching saved cloud endpoints.</summary>
+    public void SwitchStageToLocal(CloudStep step)
     {
-        if (translation)
-            CloudTranslate = false;
-        else
-            CloudClean = false;
-        Apply();
+        if (step == CloudStep.Translate && CloudTranslate)
+            Mutate(cloud => cloud.TranslatorEndpointId = "");
+        else if (step == CloudStep.Clean && CloudClean)
+            Mutate(cloud => cloud.CleanerEndpointId = "");
+    }
+
+    /// <summary>Immediately switches every text stage back to local offline models.</summary>
+    public void DisableAllCloud()
+    {
+        if (!CloudTranslate && !CloudClean)
+            return;
+
+        Mutate(cloud =>
+        {
+            cloud.TranslatorEndpointId = "";
+            cloud.CleanerEndpointId = "";
+        });
     }
 
     // ---- cloud endpoints --------------------------------------------------------------------
-    // Any number of endpoints may be saved, at most one is enabled and both cloud steps use it. Whatever would change where
-    // text goes (enabling another endpoint while a step is on, deleting, a new host for the enabled one) asks first or
-    // switches the steps off: text never moves to another service without the user's say.
+    // Any number of endpoints may be saved, and cleanup and translation independently pick whichever one they want (or stay
+    // local). Anything that would move text to another service (selecting an endpoint, editing an active endpoint's host,
+    // or deleting an endpoint) asks first or reverts that stage to local: text never moves without the user's say.
 
     /// <summary>Opens the form for a new endpoint (<paramref name="id"/> null) or to edit one.</summary>
     public void OpenEndpointForm(string? id)
@@ -492,10 +576,12 @@ public sealed partial class SettingsViewModel : ObservableObject
                 endpoint = new CloudEndpoint { Id = id, SecretId = secretId };
                 cloud.Endpoints.Add(endpoint);
             }
-            else if (id == cloud.ActiveEndpointId && !SameService(endpoint.BaseUrl, baseUrl))
+            else if (!SameService(endpoint.BaseUrl, baseUrl))
             {
-                cloud.Translate = false;
-                cloud.Clean = false;
+                if (cloud.TranslatorEndpointId == id)
+                    cloud.TranslatorEndpointId = "";
+                if (cloud.CleanerEndpointId == id)
+                    cloud.CleanerEndpointId = "";
             }
 
             endpoint.Name = name;
@@ -518,66 +604,33 @@ public sealed partial class SettingsViewModel : ObservableObject
         return apiKey.Length == 0 && existing?.HasKey != true ? EndpointError.KeyMissing : null;
     }
 
-    /// <summary>Enables an endpoint (the one that was enabled is switched off) or switches the enabled one off, which also turns both cloud steps off.</summary>
-    public void SetEndpointEnabled(string id, bool on)
-    {
-        if (Endpoints.FirstOrDefault(endpoint => endpoint.Id == id) is not { } endpoint)
-            return;
-
-        if (!on)
-        {
-            if (endpoint.Active)
-                Mutate(cloud => Deactivate(cloud));
-        }
-        else if (!endpoint.Active)
-        {
-            if (!(CloudTranslate || CloudClean))
-                Mutate(cloud => cloud.ActiveEndpointId = id);
-            else if (IsConfigured(endpoint))
-                PendingChange = new PendingEndpointChange(EndpointChange.Switch, id);
-            else
-                CloudInvalid = true;
-        }
-    }
-
-    /// <summary>Asks to delete an endpoint together with its API key; <see cref="AnswerChangeAsync"/> carries it out.</summary>
+    /// <summary>Asks to delete an endpoint together with its API key; <see cref="AnswerDeleteEndpointAsync"/> carries it out.</summary>
     public void DeleteEndpoint(string id)
     {
         if (Endpoints.Any(endpoint => endpoint.Id == id))
-            PendingChange = new PendingEndpointChange(EndpointChange.Delete, id);
+            PendingDeleteId = id;
     }
 
-    public async Task AnswerChangeAsync(bool allow)
+    public async Task AnswerDeleteEndpointAsync(bool allow)
     {
-        if (PendingChange is not { } change)
+        if (PendingDeleteId is not { } deleteId)
             return;
 
-        PendingChange = null;
-        if (!allow || Endpoints.FirstOrDefault(endpoint => endpoint.Id == change.Id) is not { } endpoint)
+        PendingDeleteId = null;
+        if (!allow || Endpoints.FirstOrDefault(endpoint => endpoint.Id == deleteId) is not { } endpoint)
             return;
-
-        if (change.Kind == EndpointChange.Switch)
-        {
-            Mutate(cloud => cloud.ActiveEndpointId = change.Id);
-            return;
-        }
 
         var secretId = _settings.CloneCurrent().Cloud.Endpoints.First(item => item.Id == endpoint.Id).SecretId;
         await _secrets.DeleteSecretAsync(secretId).ConfigureAwait(true);
         _keyed.Remove(endpoint.Id);
         Mutate(cloud =>
         {
-            if (cloud.ActiveEndpointId == change.Id)
-                Deactivate(cloud);
-            cloud.Endpoints.RemoveAll(item => item.Id == change.Id);
+            if (cloud.TranslatorEndpointId == deleteId)
+                cloud.TranslatorEndpointId = "";
+            if (cloud.CleanerEndpointId == deleteId)
+                cloud.CleanerEndpointId = "";
+            cloud.Endpoints.RemoveAll(item => item.Id == deleteId);
         });
-    }
-
-    private static void Deactivate(CloudSettings cloud)
-    {
-        cloud.ActiveEndpointId = "";
-        cloud.Translate = false;
-        cloud.Clean = false;
     }
 
     /// <summary>Changes the cloud settings and brings everything this page keeps of them up to date.</summary>
@@ -586,17 +639,32 @@ public sealed partial class SettingsViewModel : ObservableObject
         var model = _settings.CloneCurrent();
         change(model.Cloud);
         _settings.Replace(model);
-        CloudTranslate = model.Cloud.Translate;
-        CloudClean = model.Cloud.Clean;
+        SyncCloudSnapshot(model.Cloud);
         CloudInvalid = false;
-        Endpoints = EntriesOf(model.Cloud);
-        OnPropertyChanged(nameof(ActiveEndpoint));
+    }
+
+    private void SyncCloudSnapshot(CloudSettings cloud)
+    {
+        TranslatorEndpointId = cloud.TranslatorEndpointId;
+        CleanerEndpointId = cloud.CleanerEndpointId;
+        Endpoints = EntriesOf(cloud);
     }
 
     private IReadOnlyList<EndpointEntry> EntriesOf(CloudSettings cloud) =>
     [
-        .. cloud.Endpoints.Select(endpoint => new EndpointEntry(
-            endpoint.Id, endpoint.Name, endpoint.BaseUrl, endpoint.Model, _keyed.Contains(endpoint.Id), endpoint.Id == cloud.ActiveEndpointId))
+        .. cloud.Endpoints.Select(endpoint =>
+        {
+            var hasKey = _keyed.Contains(endpoint.Id);
+            return new EndpointEntry(
+                endpoint.Id,
+                endpoint.Name,
+                endpoint.BaseUrl,
+                endpoint.Model,
+                hasKey,
+                IsConfigured(endpoint.BaseUrl, endpoint.Model, hasKey),
+                endpoint.Id == cloud.TranslatorEndpointId,
+                endpoint.Id == cloud.CleanerEndpointId);
+        })
     ];
 
     private static bool IsUsableUrl(string baseUrl)
@@ -613,14 +681,11 @@ public sealed partial class SettingsViewModel : ObservableObject
     }
 
     /// <summary>The key is checked for presence only; a stored key is validated when it is used.</summary>
-    private static bool IsConfigured(EndpointEntry? endpoint)
+    private static bool IsConfigured(string baseUrl, string model, bool hasKey)
     {
-        if (endpoint is null)
-            return false;
-
         try
         {
-            CloudRoute.Create(endpoint.BaseUrl, endpoint.Model, endpoint.HasKey ? "key" : "");
+            CloudRoute.Create(baseUrl, model, hasKey ? "key" : "");
             return true;
         }
         catch (ArgumentException)
@@ -647,8 +712,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             if (!string.IsNullOrEmpty(await _secrets.GetSecretAsync(endpoint.SecretId).ConfigureAwait(true)))
                 _keyed.Add(endpoint.Id);
         }
-        Endpoints = EntriesOf(_settings.CloneCurrent().Cloud);
-        OnPropertyChanged(nameof(ActiveEndpoint));
+        SyncCloudSnapshot(_settings.CloneCurrent().Cloud);
 
         var saved = _settings.CloneCurrent().Composer.Microphone;
         var devices = await Task.Run(() => _microphone.InputDevices()).ConfigureAwait(true);
@@ -658,12 +722,14 @@ public sealed partial class SettingsViewModel : ObservableObject
         _devicesLoaded = true;
         _loading = false;
 
+        var installed = await Task.Run(() => _models.ListInstalled()).ConfigureAwait(true);
+        ModelCoordinator.SyncInstalledSnapshot(installed);
         var current = ModelCatalog.All.Select(model => model.Id).ToHashSet();
-        var legacy = await Task.Run(() => _models.ListInstalled().Where(model => !current.Contains(model.Id)).ToList())
-            .ConfigureAwait(true);
+        var legacy = installed.Where(model => !current.Contains(model.Id)).ToList();
         _legacyIds = legacy.Select(model => model.Id).ToList();
         LegacyBytes = legacy.Sum(model => model.SizeBytes);
         LegacyCount = legacy.Count;
+        ModelsChanged?.Invoke();
     }
 
     [RelayCommand]

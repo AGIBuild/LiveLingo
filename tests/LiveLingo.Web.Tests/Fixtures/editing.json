@@ -25,12 +25,12 @@
   },
   "output": {
     "value": "clean",
-    "pill": "中文 · 整理",
+    "pill": "整理原话",
     "globe": false,
     "menu": [
       {
         "id": "clean",
-        "label": "保持中文（整理）",
+        "label": "整理原话（保持原语言）",
         "checked": true,
         "enabled": true
       },
@@ -47,7 +47,7 @@
         "enabled": true
       }
     ],
-    "swap": "语言：中文 → English\u3000⇄ 互换",
+    "swap": "翻译目标改为 中文",
     "note": null
   },
   "banner": null,
@@ -55,14 +55,15 @@
     "mode": "edit",
     "text": "先检查缓存。然后更新索引。",
     "sourceRev": 1,
-    "editable": true,
+    "editable": false,
     "label": "原话",
     "routeChip": false,
     "hint": false,
     "lines": [],
     "resume": null,
     "remembered": null,
-    "canClear": true
+    "canClear": true,
+    "collapsible": false
   },
   "result": {
     "visible": true,
@@ -98,7 +99,8 @@
       }
     ],
     "editText": "C:先检查缓存。",
-    "rememberCorrection": null
+    "rememberCorrection": null,
+    "document": null
   },
   "footer": {
     "mic": {
@@ -112,10 +114,10 @@
     },
     "model": null,
     "download": null,
-    "copyEnabled": true,
+    "copyEnabled": false,
     "commit": {
       "label": "写入 Slack",
-      "enabled": true,
+      "enabled": false,
       "armed": false,
       "written": false,
       "aria": "写入"

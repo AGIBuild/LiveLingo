@@ -1,4 +1,5 @@
 using LiveLingo.Core.Inference;
+using LiveLingo.Core.Dictation;
 
 namespace LiveLingo.Core.Translation;
 
@@ -21,9 +22,24 @@ public sealed class LlmTranslator(IChatCompletionClient client) : ITranslator
     {
         var protectedText = ProtectedText.Encode(request.Source);
         var prompt = TranslationPrompt.Build(request with { Source = protectedText.Source });
-        var maxTokens = Math.Min(MaxOutputTokens, protectedText.Source.Length * 2 + 128);
+        var maxTokens = request.FinalDocument
+            ? Math.Max(MaxOutputTokens, protectedText.Source.Length * 4 + 256)
+            : Math.Min(MaxOutputTokens, protectedText.Source.Length * 2 + 128);
 
         var completion = await client.CompleteAsync(new ChatRequest(prompt, maxTokens, 0, Sampling), ct).ConfigureAwait(false);
-        return new TranslatedText(protectedText.Restore(completion.Text), completion.FirstVisibleMs, completion.TotalMs);
+        if (string.IsNullOrWhiteSpace(completion.Text))
+            throw new InvalidDataException("Empty translation response.");
+        var translated = protectedText.Restore(completion.Text);
+        // Same-language speech editing needs the same fidelity boundary as polish, not just literal restoration.
+        // Only Chinese-dominant input is checked: English -> Chinese is translation, not a lexical cleanup.
+        var chinese = protectedText.Source.Count(c => c is >= '\u4e00' and <= '\u9fff');
+        if (request.FinalDocument && request.Target == TargetLanguage.Chinese && chinese > 0
+            && chinese * 2 >= protectedText.Source.Count(char.IsLetter))
+        {
+            var gate = FidelityGate.Check(request.Source, translated, request.Terms.Select(t => t.Target).ToArray(), allowParagraphs: true);
+            if (!gate.Accepted)
+                throw new InvalidDataException("Final same-language translation refused: " + gate.Rejection?.Reason);
+        }
+        return new TranslatedText(translated, completion.FirstVisibleMs, completion.TotalMs);
     }
 }

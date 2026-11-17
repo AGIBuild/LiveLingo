@@ -227,7 +227,8 @@ public sealed class CleanupScheduler : IAsyncDisposable
     private ((JobTicket Ticket, CleanupRequest Request)? Next, TimeSpan? Wait) Find(Draft draft, DateTimeOffset now)
     {
         // The polish of the whole dictation reads the original text and goes first; units it could not polish are cleaned after it.
-        if (draft.Snapshot is not null || draft.Output != OutputKind.Clean || draft.Polishing)
+        if (draft.Snapshot is not null || draft.Output != OutputKind.Clean || draft.Polishing || draft.DocumentEditing
+            || (draft.DocumentMode && !draft.Recording))
             return (null, null);
 
         var units = draft.Units;

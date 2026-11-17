@@ -1,3 +1,5 @@
+using LiveLingo.Core.Inference;
+
 namespace LiveLingo.Core.Models;
 
 /// <summary>What an installable artifact is used for.</summary>
@@ -33,6 +35,33 @@ public record ModelAsset(
     long SizeBytes,
     string Sha256);
 
+/// <summary>
+/// Quality rank, relative ratings (1..3) and empirical resident memory footprint of a user-selectable model
+/// within its <see cref="ModelStage"/>. <paramref name="Rank"/> 1 is the highest-quality option in that stage.
+/// </summary>
+/// <param name="Stage">The user-facing pipeline stage this model serves.</param>
+/// <param name="Rank">1-based quality rank within <paramref name="Stage"/> (1 = highest quality, ascending = lighter).</param>
+/// <param name="QualityStars">Relative quality score from 1 to 3.</param>
+/// <param name="SpeedStars">Relative speed score from 1 to 3.</param>
+/// <param name="ResidentBytes">
+/// Empirical steady-state resident memory in bytes after warm inference at <c>ctx-size = 4096</c>
+/// (for <see cref="ModelStage.Speech"/>, includes the companion live streaming recognizer and ONNX runtime).
+/// </param>
+/// <param name="RequiresGpu">
+/// True when CPU-only inference exceeds interactive latency bounds due to memory-bandwidth limits (&gt; 4 GB quantized weights).
+/// </param>
+/// <param name="UtilityScore">
+/// Evidence-weighted quality contribution used by <see cref="ModelAdvisor"/> when optimizing multi-stage residency budgets.
+/// </param>
+public sealed record ModelProfile(
+    ModelStage Stage,
+    int Rank,
+    int QualityStars,
+    int SpeedStars,
+    long ResidentBytes,
+    bool RequiresGpu,
+    int UtilityScore);
+
 public record ModelDescriptor(
     string Id,
     string DisplayName,
@@ -57,4 +86,7 @@ public record ModelDescriptor(
     /// (its single top-level directory is flattened) and then removed.
     /// </summary>
     public ModelArchiveType ArchiveType { get; init; } = ModelArchiveType.None;
+
+    /// <summary>Capability and ranking metadata when this descriptor is a user-selectable stage option; null for fixed runtimes and detectors.</summary>
+    public ModelProfile? Profile { get; init; }
 }

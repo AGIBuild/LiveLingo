@@ -1,4 +1,5 @@
 using LiveLingo.Core.Inference;
+using LiveLingo.Core.Drafting;
 using LiveLingo.Desktop.Composer;
 
 namespace LiveLingo.Desktop.Web;
@@ -38,7 +39,7 @@ internal sealed record RememberedState(string Text, string Action);
 /// <param name="Remembered">Said together with the hint of an empty composer that stands on a remembered choice; null otherwise.</param>
 internal sealed record SourceState(
     string Mode, string Text, int SourceRev, bool Editable, string Label, bool RouteChip, bool Hint, IReadOnlyList<SourceLineState> Lines,
-    ResumeState? Resume, RememberedState? Remembered, bool CanClear);
+    ResumeState? Resume, RememberedState? Remembered, bool CanClear, bool Collapsible = false);
 
 internal sealed record RowState(
     int I, string State, string Text, string Note, string Time, bool Warn, bool Owned, bool Editing,
@@ -46,10 +47,15 @@ internal sealed record RowState(
 
 internal sealed record CorrectionHintState(string Spoken, string Canonical, string Label);
 
+internal sealed record DocumentView(
+    string State, string Text, string Notice, bool Editing, bool CanEdit, bool NeedsChoice, bool Owned, bool CanClean,
+    bool CanAcceptPreview);
+
 /// <param name="EditText">The page takes it once, when a sentence starts being edited.</param>
 /// <param name="RememberCorrection">Offered inside the active row editor when the user fixed a concise misrecognition.</param>
 internal sealed record ResultState(
-    bool Visible, string Label, IReadOnlyList<RowState> Rows, string EditText, CorrectionHintState? RememberCorrection = null);
+    bool Visible, string Label, IReadOnlyList<RowState> Rows, string EditText, CorrectionHintState? RememberCorrection = null,
+    DocumentView? Document = null);
 
 internal sealed record MicState(bool Recording, string Aria, bool Enabled);
 
@@ -147,7 +153,9 @@ internal sealed record ComposerViewState(
                 empty && vm.Remembered is { } remembered
                     ? new RememberedState(texts.RememberedNote(remembered, vm.Output, vm.TargetLanguage), texts.RestoreDefaults)
                     : null,
-                !vm.IsClearing && !vm.IsWritten && (vm.SourceText.Length > 0 || vm.HasTimeline || vm.IsListening || vm.IsStartingListening || vm.IsTranscribing)),
+                !vm.IsClearing && !vm.IsWritten && (vm.SourceText.Length > 0 || vm.HasTimeline || vm.IsListening || vm.IsStartingListening || vm.IsTranscribing),
+                vm.DocumentMode && !vm.IsWide && !live && vm.Output != ComposerOutput.Original &&
+                    vm.FinalState == DocumentState.Ready),
             Result: new ResultState(
                 hasResult,
                 vm.IsListening && vm.Output == ComposerOutput.Clean
@@ -157,23 +165,32 @@ internal sealed record ComposerViewState(
                 vm.EditText,
                 vm.SuggestedCorrection is { } corr
                     ? new CorrectionHintState(corr.Spoken, corr.Canonical, texts.RememberCorrectionLabel(corr))
+                    : null,
+                vm.DocumentMode && !live && hasResult
+                    ? new DocumentView(vm.FinalState.ToString().ToLowerInvariant(), vm.FinalText,
+                        texts.DocumentNotice(vm.FinalState, vm.FinalIsOwned, vm.Output == ComposerOutput.Translate), vm.IsEditingDocument,
+                        vm.CanEditDocument, vm.NeedsFinalChoice, vm.FinalIsOwned,
+                        vm.Output == ComposerOutput.Translate && vm.Outputs.Contains(ComposerOutput.Clean),
+                        vm.CanAcceptPreview)
                     : null),
             Footer: new FooterState(
                 new MicState(vm.IsListening, vm.IsListening ? texts.MicStop : texts.MicStart,
                     !vm.IsClearing),
                 new StatusState(
-                    texts.Status(vm.StatusInfo),
+                    vm.DocumentMode && !live && vm.Output != ComposerOutput.Original && !empty && !vm.IsWritten
+                        ? texts.DocumentStatus(vm.FinalState, vm.IsEditingDocument, armed)
+                        : texts.Status(vm.StatusInfo),
                     !vm.IsListening && (vm.Status == ComposerStatus.Failed ||
                         vm.Output == ComposerOutput.Clean && vm.StatusInfo.PolishOutcome == LiveLingo.Core.Drafting.PolishOutcome.KeptPreview)
                         ? "warn" : "muted"),
                 ModelLineOf(vm, texts, models),
                 vm.DownloadProgress is { } download && vm.Banner.Kind != BannerKind.Downloading
-                    ? new DownloadState(texts.FooterDownload(download), (int)Math.Round(download))
+                    ? new DownloadState(texts.FooterDownload(download, vm.DownloadingModelName), (int)Math.Round(download))
                     : null,
                 vm.CanCopy,
                 new CommitState(
                     texts.CommitLabel(vm.IsWritten, armed, vm.HasTarget, targetName),
-                    !vm.IsWritten && (armed || vm.CanWrite || vm.Status == ComposerStatus.Working),
+                    !vm.IsWritten && !vm.IsEditing && (armed || vm.CanWrite || vm.Status == ComposerStatus.Working),
                     armed,
                     vm.IsWritten,
                     texts.CommitAria(armed, vm.HasTarget))),
