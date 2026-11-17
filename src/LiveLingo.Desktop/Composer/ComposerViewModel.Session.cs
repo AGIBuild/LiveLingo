@@ -95,6 +95,7 @@ public sealed partial class ComposerViewModel
             if (_startingVoice is { IsCompleted: false } starting)
                 await starting.ConfigureAwait(true);
             await StopListeningAsync().ConfigureAwait(true);
+            CancelEdit();
             EditingIndex = -1;
             _committed = null;
             _segments = [];
@@ -111,7 +112,11 @@ public sealed partial class ComposerViewModel
             }
 
             var hasTarget = HasTarget;
-            _session.Mutate(draft => draft.Reset(hasTarget));
+            _session.Mutate(draft =>
+            {
+                draft.Reset(hasTarget);
+                draft.DocumentMode = _documentComposer;
+            });
             ApplyDraftOutput();
             Banner = BannerState.None;
             UpdateEditable();

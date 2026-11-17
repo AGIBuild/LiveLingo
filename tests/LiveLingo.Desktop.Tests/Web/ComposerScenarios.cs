@@ -54,6 +54,9 @@ internal static class ComposerScenarios
             return Task.CompletedTask;
         }),
         ["translate-ready"] = () => Ready(Chat, ComposerOutput.Translate),
+        ["document-ready"] = () => Document(),
+        ["document-editing"] = () => Document(editing: true),
+        ["document-failed"] = () => Document(failed: true),
         ["model-local"] = () => Ready(Chat, ComposerOutput.Translate, models: Models(Speech(), Cleaner(), Translator("Hy-MT2-1.8B", confirmed: true))),
         ["model-cloud"] = () => Ready(Chat, ComposerOutput.Translate, models: Models(
             Speech(), new ModelUse(ModelStage.Translator, "gpt-4o-mini-2024-07-18", Cloud: true, Confirmed: true, Endpoint: "Foundry · 东亚"))),
@@ -144,6 +147,21 @@ internal static class ComposerScenarios
 
     public static ComposerViewState State(Harness h, RecentDrafts? recent = null, ModelReport? models = null) =>
         Normalize(ComposerViewState.From(h.Vm, Texts.Chinese(), recent ?? new RecentDrafts(), sourceRev: 1, models));
+
+    private static async Task<ComposerViewState> Document(bool editing = false, bool failed = false)
+    {
+        await using var h = new Harness(documentMode: true);
+        if (failed)
+            h.Translator.Handler = (_, _) => Task.FromException<TranslatedText>(new InvalidDataException("incomplete"));
+        h.Vm.SourceText = Chat;
+        await Wait.Until(() => h.Vm.Status is ComposerStatus.Ready or ComposerStatus.Failed);
+        if (editing)
+        {
+            h.Vm.EditDocumentCommand.Execute(null);
+            h.Vm.EditText = "先检查缓存，再更新索引。\n保持术语 API 不变。";
+        }
+        return State(h);
+    }
 
     // The uses are reported in order, like the providers do: the last of a stage is the latest, the confirmed ones are what was really loaded.
     private static ModelReport Models(params ModelUse[] uses) => new(

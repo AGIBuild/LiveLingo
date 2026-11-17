@@ -145,7 +145,7 @@ public static partial class TextUnits
         return new SourceUnit(body, first || leading.Contains('\n') ? leading : "", endsLine ? trailing : "", complete);
     }
 
-    private static bool NeedsSpace(string left, string right) =>
+    internal static bool NeedsSpace(string left, string right) =>
         left.Length > 0 && right.Length > 0 && IsAsciiGlyph(left[^1]) && IsAsciiGlyph(right[0]);
 
     private static bool IsAsciiGlyph(char c) => c is > ' ' and < (char)127;

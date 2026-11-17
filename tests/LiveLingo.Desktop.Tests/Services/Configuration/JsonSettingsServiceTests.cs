@@ -42,21 +42,53 @@ public class JsonSettingsServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task CloudEndpoints_AreSavedAndLoadedWithTheEnabledOne()
+    public async Task CloudEndpoints_AreSavedAndLoadedWithPerStageAssignments()
     {
         var svc = new JsonSettingsService(_settingsPath);
         await svc.LoadAsync(TestContext.Current.CancellationToken);
-        svc.Replace(Tests.Settings.CloudTestData.WithEndpoints("other", translate: true));
+        svc.Replace(Tests.Settings.CloudTestData.WithEndpoints(translatorId: "other", cleanerId: "main"));
 
         var svc2 = new JsonSettingsService(_settingsPath);
         await svc2.LoadAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(["main", "other"], svc2.Current.Cloud.Endpoints.Select(endpoint => endpoint.Id));
-        Assert.Equal("other", svc2.Current.Cloud.Active?.Id);
+        Assert.Equal("other", svc2.Current.Cloud.TranslatorEndpoint?.Id);
+        Assert.Equal("main", svc2.Current.Cloud.CleanerEndpoint?.Id);
         Assert.True(svc2.Current.Cloud.Translate);
+        Assert.True(svc2.Current.Cloud.Clean);
 
         using var document = System.Text.Json.JsonDocument.Parse(await File.ReadAllTextAsync(_settingsPath, TestContext.Current.CancellationToken));
         Assert.False(document.RootElement.GetProperty("cloud").TryGetProperty("baseUrl", out _));
+        Assert.False(document.RootElement.GetProperty("cloud").TryGetProperty("activeEndpointId", out _));
+    }
+
+    [Fact]
+    public async Task SharedActiveEndpointAndBooleanSwitches_MigrateToPerStageEndpointIds_AndDropLegacyFields()
+    {
+        await File.WriteAllTextAsync(_settingsPath, """
+            { "schemaVersion": 3,
+              "cloud": {
+                "endpoints": [
+                  { "id": "main", "name": "Main", "baseUrl": "https://api.example.com/v1", "model": "m", "secretId": "cloud-key-main" },
+                  { "id": "other", "name": "Other", "baseUrl": "https://other.example.com/v1", "model": "o", "secretId": "cloud-key-other" }
+                ],
+                "activeEndpointId": "other",
+                "translate": true,
+                "clean": false
+              } }
+            """, TestContext.Current.CancellationToken);
+        var svc = new JsonSettingsService(_settingsPath);
+
+        await svc.LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal("other", svc.Current.Cloud.TranslatorEndpointId);
+        Assert.Equal("", svc.Current.Cloud.CleanerEndpointId);
+        Assert.True(svc.Current.Cloud.Translate);
+        Assert.False(svc.Current.Cloud.Clean);
+
+        var persisted = await File.ReadAllTextAsync(_settingsPath, TestContext.Current.CancellationToken);
+        Assert.DoesNotContain("activeEndpointId", persisted);
+        Assert.Contains("\"translatorEndpointId\": \"other\"", persisted);
     }
 
     [Fact]
@@ -74,7 +106,8 @@ public class JsonSettingsServiceTests : IDisposable
         Assert.Equal("https://api.example.com/v1", endpoint.BaseUrl);
         Assert.Equal("gpt-deploy", endpoint.Model);
         Assert.Equal(CloudSettings.LegacyApiKeySecretId, endpoint.SecretId);
-        Assert.Equal(endpoint.Id, svc.Current.Cloud.ActiveEndpointId);
+        Assert.Equal(endpoint.Id, svc.Current.Cloud.TranslatorEndpointId);
+        Assert.Equal("", svc.Current.Cloud.CleanerEndpointId);
         Assert.True(svc.Current.Cloud.Translate);
         Assert.Equal("Alt+X", svc.Current.Hotkeys.Summon);
 
@@ -84,6 +117,7 @@ public class JsonSettingsServiceTests : IDisposable
         var again = new JsonSettingsService(_settingsPath);
         await again.LoadAsync(TestContext.Current.CancellationToken);
         Assert.Equal(endpoint.Id, Assert.Single(again.Current.Cloud.Endpoints).Id);
+        Assert.Equal(endpoint.Id, again.Current.Cloud.TranslatorEndpointId);
     }
 
     [Fact]
@@ -97,8 +131,9 @@ public class JsonSettingsServiceTests : IDisposable
         await svc.LoadAsync(TestContext.Current.CancellationToken);
 
         Assert.Single(svc.Current.Cloud.Endpoints);
-        Assert.Equal("", svc.Current.Cloud.ActiveEndpointId);
-        Assert.Null(svc.Current.Cloud.Active);
+        Assert.Equal("", svc.Current.Cloud.TranslatorEndpointId);
+        Assert.Equal("", svc.Current.Cloud.CleanerEndpointId);
+        Assert.Null(svc.Current.Cloud.TranslatorEndpoint);
     }
 
     [Fact]
@@ -113,6 +148,24 @@ public class JsonSettingsServiceTests : IDisposable
 
         Assert.Empty(svc.Current.Cloud.Endpoints);
         Assert.False(svc.Current.Cloud.Translate);
+    }
+
+    [Theory]
+    [InlineData("Quality", "hy-mt2-7b-q4km")]
+    [InlineData("Fast", "hy-mt2-1.8b-q4km")]
+    public async Task EarlierTranslatorTier_MigratesToExplicitStageModels_AndDropsTheLegacyField(string legacyTier, string expectedTranslator)
+    {
+        await File.WriteAllTextAsync(_settingsPath, $$"""
+            { "schemaVersion": 3, "composer": { "translatorTier": "{{legacyTier}}" } }
+            """, TestContext.Current.CancellationToken);
+        var svc = new JsonSettingsService(_settingsPath);
+
+        await svc.LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal("qwen3-asr-0.6b-int8", svc.Current.Composer.SpeechModel);
+        Assert.Equal("qwen3.5-4b-q4km", svc.Current.Composer.CleanerModel);
+        Assert.Equal(expectedTranslator, svc.Current.Composer.TranslatorModel);
+        Assert.DoesNotContain("translatorTier", await File.ReadAllTextAsync(_settingsPath, TestContext.Current.CancellationToken));
     }
 
     [Fact]

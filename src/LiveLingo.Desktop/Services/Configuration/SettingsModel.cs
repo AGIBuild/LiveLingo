@@ -31,42 +31,74 @@ public partial class SettingsModel : ObservableObject
 
 /// <summary>
 /// Optional cloud models (Microsoft Foundry or any OpenAI-compatible service). Off by default: nothing is sent
-/// anywhere until the user switches a feature on. Only text is sent, never audio. The user may keep any number of
-/// endpoints, at most one of them enabled (<see cref="ActiveEndpointId"/>); the steps that are switched on use that one.
+/// anywhere until the user explicitly selects and authorizes a cloud endpoint for cleanup or translation. Only text is
+/// sent, never audio. Cleanup and translation may independently use local models or any saved cloud endpoint.
 /// </summary>
 public partial class CloudSettings : ObservableObject
 {
     /// <summary>The secret id the single endpoint of earlier versions kept its API key under; its migrated endpoint keeps using it.</summary>
     public const string LegacyApiKeySecretId = "cloud-api-key";
 
-    [ObservableProperty] private List<CloudEndpoint> _endpoints = [];
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(TranslatorEndpoint), nameof(CleanerEndpoint))]
+    private List<CloudEndpoint> _endpoints = [];
 
-    /// <summary>The id of the enabled endpoint; empty when none is enabled, which keeps everything local.</summary>
-    [ObservableProperty] private string _activeEndpointId = "";
+    /// <summary>The endpoint ID selected for translation, or empty when translation runs on the local model.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Translate), nameof(TranslatorEndpoint))]
+    private string _translatorEndpointId = "";
 
-    [ObservableProperty] private bool _translate;
-    [ObservableProperty] private bool _clean;
+    /// <summary>The endpoint ID selected for cleanup and whole-text polish, or empty when cleanup runs on the local model.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Clean), nameof(CleanerEndpoint))]
+    private string _cleanerEndpointId = "";
 
-    /// <summary>The address of the one endpoint earlier versions had. Read only to migrate it, never written (see <see cref="MigrateLegacy"/>).</summary>
+    /// <summary>True when translation is routed to a cloud endpoint.</summary>
+    [JsonIgnore]
+    public bool Translate => !string.IsNullOrEmpty(TranslatorEndpointId);
+
+    /// <summary>True when cleanup and polish are routed to a cloud endpoint.</summary>
+    [JsonIgnore]
+    public bool Clean => !string.IsNullOrEmpty(CleanerEndpointId);
+
+    /// <summary>The cloud endpoint currently assigned to translation, or null when translation is local.</summary>
+    [JsonIgnore]
+    public CloudEndpoint? TranslatorEndpoint => Endpoints.FirstOrDefault(endpoint => endpoint.Id == TranslatorEndpointId);
+
+    /// <summary>The cloud endpoint currently assigned to cleanup, or null when cleanup is local.</summary>
+    [JsonIgnore]
+    public CloudEndpoint? CleanerEndpoint => Endpoints.FirstOrDefault(endpoint => endpoint.Id == CleanerEndpointId);
+
+    /// <summary>Legacy fields from earlier schema-3 revisions; read only to migrate seamlessly, never written.</summary>
     [JsonPropertyName("baseUrl"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? LegacyBaseUrl { get; set; }
 
     [JsonPropertyName("model"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? LegacyModel { get; set; }
 
-    /// <summary>The enabled endpoint, or null when none is.</summary>
-    [JsonIgnore]
-    public CloudEndpoint? Active => Endpoints.FirstOrDefault(endpoint => endpoint.Id == ActiveEndpointId);
+    [JsonPropertyName("activeEndpointId"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? LegacyActiveEndpointId { get; set; }
+
+    [JsonPropertyName("translate"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? LegacyTranslate { get; set; }
+
+    [JsonPropertyName("clean"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? LegacyClean { get; set; }
 
     /// <summary>
-    /// Turns the single address and model of earlier versions into an endpoint named "Default" that keeps its API key.
-    /// It is enabled only if a cloud step was on, so a migration never changes where text goes. Returns true when
-    /// something was converted and the settings must be saved.
+    /// Migrates both the earliest single-endpoint fields (<c>baseUrl</c>/<c>model</c>) and the shared-active-endpoint
+    /// fields (<c>activeEndpointId</c> + boolean <c>translate</c>/<c>clean</c>) into explicit per-stage endpoint bindings
+    /// without altering where any step currently sends text.
     /// </summary>
     public bool MigrateLegacy()
     {
-        if (LegacyBaseUrl is null && LegacyModel is null)
+        if (LegacyBaseUrl is null && LegacyModel is null && LegacyActiveEndpointId is null
+            && LegacyTranslate is null && LegacyClean is null)
+        {
             return false;
+        }
+
+        var activeId = (LegacyActiveEndpointId ?? "").Trim();
 
         if (Endpoints.Count == 0 && !string.IsNullOrWhiteSpace(LegacyBaseUrl))
         {
@@ -79,28 +111,40 @@ public partial class CloudSettings : ObservableObject
                 SecretId = LegacyApiKeySecretId
             };
             Endpoints = [endpoint];
-            ActiveEndpointId = Translate || Clean ? endpoint.Id : "";
+            if (string.IsNullOrEmpty(activeId))
+                activeId = endpoint.Id;
         }
 
-        if (Active is null)
+        if (string.IsNullOrEmpty(TranslatorEndpointId) && LegacyTranslate == true
+            && !string.IsNullOrEmpty(activeId) && Endpoints.Any(endpoint => endpoint.Id == activeId))
         {
-            Translate = false;
-            Clean = false;
+            TranslatorEndpointId = activeId;
+        }
+
+        if (string.IsNullOrEmpty(CleanerEndpointId) && LegacyClean == true
+            && !string.IsNullOrEmpty(activeId) && Endpoints.Any(endpoint => endpoint.Id == activeId))
+        {
+            CleanerEndpointId = activeId;
         }
 
         LegacyBaseUrl = null;
         LegacyModel = null;
+        LegacyActiveEndpointId = null;
+        LegacyTranslate = null;
+        LegacyClean = null;
         return true;
     }
 
     public CloudSettings DeepClone() => new()
     {
         Endpoints = [.. Endpoints.Select(endpoint => endpoint.DeepClone())],
-        ActiveEndpointId = ActiveEndpointId,
-        Translate = Translate,
-        Clean = Clean,
+        TranslatorEndpointId = TranslatorEndpointId,
+        CleanerEndpointId = CleanerEndpointId,
         LegacyBaseUrl = LegacyBaseUrl,
-        LegacyModel = LegacyModel
+        LegacyModel = LegacyModel,
+        LegacyActiveEndpointId = LegacyActiveEndpointId,
+        LegacyTranslate = LegacyTranslate,
+        LegacyClean = LegacyClean
     };
 }
 
@@ -127,8 +171,18 @@ public partial class HotkeySettings : ObservableObject
 
 public partial class ComposerSettings : ObservableObject
 {
-    /// <summary>Name of a <see cref="LiveLingo.Core.Models.TranslatorTier"/>; the fast tier suits 16 GB machines.</summary>
-    [ObservableProperty] private string _translatorTier = nameof(LiveLingo.Core.Models.TranslatorTier.Fast);
+    /// <summary>Selected speech second-pass model ID (<see cref="LiveLingo.Core.Models.ModelCatalog.SpeechModels"/>), or empty to use hardware Best Match.</summary>
+    [ObservableProperty] private string _speechModel = "";
+
+    /// <summary>Selected cleanup/polish model ID (<see cref="LiveLingo.Core.Models.ModelCatalog.CleanerModels"/>), or empty to use hardware Best Match.</summary>
+    [ObservableProperty] private string _cleanerModel = "";
+
+    /// <summary>Selected translation model ID (<see cref="LiveLingo.Core.Models.ModelCatalog.TranslatorModels"/>), or empty to use hardware Best Match.</summary>
+    [ObservableProperty] private string _translatorModel = "";
+
+    /// <summary>Earlier schema-3 translation tier ("Fast" / "Quality"); read only to migrate existing files without forcing unexpected downloads.</summary>
+    [JsonPropertyName("translatorTier"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? LegacyTranslatorTier { get; set; }
 
     /// <summary>The user's terms, one per line (see <see cref="LiveLingo.Core.Translation.Glossary"/>).</summary>
     [ObservableProperty] private string _glossary = "";
@@ -181,6 +235,37 @@ public partial class ComposerSettings : ObservableObject
     public LiveLingo.Core.Translation.Glossary EffectiveGlossary() =>
         LiveLingo.Core.Translation.Glossary.Parse(Glossary, BuiltInGlossary);
 
+    public LiveLingo.Core.Models.ModelSelection ResolveSelection(LiveLingo.Core.Models.HardwareProfile hardware) =>
+        LiveLingo.Core.Models.ModelAdvisor.Resolve(SpeechModel, CleanerModel, TranslatorModel, hardware);
+
+    /// <summary>
+    /// Converts the earlier single <c>translatorTier</c> field into explicit stage model IDs matching what that version ran,
+    /// so upgrading never triggers an unconsented multi-gigabyte model swap.
+    /// </summary>
+    public bool MigrateLegacy()
+    {
+        if (LegacyTranslatorTier is null)
+            return false;
+
+        if (string.IsNullOrWhiteSpace(SpeechModel))
+            SpeechModel = LiveLingo.Core.Models.ModelCatalog.SpeechSecondPass.Id;
+        if (string.IsNullOrWhiteSpace(CleanerModel))
+            CleanerModel = LiveLingo.Core.Models.ModelCatalog.Cleaner.Id;
+        if (string.IsNullOrWhiteSpace(TranslatorModel))
+        {
+            var quality = string.Equals(
+                LegacyTranslatorTier.Trim(),
+                nameof(LiveLingo.Core.Models.TranslatorTier.Quality),
+                StringComparison.OrdinalIgnoreCase);
+            TranslatorModel = quality
+                ? LiveLingo.Core.Models.ModelCatalog.TranslatorQuality.Id
+                : LiveLingo.Core.Models.ModelCatalog.TranslatorFast.Id;
+        }
+
+        LegacyTranslatorTier = null;
+        return true;
+    }
+
     public ComposerSettings DeepClone() => new()
     {
         CleanupEnabled = CleanupEnabled,
@@ -189,7 +274,10 @@ public partial class ComposerSettings : ObservableObject
         PreloadSpeech = PreloadSpeech,
         RememberChoices = RememberChoices,
         PolishPrompt = PolishPrompt,
-        TranslatorTier = TranslatorTier,
+        SpeechModel = SpeechModel,
+        CleanerModel = CleanerModel,
+        TranslatorModel = TranslatorModel,
+        LegacyTranslatorTier = LegacyTranslatorTier,
         Glossary = Glossary,
         BuiltInGlossary = BuiltInGlossary,
         CommitKey = CommitKey,

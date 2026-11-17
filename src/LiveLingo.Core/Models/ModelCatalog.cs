@@ -1,3 +1,5 @@
+using LiveLingo.Core.Inference;
+
 namespace LiveLingo.Core.Models;
 
 public enum TranslatorTier
@@ -14,27 +16,13 @@ public static class ModelCatalog
 {
     public const string LlamaRuntimeId = "llama-cpp-b11980";
 
+    private const long MiB = 1024L * 1024;
     private const string SherpaRelease = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/";
     private const string SpeechLiveArchive = "sherpa-onnx-x-asr-480ms-streaming-zipformer-transducer-zh-en-punct-int8-2026-06-05";
     private const string SpeechSecondPassArchive = "sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25";
+    private const string SpeechFastArchive = "sherpa-onnx-x-asr-zipformer-transducer-zh-en-punct-int8-2026-06-03";
 
     private const string LlamaRelease = "https://github.com/ggml-org/llama.cpp/releases/download/b11980/";
-
-    public static readonly ModelDescriptor TranslatorFast = new(
-        "hy-mt2-1.8b-q4km",
-        "Hy-MT2 1.8B (fast translation)",
-        ModelType.Translation,
-        "Apache-2.0",
-        [
-            new ModelAsset(
-                "Hy-MT2-1.8B-Q4_K_M.gguf",
-                "https://huggingface.co/tencent/Hy-MT2-1.8B-GGUF/resolve/a0c709d9fac510f2c807aa3af52872340dc37a4a/Hy-MT2-1.8B-Q4_K_M.gguf",
-                1_133_080_448,
-                "dc5f44fcf1fa496ee7ad725982c0c8c553a4de00259b53af84c4b89fb0c06699")
-        ])
-    {
-        ShortName = "Hy-MT2-1.8B"
-    };
 
     public static readonly ModelDescriptor TranslatorQuality = new(
         "hy-mt2-7b-q4km",
@@ -49,7 +37,42 @@ public static class ModelCatalog
                 "9f96256500f3fc1ab4d64336b58f52a949a95ad7516b0c229476eef782f9f77b")
         ])
     {
-        ShortName = "Hy-MT2-7B"
+        ShortName = "Hy-MT2-7B",
+        Profile = new ModelProfile(ModelStage.Translator, Rank: 1, QualityStars: 3, SpeedStars: 2, ResidentBytes: 5_056 * MiB, RequiresGpu: true, UtilityScore: 45)
+    };
+
+    public static readonly ModelDescriptor TranslatorFast = new(
+        "hy-mt2-1.8b-q4km",
+        "Hy-MT2 1.8B (fast translation)",
+        ModelType.Translation,
+        "Apache-2.0",
+        [
+            new ModelAsset(
+                "Hy-MT2-1.8B-Q4_K_M.gguf",
+                "https://huggingface.co/tencent/Hy-MT2-1.8B-GGUF/resolve/a0c709d9fac510f2c807aa3af52872340dc37a4a/Hy-MT2-1.8B-Q4_K_M.gguf",
+                1_133_080_448,
+                "dc5f44fcf1fa496ee7ad725982c0c8c553a4de00259b53af84c4b89fb0c06699")
+        ])
+    {
+        ShortName = "Hy-MT2-1.8B",
+        Profile = new ModelProfile(ModelStage.Translator, Rank: 2, QualityStars: 2, SpeedStars: 3, ResidentBytes: 1_448 * MiB, RequiresGpu: false, UtilityScore: 25)
+    };
+
+    public static readonly ModelDescriptor CleanerQuality = new(
+        "qwen3.5-9b-q4km",
+        "Qwen3.5 9B (deep text cleanup)",
+        ModelType.PostProcessing,
+        "Apache-2.0",
+        [
+            new ModelAsset(
+                "Qwen3.5-9B-Q4_K_M.gguf",
+                "https://huggingface.co/unsloth/Qwen3.5-9B-GGUF/resolve/3885219b6810b007914f3a7950a8d1b469d598a5/Qwen3.5-9B-Q4_K_M.gguf",
+                5_680_522_464,
+                "03b74727a860a56338e042c4420bb3f04b2fec5734175f4cb9fa853daf52b7e8")
+        ])
+    {
+        ShortName = "Qwen3.5 9B",
+        Profile = new ModelProfile(ModelStage.Cleaner, Rank: 1, QualityStars: 3, SpeedStars: 1, ResidentBytes: 6_170 * MiB, RequiresGpu: true, UtilityScore: 42)
     };
 
     public static readonly ModelDescriptor Cleaner = new(
@@ -65,7 +88,25 @@ public static class ModelCatalog
                 "00fe7986ff5f6b463e62455821146049db6f9313603938a70800d1fb69ef11a4")
         ])
     {
-        ShortName = "Qwen3.5 4B"
+        ShortName = "Qwen3.5 4B",
+        Profile = new ModelProfile(ModelStage.Cleaner, Rank: 2, QualityStars: 2, SpeedStars: 2, ResidentBytes: 3_019 * MiB, RequiresGpu: false, UtilityScore: 30)
+    };
+
+    public static readonly ModelDescriptor CleanerFast = new(
+        "qwen3.5-2b-q4km",
+        "Qwen3.5 2B (light text cleanup)",
+        ModelType.PostProcessing,
+        "Apache-2.0",
+        [
+            new ModelAsset(
+                "Qwen3.5-2B-Q4_K_M.gguf",
+                "https://huggingface.co/unsloth/Qwen3.5-2B-GGUF/resolve/f6d5376be1edb4d416d56da11e5397a961aca8ae/Qwen3.5-2B-Q4_K_M.gguf",
+                1_280_835_840,
+                "aaf42c8b7c3cab2bf3d69c355048d4a0ee9973d48f16c731c0520ee914699223")
+        ])
+    {
+        ShortName = "Qwen3.5 2B",
+        Profile = new ModelProfile(ModelStage.Cleaner, Rank: 3, QualityStars: 1, SpeedStars: 3, ResidentBytes: 1_600 * MiB, RequiresGpu: false, UtilityScore: 15)
     };
 
     /// <summary>Streaming X-ASR (480 ms chunks) that produces the live text while the user speaks.</summary>
@@ -87,7 +128,7 @@ public static class ModelCatalog
         ExtractedFiles = ["encoder.int8.onnx", "decoder.onnx", "joiner.int8.onnx", "tokens.txt"]
     };
 
-    /// <summary>Qwen3-ASR 0.6B that re-decodes each closed segment for the settled text.</summary>
+    /// <summary>Qwen3-ASR 0.6B that re-decodes each closed segment for the settled text with hotword biasing.</summary>
     public static readonly ModelDescriptor SpeechSecondPass = new(
         "qwen3-asr-0.6b-int8",
         "Qwen3-ASR 0.6B (settled text)",
@@ -107,7 +148,32 @@ public static class ModelCatalog
         [
             "conv_frontend.onnx", "encoder.int8.onnx", "decoder.int8.onnx",
             "tokenizer/merges.txt", "tokenizer/tokenizer_config.json", "tokenizer/vocab.json"
-        ]
+        ],
+        Profile = new ModelProfile(ModelStage.Speech, Rank: 1, QualityStars: 3, SpeedStars: 2, ResidentBytes: 1_350 * MiB, RequiresGpu: false, UtilityScore: 30)
+    };
+
+    /// <summary>Lightweight offline X-ASR Zipformer transducer for fast, low-memory settled speech recognition.</summary>
+    public static readonly ModelDescriptor SpeechFast = new(
+        "x-asr-offline-int8",
+        "X-ASR Offline (light settled text)",
+        ModelType.SpeechToText,
+        "Apache-2.0",
+        [
+            new ModelAsset(
+                SpeechFastArchive + ".tar.bz2",
+                SherpaRelease + SpeechFastArchive + ".tar.bz2",
+                136_396_739,
+                "5d02c36d7b44e886b7c8f0d8e051f8713acab96c264bb6ef9e718be39a6a2224")
+        ])
+    {
+        ShortName = "X-ASR Offline",
+        ArchiveType = ModelArchiveType.TarBz2,
+        ExtractedFiles =
+        [
+            "encoder-epoch-99-avg-1.int8.onnx", "decoder-epoch-99-avg-1.onnx",
+            "joiner-epoch-99-avg-1.int8.onnx", "tokens.txt"
+        ],
+        Profile = new ModelProfile(ModelStage.Speech, Rank: 2, QualityStars: 2, SpeedStars: 3, ResidentBytes: 768 * MiB, RequiresGpu: false, UtilityScore: 15)
     };
 
     public static readonly ModelDescriptor SpeechVad = new(
@@ -123,11 +189,57 @@ public static class ModelCatalog
                 "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6")
         ]);
 
-    /// <summary>Everything voice dictation needs besides the cleaner and the translator.</summary>
-    public static IReadOnlyList<ModelDescriptor> Speech { get; } = [SpeechLive, SpeechSecondPass, SpeechVad];
+    /// <summary>Selectable speech recognition models, ordered strictly from highest quality (#1) to lightest.</summary>
+    public static IReadOnlyList<ModelDescriptor> SpeechModels { get; } = [SpeechSecondPass, SpeechFast];
 
-    /// <summary>What importing a recording needs: no live recognizer, since the whole file is known.</summary>
-    public static IReadOnlyList<ModelDescriptor> Transcription { get; } = [SpeechSecondPass, SpeechVad];
+    /// <summary>Selectable cleanup and polish models, ordered strictly from highest quality (#1) to lightest.</summary>
+    public static IReadOnlyList<ModelDescriptor> CleanerModels { get; } = [CleanerQuality, Cleaner, CleanerFast];
+
+    /// <summary>Selectable translation models, ordered strictly from highest quality (#1) to lightest.</summary>
+    public static IReadOnlyList<ModelDescriptor> TranslatorModels { get; } = [TranslatorQuality, TranslatorFast];
+
+    /// <summary>Every user-selectable stage option, ordered by stage and then from best quality (#1) to lightest.</summary>
+    public static IReadOnlyList<ModelDescriptor> Selectable { get; } = [.. SpeechModels, .. CleanerModels, .. TranslatorModels];
+
+    public static IReadOnlyList<ModelDescriptor> OptionsFor(ModelStage stage) => stage switch
+    {
+        ModelStage.Speech => SpeechModels,
+        ModelStage.Cleaner => CleanerModels,
+        ModelStage.Translator => TranslatorModels,
+        _ => throw new ArgumentOutOfRangeException(nameof(stage))
+    };
+
+    public static ModelDescriptor? FindOption(ModelStage stage, string? modelId) =>
+        string.IsNullOrWhiteSpace(modelId)
+            ? null
+            : OptionsFor(stage).FirstOrDefault(model => string.Equals(model.Id, modelId, StringComparison.Ordinal));
+
+    public static ModelDescriptor? FindSelectable(string? modelId) =>
+        string.IsNullOrWhiteSpace(modelId)
+            ? null
+            : Selectable.FirstOrDefault(model => string.Equals(model.Id, modelId, StringComparison.Ordinal));
+
+    /// <summary>Everything voice dictation needs for the default speech recognizer besides the cleaner and the translator.</summary>
+    public static IReadOnlyList<ModelDescriptor> Speech { get; } = SpeechFor(SpeechSecondPass);
+
+    /// <summary>What importing a recording needs for the default speech recognizer: no live recognizer, since the whole file is known.</summary>
+    public static IReadOnlyList<ModelDescriptor> Transcription { get; } = TranscriptionFor(SpeechSecondPass);
+
+    public static IReadOnlyList<ModelDescriptor> SpeechFor(ModelDescriptor secondPass) => [SpeechLive, secondPass, SpeechVad];
+
+    public static IReadOnlyList<ModelDescriptor> TranscriptionFor(ModelDescriptor secondPass) => [secondPass, SpeechVad];
+
+    public static bool IsSpeechAsset(string modelId) =>
+        modelId == SpeechLive.Id || modelId == SpeechVad.Id || SpeechModels.Any(model => model.Id == modelId);
+
+    /// <summary>All artifacts (including shared runtime or companion speech assets) required to run <paramref name="option"/> locally.</summary>
+    public static IReadOnlyList<ModelDescriptor> BundleFor(ModelDescriptor option, ModelDescriptor? llamaRuntime = null) =>
+        option.Profile?.Stage switch
+        {
+            ModelStage.Speech => SpeechFor(option),
+            ModelStage.Cleaner or ModelStage.Translator => (llamaRuntime ?? LlamaRuntimeOrNull) is { } runtime ? [runtime, option] : [option],
+            _ => [option]
+        };
 
     private static readonly ModelDescriptor LlamaMacArm64 = new(
         LlamaRuntimeId + "-osx-arm64",
@@ -182,6 +294,19 @@ public static class ModelCatalog
     public static ModelDescriptor LlamaRuntime =>
         LlamaRuntimeFor(System.Runtime.InteropServices.RuntimeInformation.RuntimeIdentifier);
 
+    public static ModelDescriptor? LlamaRuntimeOrNull =>
+        System.Runtime.InteropServices.RuntimeInformation.RuntimeIdentifier switch
+        {
+            "osx-arm64" => LlamaMacArm64,
+            "win-x64" => LlamaWinX64,
+            _ => null
+        };
+
     public static IReadOnlyList<ModelDescriptor> All { get; } =
-        [TranslatorFast, TranslatorQuality, Cleaner, SpeechLive, SpeechSecondPass, SpeechVad, LlamaMacArm64, LlamaWinX64];
+    [
+        TranslatorQuality, TranslatorFast,
+        CleanerQuality, Cleaner, CleanerFast,
+        SpeechLive, SpeechSecondPass, SpeechFast, SpeechVad,
+        LlamaMacArm64, LlamaWinX64
+    ];
 }

@@ -1,8 +1,13 @@
+using LiveLingo.Core.Drafting;
+using LiveLingo.Core.Translation;
+
 namespace LiveLingo.Desktop.Composer;
 
 /// <summary>A closed composer's source text.</summary>
 /// <param name="Written">The result was written or copied; a draft that was not is offered again on the next summon.</param>
-public sealed record RecentDraft(DateTimeOffset At, string Text, bool Written);
+public sealed record RecentDraft(
+    DateTimeOffset At, string Text, bool Written, DraftState? State = null,
+    ComposerOutput Output = ComposerOutput.Clean, TargetLanguage Target = TargetLanguage.English);
 
 /// <summary>
 /// The last few source texts, newest first, so a closed composer can be continued. Memory only: nothing is persisted,
@@ -24,12 +29,15 @@ public sealed class RecentDrafts(TimeProvider? time = null)
     public RecentDraft? Unsent => _items is [{ Written: false } latest, ..] ? latest : null;
 
     public void Close(string sourceText, bool written)
+        => Close(new RecentDraft(_time.GetUtcNow(), sourceText, written));
+
+    public void Close(RecentDraft draft)
     {
-        if (string.IsNullOrWhiteSpace(sourceText))
+        if (string.IsNullOrWhiteSpace(draft.Text))
             return;
 
-        _items.RemoveAll(item => item.Text == sourceText);
-        _items.Insert(0, new RecentDraft(_time.GetUtcNow(), sourceText, written));
+        _items.RemoveAll(item => item.Text == draft.Text);
+        _items.Insert(0, draft);
         if (_items.Count > Capacity)
             _items.RemoveRange(Capacity, _items.Count - Capacity);
     }

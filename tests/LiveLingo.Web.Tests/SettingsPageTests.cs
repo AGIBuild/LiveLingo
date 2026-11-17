@@ -25,8 +25,10 @@ public sealed class SettingsPageTests(BrowserFixture browsers)
 
         Assert.Single(await page.IntentsAsync(), i => i is ReadyIntent);
         Assert.Equal("zh-CN", await page.Page.EvaluateAsync<string>("document.documentElement.lang"));
+        Assert.Equal(4, await page.Page.Locator("nav button").CountAsync());
+        Assert.Equal(0, await page.Page.Locator("#nav-privacy").CountAsync());
         Assert.Equal("page", await page.Page.Locator("#nav-general").GetAttributeAsync("aria-current"));
-        Assert.Equal(6, await page.Page.Locator("#panel .srow").CountAsync());
+        Assert.Equal(7, await page.Page.Locator("#panel .srow").CountAsync());
         Assert.True(page.ConsoleErrors.Count == 0, string.Join("\n", page.ConsoleErrors));
         Assert.Empty(page.Requests);
     }
@@ -167,31 +169,32 @@ public sealed class SettingsPageTests(BrowserFixture browsers)
 
     [Theory]
     [MemberData(nameof(Engines))]
-    public async Task TheEndpoints_AreListed_WithTheEnabledOneMarked_AndNoKeyIsEverShown(string engine)
+    public async Task ModelsPrivacyStripAndInlineEndpoints_ShowCrossStageUsageSwitchAllToLocal_AndNeverExposeKeys(string engine)
     {
         await using var page = await browsers.OpenSettingsAsync(engine, "settings-cloud");
 
-        Assert.True(await page.Page.Locator("#cloud-translate").IsCheckedAsync());
-        Assert.False(await page.Page.Locator("#cloud-clean").IsCheckedAsync());
-        Assert.Equal(["Main", "Other"], await page.Page.Locator(".endpoint .ep-title b").AllInnerTextsAsync());
-        Assert.Equal(1, await page.Page.Locator(".endpoint.on").CountAsync());
-        Assert.True(await page.Page.Locator("#endpoint-on-main").IsCheckedAsync());
-        Assert.False(await page.Page.Locator("#endpoint-on-other").IsCheckedAsync());
-        Assert.Contains("other.example.com", await page.Page.Locator(".endpoint").Nth(1).InnerTextAsync());
-        Assert.Contains(S("cloud.keySaved"), await page.Page.Locator(".endpoint").Nth(1).InnerTextAsync());
-        Assert.Equal(S("cloud.endpoints.active").Replace("{0}", "Main"), (await page.Page.Locator("#endpoints-hint").InnerTextAsync()).Trim());
+        Assert.Equal(1, await page.Page.Locator("#cloud-disable-all").CountAsync());
+        Assert.Contains(S("privacy.badge.cloud"), await page.Page.Locator("#models-privacy-strip").InnerTextAsync());
+        Assert.Contains("Main", await page.Page.Locator("#model-cloud-card-translate-main").InnerTextAsync());
+        Assert.Contains("Other", await page.Page.Locator("#model-cloud-card-translate-other").InnerTextAsync());
+        Assert.Contains(S("output.clean"), await page.Page.Locator("#model-cloud-card-translate-main").InnerTextAsync());
+        Assert.Contains("other.example.com", await page.Page.Locator("#model-cloud-card-translate-other").InnerTextAsync());
+        Assert.Contains(S("cloud.keySaved"), await page.Page.Locator("#model-cloud-card-translate-other").InnerTextAsync());
         Assert.Equal(0, await page.Page.Locator("input[type=password]").CountAsync());
+
+        await page.ClearIntentsAsync();
+        await page.Page.Locator("#cloud-disable-all").ClickAsync();
+        Assert.IsType<DisableAllCloudIntent>((await page.IntentsAsync()).Last());
     }
 
     [Theory]
     [MemberData(nameof(Engines))]
-    public async Task WithoutEndpoints_ThePageSaysEverythingStaysLocal(string engine)
+    public async Task WithoutCloudActive_ModelsPrivacyStripSaysEverythingStaysLocal(string engine)
     {
-        await using var page = await browsers.OpenSettingsAsync(engine, "settings-privacy");
+        await using var page = await browsers.OpenSettingsAsync(engine, "settings-models");
 
-        Assert.Equal(0, await page.Page.Locator(".endpoint").CountAsync());
-        Assert.Equal(S("cloud.endpoints.empty"), (await page.Page.Locator("#endpoints-empty").InnerTextAsync()).Trim());
-        Assert.Equal(S("cloud.endpoints.none"), (await page.Page.Locator("#endpoints-hint").InnerTextAsync()).Trim());
+        Assert.Equal(0, await page.Page.Locator("#cloud-disable-all").CountAsync());
+        Assert.Contains(S("privacy.badge.local"), await page.Page.Locator("#models-privacy-strip").InnerTextAsync());
     }
 
     [Theory]
@@ -201,18 +204,53 @@ public sealed class SettingsPageTests(BrowserFixture browsers)
         await using var page = await browsers.OpenSettingsAsync(engine, "settings-cloud-invalid");
 
         Assert.Equal(S("cloud.invalid"), (await page.Page.Locator(".err[role=alert]").InnerTextAsync()).Trim());
-        Assert.False(await page.Page.Locator("#cloud-translate").IsCheckedAsync());
+        Assert.False(await page.Page.Locator("#model-cloud-translate-main").IsCheckedAsync());
     }
 
     [Theory]
     [MemberData(nameof(Engines))]
-    public async Task TheModelsGroup_ShowsTheChipsTheLegacyModelsAndTheVersion(string engine)
+    public async Task TheModelsAndAboutGroups_AreSeparate_CategorizedByPurpose_AndShowLocalStorageInventory(string engine)
     {
         await using var page = await browsers.OpenSettingsAsync(engine, "settings-models");
 
-        Assert.Equal(3, await page.Page.Locator(".chips .chip").CountAsync());
-        Assert.Equal("2.0.0", (await page.Page.Locator("#version").InnerTextAsync()).Trim());
+        // About items live on their own section, never cluttering the Models page.
+        Assert.Equal(1, await page.Page.Locator("#nav-about").CountAsync());
+        Assert.Equal(0, await page.Page.Locator("#version").CountAsync());
+        Assert.Equal(0, await page.Page.Locator("#update-action").CountAsync());
+
+        // Hardware banner + 4 focused category/storage tabs; only one panel renders at a time.
+        Assert.Equal(1, await page.Page.Locator("#models-hw").CountAsync());
+        Assert.Equal(1, await page.Page.Locator("#models-best-badge").CountAsync());
+        Assert.Equal(4, await page.Page.Locator("#models-tabs [role=tab]").CountAsync());
+        Assert.Equal(1, await page.Page.Locator("#speech-local-only").CountAsync());
+        Assert.Equal(0, await page.Page.Locator("#stage-cloud-empty-speech").CountAsync());
+        Assert.Equal(["#1", "#2"], await page.Page.Locator("#stage-speech .mrank").AllInnerTextsAsync());
+        Assert.Equal(0, await page.Page.Locator("#stage-cleaner").CountAsync());
+        Assert.Equal(0, await page.Page.Locator("#stage-translator").CountAsync());
+
+        // Switch across purpose categories and verify ranked options, inline cloud onboarding & hardware gating.
+        await page.Page.Locator("#model-tab-cleaner").ClickAsync();
+        Assert.Equal(1, await page.Page.Locator("#stage-cloud-empty-cleaner").CountAsync());
+        Assert.Equal(["#1", "#2", "#3"], await page.Page.Locator("#stage-cleaner .mcard:not(.cloud) .mrank").AllInnerTextsAsync());
+        Assert.True(await page.Page.Locator("#model-radio-qwen3\\.5-9b-q4km").IsDisabledAsync());
+        Assert.True(await page.Page.Locator("#model-radio-qwen3\\.5-4b-q4km").IsCheckedAsync());
+
+        await page.Page.Locator("#model-tab-cleaner").PressAsync("ArrowRight");
+        Assert.Equal(["#1", "#2"], await page.Page.Locator("#stage-translator .mcard:not(.cloud) .mrank").AllInnerTextsAsync());
+        Assert.True(await page.Page.Locator("#model-radio-hy-mt2-1\\.8b-q4km").IsCheckedAsync());
+
+        // Clicking the disk usage summary jumps directly to Local Storage with full inventory and sizes.
+        await page.Page.Locator("#models-disk-link").ClickAsync();
+        Assert.Equal("true", await page.Page.Locator("#model-tab-storage").GetAttributeAsync("aria-selected"));
+        Assert.Equal("/models", (await page.Page.Locator("#storage-path").InnerTextAsync()).Trim());
+        Assert.Equal(7, await page.Page.Locator(".storage-item").CountAsync());
         Assert.Contains("8.5", await page.Page.Locator("#legacy-remove").Locator("xpath=ancestor::div[contains(@class,'srow')]").InnerTextAsync());
+
+        // About section displays Version, Updates and Diagnostics independently.
+        await page.PushAsync("settings-diagnostics");
+        Assert.Equal("page", await page.Page.Locator("#nav-about").GetAttributeAsync("aria-current"));
+        Assert.Equal("2.0.0", (await page.Page.Locator("#version").InnerTextAsync()).Trim());
+        Assert.Equal(1, await page.Page.Locator("#diag-open").CountAsync());
     }
 
     [Theory]
@@ -241,10 +279,13 @@ public sealed class SettingsPageTests(BrowserFixture browsers)
     public async Task NoLegacyModels_NoRemoveRow(string engine)
     {
         await using var page = await browsers.OpenSettingsAsync(engine, "settings-models");
+        await page.Page.Locator("#model-tab-storage").ClickAsync();
+        Assert.Equal(1, await page.Page.Locator("#legacy-remove").CountAsync());
 
         await page.PushAsync("settings-voice", s => s["section"] = "models");
 
         Assert.Equal(0, await page.Page.Locator("#legacy-remove").CountAsync());
+        Assert.Equal(1, await page.Page.Locator("#storage-empty").CountAsync());
     }
 
     [Theory]
@@ -317,13 +358,13 @@ public sealed class SettingsPageTests(BrowserFixture browsers)
 
     [Theory]
     [MemberData(nameof(Engines))]
-    public async Task ClosingTheDialog_ReturnsTheFocusToTheSwitch(string engine)
+    public async Task ClosingTheDialog_ReturnsTheFocusToTheCloudOptionCard(string engine)
     {
         await using var page = await browsers.OpenSettingsAsync(engine, "settings-consent");
 
-        await page.PushAsync("settings-cloud");
+        await page.PushAsync("settings-consent", s => s["models"]!["consent"] = null);
 
-        Assert.Equal("cloud-clean", await page.Page.EvaluateAsync<string>("document.activeElement.id"));
+        Assert.Equal("model-cloud-clean-main", await page.Page.EvaluateAsync<string>("document.activeElement.id"));
     }
 
     // --- acting -----------------------------------------------------------------------------------------------------
@@ -370,7 +411,7 @@ public sealed class SettingsPageTests(BrowserFixture browsers)
     [MemberData(nameof(Engines))]
     public async Task TheRememberedApps_AreListedAndForgottenOneByOneOrAllAtOnce(string engine)
     {
-        await using var none = await browsers.OpenSettingsAsync(engine, "settings-privacy");
+        await using var none = await browsers.OpenSettingsAsync(engine, "settings-general");
         Assert.Equal(0, await none.Page.Locator(".app").CountAsync());
         Assert.Equal(S("apps.empty"), (await none.Page.Locator("#apps-empty").InnerTextAsync()).Trim());
         Assert.True(await none.Page.Locator("#apps-clear").IsDisabledAsync());
@@ -416,14 +457,35 @@ public sealed class SettingsPageTests(BrowserFixture browsers)
 
     [Theory]
     [MemberData(nameof(Engines))]
-    public async Task ModelChoice_SendsTheTier(string engine)
+    public async Task ModelCards_DownloadCenter_AndStorage_SendSelectDownloadCancelDeleteAndApplyBestMatchIntents(string engine)
     {
         await using var page = await browsers.OpenSettingsAsync(engine, "settings-models");
+        await page.ClearIntentsAsync();
 
-        await page.Page.Locator("#tier").SelectOptionAsync("Fast");
+        await page.Page.Locator("#model-tab-cleaner").ClickAsync();
+        await page.Page.Locator("#model-use-qwen3\\.5-2b-q4km").ClickAsync();
+        Assert.Equal(new SelectModelIntent("qwen3.5-2b-q4km") { V = 1 }, await page.LastIntentAsync<SelectModelIntent>());
 
-        var tier = await page.LastIntentAsync<SettingIntent>();
-        Assert.Equal(("tier", "Fast"), (tier.Key, tier.Value));
+        await page.Page.Locator("#model-tab-storage").ClickAsync();
+        await page.Page.Locator("#storage-delete-qwen3\\.5-2b-q4km").ClickAsync();
+        Assert.Equal(new DeleteModelIntent("qwen3.5-2b-q4km") { V = 1 }, await page.LastIntentAsync<DeleteModelIntent>());
+
+        await page.Page.Locator("#model-tab-translator").ClickAsync();
+        await page.Page.Locator("#model-download-hy-mt2-7b-q4km").ClickAsync();
+        Assert.Equal(new DownloadModelIntent("hy-mt2-7b-q4km") { V = 1 }, await page.LastIntentAsync<DownloadModelIntent>());
+
+        // Even while staying on Speech tab, the persistent top Download Center and sidebar badge show exact model & byte progress.
+        await page.Page.Locator("#model-tab-speech").ClickAsync();
+        await page.PushAsync("settings-models-downloading");
+        await page.ClearIntentsAsync();
+        Assert.Equal("42%", (await page.Page.Locator("#nav-models-badge").InnerTextAsync()).Trim());
+        Assert.Contains("Hy-MT2 7B", await page.Page.Locator("#dl-item-hy-mt2-7b-q4km").InnerTextAsync());
+        Assert.Contains("1.94 GB / 4.62 GB · 42%", await page.Page.Locator("#dl-item-hy-mt2-7b-q4km").InnerTextAsync());
+        await page.Page.Locator("#dl-cancel-hy-mt2-7b-q4km").ClickAsync();
+        Assert.Equal(new CancelModelDownloadIntent("hy-mt2-7b-q4km") { V = 1 }, await page.LastIntentAsync<CancelModelDownloadIntent>());
+
+        await page.Page.Locator("#models-apply-best").ClickAsync();
+        Assert.IsType<ApplyRecommendedModelsIntent>((await page.IntentsAsync()).Last());
     }
 
     [Theory]
@@ -444,72 +506,67 @@ public sealed class SettingsPageTests(BrowserFixture browsers)
 
     [Theory]
     [MemberData(nameof(Engines))]
-    public async Task ACloudSwitch_AsksTheHost_NeverDecidesItself(string engine)
+    public async Task UnifiedStageRadioGroup_MarksCloudOrLocalExclusively_AndSendsCloudAndLocalSwitchIntents(string engine)
     {
-        await using var page = await browsers.OpenSettingsAsync(engine, "settings-privacy");
+        await using var page = await browsers.OpenSettingsAsync(engine, "settings-endpoint-switch");
 
-        await page.Page.Locator("#cloud-translate").ClickAsync();
-        await page.Page.Locator("#cloud-clean").ClickAsync();
+        // First examine and dismiss the endpoint-switch consent dialog: names both Main and Other and starts on Keep Current.
+        var dialog = page.Page.GetByRole(AriaRole.Dialog);
+        var dialogText = await dialog.InnerTextAsync();
+        Assert.Equal(S("consent.translate"), (await dialog.Locator("h2").InnerTextAsync()).Trim());
+        Assert.Contains("Main", dialogText);
+        Assert.Contains("Other", dialogText);
+        Assert.Contains("other.example.com", dialogText);
+        Assert.Equal("consent-keep", await page.Page.EvaluateAsync<string>("document.activeElement.id"));
+        await page.Page.Locator("#consent-allow").ClickAsync();
+        Assert.True((await page.LastIntentAsync<ConsentIntent>()).Allow);
 
+        // Close modal in snapshot and verify single-radio exclusivity on the Models -> Translation tab:
+        // Cloud Main is checked (●), while local Hy-MT2 1.8B is unchecked ( ) and offers immediate local switch or disk deletion.
+        await page.PushAsync("settings-endpoint-switch", s => s["models"]!["consent"] = null);
+        await page.ClearIntentsAsync();
+
+        Assert.True(await page.Page.Locator("#model-cloud-translate-main").IsCheckedAsync());
+        Assert.False(await page.Page.Locator("#model-cloud-translate-other").IsCheckedAsync());
+        Assert.False(await page.Page.Locator("#model-radio-hy-mt2-1\\.8b-q4km").IsCheckedAsync());
+        Assert.Equal(1, await page.Page.Locator("#stage-translator input[type=radio]:checked").CountAsync());
+        Assert.Equal(1, await page.Page.Locator("#model-delete-hy-mt2-1\\.8b-q4km").CountAsync());
+
+        // Selecting another cloud endpoint asks the host (never checks the radio on its own).
+        await page.Page.Locator("#model-cloud-use-translate-other").ClickAsync();
+        Assert.Equal(new SelectCloudModelIntent(CloudStep.Translate, "other") { V = 1 }, await page.LastIntentAsync<SelectCloudModelIntent>());
+        Assert.False(await page.Page.Locator("#model-cloud-translate-other").IsCheckedAsync());
+
+        // Switching back to local can be done either from the active cloud card ("Switch to local") or by clicking an installed local model.
+        await page.Page.Locator("#model-cloud-local-translate-main").ClickAsync();
+        Assert.Equal(new UseLocalStageIntent(CloudStep.Translate) { V = 1 }, await page.LastIntentAsync<UseLocalStageIntent>());
+
+        await page.Page.Locator("#model-use-hy-mt2-1\\.8b-q4km").ClickAsync();
+        Assert.Equal(new SelectModelIntent("hy-mt2-1.8b-q4km") { V = 1 }, await page.LastIntentAsync<SelectModelIntent>());
+
+        // Inline "+ Add cloud service" and "Edit" open the endpoint modal right from the Models page without navigating away.
+        await page.Page.Locator("#stage-cloud-add-translator").ClickAsync();
+        await page.Page.Locator("#stage-cloud-edit-translator-main").ClickAsync();
         Assert.Equal(
-            [(CloudStep.Translate, true), (CloudStep.Clean, true)],
-            (await page.IntentsAsync()).OfType<CloudToggleIntent>().Select(t => (t.Step, t.On)));
-        Assert.False(await page.Page.Locator("#cloud-translate").IsCheckedAsync());
-        Assert.Equal(0, await page.Page.GetByRole(AriaRole.Dialog).CountAsync());
-    }
-
-    [Theory]
-    [MemberData(nameof(Engines))]
-    public async Task TurningACloudStepOff_IsSentLikeAnyOtherToggle(string engine)
-    {
-        await using var page = await browsers.OpenSettingsAsync(engine, "settings-cloud");
-
-        await page.Page.Locator("#cloud-translate").ClickAsync();
-
-        var toggle = await page.LastIntentAsync<CloudToggleIntent>();
-        Assert.Equal((CloudStep.Translate, false), (toggle.Step, toggle.On));
+            [new OpenEndpointFormIntent(null) { V = 1 }, new OpenEndpointFormIntent("main") { V = 1 }],
+            (await page.IntentsAsync()).OfType<OpenEndpointFormIntent>());
     }
 
     // --- the endpoints ----------------------------------------------------------------------------------------------
 
     [Theory]
     [MemberData(nameof(Engines))]
-    public async Task AddingAndEditing_AskTheHostToOpenTheForm(string engine)
+    public async Task AddingEditingAndDeleting_AreHandledInlineInModelsWithoutLeavingThePage(string engine)
     {
         await using var page = await browsers.OpenSettingsAsync(engine, "settings-cloud");
 
-        await page.Page.Locator("#endpoint-add").ClickAsync();
-        await page.Page.Locator("#endpoint-edit-other").ClickAsync();
+        await page.Page.Locator("#stage-cloud-add-translator").ClickAsync();
+        await page.Page.Locator("#stage-cloud-edit-translator-other").ClickAsync();
+        await page.Page.Locator("#stage-cloud-delete-translator-other").ClickAsync();
 
         Assert.Equal(
             [new OpenEndpointFormIntent(null) { V = 1 }, new OpenEndpointFormIntent("other") { V = 1 }],
             (await page.IntentsAsync()).OfType<OpenEndpointFormIntent>());
-    }
-
-    [Theory]
-    [MemberData(nameof(Engines))]
-    public async Task TheEndpointSwitch_AsksTheHost_NeverDecidesItself(string engine)
-    {
-        await using var page = await browsers.OpenSettingsAsync(engine, "settings-cloud");
-
-        await page.Page.Locator("#endpoint-on-other").ClickAsync();
-        await page.Page.Locator("#endpoint-on-main").ClickAsync();
-
-        Assert.Equal(
-            [new EnableEndpointIntent("other", true) { V = 1 }, new EnableEndpointIntent("main", false) { V = 1 }],
-            (await page.IntentsAsync()).OfType<EnableEndpointIntent>());
-        Assert.False(await page.Page.Locator("#endpoint-on-other").IsCheckedAsync());
-        Assert.True(await page.Page.Locator("#endpoint-on-main").IsCheckedAsync());
-    }
-
-    [Theory]
-    [MemberData(nameof(Engines))]
-    public async Task Deleting_AsksTheHostWhichAsksTheUser(string engine)
-    {
-        await using var page = await browsers.OpenSettingsAsync(engine, "settings-cloud");
-
-        await page.Page.Locator("#endpoint-delete-other").ClickAsync();
-
         Assert.Equal(new DeleteEndpointIntent("other") { V = 1 }, await page.LastIntentAsync<DeleteEndpointIntent>());
         Assert.Equal(0, await page.Page.GetByRole(AriaRole.Dialog).CountAsync());
     }
@@ -603,32 +660,15 @@ public sealed class SettingsPageTests(BrowserFixture browsers)
 
     [Theory]
     [MemberData(nameof(Engines))]
-    public async Task SwitchingTheEnabledEndpoint_NamesBothEndpointsAndStartsOnTheSafeAnswer(string engine)
-    {
-        await using var page = await browsers.OpenSettingsAsync(engine, "settings-endpoint-switch");
-
-        var dialog = page.Page.GetByRole(AriaRole.Dialog);
-        var text = await dialog.InnerTextAsync();
-        Assert.Equal(S("cloud.switch.title"), (await dialog.Locator("h2").InnerTextAsync()).Trim());
-        Assert.Contains("Main", text);
-        Assert.Contains("Other", text);
-        Assert.Contains("other.example.com", text);
-        Assert.Contains(S("cloud.translate"), text);
-        Assert.Equal("endpoint-keep", await page.Page.EvaluateAsync<string>("document.activeElement.id"));
-
-        await page.Page.Locator("#endpoint-confirm").ClickAsync();
-        Assert.True((await page.LastIntentAsync<EndpointAnswerIntent>()).Allow);
-    }
-
-    [Theory]
-    [MemberData(nameof(Engines))]
-    public async Task Deleting_NamesTheEndpoint_AndEscapeKeepsIt(string engine)
+    public async Task Deleting_NamesTheEndpointAndAffectedCloudSteps_AndEscapeKeepsIt(string engine)
     {
         await using var page = await browsers.OpenSettingsAsync(engine, "settings-endpoint-delete");
 
         var dialog = page.Page.GetByRole(AriaRole.Dialog);
-        Assert.Equal(S("cloud.delete.title").Replace("{0}", "Other"), (await dialog.Locator("h2").InnerTextAsync()).Trim());
-        Assert.Contains(S("cloud.delete.body"), await dialog.InnerTextAsync());
+        var text = await dialog.InnerTextAsync();
+        Assert.Equal(S("cloud.delete.title").Replace("{0}", "Main"), (await dialog.Locator("h2").InnerTextAsync()).Trim());
+        Assert.Contains(S("cloud.delete.body"), text);
+        Assert.Contains(S("cloud.translate"), text);
         Assert.Contains("destructive", await page.Page.Locator("#endpoint-confirm").GetAttributeAsync("class"));
 
         await page.Page.Keyboard.PressAsync("Escape");
@@ -752,12 +792,13 @@ public sealed class SettingsPageTests(BrowserFixture browsers)
     [MemberData(nameof(Engines))]
     public async Task RecentDraftsAndLegacyModels_AreOneClickIntents(string engine)
     {
-        await using var cloud = await browsers.OpenSettingsAsync(engine, "settings-cloud");
-        await cloud.Page.Locator("#recent-clear").ClickAsync();
+        await using var general = await browsers.OpenSettingsAsync(engine, "settings-general");
+        await general.Page.Locator("#recent-clear").ClickAsync();
         await using var models = await browsers.OpenSettingsAsync(engine, "settings-models");
+        await models.Page.Locator("#model-tab-storage").ClickAsync();
         await models.Page.Locator("#legacy-remove").ClickAsync();
 
-        Assert.Equal(1, await cloud.CountAsync<ClearRecentIntent>());
+        Assert.Equal(1, await general.CountAsync<ClearRecentIntent>());
         Assert.Equal(1, await models.CountAsync<RemoveLegacyModelsIntent>());
     }
 
@@ -765,7 +806,7 @@ public sealed class SettingsPageTests(BrowserFixture browsers)
     [MemberData(nameof(Engines))]
     public async Task TheUpdateRow_ChecksOnRequest_AndShowsTheDownloadsProgress(string engine)
     {
-        await using var idle = await browsers.OpenSettingsAsync(engine, "settings-models");
+        await using var idle = await browsers.OpenSettingsAsync(engine, "settings-diagnostics");
         await idle.Page.Locator("#update-action").ClickAsync();
         Assert.Equal(1, await idle.CountAsync<CheckUpdatesIntent>());
 
@@ -812,13 +853,13 @@ public sealed class SettingsPageTests(BrowserFixture browsers)
     {
         await using var page = await browsers.OpenSettingsAsync(engine);
 
-        await page.Page.Locator("#nav-privacy").ClickAsync();
+        await page.Page.Locator("#nav-models").ClickAsync();
 
-        Assert.Equal("privacy", (await page.LastIntentAsync<OpenSettingsIntent>()).Section);
+        Assert.Equal("models", (await page.LastIntentAsync<OpenSettingsIntent>()).Section);
         Assert.Equal("page", await page.Page.Locator("#nav-general").GetAttributeAsync("aria-current"));
 
-        await page.PushAsync("settings-privacy");
-        Assert.Equal("page", await page.Page.Locator("#nav-privacy").GetAttributeAsync("aria-current"));
+        await page.PushAsync("settings-models");
+        Assert.Equal("page", await page.Page.Locator("#nav-models").GetAttributeAsync("aria-current"));
     }
 
     [Theory]
@@ -826,7 +867,7 @@ public sealed class SettingsPageTests(BrowserFixture browsers)
     public async Task TheSettingsWindowNeverReportsASize(string engine)
     {
         await using var page = await browsers.OpenSettingsAsync(engine, "settings-voice");
-        await page.PushAsync("settings-privacy");
+        await page.PushAsync("settings-models");
 
         Assert.Equal(0, await page.CountAsync<SizeIntent>());
     }

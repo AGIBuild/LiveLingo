@@ -93,6 +93,9 @@ internal sealed class ComposerIntents : IIntentHandler
             case HideIntent: _vm.HideCommand.Execute(null); break;
             case RetryIntent retry: _vm.RetryCommand.Execute(retry.I); break;
             case EditIntent edit: _vm.StartEditCommand.Execute(edit.I); break;
+            case EditDocumentIntent: _vm.EditDocumentCommand.Execute(null); break;
+            case RetryDocumentIntent: _vm.RetryDocumentCommand.Execute(null); break;
+            case AcceptPreviewIntent: _vm.AcceptPreviewCommand.Execute(null); break;
             case EditTextIntent edit: _vm.EditText = edit.Text; break;
             case SaveEditIntent: _vm.SaveEditCommand.Execute(null); break;
             case SaveEditAndRememberIntent: _vm.SaveEditAndRememberCommand.Execute(null); break;
@@ -124,7 +127,7 @@ internal sealed class ComposerIntents : IIntentHandler
     private void Restore(int index)
     {
         if (_vm.CanReplaceDraft && index < _recent.Items.Count)
-            _vm.SourceText = _recent.Items[index].Text;
+            _vm.RestoreRecentDraft(_recent.Items[index]);
     }
 
     private async Task ImportAsync()

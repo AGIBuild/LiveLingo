@@ -77,7 +77,10 @@ public partial class App : Application
             builder.ClearProviders();
             builder.AddSerilog(dispose: true);
         });
-        services.AddLiveLingoCore(opts => ApplyCoreOptions(settings, opts));
+        var hardwareProbe = new SystemHardwareProbe();
+        var hardware = hardwareProbe.Detect();
+        services.AddLiveLingoCore(opts => ApplyCoreOptions(settings, opts, hardware));
+        services.AddSingleton<IHardwareProbe>(hardwareProbe);
         services.AddSingleton<ISettingsService>(settingsService);
         services.AddSingleton<ILocalizationService>(sp =>
         {
@@ -104,6 +107,7 @@ public partial class App : Application
         services.AddSingleton<IPreferencesStore>(sp =>
             new JsonPreferencesStore(Path.Combine(UserData.Directory, "preferences.json"), sp.GetService<ILogger<JsonPreferencesStore>>()));
         services.AddSingleton<ComposerPreferences>();
+        services.AddSingleton<ModelSelectionCoordinator>();
         services.AddSingleton<ModelWarmup>();
 
         // Registered after AddLiveLingoCore so it replaces the local-only default: roles go to the cloud only when the user enabled them.
@@ -164,11 +168,9 @@ public partial class App : Application
         _ => Avalonia.Styling.ThemeVariant.Default
     };
 
-    private static void ApplyCoreOptions(SettingsModel settings, CoreOptions options)
+    private static void ApplyCoreOptions(SettingsModel settings, CoreOptions options, HardwareProfile hardware)
     {
-        options.TranslatorTier = Enum.TryParse<TranslatorTier>(settings.Composer.TranslatorTier, out var tier)
-            ? tier
-            : TranslatorTier.Fast;
+        options.Models = settings.Composer.ResolveSelection(hardware);
         if (!string.IsNullOrWhiteSpace(settings.Advanced.ModelStoragePath))
             options.ModelStoragePath = settings.Advanced.ModelStoragePath;
         options.InferenceThreads = settings.Advanced.InferenceThreads;
@@ -260,6 +262,7 @@ public partial class App : Application
         var settings = settingsService.Current;
         var glossary = settings.Composer.EffectiveGlossary();
         var session = new DraftSession(hasTarget: target is not null, notifyOn: context);
+        session.Mutate(d => d.DocumentMode = true);
         var options = new ComposerOptions(
             settings.Cloud.Translate, settings.Cloud.Clean,
             Enum.Parse<CommitKey>(settings.Composer.CommitKey), settings.Appearance.Animations, settings.Appearance.Theme,
@@ -291,7 +294,7 @@ public partial class App : Application
             session,
             scheduler,
             ComposerModelPlan.Create(
-                services.GetRequiredService<CoreOptions>().TranslatorTier,
+                services.GetRequiredService<CoreOptions>().Models,
                 cleanInCloud: settings.Cloud.Clean,
                 translateInCloud: settings.Cloud.Translate),
             services.GetRequiredService<IModelManager>(),
@@ -326,7 +329,9 @@ public partial class App : Application
             await vm.StartListeningAsync();
         await presented;
 
-        _recentDrafts.Close(vm.HasTimeline ? "" : vm.SourceText, written);
+        await vm.StopListeningAsync();
+        if (!vm.HasTimeline)
+            _recentDrafts.Close(vm.CaptureRecentDraft(written));
         await vm.DisposeAsync();
         if (cleanup is not null)
             await cleanup.DisposeAsync();
@@ -362,7 +367,8 @@ public partial class App : Application
         var vm = new SettingsViewModel(
             services.GetRequiredService<ISettingsService>(), services.GetRequiredService<ISecretStore>(),
             services.GetRequiredService<IModelManager>(), _recentDrafts, services.GetRequiredService<IPlatformServices>().Microphone,
-            services.GetRequiredService<ComposerPreferences>());
+            services.GetRequiredService<ComposerPreferences>(),
+            services.GetRequiredService<ModelSelectionCoordinator>());
         _settingsWindow = new SettingsWindow(
             vm, new SettingsTexts(services.GetRequiredService<ILocalizationService>()), section,
             _updates, services.GetRequiredService<IPlatformServices>().OpenUrl,
@@ -390,13 +396,20 @@ public partial class App : Application
     {
         var services = _serviceProvider!;
         var core = services.GetRequiredService<CoreOptions>();
-        var previousTier = core.TranslatorTier;
-        ApplyCoreOptions(settings, core);
-        if (previousTier != core.TranslatorTier)
+        var hardware = services.GetRequiredService<ModelSelectionCoordinator>().Hardware;
+        var previousModels = core.Models;
+        ApplyCoreOptions(settings, core, hardware);
+        if (previousModels != core.Models)
         {
-            _composer?.UpdateModelPlan(ComposerModelPlan.Create(core.TranslatorTier,
+            _composer?.UpdateModelPlan(ComposerModelPlan.Create(core.Models,
                 settings.Cloud.Clean && settings.Composer.CleanupEnabled, settings.Cloud.Translate));
-            services.GetRequiredService<ModelWarmup>().OnOutputChanged(ComposerOutput.Translate);
+            var warmup = services.GetRequiredService<ModelWarmup>();
+            if (previousModels.SpeechModelId != core.Models.SpeechModelId)
+                warmup.OnSpeechModelChanged();
+            if (previousModels.CleanerModelId != core.Models.CleanerModelId)
+                warmup.OnOutputChanged(ComposerOutput.Clean);
+            if (previousModels.TranslatorModelId != core.Models.TranslatorModelId)
+                warmup.OnOutputChanged(ComposerOutput.Translate);
         }
         ApplyTheme(settings);
         var loc = _serviceProvider!.GetRequiredService<ILocalizationService>();
@@ -454,7 +467,7 @@ public partial class App : Application
             return;
         }
 
-        ShowSettings("models");
+        ShowSettings("about");
         if (_updates is not null)
             _ = _updates.CheckNowAsync();
     }

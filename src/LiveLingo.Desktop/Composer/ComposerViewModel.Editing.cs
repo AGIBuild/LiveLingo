@@ -9,6 +9,8 @@ namespace LiveLingo.Desktop.Composer;
 public sealed partial class ComposerViewModel
 {
     private string _editingOriginalText = "";
+    private UnitKind _editingKind;
+    private int _editingUnitId;
 
     /// <summary>The active glossary for this composer session, used to detect new accent corrections during inline edits.</summary>
     public Glossary ActiveGlossary { get; set; } = Glossary.Empty;
@@ -28,11 +30,14 @@ public sealed partial class ComposerViewModel
             : null;
 
     /// <summary>Sentence tools show on hover only while nothing is recording, written or being edited.</summary>
-    public bool CanEditRows => _committed is null && !IsListening && !IsStartingListening && !IsTranscribing && EditingIndex < 0;
+    public bool CanEditRows => _committed is null && !IsClearing && !IsListening && !IsStartingListening && !IsTranscribing && !IsEditing;
 
     partial void OnEditingIndexChanged(int value)
     {
         OnPropertyChanged(nameof(CanEditRows));
+        OnPropertyChanged(nameof(IsEditing));
+        OnPropertyChanged(nameof(IsEditingDocument));
+        OnPropertyChanged(nameof(CanEditDocument));
         OnPropertyChanged(nameof(SuggestedCorrection));
         UpdateEditable();
         Refresh();
@@ -51,6 +56,8 @@ public sealed partial class ComposerViewModel
         CancelQueuedWrite();
         _editingOriginalText = Lines[index].Text;
         EditText = Lines[index].Text;
+        _editingKind = SelectedKind;
+        _editingUnitId = _session.Read(d => d.Units[index].Id);
         EditingIndex = index;
     }
 
@@ -58,15 +65,36 @@ public sealed partial class ComposerViewModel
     [RelayCommand]
     private void SaveEdit()
     {
-        if (EditingIndex < 0)
+        if (!IsEditing)
             return;
+
+        if (_documentEdit is { } ticket)
+        {
+            var saved = _session.Mutate(d => d.SaveDocumentEdit(ticket, EditText));
+            if (!saved)
+            {
+                ToastRaised?.Invoke(ToastKind.EditExpired);
+                return;
+            }
+            _documentEdit = null;
+            EditingIndex = -1;
+            return;
+        }
 
         var index = EditingIndex;
         var text = EditText;
-        var kind = SelectedKind;
+        var kind = _editingKind;
         _editingOriginalText = "";
         EditingIndex = -1;
-        _session.Mutate(draft => draft.Edit(index, kind, text));
+        var savedRow = _session.Mutate(d =>
+        {
+            if (index >= d.Units.Count || d.Units[index].Id != _editingUnitId)
+                return false;
+            d.Edit(index, kind, text);
+            return true;
+        });
+        if (!savedRow)
+            ToastRaised?.Invoke(ToastKind.EditExpired);
     }
 
     /// <summary>Saves the edited sentence and records the detected misrecognition rule in the user's glossary.</summary>
@@ -92,6 +120,9 @@ public sealed partial class ComposerViewModel
     [RelayCommand]
     private void CancelEdit()
     {
+        if (_documentEdit is { } ticket)
+            _session.Mutate(d => d.CancelDocumentEdit(ticket));
+        _documentEdit = null;
         _editingOriginalText = "";
         EditingIndex = -1;
     }

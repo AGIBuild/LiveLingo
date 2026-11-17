@@ -1,4 +1,4 @@
-// The "will be written" pane: one article per sentence.
+// Document finals and timed passage previews share the same result pane.
 (function () {
   'use strict';
 
@@ -35,13 +35,14 @@
       this.send();
     };
 
-    render({ row, options, rememberCorrection }) {
-      const id = 'edit-' + row.i;
+    render({ row, options, rememberCorrection, document }) {
+      const id = document ? 'edit-document' : 'edit-' + row.i;
       return html`<label class="sr-only" for=${id}>${row.editAria}</label>
-        <textarea class="edit" id=${id} rows="3" ref=${this.setBox} onInput=${this.onInput} oncompositionstart=${this.onCompositionStart}
+        <textarea class=${'edit' + (document ? ' document-edit' : '')} id=${id} rows=${document ? 10 : 3} ref=${this.setBox} onInput=${this.onInput} oncompositionstart=${this.onCompositionStart}
           oncompositionend=${this.onCompositionEnd}></textarea>
+        ${document && html`<p class="edit-hint">${LL.t('documentSaveHint')}</p>`}
         <div class="edit-actions">
-          <button type="button" onClick=${() => LL.send('saveEdit')}>${LL.t('rowSave')} <kbd>${options.commitKeyCap}</kbd></button>
+          <button type="button" onClick=${() => LL.send('saveEdit')}>${LL.t('rowSave')} <kbd>${document ? (options.modifier === 'meta' ? '⌘↵' : 'Ctrl+↵') : options.commitKeyCap}</kbd></button>
           ${rememberCorrection && html`<button type="button" class="remember-corr" onClick=${() => LL.send('saveEditAndRemember')}>${rememberCorrection.label}</button>`}
           <button type="button" onClick=${() => LL.send('cancelEdit')}>${LL.t('rowCancel')} <kbd>Esc</kbd></button>
         </div>`;
@@ -72,14 +73,31 @@
       onClick=${() => LL.send('edit', { i: row.i })}><${Icon} name="edit"/></button>
   </div>`;
 
+  const Document = ({ result, options }) => {
+    const doc = result.document;
+    return html`<div class="document-body">
+      ${doc.editing
+        ? html`<${EditRow} key="document-editor" row=${{ editAria: LL.t('documentEdit') }} text=${result.editText} options=${options} document=${true}/>`
+        : html`<p id="final-text" class="document-text">${doc.text}</p>
+            <p class=${'document-notice' + (doc.needsChoice ? ' warn' : '')} role="status">${doc.notice}</p>
+            <div class="document-actions">
+              <button type="button" id="edit-full" disabled=${!doc.canEdit} onClick=${() => LL.send('editDocument')}>${LL.t('documentEdit')}</button>
+              ${(doc.needsChoice || doc.owned) && html`<button type="button" disabled=${!doc.canEdit} onClick=${() => LL.send('retryDocument')}>${LL.t('documentRetry')}</button>`}
+              ${doc.needsChoice && html`${doc.canAcceptPreview && html`<button type="button" onClick=${() => LL.send('acceptPreview')}>${LL.t('documentAccept')}</button>`}
+                ${doc.canClean && html`<button type="button" id="clean-original" disabled=${!doc.canEdit} onClick=${() => LL.send('output', { value: 'clean' })}>${LL.t('documentClean')}</button>`}
+                <button type="button" disabled=${!doc.canEdit} onClick=${() => LL.send('output', { value: 'original' })}>${LL.t('documentOriginal')}</button>`}
+            </div>`}
+    </div>`;
+  };
+
   LL.Result = ({ result, options }) => {
     if (!result.visible) return null;
     return html`<section id="res" class="pane res" aria-label=${LL.t('resultAria')}>
       <div class="pane-label"><span id="res-label">${result.label}</span></div>
-      <div id="rows" class="rows">${result.rows.map((row) => html`<article key=${row.i} class=${'unit' + (row.warn ? ' warn' : '') + (row.owned ? ' owned' : '')}>
+      ${result.document ? html`<${Document} result=${result} options=${options}/>` : html`<div id="rows" class="rows">${result.rows.map((row) => html`<article key=${row.i} class=${'unit' + (row.warn ? ' warn' : '') + (row.owned ? ' owned' : '')}>
         ${row.editing ? html`<${EditRow} row=${row} text=${result.editText} options=${options} rememberCorrection=${result.rememberCorrection}/>` : html`<${Body} row=${row}/>`}
         ${row.canEdit && !row.editing && html`<${Tools} row=${row} canUseOriginal=${row.canUseOriginal}/>`}
-      </article>`)}</div>
+      </article>`)}</div>`}
     </section>`;
   };
 })();

@@ -30,6 +30,7 @@ public sealed class ModelWarmup : IDisposable
     private readonly IInferenceWarmup _inference;
     private readonly ISettingsService _settings;
     private readonly IModelDownloadCoordinator _downloads;
+    private readonly HardwareProfile _hardware;
     private readonly ILogger _logger;
     private readonly TimeProvider _time;
 
@@ -39,12 +40,14 @@ public sealed class ModelWarmup : IDisposable
         ISettingsService settings,
         IModelDownloadCoordinator downloads,
         ILogger<ModelWarmup> logger,
-        TimeProvider? time = null)
+        TimeProvider? time = null,
+        IHardwareProbe? hardware = null)
     {
         _speech = speech;
         _inference = inference;
         _settings = settings;
         _downloads = downloads;
+        _hardware = hardware?.Detect() ?? HardwareProfile.Baseline16GbAppleMetal;
         _logger = logger;
         _time = time ?? TimeProvider.System;
         _downloads.StateChanged += OnDownloadChanged;
@@ -75,11 +78,18 @@ public sealed class ModelWarmup : IDisposable
     /// <summary>The user (or a banner) changed the output of an open composer.</summary>
     public void OnOutputChanged(ComposerOutput output) => _ = Start(() => WarmOutputAsync(output));
 
+    /// <summary>The user selected another speech recognizer in settings while preload is enabled.</summary>
+    public void OnSpeechModelChanged()
+    {
+        if (_settings.Current.Composer.PreloadSpeech)
+            _ = Start(WarmSpeechAsync);
+    }
+
     public void Dispose() => _downloads.StateChanged -= OnDownloadChanged;
 
     private void OnDownloadChanged(ModelDownloadState state)
     {
-        if (state.IsInstalled && ModelCatalog.Speech.Any(model => model.Id == state.ModelId) && _settings.Current.Composer.PreloadSpeech)
+        if (state.IsInstalled && ModelCatalog.IsSpeechAsset(state.ModelId) && _settings.Current.Composer.PreloadSpeech)
             _ = Start(WarmSpeechAsync);
     }
 
@@ -87,18 +97,25 @@ public sealed class ModelWarmup : IDisposable
         Warm("speech models", () => _speech.WarmAsync(_settings.Current.Composer.EffectiveGlossary().SpeechHotwords()));
 
     /// <summary>
-    /// Warms the opposite local role right after the starting output when the fast translator tier is selected, so
-    /// switching between Clean and Translate inside an open composer never waits for a cold llama-server startup.
-    /// Skipped for the 7B quality translator so a 16 GB machine never speculatively keeps both large models in memory.
+    /// Warms the opposite local role right after the starting output when <see cref="ModelAdvisor.AssessPlan"/> confirms
+    /// both LLM servers fit inside the host's concurrent residency and compute budget, so switching between Clean and
+    /// Translate inside an open composer never waits for a cold llama-server startup.
     /// </summary>
     private ComposerOutput? SecondaryOutputToWarm(ComposerOutput primary)
     {
         var current = _settings.Current;
-        var fastTier = !Enum.TryParse<TranslatorTier>(current.Composer.TranslatorTier, out var tier) || tier == TranslatorTier.Fast;
+        var selection = current.Composer.ResolveSelection(_hardware);
+        var canCoReside = ModelAdvisor.AssessPlan(
+            selection,
+            _hardware,
+            cleanInCloud: current.Cloud.Clean,
+            translateInCloud: current.Cloud.Translate,
+            cleanupEnabled: current.Composer.CleanupEnabled).CanCoResideBothLlms;
+
         return primary switch
         {
-            ComposerOutput.Clean when current.Composer.CleanupEnabled && !current.Cloud.Translate && fastTier => ComposerOutput.Translate,
-            ComposerOutput.Translate when current.Composer.CleanupEnabled && !current.Cloud.Clean && (current.Cloud.Translate || fastTier) => ComposerOutput.Clean,
+            ComposerOutput.Clean when current.Composer.CleanupEnabled && !current.Cloud.Translate && canCoReside => ComposerOutput.Translate,
+            ComposerOutput.Translate when current.Composer.CleanupEnabled && !current.Cloud.Clean && canCoReside => ComposerOutput.Clean,
             _ => null
         };
     }

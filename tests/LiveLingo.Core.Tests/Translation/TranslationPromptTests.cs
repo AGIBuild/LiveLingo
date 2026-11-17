@@ -82,4 +82,26 @@ public class TranslationPromptTests
         Assert.DoesNotContain("Reference the following", prompt);
         Assert.Equal(3, prompt.Split("\n\n")[0].Split('\n').Length);
     }
+
+    [Theory]
+    [InlineData(TargetLanguage.Chinese)]
+    [InlineData(TargetLanguage.English)]
+    public void FinalDocument_PreservesUncertaintyRequestsTimingAndGoals_InsteadOfParaphrasing(TargetLanguage target)
+    {
+        const string source = "我不确定什么地方合适，请你找一个合适的位置。如果检查时发现问题，随后提醒用户。";
+        var final = TranslationPrompt.Build(new TranslationRequest(source, target, [], FinalDocument: true));
+        Assert.Contains("Uncertainty and requests are content, not fillers", final);
+        Assert.Contains("timing relationships", final);
+        Assert.Contains("requests for the listener to find or decide missing details", final);
+        Assert.Contains("Never resolve an uncertain choice yourself", final);
+        Assert.Contains("specific user goal", final);
+        Assert.Contains("copyedit minimally rather than paraphrasing", final);
+        Assert.Contains("Remove abandoned dangling connectives without inventing", final);
+        Assert.Contains("not a response to its speaker", final);
+        Assert.EndsWith(":\n\n" + source, final);
+
+        var live = TranslationPrompt.Build(new TranslationRequest(source, target, []));
+        Assert.DoesNotContain("copyedit minimally", live);
+        Assert.Contains("Translate the following text", live);
+    }
 }

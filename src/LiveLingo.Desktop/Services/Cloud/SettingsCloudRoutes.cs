@@ -6,26 +6,26 @@ using LiveLingo.Desktop.Services.Configuration;
 namespace LiveLingo.Desktop.Services.Cloud;
 
 /// <summary>
-/// Sends a role to the cloud only when the user switched it on in the settings, and only to the one enabled endpoint.
-/// The settings and the API key (system secret store) are read on every request. An incomplete configuration is an
-/// explicit error: the text is never quietly handled by another backend or another endpoint.
+/// Sends a role to the cloud only when the user explicitly assigned a cloud endpoint to that role.
+/// The settings and the API key (system secret store) are read on every request. An incomplete or dangling configuration
+/// is an explicit error: text is never quietly handled by the local model or by another endpoint.
 /// </summary>
 public sealed class SettingsCloudRoutes(ISettingsService settings, ISecretStore secrets) : ICloudRoutes
 {
     public async Task<CloudRoute?> GetAsync(InferenceRole role, CancellationToken ct)
     {
         var cloud = settings.Current.Cloud;
-        var enabled = role switch
+        var endpointId = role switch
         {
-            InferenceRole.Translator => cloud.Translate,
-            InferenceRole.Cleaner => cloud.Clean,
+            InferenceRole.Translator => cloud.TranslatorEndpointId,
+            InferenceRole.Cleaner => cloud.CleanerEndpointId,
             _ => throw new ArgumentOutOfRangeException(nameof(role))
         };
-        if (!enabled)
+        if (string.IsNullOrEmpty(endpointId))
             return null;
 
-        if (cloud.Active is not { } endpoint)
-            throw new CloudNotConfiguredException("The cloud model is not configured: no cloud endpoint is enabled.");
+        if (cloud.Endpoints.FirstOrDefault(item => item.Id == endpointId) is not { } endpoint)
+            throw new CloudNotConfiguredException("The cloud model is not configured: the selected cloud endpoint does not exist.");
 
         var key = await secrets.GetSecretAsync(endpoint.SecretId, ct).ConfigureAwait(false);
         try

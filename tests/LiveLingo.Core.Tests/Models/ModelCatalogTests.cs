@@ -94,4 +94,23 @@ public class ModelCatalogTests
         Assert.Equal(ModelType.PostProcessing, ModelCatalog.Cleaner.Type);
         Assert.Matches("/resolve/[0-9a-f]{40}/", ModelCatalog.Cleaner.Assets[0].DownloadUrl);
     }
+
+    [Theory]
+    [InlineData(LiveLingo.Core.Inference.ModelStage.Speech)]
+    [InlineData(LiveLingo.Core.Inference.ModelStage.Cleaner)]
+    [InlineData(LiveLingo.Core.Inference.ModelStage.Translator)]
+    public void SelectableOptions_AreOrderedStrictlyFromBestQualityToLightest(LiveLingo.Core.Inference.ModelStage stage)
+    {
+        var options = ModelCatalog.OptionsFor(stage);
+
+        Assert.True(options.Count >= 2);
+        Assert.Equal(Enumerable.Range(1, options.Count), options.Select(m => m.Profile!.Rank));
+        for (var i = 1; i < options.Count; i++)
+        {
+            Assert.True(options[i - 1].Profile!.QualityStars >= options[i].Profile!.QualityStars);
+            Assert.True(options[i - 1].Profile!.UtilityScore > options[i].Profile!.UtilityScore);
+            Assert.True(options[i - 1].SizeBytes > options[i].SizeBytes);
+            Assert.True(options[i - 1].Profile!.ResidentBytes > options[i].Profile!.ResidentBytes);
+        }
+    }
 }

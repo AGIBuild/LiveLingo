@@ -15,9 +15,12 @@ internal sealed class SettingsWindow : Window
     {
         var web = new WebSurface(WebPage.SettingsEntry, logger);
         Title = texts.Title;
-        Width = 920;
-        Height = 660;
-        CanResize = false;
+        Width = 980;
+        Height = 700;
+        MinWidth = 800;
+        MinHeight = 560;
+        CanResize = true;
+        CanMaximize = true;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
         Content = web.View;
 

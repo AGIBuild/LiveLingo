@@ -56,7 +56,8 @@ public enum CommitAction
 /// Identifies one piece of asynchronous work. A result is accepted only while the draft session,
 /// the unit and (for translations) the translation revision it was issued for are still current.
 /// </summary>
-public readonly record struct JobTicket(int Epoch, int UnitId, int TranslationRevision);
+public readonly record struct JobTicket(
+    int Epoch, int UnitId, int TranslationRevision, int UnitTranslationRevision = 0, int EditGeneration = 0);
 
 /// <summary>A source sentence or line with the layout whitespace around it, which is never sent to a model.</summary>
 public sealed record SourceUnit(string Body, string Lead = "", string Trail = "", bool IsComplete = true);

@@ -27,6 +27,7 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
     private readonly TargetWindowInfo? _target;
     private readonly SynchronizationContext? _notifyOn;
     private readonly TimeProvider _time;
+    private readonly bool _documentComposer;
     private readonly object _refreshGate = new();
     private CommitSnapshot? _committed;
     private bool _applyingDraftText;
@@ -56,6 +57,7 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
         TimeProvider? time = null)
     {
         _session = session;
+        _documentComposer = session.Read(d => d.DocumentMode);
         _scheduler = scheduler;
         _plan = plan;
         _models = models;
@@ -114,6 +116,9 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
     /// <summary>Overall download progress (0–100) of the models this composer needs; null when none is downloading.</summary>
     [ObservableProperty] private double? _downloadProgress;
 
+    /// <summary>Short name of the model currently downloading for this composer; empty when unknown or none.</summary>
+    [ObservableProperty] private string _downloadingModelName = "";
+
     [ObservableProperty] private bool _isListening;
 
     /// <summary>True while the speech models are loading after the microphone was pressed (takes a few seconds).</summary>
@@ -142,6 +147,8 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
 
     partial void OnOutputChanged(ComposerOutput value)
     {
+        if (IsEditing)
+            SaveEdit();
         CancelQueuedWrite();
         ModelsReady = IsInstalled(_plan.For(value));
         ApplyDraftOutput();
@@ -152,6 +159,8 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
 
     partial void OnTargetLanguageChanged(TargetLanguage value)
     {
+        if (IsEditing)
+            SaveEdit();
         CancelQueuedWrite();
         _scheduler.SetTarget(value);
     }
@@ -203,8 +212,12 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
             IsListening || IsStartingListening || IsTranscribing || HasTimeline || _committed is not null)
             return;
 
-        if (EditingIndex >= 0)
+        if (IsEditing)
+        {
             SaveEdit();
+            if (IsEditing)
+                return;
+        }
 
         if (_platform.MicrophonePermission.Status == MicrophoneAccess.Denied)
         {
@@ -284,6 +297,11 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
     {
         if (IsClearing)
             return;
+        if (IsEditingDocument)
+        {
+            SaveEdit();
+            return;
+        }
         var generation = _draftGeneration;
         if (_committed is not null)
             return;
@@ -298,7 +316,7 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
             return;
         }
 
-        if (EditingIndex >= 0)
+        if (IsEditing)
             SaveEdit();
 
         await StopListeningAsync().ConfigureAwait(true);
@@ -351,6 +369,13 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
     /// <summary>Closes without writing: the keyboard goes back to the application the user came from, which the closed window no longer holds.</summary>
     private void Close()
     {
+        if (IsEditing)
+        {
+            SaveEdit();
+            if (IsEditing)
+                return;
+        }
+        CancelQueuedWrite();
         if (_target is not null && HasOriginalTarget)
             _platform.WindowTracker.Activate(_target);
         CloseRequested?.Invoke();
@@ -373,7 +398,7 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
     [RelayCommand]
     private async Task CancelAsync()
     {
-        if (EditingIndex >= 0)
+        if (IsEditing)
             CancelEdit();
         else if (IsListening)
             await StopListeningAsync().ConfigureAwait(true);
@@ -425,6 +450,7 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
         }
 
         DownloadProgress = null;
+        DownloadingModelName = "";
         _downloadInBackground = false;
         if (missing.Count > 0)
         {
@@ -445,6 +471,7 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
     private void ShowDownloadFailure(string? error)
     {
         DownloadProgress = null;
+        DownloadingModelName = "";
         _downloadInBackground = false;
         Banner = new BannerState(BannerKind.DownloadFailed, error ?? "");
     }
@@ -456,10 +483,12 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
     private void AttachToRunningDownloads()
     {
         var wanted = WantedModels();
-        if (!wanted.Any(model => _downloads.GetState(model.Id).IsDownloading))
+        var active = wanted.FirstOrDefault(model => _downloads.GetState(model.Id).IsDownloading);
+        if (active is null)
             return;
 
         _downloadInBackground = true;
+        DownloadingModelName = active.ShortName;
         DownloadProgress = OverallProgress(wanted);
         if (Banner.Kind is BannerKind.ModelMissing)
             Banner = BannerState.None;
@@ -517,7 +546,7 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
     private void CancelQueuedWrite() => IsWriteQueued = false;
 
     private void UpdateEditable() =>
-        IsEditable = _committed is null && !IsClearing && !IsListening && !IsStartingListening && !IsTranscribing && !HasTimeline;
+        IsEditable = _committed is null && !IsEditing && !IsClearing && !IsListening && !IsStartingListening && !IsTranscribing && !HasTimeline;
 
     private async Task CompleteAsync(CommitSnapshot snapshot)
     {
@@ -599,7 +628,8 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
     private void OnDownloadStateChanged(ModelDownloadState state)
     {
         var wanted = WantedModels();
-        if (wanted.All(model => model.Id != state.ModelId))
+        var matching = wanted.FirstOrDefault(model => model.Id == state.ModelId);
+        if (matching is null)
             return;
 
         void Apply()
@@ -608,9 +638,10 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
                 return;
 
             var progress = OverallProgress(wanted);
+            DownloadingModelName = matching.ShortName;
             DownloadProgress = progress;
             if (!_downloadInBackground)
-                Banner = new BannerState(BannerKind.Downloading, "", progress);
+                Banner = new BannerState(BannerKind.Downloading, matching.ShortName, progress);
         }
 
         if (_notifyOn is null)
@@ -651,10 +682,17 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
             // The countdown exists before "working" is published, so whoever sees the status can rely on it.
             UpdateSlowTimer(status);
             Status = status;
-            CanCopy = _committed is not null || Status == ComposerStatus.Ready;
+            CanCopy = !IsEditing && (_committed is not null || Status == ComposerStatus.Ready);
             CanWrite = CanCopy && _committed is null;
             OnPropertyChanged(nameof(CanReplaceDraft));
             OnPropertyChanged(nameof(CanEditRows));
+            OnPropertyChanged(nameof(CanEditDocument));
+            OnPropertyChanged(nameof(FinalState));
+            OnPropertyChanged(nameof(FinalIsOwned));
+            OnPropertyChanged(nameof(FinalText));
+            OnPropertyChanged(nameof(FinalError));
+            OnPropertyChanged(nameof(NeedsFinalChoice));
+            OnPropertyChanged(nameof(CanAcceptPreview));
 
             var needsModels = !ModelsReady && Output != ComposerOutput.Original;
             if (needsModels && Banner.Kind is BannerKind.None && DownloadProgress is null)

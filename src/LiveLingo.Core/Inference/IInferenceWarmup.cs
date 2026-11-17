@@ -16,6 +16,13 @@ public interface IInferenceWarmup
 /// <summary>The local model that serves each role.</summary>
 public static class InferenceModels
 {
+    public static ModelDescriptor For(InferenceRole role, ModelSelection selection) => role switch
+    {
+        InferenceRole.Cleaner => selection.Cleaner,
+        InferenceRole.Translator => selection.Translator,
+        _ => throw new ArgumentOutOfRangeException(nameof(role))
+    };
+
     public static ModelDescriptor For(InferenceRole role, TranslatorTier tier) => role switch
     {
         InferenceRole.Cleaner => ModelCatalog.Cleaner,

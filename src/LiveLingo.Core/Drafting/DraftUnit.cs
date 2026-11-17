@@ -38,6 +38,7 @@ public sealed class DraftUnit
     public bool IsComplete { get; private set; } = true;
     public UnitResult Clean { get; } = new();
     public UnitResult Translation { get; } = new();
+    internal int TranslationRevision { get; set; }
 
     internal UnitResult Result(UnitKind kind) => kind == UnitKind.Clean ? Clean : Translation;
 

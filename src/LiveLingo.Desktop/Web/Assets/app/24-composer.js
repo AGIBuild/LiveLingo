@@ -130,6 +130,7 @@
 
     const target = e.target;
     if (target.classList?.contains('edit')) {
+      if (target.classList.contains('document-edit') && !(e.ctrlKey || e.metaKey)) return;
       e.preventDefault();
       LL.send('saveEdit');
       return;

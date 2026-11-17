@@ -1,6 +1,7 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using LiveLingo.Core.Models;
 using LiveLingo.Desktop.Composer;
 using LiveLingo.Desktop.Settings;
 
@@ -28,6 +29,9 @@ namespace LiveLingo.Desktop.Web;
 [JsonDerivedType(typeof(HideIntent), "hide")]
 [JsonDerivedType(typeof(RetryIntent), "retry")]
 [JsonDerivedType(typeof(EditIntent), "edit")]
+[JsonDerivedType(typeof(EditDocumentIntent), "editDocument")]
+[JsonDerivedType(typeof(RetryDocumentIntent), "retryDocument")]
+[JsonDerivedType(typeof(AcceptPreviewIntent), "acceptPreview")]
 [JsonDerivedType(typeof(EditTextIntent), "editText")]
 [JsonDerivedType(typeof(SaveEditIntent), "saveEdit")]
 [JsonDerivedType(typeof(SaveEditAndRememberIntent), "saveEditAndRemember")]
@@ -48,14 +52,20 @@ namespace LiveLingo.Desktop.Web;
 [JsonDerivedType(typeof(RemoveTermIntent), "removeTerm")]
 [JsonDerivedType(typeof(AddCorrectionIntent), "addCorrection")]
 [JsonDerivedType(typeof(RemoveCorrectionIntent), "removeCorrection")]
-[JsonDerivedType(typeof(CloudToggleIntent), "cloudToggle")]
+[JsonDerivedType(typeof(SelectCloudModelIntent), "selectCloudModel")]
+[JsonDerivedType(typeof(UseLocalStageIntent), "useLocalStage")]
+[JsonDerivedType(typeof(DisableAllCloudIntent), "disableAllCloud")]
 [JsonDerivedType(typeof(ConsentIntent), "consent")]
 [JsonDerivedType(typeof(OpenEndpointFormIntent), "openEndpointForm")]
 [JsonDerivedType(typeof(CloseEndpointFormIntent), "closeEndpointForm")]
 [JsonDerivedType(typeof(SaveEndpointIntent), "saveEndpoint")]
-[JsonDerivedType(typeof(EnableEndpointIntent), "enableEndpoint")]
 [JsonDerivedType(typeof(DeleteEndpointIntent), "deleteEndpoint")]
 [JsonDerivedType(typeof(EndpointAnswerIntent), "endpointAnswer")]
+[JsonDerivedType(typeof(SelectModelIntent), "selectModel")]
+[JsonDerivedType(typeof(DownloadModelIntent), "downloadModel")]
+[JsonDerivedType(typeof(CancelModelDownloadIntent), "cancelModelDownload")]
+[JsonDerivedType(typeof(DeleteModelIntent), "deleteModel")]
+[JsonDerivedType(typeof(ApplyRecommendedModelsIntent), "applyRecommendedModels")]
 [JsonDerivedType(typeof(RemoveLegacyModelsIntent), "removeLegacyModels")]
 [JsonDerivedType(typeof(CheckUpdatesIntent), "checkUpdates")]
 [JsonDerivedType(typeof(RestartToUpdateIntent), "restartToUpdate")]
@@ -69,7 +79,8 @@ internal abstract record WebIntent
     /// <summary>A message may carry a whole pasted document; nothing legitimate is larger.</summary>
     public const int MaxBytes = 1 << 20;
 
-    private static readonly string[] SettingsSections = ["general", "voice", "privacy", "models"];
+    private static readonly string[] SettingsSections = ["general", "voice", "models", "about"];
+    private static readonly string[] ModelsTabs = ["speech", "cleaner", "translator", "storage"];
 
     public required int V { get; init; }
 
@@ -81,7 +92,14 @@ internal abstract record WebIntent
 
     protected static bool IsSection(string value) => SettingsSections.Contains(value);
 
+    protected static bool IsModelsTab(string value) => ModelsTabs.Contains(value);
+
     protected static bool IsEndpointId(string value) => value.Length is >= 1 and <= 64;
+
+    protected static bool IsSelectableModelId(string value) => ModelCatalog.FindSelectable(value) is not null;
+
+    protected static bool IsCatalogModelId(string value) =>
+        value.Length is >= 1 and <= 64 && ModelCatalog.All.Any(m => string.Equals(m.Id, value, StringComparison.Ordinal));
 
     /// <summary>
     /// Returns the intent, or null with a <paramref name="reason"/> that is safe to log: it names the kind of failure
@@ -208,6 +226,12 @@ internal sealed record EditIntent(int I) : WebIntent
 
 internal sealed record EditTextIntent(string Text) : WebIntent;
 
+internal sealed record EditDocumentIntent : WebIntent;
+
+internal sealed record RetryDocumentIntent : WebIntent;
+
+internal sealed record AcceptPreviewIntent : WebIntent;
+
 internal sealed record SaveEditIntent : WebIntent;
 
 internal sealed record SaveEditAndRememberIntent : WebIntent;
@@ -240,9 +264,9 @@ internal sealed record CopyOnlyIntent(bool On) : WebIntent;
 
 internal sealed record BannerIntent(BannerAction Action) : WebIntent;
 
-internal sealed record OpenSettingsIntent(string Section) : WebIntent
+internal sealed record OpenSettingsIntent(string Section, string? Tab = null) : WebIntent
 {
-    protected override bool IsValid => IsSection(Section);
+    protected override bool IsValid => IsSection(Section) && (Tab is null || (Section == "models" && IsModelsTab(Tab)));
 }
 
 /// <summary>One value of the settings changed. Unknown keys, and values outside a closed choice, are dropped here.</summary>
@@ -258,7 +282,6 @@ internal sealed record SettingIntent(string Key, string Value) : WebIntent
         public const string Microphone = "microphone";
         public const string Direction = "direction";
         public const string Cleanup = "cleanup";
-        public const string Tier = "tier";
         public const string DefaultOutput = "defaultOutput";
         public const string AutoDictate = "autoDictate";
         public const string PreloadSpeech = "preloadSpeech";
@@ -278,7 +301,6 @@ internal sealed record SettingIntent(string Key, string Value) : WebIntent
         Names.Language => SettingsViewModel.Languages.Contains(Value),
         Names.Theme => SettingsViewModel.Themes.Contains(Value),
         Names.Direction => SettingsViewModel.Targets.Contains(Value),
-        Names.Tier => SettingsViewModel.Tiers.Contains(Value),
         Names.DefaultOutput => SettingsViewModel.DefaultOutputs.Contains(Value),
         Names.ReduceMotion or Names.Cleanup or Names.AutoDictate or Names.PreloadSpeech or Names.BuiltInGlossary or Names.RememberChoices => Value is "true" or "false",
         _ => false
@@ -305,7 +327,14 @@ internal sealed record RemoveCorrectionIntent(int Index) : WebIntent
     protected override bool IsValid => IsIndex(Index);
 }
 
-internal sealed record CloudToggleIntent(CloudStep Step, bool On) : WebIntent;
+internal sealed record SelectCloudModelIntent(CloudStep Step, string EndpointId) : WebIntent
+{
+    protected override bool IsValid => IsEndpointId(EndpointId);
+}
+
+internal sealed record UseLocalStageIntent(CloudStep Step) : WebIntent;
+
+internal sealed record DisableAllCloudIntent : WebIntent;
 
 internal sealed record ConsentIntent(bool Allow) : WebIntent;
 
@@ -328,18 +357,35 @@ internal sealed record SaveEndpointIntent(string Label, string BaseUrl, string M
     public override string ToString() => nameof(SaveEndpointIntent);
 }
 
-internal sealed record EnableEndpointIntent(string Id, bool On) : WebIntent
-{
-    protected override bool IsValid => IsEndpointId(Id);
-}
-
 internal sealed record DeleteEndpointIntent(string Id) : WebIntent
 {
     protected override bool IsValid => IsEndpointId(Id);
 }
 
-/// <summary>The answer to a switch of the enabled endpoint or a deletion that was asked about.</summary>
+/// <summary>The answer to an endpoint deletion that was asked about.</summary>
 internal sealed record EndpointAnswerIntent(bool Allow) : WebIntent;
+
+internal sealed record SelectModelIntent(string ModelId) : WebIntent
+{
+    protected override bool IsValid => IsSelectableModelId(ModelId);
+}
+
+internal sealed record DownloadModelIntent(string ModelId) : WebIntent
+{
+    protected override bool IsValid => IsCatalogModelId(ModelId);
+}
+
+internal sealed record CancelModelDownloadIntent(string ModelId) : WebIntent
+{
+    protected override bool IsValid => IsCatalogModelId(ModelId);
+}
+
+internal sealed record DeleteModelIntent(string ModelId) : WebIntent
+{
+    protected override bool IsValid => IsSelectableModelId(ModelId);
+}
+
+internal sealed record ApplyRecommendedModelsIntent : WebIntent;
 
 internal sealed record RemoveLegacyModelsIntent : WebIntent;
 

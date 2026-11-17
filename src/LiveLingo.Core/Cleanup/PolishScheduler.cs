@@ -47,12 +47,14 @@ public sealed class PolishScheduler : IAsyncDisposable
     private bool _running;
     private bool _disposed;
     private Task _worker = Task.CompletedTask;
+    private readonly DocumentScheduler _documents;
 
     /// <param name="style">The polish requirements, already resolved (<see cref="PolishStyle.Resolve"/>).</param>
     public PolishScheduler(
         DraftSession session, IDictationPolisher polisher, IReadOnlyList<string> glossary, string style, int contextChars,
         ILogger<PolishScheduler>? logger = null,
-        IReadOnlyList<GlossaryCorrection>? corrections = null)
+        IReadOnlyList<GlossaryCorrection>? corrections = null,
+        TimeProvider? time = null)
     {
         _session = session;
         _polisher = polisher;
@@ -61,6 +63,7 @@ public sealed class PolishScheduler : IAsyncDisposable
         _style = PolishStyle.Resolve(style);
         _contextChars = contextChars;
         _logger = logger ?? NullLogger<PolishScheduler>.Instance;
+        _documents = new DocumentScheduler(session, UnitKind.Clean, PolishDocumentAsync, time);
         _session.Mutate(draft => draft.PolishExpected = true);
         _session.Changed += OnChanged;
         OnChanged();
@@ -84,7 +87,44 @@ public sealed class PolishScheduler : IAsyncDisposable
 
     /// <summary>A recording just stopped and the polish is not done: only for the cleanup output, and not for a frozen draft.</summary>
     private static bool IsDue(Draft draft) =>
-        draft.Polishing && !draft.Recording && draft.Snapshot is null && draft.Output == OutputKind.Clean;
+        !draft.DocumentMode && draft.Polishing && !draft.Recording && draft.Snapshot is null && draft.Output == OutputKind.Clean;
+
+    private async Task<string> PolishDocumentAsync(DocumentWork work, CancellationToken ct)
+    {
+        var summary = work.Pieces.Count(piece => !piece.Owned) > 1
+            ? await _polisher.SummarizeAsync(work.Source, ct).ConfigureAwait(false) : "";
+        return await work.TransformAsync(async (target, preceding, token) =>
+        {
+            const string layout = "\n保留显式段落、缩进和列表结构；代码、URL、占位符和技术标识符必须逐字保留。";
+            var request = new PolishRequest(target, preceding, summary, _glossary, _style + layout, _corrections);
+            string text = "";
+            try
+            {
+                text = (await _polisher.PolishAsync(request, token).ConfigureAwait(false)).Trim();
+            }
+            catch (InvalidDataException) when (_style != PolishStyle.Default) { }
+            token.ThrowIfCancellationRequested();
+            string? Refusal(string candidate)
+            {
+                var gate = FidelityGate.Check(target, candidate, _glossary, allowParagraphs: true, corrections: _corrections);
+                if (!gate.Accepted)
+                    return "Final polish refused: " + gate.Rejection?.Reason;
+                return TextUnits.LiteralSpans(target).Select(span => target[span.Start..span.End])
+                    .SequenceEqual(TextUnits.LiteralSpans(candidate).Select(span => candidate[span.Start..span.End]))
+                    ? null : "Final polish changed a protected literal.";
+            }
+            var refusal = Refusal(text);
+            if (refusal is not null && _style != PolishStyle.Default)
+            {
+                text = (await _polisher.PolishAsync(request with { Style = PolishStyle.Default + layout }, token).ConfigureAwait(false)).Trim();
+                token.ThrowIfCancellationRequested();
+                refusal = Refusal(text);
+            }
+            if (refusal is not null)
+                throw new InvalidDataException(refusal);
+            return text;
+        }, _contextChars, ct).ConfigureAwait(false);
+    }
 
     private bool Observe(Draft draft)
     {
@@ -365,6 +405,7 @@ public sealed class PolishScheduler : IAsyncDisposable
         }
 
         _session.Changed -= OnChanged;
+        await _documents.DisposeAsync().ConfigureAwait(false);
         await _stop.CancelAsync().ConfigureAwait(false);
         await worker.ConfigureAwait(false);
         _stop.Dispose();

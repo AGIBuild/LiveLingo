@@ -49,7 +49,7 @@ public sealed class SettingsIntentsTests
         rig.Set(SettingIntent.Names.Language, "en-US");
         rig.Set(SettingIntent.Names.Theme, "Dark");
         rig.Set(SettingIntent.Names.Direction, "Chinese");
-        rig.Set(SettingIntent.Names.Tier, "Fast");
+        rig.Do(new SelectModelIntent(ModelCatalog.TranslatorQuality.Id) { V = 1 });
         rig.Set(SettingIntent.Names.ReduceMotion, "true");
 
         var stored = rig.F.Last;
@@ -58,7 +58,7 @@ public sealed class SettingsIntentsTests
         Assert.Equal("en-US", stored.Appearance.Language);
         Assert.Equal("Dark", stored.Appearance.Theme);
         Assert.Equal("Chinese", stored.Composer.TargetLanguage);
-        Assert.Equal("Fast", stored.Composer.TranslatorTier);
+        Assert.Equal(ModelCatalog.TranslatorQuality.Id, stored.Composer.TranslatorModel);
         Assert.False(stored.Appearance.Animations);
     }
 
@@ -145,21 +145,29 @@ public sealed class SettingsIntentsTests
     }
 
     [Fact]
-    public async Task ACloudStep_NeedsTheUsersAnswerBeforeItTurnsOn()
+    public async Task ACloudStep_NeedsTheUsersAnswerBeforeItTurnsOn_AndCanSwitchBackToLocalOrDisableAll()
     {
         var rig = new Rig(ConfiguredCloud(), storedKey: "sk");
         await rig.Vm.InitializeAsync();
 
-        rig.Do(new CloudToggleIntent(CloudStep.Translate, On: true) { V = 1 });
-        Assert.Equal(CloudStep.Translate, rig.Vm.PendingConsent);
+        rig.Do(new SelectCloudModelIntent(CloudStep.Translate, "main") { V = 1 });
+        Assert.Equal(new PendingCloudConsent(CloudStep.Translate, "main", null), rig.Vm.PendingConsent);
         Assert.False(rig.Vm.CloudTranslate);
 
         rig.Do(new ConsentIntent(Allow: true) { V = 1 });
         Assert.Null(rig.Vm.PendingConsent);
-        Assert.True(rig.F.Last.Cloud.Translate);
+        Assert.Equal("main", rig.F.Last.Cloud.TranslatorEndpointId);
 
-        rig.Do(new CloudToggleIntent(CloudStep.Translate, On: false) { V = 1 });
-        Assert.False(rig.F.Last.Cloud.Translate);
+        rig.Do(new SelectCloudModelIntent(CloudStep.Clean, "other") { V = 1 });
+        rig.Do(new ConsentIntent(Allow: true) { V = 1 });
+        Assert.Equal("other", rig.F.Last.Cloud.CleanerEndpointId);
+
+        rig.Do(new UseLocalStageIntent(CloudStep.Translate) { V = 1 });
+        Assert.Equal("", rig.F.Last.Cloud.TranslatorEndpointId);
+        Assert.Equal("other", rig.F.Last.Cloud.CleanerEndpointId);
+
+        rig.Do(new DisableAllCloudIntent { V = 1 });
+        Assert.Equal("", rig.F.Last.Cloud.CleanerEndpointId);
     }
 
     [Fact]
@@ -192,16 +200,13 @@ public sealed class SettingsIntentsTests
     }
 
     [Fact]
-    public async Task AnEndpoint_IsEnabledByTheSwitch_AndAskedAboutBeforeItIsDeleted()
+    public async Task AnEndpoint_IsAskedAboutBeforeItIsDeleted()
     {
         var rig = new Rig(ConfiguredCloud(), storedKey: "sk");
         await rig.Vm.InitializeAsync();
 
-        rig.Do(new EnableEndpointIntent("other", On: true) { V = 1 });
-        Assert.Equal("other", rig.F.Last.Cloud.ActiveEndpointId);
-
         rig.Do(new DeleteEndpointIntent("main") { V = 1 });
-        Assert.Equal(new PendingEndpointChange(EndpointChange.Delete, "main"), rig.Vm.PendingChange);
+        Assert.Equal("main", rig.Vm.PendingDeleteId);
 
         rig.Do(new EndpointAnswerIntent(Allow: true) { V = 1 });
         await Wait.Until(() => rig.Vm.Endpoints.Count == 1);
@@ -258,6 +263,31 @@ public sealed class SettingsIntentsTests
         rig.Do(new ClearRecentIntent { V = 1 });
 
         Assert.Empty(rig.F.Recent.Items);
+    }
+
+    [Fact]
+    public async Task ModelManagementIntents_DispatchSelectDownloadCancelDeleteAndApplyRecommended()
+    {
+        var rig = new Rig();
+        rig.F.Models.ListInstalled().Returns([
+            new InstalledModel(ModelCatalog.TranslatorFast.Id, "fast", "/m/fast", 10, ModelType.Translation, DateTime.UnixEpoch),
+            new InstalledModel(ModelCatalog.CleanerFast.Id, "c2", "/m/c2", 10, ModelType.PostProcessing, DateTime.UnixEpoch)]);
+        await rig.Vm.InitializeAsync();
+
+        rig.Do(new DownloadModelIntent(ModelCatalog.TranslatorQuality.Id) { V = 1 });
+        await rig.F.Downloads.Received(1).StartAsync(ModelCatalog.TranslatorQuality);
+
+        rig.Do(new CancelModelDownloadIntent(ModelCatalog.TranslatorQuality.Id) { V = 1 });
+        rig.F.Downloads.Received(1).Cancel(ModelCatalog.TranslatorQuality.Id);
+
+        rig.Do(new SelectModelIntent(ModelCatalog.SpeechFast.Id) { V = 1 });
+        Assert.Equal(ModelCatalog.SpeechFast.Id, rig.Vm.ActiveModels.SpeechModelId);
+
+        rig.Do(new ApplyRecommendedModelsIntent { V = 1 });
+        Assert.Equal(ModelCatalog.SpeechSecondPass.Id, rig.Vm.ActiveModels.SpeechModelId);
+
+        rig.Do(new DeleteModelIntent(ModelCatalog.CleanerFast.Id) { V = 1 });
+        await Wait.Until(() => rig.F.Models.ReceivedCalls().Any(c => c.GetMethodInfo().Name == nameof(IModelManager.CleanObsoleteModelsAsync)));
     }
 
     [Fact]
@@ -338,9 +368,10 @@ public sealed class SettingsIntentsTests
         var rig = new Rig(section: "voice");
         Assert.Equal("voice", rig.Sut.Section);
 
-        rig.Do(new OpenSettingsIntent("privacy") { V = 1 });
+        rig.Do(new OpenSettingsIntent("models", "translator") { V = 1 });
 
-        Assert.Equal("privacy", rig.Sut.Section);
+        Assert.Equal("models", rig.Sut.Section);
+        Assert.Equal("translator", rig.Sut.ModelsTab);
     }
 
     [Fact]

@@ -17,8 +17,10 @@ public sealed record GlossaryCorrection(string Spoken, string Canonical);
 
 /// <param name="Source">Text to translate as the user wrote it; the translator protects literals itself.</param>
 /// <param name="Context">Read-only background that must not be translated; empty when unused.</param>
+/// <param name="FinalDocument">Repair ASR fragment boundaries while translating the final document, including same-language output.</param>
 public sealed record TranslationRequest(
     string Source,
     TargetLanguage Target,
     IReadOnlyList<GlossaryTerm> Terms,
-    string Context = "");
+    string Context = "",
+    bool FinalDocument = false);

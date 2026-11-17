@@ -73,8 +73,10 @@ public sealed class JsonSettingsService : ISettingsService
                 }
             }
 
-            // The single cloud endpoint of earlier versions becomes the first of the endpoint list.
+            // The single cloud endpoint and single translator tier of earlier versions migrate in-place.
             if (_current.Cloud.MigrateLegacy())
+                shouldPersistDefaults = true;
+            if (_current.Composer.MigrateLegacy())
                 shouldPersistDefaults = true;
 
             if (shouldPersistDefaults)

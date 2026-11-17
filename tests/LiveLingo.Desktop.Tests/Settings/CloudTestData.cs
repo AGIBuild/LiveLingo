@@ -13,14 +13,17 @@ internal static class CloudTestData
     public static CloudEndpoint Endpoint(string id, string name, string url, string model) =>
         new() { Id = id, Name = name, BaseUrl = url, Model = model, SecretId = SecretId(id) };
 
-    /// <summary>The endpoints "main" and "other"; <paramref name="active"/> is the id of the enabled one (null: none).</summary>
-    public static SettingsModel WithEndpoints(string? active = "main", bool translate = false, bool clean = false)
+    /// <summary>The saved endpoints "main" and "other", optionally assigned independently to translation and/or cleanup.</summary>
+    public static SettingsModel WithEndpoints(
+        bool translate = false,
+        bool clean = false,
+        string? translatorId = null,
+        string? cleanerId = null)
     {
         var model = new SettingsModel();
         model.Cloud.Endpoints = [Endpoint("main", "Main", MainUrl, "m"), Endpoint("other", "Other", OtherUrl, "o")];
-        model.Cloud.ActiveEndpointId = active ?? "";
-        model.Cloud.Translate = translate;
-        model.Cloud.Clean = clean;
+        model.Cloud.TranslatorEndpointId = translatorId ?? (translate ? "main" : "");
+        model.Cloud.CleanerEndpointId = cleanerId ?? (clean ? "main" : "");
         return model;
     }
 }

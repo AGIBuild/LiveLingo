@@ -48,6 +48,7 @@ public static class ServiceCollectionExtensions
             });
         services.AddSingleton<IModelManager>(sp => sp.GetRequiredService<ModelManager>());
         services.AddSingleton<IModelDownloadCoordinator, InProcessModelDownloadCoordinator>();
+        services.AddSingleton<IHardwareProbe, SystemHardwareProbe>();
 
         services.AddSingleton<IProcessInspector, SystemProcessInspector>();
         services.AddSingleton(sp => new ServerPidRegistry(
@@ -85,7 +86,7 @@ public static class ServiceCollectionExtensions
             new LocalChatClient(
                 sp.GetRequiredService<LlamaServerHost>(),
                 InferenceRole.Cleaner,
-                () => InferenceModels.For(InferenceRole.Cleaner, sp.GetRequiredService<CoreOptions>().TranslatorTier),
+                () => InferenceModels.For(InferenceRole.Cleaner, sp.GetRequiredService<CoreOptions>().Models),
                 sp.GetRequiredService<ModelUsage>()),
             CloudHttp, sp.GetRequiredService<ModelUsage>()));
         services.AddSingleton<ITextCleaner>(sp =>
@@ -98,7 +99,7 @@ public static class ServiceCollectionExtensions
             new LocalChatClient(
                 sp.GetRequiredService<LlamaServerHost>(),
                 InferenceRole.Translator,
-                () => InferenceModels.For(InferenceRole.Translator, sp.GetRequiredService<CoreOptions>().TranslatorTier),
+                () => InferenceModels.For(InferenceRole.Translator, sp.GetRequiredService<CoreOptions>().Models),
                 sp.GetRequiredService<ModelUsage>()),
             CloudHttp, sp.GetRequiredService<ModelUsage>())));
 

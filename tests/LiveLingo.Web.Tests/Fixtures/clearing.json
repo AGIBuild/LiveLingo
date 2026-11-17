@@ -25,12 +25,12 @@
   },
   "output": {
     "value": "clean",
-    "pill": "中文 · 整理",
+    "pill": "整理原话",
     "globe": false,
     "menu": [
       {
         "id": "clean",
-        "label": "保持中文（整理）",
+        "label": "整理原话（保持原语言）",
         "checked": true,
         "enabled": true
       },
@@ -47,7 +47,7 @@
         "enabled": true
       }
     ],
-    "swap": "语言：中文 → English\u3000⇄ 互换",
+    "swap": "翻译目标改为 中文",
     "note": null
   },
   "banner": null,
@@ -62,7 +62,8 @@
     "lines": [],
     "resume": null,
     "remembered": null,
-    "canClear": false
+    "canClear": false,
+    "collapsible": false
   },
   "result": {
     "visible": true,
@@ -77,14 +78,15 @@
         "warn": false,
         "owned": false,
         "editing": false,
-        "canEdit": true,
-        "canUseOriginal": true,
+        "canEdit": false,
+        "canUseOriginal": false,
         "useOriginalAria": "第 1 句改用原话",
         "editAria": "编辑第 1 句"
       }
     ],
     "editText": "",
-    "rememberCorrection": null
+    "rememberCorrection": null,
+    "document": null
   },
   "footer": {
     "mic": {

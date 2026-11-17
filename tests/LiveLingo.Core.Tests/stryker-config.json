@@ -19,6 +19,8 @@
       "**/Cloud/**/*.cs",
       "**/Transcription/**/*.cs",
       "**/Inference/**/*.cs",
+      "**/Models/ModelAdvisor.cs",
+      "**/Models/ModelSelection.cs",
       "!**/Inference/LlamaProcessLauncher.cs",
       "!**/Inference/LlamaServerAdapters.cs"
     ],

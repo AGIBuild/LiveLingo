@@ -40,4 +40,19 @@ public class ComposerModelPlanTests
         Assert.Equal(ModelCatalog.Speech, plan.Voice);
         Assert.Empty(plan.For(ComposerOutput.Clean));
     }
+
+    [Fact]
+    public void ModelSelection_WiresAllThreeStagesIntoThePlan()
+    {
+        var selection = new ModelSelection(
+            ModelCatalog.SpeechFast.Id,
+            ModelCatalog.CleanerQuality.Id,
+            ModelCatalog.TranslatorQuality.Id);
+        var plan = ComposerModelPlan.Create(selection, cleanInCloud: false, translateInCloud: false);
+
+        Assert.Equal([ModelCatalog.LlamaRuntime, ModelCatalog.CleanerQuality], plan.For(ComposerOutput.Clean));
+        Assert.Equal([ModelCatalog.LlamaRuntime, ModelCatalog.TranslatorQuality], plan.For(ComposerOutput.Translate));
+        Assert.Equal(ModelCatalog.SpeechFor(ModelCatalog.SpeechFast), plan.Voice);
+        Assert.Equal(ModelCatalog.TranscriptionFor(ModelCatalog.SpeechFast), plan.Transcription);
+    }
 }

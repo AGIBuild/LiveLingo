@@ -288,14 +288,18 @@ public class LlamaServerHostTests
     }
 
     [Fact]
-    public async Task TheWarmupOfARole_LoadsThePinnedModelOfThatRole_AndNothingWhenTheRoleRunsInTheCloud()
+    public async Task TheWarmupOfARole_LoadsTheSelectedModelOfThatRole_AndNothingWhenTheRoleRunsInTheCloud()
     {
         await using var h = new Harness();
         var routes = Substitute.For<LiveLingo.Core.Cloud.ICloudRoutes>();
         routes.GetAsync(InferenceRole.Translator, Arg.Any<CancellationToken>())
             .Returns(LiveLingo.Core.Cloud.CloudRoute.Create("https://example.com/v1", "m", "k"));
         routes.GetAsync(InferenceRole.Cleaner, Arg.Any<CancellationToken>()).Returns((LiveLingo.Core.Cloud.CloudRoute?)null);
-        h.Core.TranslatorTier = TranslatorTier.Quality;
+        h.Core.Models = ModelSelection.Baseline with
+        {
+            CleanerModelId = ModelCatalog.CleanerQuality.Id,
+            TranslatorModelId = ModelCatalog.TranslatorQuality.Id
+        };
         var warmup = new LlamaWarmup(h.Host, routes, h.Core);
 
         await warmup.WarmAsync(InferenceRole.Translator);
@@ -303,16 +307,25 @@ public class LlamaServerHostTests
 
         await warmup.WarmAsync(InferenceRole.Cleaner);
         var model = h.Launcher.Started.Single().Launch.Arguments[1];
-        Assert.Contains(ModelCatalog.Cleaner.Id, model);
+        Assert.Contains(ModelCatalog.CleanerQuality.Id, model);
     }
 
     [Theory]
     [InlineData(TranslatorTier.Fast, "hy-mt2-1.8b-q4km")]
     [InlineData(TranslatorTier.Quality, "hy-mt2-7b-q4km")]
-    public void TheTranslatorRole_FollowsTheTier_AndTheCleanerDoesNot(TranslatorTier tier, string translator)
+    public void TheTranslatorRole_FollowsTheTier_AndModelSelectionResolvesBothRoles(TranslatorTier tier, string translator)
     {
         Assert.Equal(translator, InferenceModels.For(InferenceRole.Translator, tier).Id);
         Assert.Equal(ModelCatalog.Cleaner, InferenceModels.For(InferenceRole.Cleaner, tier));
+
+        var selection = new ModelSelection(
+            ModelCatalog.SpeechFast.Id,
+            ModelCatalog.CleanerFast.Id,
+            translator);
+        Assert.Equal(ModelCatalog.CleanerFast, InferenceModels.For(InferenceRole.Cleaner, selection));
+        Assert.Equal(translator, InferenceModels.For(InferenceRole.Translator, selection).Id);
+        Assert.Throws<ArgumentOutOfRangeException>(() => InferenceModels.For((InferenceRole)99, selection));
+        Assert.Throws<ArgumentOutOfRangeException>(() => InferenceModels.For((InferenceRole)99, tier));
     }
 
     [Fact]

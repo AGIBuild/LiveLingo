@@ -606,11 +606,11 @@ public sealed class ComposerInteractionTests(BrowserFixture browsers)
         const string active = "document.activeElement.textContent";
 
         await page.Page.Keyboard.PressAsync("End");
-        Assert.Contains("互换", await page.Page.EvaluateAsync<string>(active));
+        Assert.Contains("翻译目标改为", await page.Page.EvaluateAsync<string>(active));
         await page.Page.Keyboard.PressAsync("ArrowDown");
         Assert.Contains("整理", await page.Page.EvaluateAsync<string>(active));
         await page.Page.Keyboard.PressAsync("ArrowUp");
-        Assert.Contains("互换", await page.Page.EvaluateAsync<string>(active));
+        Assert.Contains("翻译目标改为", await page.Page.EvaluateAsync<string>(active));
         await page.Page.Keyboard.PressAsync("Home");
         Assert.Contains("整理", await page.Page.EvaluateAsync<string>(active));
     }
@@ -622,7 +622,7 @@ public sealed class ComposerInteractionTests(BrowserFixture browsers)
         await using var page = await browsers.OpenAsync(engine, "translate-ready");
         await page.Page.Locator("#out-pill").ClickAsync();
 
-        await page.Page.Locator(".menu button", new() { HasText = "互换" }).ClickAsync();
+        await page.Page.Locator(".menu button", new() { HasText = "翻译目标改为" }).ClickAsync();
 
         Assert.Equal(1, await page.CountAsync<SwapLanguageIntent>());
     }

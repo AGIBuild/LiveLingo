@@ -99,19 +99,21 @@ public sealed class SettingsWebSessionTests
     [Fact]
     public async Task TheConsentQuestion_TravelsInTheSnapshot()
     {
-        using var rig = new Rig(CloudTestData.WithEndpoints(), storedKey: "sk", section: "privacy");
+        using var rig = new Rig(CloudTestData.WithEndpoints(), storedKey: "sk", section: "models");
         await Wait.Until(() => rig.F.Vm.Endpoints[0].HasKey);
         rig.Host.Posted.Clear();
 
-        rig.Host.FromPage("""{"v":1,"name":"cloudToggle","step":"translate","on":true}""");
+        rig.Host.FromPage("""{"v":1,"name":"selectCloudModel","step":"translate","endpointId":"main"}""");
         rig.Time.Advance(WebBridge.Frame);
-        Assert.Equal("translate", rig.Last.GetProperty("data").GetProperty("privacy").GetProperty("consent").GetString());
+        var consent = rig.Last.GetProperty("data").GetProperty("models").GetProperty("consent");
+        Assert.Equal("translate", consent.GetProperty("step").GetString());
+        Assert.Equal("main", consent.GetProperty("endpointId").GetString());
 
         rig.Host.FromPage("""{"v":1,"name":"consent","allow":true}""");
         rig.Time.Advance(WebBridge.Frame);
-        var privacy = rig.Last.GetProperty("data").GetProperty("privacy");
-        Assert.Equal(JsonValueKind.Null, privacy.GetProperty("consent").ValueKind);
-        Assert.True(privacy.GetProperty("cloudTranslate").GetBoolean());
+        var models = rig.Last.GetProperty("data").GetProperty("models");
+        Assert.Equal(JsonValueKind.Null, models.GetProperty("consent").ValueKind);
+        Assert.True(models.GetProperty("hardware").GetProperty("anyCloud").GetBoolean());
     }
 
     [Fact]
@@ -123,21 +125,21 @@ public sealed class SettingsWebSessionTests
         service.ReadyVersion.Returns((string?)null);
         service.FindAsync(Arg.Any<CancellationToken>()).Returns(gate.Task);
         using var checks = new UpdateChecks(service, TimeSpan.FromHours(4), NullLogger.Instance);
-        using var rig = new Rig(section: "models", updates: checks);
+        using var rig = new Rig(section: "about", updates: checks);
         await rig.DevicesRead();
         rig.Host.Posted.Clear();
 
         rig.Host.FromPage("""{"v":1,"name":"checkUpdates"}""");
         await Wait.Until(() => checks.State.Phase == UpdatePhase.Checking);
         rig.Time.Advance(WebBridge.Frame);
-        var checking = rig.Last.GetProperty("data").GetProperty("models").GetProperty("update");
+        var checking = rig.Last.GetProperty("data").GetProperty("about").GetProperty("update");
         Assert.True(checking.GetProperty("busy").GetBoolean());
         Assert.Equal("正在检查更新…", checking.GetProperty("status").GetString());
 
         gate.SetResult(null);
         await Wait.Until(() => checks.State.Phase == UpdatePhase.UpToDate);
         rig.Time.Advance(WebBridge.Frame);
-        var latest = rig.Last.GetProperty("data").GetProperty("models").GetProperty("update");
+        var latest = rig.Last.GetProperty("data").GetProperty("about").GetProperty("update");
         Assert.False(latest.GetProperty("busy").GetBoolean());
         Assert.True(latest.GetProperty("canCheck").GetBoolean());
         Assert.StartsWith("已是最新版本（2.0.0）", latest.GetProperty("status").GetString());
@@ -146,9 +148,9 @@ public sealed class SettingsWebSessionTests
     [Fact]
     public void WithUpdatesOff_ThePageSaysSo()
     {
-        using var rig = new Rig(section: "models");
+        using var rig = new Rig(section: "about");
 
-        var update = rig.Last.GetProperty("data").GetProperty("models").GetProperty("update");
+        var update = rig.Last.GetProperty("data").GetProperty("about").GetProperty("update");
 
         Assert.Contains("已关闭自动更新", update.GetProperty("status").GetString());
         Assert.False(update.GetProperty("canCheck").GetBoolean());
@@ -172,10 +174,10 @@ public sealed class SettingsWebSessionTests
         using var rig = new Rig();
         rig.Host.Posted.Clear();
 
-        rig.Host.FromPage("""{"v":1,"name":"openSettings","section":"privacy"}""");
+        rig.Host.FromPage("""{"v":1,"name":"openSettings","section":"models"}""");
         rig.Time.Advance(WebBridge.Frame);
 
-        Assert.Equal("privacy", rig.Section);
+        Assert.Equal("models", rig.Section);
     }
 
     [Fact]

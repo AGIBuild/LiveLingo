@@ -129,7 +129,8 @@ public sealed class SettingsViewStateTests
     {
         var state = await SettingsScenarios.All["settings-diagnostics"]();
 
-        var lines = state.Models.Diagnostics.ToDictionary(l => l.Label, l => l.Value);
+        Assert.Equal("about", state.Section);
+        var lines = state.About.Diagnostics.ToDictionary(l => l.Label, l => l.Value);
         Assert.Equal("2.0.0", lines["版本"]);
         Assert.Equal("macOS 15.0 Arm64", lines["系统"]);
         Assert.Equal("开", lines["云端翻译"]);
@@ -159,24 +160,30 @@ public sealed class SettingsViewStateTests
         var state = await SettingsScenarios.All["settings-cloud"]();
         var json = JsonSerializer.Serialize(state, WebJson.Wire);
 
-        Assert.All(state.Privacy.Endpoints, endpoint => Assert.True(endpoint.HasKey));
+        var cloudOptions = state.Models.Stages.Single(g => g.Stage == "translator").CloudOptions;
+        Assert.All(cloudOptions, endpoint => Assert.True(endpoint.HasKey));
         Assert.DoesNotContain("sk-stored", json);
     }
 
     [Fact]
-    public async Task TheEndpoints_AreListedWithTheEnabledOneMarked_AndTheHostNamed()
+    public async Task TheEndpoints_AreListedInlineInModelsWithCrossStageBadges_AndPrivacyStripReflectsCloudState()
     {
         var state = await SettingsScenarios.All["settings-cloud"]();
+        var translator = state.Models.Stages.Single(g => g.Stage == "translator");
 
-        Assert.Equal(["Main", "Other"], state.Privacy.Endpoints.Select(endpoint => endpoint.Name));
-        Assert.Equal(["main"], state.Privacy.Endpoints.Where(endpoint => endpoint.Active).Select(endpoint => endpoint.Id));
-        Assert.Equal("other.example.com", state.Privacy.Endpoints[1].Host);
-        Assert.Null(state.Privacy.Form);
-        Assert.Null(state.Privacy.Change);
+        Assert.True(state.Models.Hardware.AnyCloud);
+        Assert.Contains("云端整理", state.Models.Hardware.PrivacyStatus);
+        Assert.Contains("云端翻译", state.Models.Hardware.PrivacyStatus);
+        Assert.Equal(["Main", "Other"], translator.CloudOptions.Select(endpoint => endpoint.Name));
+        Assert.Equal(["main"], translator.CloudOptions.Where(endpoint => endpoint.Active).Select(endpoint => endpoint.Id));
+        Assert.Contains("整理", translator.CloudOptions[0].PeerBadge);
+        Assert.Equal("other.example.com", translator.CloudOptions[1].Host);
+        Assert.Null(state.Models.Form);
+        Assert.Null(state.Models.DeleteConfirm);
     }
 
     [Fact]
-    public async Task TheFormAndTheQuestionsAboutAnEndpoint_TravelInTheSnapshot()
+    public async Task TheFormAndTheQuestionsAboutAnEndpoint_TravelInTheModelsSnapshot()
     {
         var add = await SettingsScenarios.All["settings-endpoint-add"]();
         var edit = await SettingsScenarios.All["settings-endpoint-edit"]();
@@ -184,53 +191,79 @@ public sealed class SettingsViewStateTests
         var switching = await SettingsScenarios.All["settings-endpoint-switch"]();
         var delete = await SettingsScenarios.All["settings-endpoint-delete"]();
 
-        Assert.Equal(new EndpointForm(null, null), add.Privacy.Form);
-        Assert.Equal(new EndpointForm("main", null), edit.Privacy.Form);
-        Assert.Equal(new EndpointForm(null, EndpointError.UrlInvalid), error.Privacy.Form);
-        Assert.Equal(new PendingEndpointChange(EndpointChange.Switch, "other"), switching.Privacy.Change);
-        Assert.Equal(new PendingEndpointChange(EndpointChange.Delete, "other"), delete.Privacy.Change);
+        Assert.Equal(new EndpointForm(null, null), add.Models.Form);
+        Assert.Equal(new EndpointForm("main", null), edit.Models.Form);
+        Assert.Equal(new EndpointForm(null, EndpointError.UrlInvalid), error.Models.Form);
+        Assert.Equal(new ConsentModalState(CloudStep.Translate, "other", "Other", "other.example.com", "Main"), switching.Models.Consent);
+        Assert.Equal("main", delete.Models.DeleteConfirm?.Id);
+        Assert.Contains("云端翻译", delete.Models.DeleteConfirm?.AffectedSteps);
+
+        // When cloud translation is active ("main"), only the cloud option is Active; no local translator radio card is marked Active.
+        var translatorGroup = switching.Models.Stages.Single(g => g.Stage == "translator");
+        Assert.True(translatorGroup.CloudRouted);
+        Assert.Equal(["main"], translatorGroup.CloudOptions.Where(c => c.Active).Select(c => c.Id));
+        Assert.DoesNotContain(translatorGroup.Options, o => o.Active);
     }
 
     [Fact]
-    public async Task AskingForConsent_NamesTheStep()
+    public async Task AskingForConsent_NamesTheStepAndTargetEndpoint()
     {
         var consent = await SettingsScenarios.All["settings-consent"]();
         var cloud = await SettingsScenarios.All["settings-cloud"]();
 
-        Assert.Equal(CloudStep.Clean, consent.Privacy.Consent);
-        Assert.False(consent.Privacy.CloudClean);
-        Assert.Null(cloud.Privacy.Consent);
-        Assert.True(cloud.Privacy.CloudTranslate);
+        Assert.Equal(new ConsentModalState(CloudStep.Clean, "main", "Main", "api.example.com", null), consent.Models.Consent);
+        Assert.False(consent.Models.Stages.Single(g => g.Stage == "cleaner").CloudRouted);
+        Assert.Null(cloud.Models.Consent);
+        Assert.True(cloud.Models.Stages.Single(g => g.Stage == "translator").CloudRouted);
     }
 
     [Fact]
     public async Task ACloudStepThatCannotRun_IsFlagged()
     {
         var state = await SettingsScenarios.All["settings-cloud-invalid"]();
+        var translator = state.Models.Stages.Single(g => g.Stage == "translator");
 
-        Assert.True(state.Privacy.Invalid);
-        Assert.False(state.Privacy.CloudTranslate);
+        Assert.True(translator.CloudInvalid);
+        Assert.False(translator.CloudRouted);
     }
 
     [Fact]
     public async Task ModelsFromEarlierVersions_AreDescribedOnlyWhenThereAreSome()
     {
         var with = await SettingsScenarios.All["settings-models"]();
-        var without = await SettingsScenarios.All["settings-privacy"]();
+        var without = await SettingsScenarios.All["settings-general"]();
 
-        Assert.Equal(2, with.Models.Legacy.Count);
-        Assert.Contains("8.5", with.Models.Legacy.Text);
-        Assert.Equal(new LegacyModelsState(0, ""), without.Models.Legacy);
+        Assert.Equal(2, with.Models.Storage.Legacy.Count);
+        Assert.Contains("8.5", with.Models.Storage.Legacy.Text);
+        Assert.Equal(new LegacyModelsState(0, ""), without.Models.Storage.Legacy);
     }
 
     [Fact]
-    public async Task TheRememberedApps_AreNamedAndSummarizedInTheWordsOfTheOutputMenu()
+    public async Task LocalStorageAndActiveDownloads_ReportExactSizesPathsAndProgress()
+    {
+        var models = await SettingsScenarios.All["settings-models"]();
+        Assert.Equal("/models", models.Models.Storage.Path);
+        Assert.Equal(7, models.Models.Storage.Items.Count);
+        Assert.Contains(models.Models.Storage.Items, item => item.Id == "qwen3.5-2b-q4km" && !item.InUse && item.CanDelete && item.CanActivate);
+        Assert.Contains(models.Models.Storage.Items, item => item.Id == "x-asr-480ms-streaming-int8" && item.InUse && !item.CanDelete);
+
+        var downloading = await SettingsScenarios.All["settings-models-downloading"]();
+        Assert.Equal("42%", downloading.Models.NavBadge);
+        var activeTask = Assert.Single(downloading.Models.Downloads);
+        Assert.Equal("hy-mt2-7b-q4km", activeTask.Id);
+        Assert.Equal(42, activeTask.Percent);
+        Assert.Contains("1.94 GB / 4.62 GB", activeTask.StatusText);
+    }
+
+    [Fact]
+    public async Task TheRememberedApps_AreNamedAndSummarizedUnderGeneralInTheWordsOfTheOutputMenu()
     {
         var state = await SettingsScenarios.All["settings-apps"]();
 
-        Assert.Equal(["Slack", "Code", "仅复制"], state.Privacy.Apps.Select(app => app.Name));
-        Assert.Equal(["翻译成 English", "保持中文（整理）", "翻译成 中文"], state.Privacy.Apps.Select(app => app.Summary));
-        Assert.Equal("com.tinyspeck.slackmacgap", state.Privacy.Apps[0].Id);
+        Assert.Equal("general", state.Section);
+        Assert.Equal(["Slack", "Code", "仅复制"], state.General.Apps.Select(app => app.Name));
+        Assert.Equal(["翻译成 English", "整理原话（保持原语言）", "翻译成 中文"], state.General.Apps.Select(app => app.Summary));
+        Assert.Equal("com.tinyspeck.slackmacgap", state.General.Apps[0].Id);
     }
 
     [Fact]
@@ -239,11 +272,11 @@ public sealed class SettingsViewStateTests
         using var document = JsonDocument.Parse(JsonSerializer.Serialize(await SettingsScenarios.All["settings-cloud"](), WebJson.Wire));
 
         Assert.Equal(
-            ["general", "models", "options", "privacy", "rev", "section", "voice"],
+            ["about", "general", "models", "options", "rev", "section", "voice"],
             document.RootElement.EnumerateObject().Select(p => p.Name).Order(StringComparer.Ordinal));
         Assert.Equal(
-            ["apps", "change", "cloudClean", "cloudTranslate", "consent", "endpoints", "form", "invalid"],
-            document.RootElement.GetProperty("privacy").EnumerateObject().Select(p => p.Name).Order(StringComparer.Ordinal));
+            ["consent", "deleteConfirm", "downloads", "form", "hardware", "navBadge", "stages", "storage", "tab"],
+            document.RootElement.GetProperty("models").EnumerateObject().Select(p => p.Name).Order(StringComparer.Ordinal));
     }
 
     private static string FixtureDirectory([CallerFilePath] string self = "") =>

@@ -36,9 +36,9 @@ public sealed class InProcessModelDownloadCoordinator : IModelDownloadCoordinato
         if (_sessions.TryGetValue(modelId, out var session))
             return session.State;
 
-        var installed = _modelManager.ListInstalled().Any(m => string.Equals(m.Id, modelId, StringComparison.Ordinal));
-        return installed
-            ? new ModelDownloadState(modelId, ModelDownloadStatus.Installed, 100, null)
+        var installed = _modelManager.ListInstalled().FirstOrDefault(m => string.Equals(m.Id, modelId, StringComparison.Ordinal));
+        return installed is not null
+            ? new ModelDownloadState(modelId, ModelDownloadStatus.Installed, 100, null, installed.SizeBytes, installed.SizeBytes)
             : new ModelDownloadState(modelId, ModelDownloadStatus.Idle, 0, null);
     }
 
@@ -52,24 +52,15 @@ public sealed class InProcessModelDownloadCoordinator : IModelDownloadCoordinato
                 return existing.Task;
 
             var cts = new CancellationTokenSource();
-            var session = new Session(descriptor.Id, cts);
+            var session = new Session(descriptor.Id, descriptor.SizeBytes, cts);
             _sessions[descriptor.Id] = session;
 
-            Publish(session, new ModelDownloadState(descriptor.Id, ModelDownloadStatus.Downloading, 0, null));
+            Publish(session, new ModelDownloadState(descriptor.Id, ModelDownloadStatus.Downloading, 0, null, 0, descriptor.SizeBytes));
             _logger?.LogInformation("Model download started: {ModelId} ({SizeBytes} bytes)", descriptor.Id, descriptor.SizeBytes);
 
-            // Progress<T> captures the caller's SynchronizationContext so incremental
-            // progress lands on the same scheduler that invoked StartAsync. Terminal
-            // transitions published from RunAsync run on whichever thread the download
-            // pipeline completes on; Publish serializes both paths and enforces that
-            // terminal states (Installed/Failed/Cancelled) cannot be downgraded by a
-            // late progress callback racing a completion.
-            var progress = new Progress<ModelDownloadProgress>(p =>
-                Publish(session, new ModelDownloadState(
-                    descriptor.Id,
-                    ModelDownloadStatus.Downloading,
-                    p.Percentage,
-                    null)));
+            // Subscribers marshal StateChanged onto their own UI scheduler; reporting synchronously with lightweight
+            // throttling avoids double async scheduler hops and prevents UI dispatcher flooding on fast links.
+            var progress = new ThrottledProgress(descriptor.SizeBytes, state => Publish(session, state), descriptor.Id);
 
             session.Task = RunAsync(descriptor, session, progress);
             return session.Task;
@@ -100,13 +91,16 @@ public sealed class InProcessModelDownloadCoordinator : IModelDownloadCoordinato
         try
         {
             await _modelManager.EnsureModelAsync(descriptor, progress, session.Cts.Token).ConfigureAwait(false);
-            Publish(session, new ModelDownloadState(descriptor.Id, ModelDownloadStatus.Installed, 100, null));
+            Publish(session, new ModelDownloadState(
+                descriptor.Id, ModelDownloadStatus.Installed, 100, null, descriptor.SizeBytes, descriptor.SizeBytes));
             _logger?.LogInformation("Model download finished: {ModelId} in {Seconds:0.0} s", descriptor.Id, Stopwatch.GetElapsedTime(started).TotalSeconds);
         }
         catch (OperationCanceledException)
         {
             _logger?.LogInformation("Model download cancelled: {ModelId}", descriptor.Id);
-            Publish(session, new ModelDownloadState(descriptor.Id, ModelDownloadStatus.Cancelled, session.State.Percentage, null));
+            Publish(session, new ModelDownloadState(
+                descriptor.Id, ModelDownloadStatus.Cancelled, session.State.Percentage, null,
+                session.State.BytesDownloaded, session.State.TotalBytes));
         }
         catch (ModelDownloadAuthorizationException ex)
         {
@@ -115,7 +109,9 @@ public sealed class InProcessModelDownloadCoordinator : IModelDownloadCoordinato
                 descriptor.Id,
                 ModelDownloadStatus.Failed,
                 session.State.Percentage,
-                ModelDownloadErrorCodes.HuggingFaceAuthorization));
+                ModelDownloadErrorCodes.HuggingFaceAuthorization,
+                session.State.BytesDownloaded,
+                session.State.TotalBytes));
         }
         catch (Exception ex)
         {
@@ -124,7 +120,9 @@ public sealed class InProcessModelDownloadCoordinator : IModelDownloadCoordinato
                 descriptor.Id,
                 ModelDownloadStatus.Failed,
                 session.State.Percentage,
-                ex.Message));
+                ex.Message,
+                session.State.BytesDownloaded,
+                session.State.TotalBytes));
         }
         finally
         {
@@ -159,17 +157,54 @@ public sealed class InProcessModelDownloadCoordinator : IModelDownloadCoordinato
 
     private sealed class Session
     {
-        public Session(string modelId, CancellationTokenSource cts)
+        public Session(string modelId, long totalBytes, CancellationTokenSource cts)
         {
             ModelId = modelId;
             Cts = cts;
-            State = new ModelDownloadState(modelId, ModelDownloadStatus.Downloading, 0, null);
+            State = new ModelDownloadState(modelId, ModelDownloadStatus.Downloading, 0, null, 0, totalBytes);
         }
 
         public string ModelId { get; }
         public CancellationTokenSource Cts { get; }
         public ModelDownloadState State { get; set; }
         public Task Task { get; set; } = Task.CompletedTask;
+    }
+
+    private sealed class ThrottledProgress(
+        long fallbackTotalBytes,
+        Action<ModelDownloadState> publish,
+        string modelId) : IProgress<ModelDownloadProgress>
+    {
+        private readonly object _gate = new();
+        private long _lastTick;
+        private long _lastBytes = -1;
+        private double _lastPercentage = -1;
+
+        public void Report(ModelDownloadProgress p)
+        {
+            var total = p.TotalBytes > 0 ? p.TotalBytes : fallbackTotalBytes;
+            var downloaded = Math.Clamp(p.BytesDownloaded, 0, Math.Max(total, p.BytesDownloaded));
+            var percentage = total > 0 ? Math.Clamp((double)downloaded / total * 100d, 0d, 100d) : p.Percentage;
+            var now = Stopwatch.GetTimestamp();
+
+            lock (_gate)
+            {
+                var firstChunk = _lastBytes <= 0 && downloaded > 0;
+                var completedBytes = total > 0 && downloaded >= total && _lastBytes < total;
+                var movedEnough = Math.Abs(percentage - _lastPercentage) >= 0.25d
+                               || downloaded - _lastBytes >= 2 * 1024 * 1024;
+                var timeElapsed = _lastTick == 0 || Stopwatch.GetElapsedTime(_lastTick, now) >= TimeSpan.FromMilliseconds(80);
+
+                if (!firstChunk && !completedBytes && !(movedEnough && timeElapsed) && _lastBytes >= 0)
+                    return;
+
+                _lastTick = now;
+                _lastBytes = downloaded;
+                _lastPercentage = percentage;
+            }
+
+            publish(new ModelDownloadState(modelId, ModelDownloadStatus.Downloading, percentage, null, downloaded, total));
+        }
     }
 }
 

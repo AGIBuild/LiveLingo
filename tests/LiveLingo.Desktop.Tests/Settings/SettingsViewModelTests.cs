@@ -18,12 +18,18 @@ public class SettingsViewModelTests
         public List<SettingsModel> Saved { get; } = [];
         public ISecretStore Secrets { get; } = Substitute.For<ISecretStore>();
         public IModelManager Models { get; } = Substitute.For<IModelManager>();
+        public IModelDownloadCoordinator Downloads { get; } = Substitute.For<IModelDownloadCoordinator>();
         public IMicrophone Microphone { get; } = Substitute.For<IMicrophone>();
         public RecentDrafts Recent { get; } = new();
         public Services.Preferences.MemoryPreferencesStore PreferenceStore { get; } = new();
+        public ModelSelectionCoordinator Coordinator { get; }
         public SettingsViewModel Vm { get; }
 
-        public Fixture(SettingsModel? current = null, string? storedKey = null, PreferencesData? remembered = null)
+        public Fixture(
+            SettingsModel? current = null,
+            string? storedKey = null,
+            PreferencesData? remembered = null,
+            HardwareProfile? hardware = null)
         {
             Current = current ?? new SettingsModel();
             PreferenceStore.Data = remembered ?? new PreferencesData();
@@ -33,7 +39,13 @@ public class SettingsViewModelTests
             service.When(s => s.Replace(Arg.Any<SettingsModel>())).Do(call => Saved.Add(call.Arg<SettingsModel>()));
             Secrets.GetSecretAsync(Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns(storedKey);
             Microphone.InputDevices().Returns(["USB Mic", "Built-in"]);
-            Vm = new SettingsViewModel(service, Secrets, Models, Recent, Microphone, new ComposerPreferences(PreferenceStore, service));
+            Models.GetModelDirectory(Arg.Any<string>()).Returns(call => "/models/" + call.Arg<string>());
+            Downloads.GetState(Arg.Any<string>())
+                .Returns(call => new ModelDownloadState(call.Arg<string>(), ModelDownloadStatus.Idle, 0, null));
+            var probe = Substitute.For<IHardwareProbe>();
+            probe.Detect().Returns(hardware ?? HardwareProfile.Baseline16GbAppleMetal);
+            Coordinator = new ModelSelectionCoordinator(service, Models, Downloads, probe);
+            Vm = new SettingsViewModel(service, Secrets, Models, Recent, Microphone, new ComposerPreferences(PreferenceStore, service), Coordinator);
         }
 
         public SettingsModel Last => Saved[^1];
@@ -49,12 +61,10 @@ public class SettingsViewModelTests
         model.Appearance.Animations = false;
         model.Composer.CommitKey = "CtrlEnter";
         model.Composer.TargetLanguage = "Chinese";
-        model.Composer.TranslatorTier = "Fast";
+        model.Composer.TranslatorModel = ModelCatalog.TranslatorQuality.Id;
         model.Composer.CleanupEnabled = false;
         model.Composer.Glossary = "Redis\n缓存穿透=cache penetration";
-        model.Cloud.Endpoints = CloudTestData.WithEndpoints("main", translate: true).Cloud.Endpoints;
-        model.Cloud.ActiveEndpointId = "main";
-        model.Cloud.Translate = true;
+        model.Cloud = CloudTestData.WithEndpoints(translate: true).Cloud;
 
         var vm = new Fixture(model).Vm;
 
@@ -65,10 +75,11 @@ public class SettingsViewModelTests
         Assert.True(vm.ReduceMotion);
         Assert.Equal(1, vm.CommitKeyIndex);
         Assert.Equal(1, vm.TargetIndex);
-        Assert.Equal(1, vm.TierIndex);
+        Assert.Equal(ModelCatalog.TranslatorQuality.Id, vm.ActiveModels.TranslatorModelId);
         Assert.Equal([new TermEntry("Redis", "Redis"), new TermEntry("缓存穿透", "cache penetration")], vm.Terms);
         Assert.Equal(["Main", "Other"], vm.Endpoints.Select(endpoint => endpoint.Name));
-        Assert.Equal("Main", vm.ActiveEndpoint?.Name);
+        Assert.Equal("Main", vm.TranslatorEndpoint?.Name);
+        Assert.Null(vm.CleanerEndpoint);
         Assert.True(vm.CloudTranslate);
         Assert.False(vm.CloudClean);
     }
@@ -122,7 +133,7 @@ public class SettingsViewModelTests
         f.Vm.CommitKeyIndex = 1;
         f.Vm.ReduceMotion = true;
         f.Vm.TargetIndex = 1;
-        f.Vm.TierIndex = 1;
+        f.Vm.SelectModel(ModelCatalog.TranslatorQuality.Id);
         f.Vm.CleanupEnabled = false;
 
         var model = f.Last;
@@ -133,7 +144,7 @@ public class SettingsViewModelTests
         Assert.Equal("CtrlEnter", model.Composer.CommitKey);
         Assert.False(model.Appearance.Animations);
         Assert.Equal("Chinese", model.Composer.TargetLanguage);
-        Assert.Equal("Fast", model.Composer.TranslatorTier);
+        Assert.Equal(ModelCatalog.TranslatorQuality.Id, model.Composer.TranslatorModel);
     }
 
     [Fact]
@@ -288,17 +299,23 @@ public class SettingsViewModelTests
 
         Assert.False(vm.CloudTranslate);
         Assert.False(vm.CloudClean);
+        Assert.Equal("", vm.TranslatorEndpointId);
+        Assert.Equal("", vm.CleanerEndpointId);
     }
 
     [Fact]
-    public void EnablingCloud_WithoutAnEnabledEndpoint_IsRefused_AndFlagged()
+    public void EnablingCloud_WithUnknownOrKeylessEndpoint_IsRefused_AndFlagged()
     {
-        var f = new Fixture(CloudTestData.WithEndpoints(active: null), storedKey: "sk");
+        var f = new Fixture(CloudTestData.WithEndpoints(), storedKey: null);
 
-        Assert.False(f.Vm.TryEnableCloud(translation: true));
-
+        Assert.False(f.Vm.TryApplyCloudEndpoint(CloudStep.Translate, "main"));
         Assert.True(f.Vm.CloudInvalid);
         Assert.False(f.Vm.CloudTranslate);
+
+        f.Vm.CloudInvalid = false;
+        f.Vm.SelectCloudEndpoint(CloudStep.Translate, "missing");
+        Assert.True(f.Vm.CloudInvalid);
+        Assert.Null(f.Vm.PendingConsent);
         Assert.Empty(f.Saved);
     }
 
@@ -315,10 +332,12 @@ public class SettingsViewModelTests
         Assert.Equal("https://example.openai.azure.com/openai/v1", saved.BaseUrl);
         Assert.Equal("gpt-4.1-mini", saved.Model);
         await f.Secrets.Received(1).SetSecretAsync(saved.SecretId, "sk-secret", Arg.Any<CancellationToken>());
-        Assert.Equal("", f.Last.Cloud.ActiveEndpointId);
-        Assert.Null(f.Vm.ActiveEndpoint);
+        Assert.Equal("", f.Last.Cloud.TranslatorEndpointId);
+        Assert.Equal("", f.Last.Cloud.CleanerEndpointId);
+        Assert.Null(f.Vm.TranslatorEndpoint);
         Assert.Null(f.Vm.Form);
         Assert.True(Assert.Single(f.Vm.Endpoints).HasKey);
+        Assert.True(Assert.Single(f.Vm.Endpoints).Usable);
         Assert.DoesNotContain("sk-secret", System.Text.Json.JsonSerializer.Serialize(f.Last));
     }
 
@@ -332,7 +351,7 @@ public class SettingsViewModelTests
     public async Task AnUnusableEndpoint_KeepsTheFormOpen_WithTheReason_AndStoresNothing(
         string name, string url, string model, string key, EndpointError expected)
     {
-        var f = new Fixture(CloudTestData.WithEndpoints(active: null));
+        var f = new Fixture(CloudTestData.WithEndpoints());
         f.Vm.OpenEndpointForm(null);
 
         await f.Vm.SaveEndpointAsync(name, url, model, key);
@@ -356,7 +375,7 @@ public class SettingsViewModelTests
     [Fact]
     public async Task EditingAnEndpoint_WithAnEmptyKey_KeepsTheStoredKey_AndItsOwnNameIsNotATaken()
     {
-        var f = new Fixture(CloudTestData.WithEndpoints(active: null), storedKey: "sk-stored");
+        var f = new Fixture(CloudTestData.WithEndpoints(), storedKey: "sk-stored");
         await f.Vm.InitializeAsync();
         f.Vm.OpenEndpointForm("main");
 
@@ -370,7 +389,7 @@ public class SettingsViewModelTests
     [Fact]
     public async Task EditingAnEndpoint_WithANewKey_ReplacesItUnderTheSameSecretId()
     {
-        var f = new Fixture(CloudTestData.WithEndpoints(active: null), storedKey: "sk-stored");
+        var f = new Fixture(CloudTestData.WithEndpoints(), storedKey: "sk-stored");
         await f.Vm.InitializeAsync();
         f.Vm.OpenEndpointForm("other");
 
@@ -380,23 +399,22 @@ public class SettingsViewModelTests
     }
 
     [Fact]
-    public async Task ChangingTheHostOfTheEnabledEndpoint_SwitchesTheCloudStepsOff()
+    public async Task ChangingTheHostOfAnAssignedEndpoint_RevertsOnlyStagesUsingThatEndpointToLocal()
     {
-        var f = new Fixture(CloudTestData.WithEndpoints(translate: true, clean: true), storedKey: "sk");
+        var f = new Fixture(CloudTestData.WithEndpoints(translatorId: "main", cleanerId: "other"), storedKey: "sk");
         await f.Vm.InitializeAsync();
         f.Vm.OpenEndpointForm("main");
 
         await f.Vm.SaveEndpointAsync("Main", "https://elsewhere.example.net/v1", "m", "");
 
         Assert.False(f.Vm.CloudTranslate);
-        Assert.False(f.Vm.CloudClean);
-        Assert.False(f.Last.Cloud.Translate);
-        Assert.False(f.Last.Cloud.Clean);
-        Assert.Equal("main", f.Last.Cloud.ActiveEndpointId);
+        Assert.True(f.Vm.CloudClean);
+        Assert.Equal("", f.Last.Cloud.TranslatorEndpointId);
+        Assert.Equal("other", f.Last.Cloud.CleanerEndpointId);
     }
 
     [Fact]
-    public async Task ChangingOnlyThePathOrModelOfTheEnabledEndpoint_KeepsTheCloudStepsOn()
+    public async Task ChangingOnlyThePathOrModelOfAnAssignedEndpoint_KeepsTheStageAssignment()
     {
         var f = new Fixture(CloudTestData.WithEndpoints(translate: true), storedKey: "sk");
         await f.Vm.InitializeAsync();
@@ -405,6 +423,7 @@ public class SettingsViewModelTests
         await f.Vm.SaveEndpointAsync("Renamed", "https://api.example.com/openai/v1", "m2", "");
 
         Assert.True(f.Last.Cloud.Translate);
+        Assert.Equal("main", f.Last.Cloud.TranslatorEndpointId);
         Assert.Equal("Renamed", f.Last.Cloud.Endpoints[0].Name);
     }
 
@@ -419,108 +438,101 @@ public class SettingsViewModelTests
     }
 
     [Fact]
-    public async Task EnablingAnEndpoint_DisablesTheOne_ThatWasEnabled()
+    public async Task CleanerAndTranslator_CanIndependentlySelectDifferentEndpoints_WithExplicitConsent()
     {
         var f = new Fixture(CloudTestData.WithEndpoints(), storedKey: "sk");
         await f.Vm.InitializeAsync();
 
-        f.Vm.SetEndpointEnabled("other", on: true);
+        f.Vm.SelectCloudEndpoint(CloudStep.Translate, "main");
+        Assert.Equal(new PendingCloudConsent(CloudStep.Translate, "main", null), f.Vm.PendingConsent);
+        f.Vm.AnswerConsent(allow: true);
 
-        Assert.Equal("other", f.Last.Cloud.ActiveEndpointId);
-        Assert.Equal(["other"], f.Vm.Endpoints.Where(endpoint => endpoint.Active).Select(endpoint => endpoint.Id));
-        Assert.Null(f.Vm.PendingChange);
+        f.Vm.SelectCloudEndpoint(CloudStep.Clean, "other");
+        Assert.Equal(new PendingCloudConsent(CloudStep.Clean, "other", null), f.Vm.PendingConsent);
+        f.Vm.AnswerConsent(allow: true);
+
+        Assert.Equal("main", f.Last.Cloud.TranslatorEndpointId);
+        Assert.Equal("other", f.Last.Cloud.CleanerEndpointId);
+        Assert.True(f.Vm.Endpoints.Single(e => e.Id == "main").UsedForTranslate);
+        Assert.True(f.Vm.Endpoints.Single(e => e.Id == "other").UsedForClean);
     }
 
     [Fact]
-    public async Task EnablingAnEndpoint_WhileAStepIsOn_AsksFirst_AndKeepsTheOldOneUntilAnswered()
+    public async Task SwitchingACloudStageToAnotherEndpoint_AsksFirstNamingPreviousEndpoint_AndKeepsCurrentUntilAnswered()
     {
         var f = new Fixture(CloudTestData.WithEndpoints(translate: true), storedKey: "sk");
         await f.Vm.InitializeAsync();
 
-        f.Vm.SetEndpointEnabled("other", on: true);
+        f.Vm.SelectCloudEndpoint(CloudStep.Translate, "other");
 
-        Assert.Equal(new PendingEndpointChange(EndpointChange.Switch, "other"), f.Vm.PendingChange);
+        Assert.Equal(new PendingCloudConsent(CloudStep.Translate, "other", "main"), f.Vm.PendingConsent);
         Assert.Empty(f.Saved);
 
-        await f.Vm.AnswerChangeAsync(allow: false);
-        Assert.Null(f.Vm.PendingChange);
+        f.Vm.AnswerConsent(allow: false);
+        Assert.Null(f.Vm.PendingConsent);
         Assert.Empty(f.Saved);
 
-        f.Vm.SetEndpointEnabled("other", on: true);
-        await f.Vm.AnswerChangeAsync(allow: true);
-        Assert.Equal("other", f.Last.Cloud.ActiveEndpointId);
+        f.Vm.SelectCloudEndpoint(CloudStep.Translate, "other");
+        f.Vm.AnswerConsent(allow: true);
+        Assert.Equal("other", f.Last.Cloud.TranslatorEndpointId);
         Assert.True(f.Last.Cloud.Translate);
     }
 
     [Fact]
-    public async Task SwitchingToAnEndpointWithoutAKey_WhileAStepIsOn_IsRefusedAndFlagged()
+    public async Task SwitchingToAnEndpointWithoutAKey_IsRefusedAndFlagged()
     {
         var f = new Fixture(CloudTestData.WithEndpoints(translate: true), storedKey: null);
         await f.Vm.InitializeAsync();
 
-        f.Vm.SetEndpointEnabled("other", on: true);
+        f.Vm.SelectCloudEndpoint(CloudStep.Translate, "other");
 
-        Assert.Null(f.Vm.PendingChange);
+        Assert.Null(f.Vm.PendingConsent);
         Assert.True(f.Vm.CloudInvalid);
         Assert.Empty(f.Saved);
     }
 
     [Fact]
-    public async Task DisablingTheEnabledEndpoint_SwitchesBothCloudStepsOff()
+    public async Task DisableAllCloud_ImmediatelyReturnsBothTextStagesToLocal()
     {
-        var f = new Fixture(CloudTestData.WithEndpoints(translate: true, clean: true), storedKey: "sk");
+        var f = new Fixture(CloudTestData.WithEndpoints(translatorId: "main", cleanerId: "other"), storedKey: "sk");
         await f.Vm.InitializeAsync();
 
-        f.Vm.SetEndpointEnabled("main", on: false);
+        f.Vm.DisableAllCloud();
 
-        Assert.Equal("", f.Last.Cloud.ActiveEndpointId);
-        Assert.False(f.Last.Cloud.Translate);
-        Assert.False(f.Last.Cloud.Clean);
+        Assert.Equal("", f.Last.Cloud.TranslatorEndpointId);
+        Assert.Equal("", f.Last.Cloud.CleanerEndpointId);
         Assert.False(f.Vm.CloudTranslate);
-        Assert.Null(f.Vm.ActiveEndpoint);
+        Assert.False(f.Vm.CloudClean);
     }
 
     [Fact]
-    public async Task ExactlyOneEndpoint_IsEverEnabled()
+    public async Task DeletingAnEndpoint_AsksFirst_ThenDeletesItsKey_WithoutDisturbingUnrelatedStages()
     {
-        var f = new Fixture(CloudTestData.WithEndpoints(active: null), storedKey: "sk");
-        await f.Vm.InitializeAsync();
-
-        f.Vm.SetEndpointEnabled("main", on: true);
-        f.Vm.SetEndpointEnabled("other", on: true);
-        f.Vm.SetEndpointEnabled("main", on: true);
-
-        Assert.Equal(1, f.Vm.Endpoints.Count(endpoint => endpoint.Active));
-        Assert.Equal("main", f.Last.Cloud.ActiveEndpointId);
-    }
-
-    [Fact]
-    public async Task DeletingAnEndpoint_AsksFirst_ThenDeletesItsKey()
-    {
-        var f = new Fixture(CloudTestData.WithEndpoints(active: "main"), storedKey: "sk");
+        var f = new Fixture(CloudTestData.WithEndpoints(translate: true), storedKey: "sk");
         await f.Vm.InitializeAsync();
 
         f.Vm.DeleteEndpoint("other");
-        Assert.Equal(new PendingEndpointChange(EndpointChange.Delete, "other"), f.Vm.PendingChange);
+        Assert.Equal("other", f.Vm.PendingDeleteId);
         Assert.Empty(f.Saved);
 
-        await f.Vm.AnswerChangeAsync(allow: true);
+        await f.Vm.AnswerDeleteEndpointAsync(allow: true);
 
         await f.Secrets.Received(1).DeleteSecretAsync(CloudTestData.SecretId("other"), Arg.Any<CancellationToken>());
         Assert.Equal(["main"], f.Last.Cloud.Endpoints.Select(endpoint => endpoint.Id));
-        Assert.Equal("main", f.Last.Cloud.ActiveEndpointId);
+        Assert.Equal("main", f.Last.Cloud.TranslatorEndpointId);
     }
 
     [Fact]
-    public async Task DeletingTheEnabledEndpoint_SwitchesTheCloudStepsOff()
+    public async Task DeletingAnAssignedEndpoint_RevertsAssignedStagesToLocal()
     {
         var f = new Fixture(CloudTestData.WithEndpoints(translate: true, clean: true), storedKey: "sk");
         await f.Vm.InitializeAsync();
 
         f.Vm.DeleteEndpoint("main");
-        await f.Vm.AnswerChangeAsync(allow: true);
+        await f.Vm.AnswerDeleteEndpointAsync(allow: true);
 
-        Assert.Equal("", f.Last.Cloud.ActiveEndpointId);
+        Assert.Equal("", f.Last.Cloud.TranslatorEndpointId);
+        Assert.Equal("", f.Last.Cloud.CleanerEndpointId);
         Assert.False(f.Last.Cloud.Translate);
         Assert.False(f.Last.Cloud.Clean);
         Assert.Equal(["other"], f.Last.Cloud.Endpoints.Select(endpoint => endpoint.Id));
@@ -533,7 +545,7 @@ public class SettingsViewModelTests
         await f.Vm.InitializeAsync();
         f.Vm.DeleteEndpoint("main");
 
-        await f.Vm.AnswerChangeAsync(allow: false);
+        await f.Vm.AnswerDeleteEndpointAsync(allow: false);
 
         Assert.Empty(f.Saved);
         await f.Secrets.DidNotReceiveWithAnyArgs().DeleteSecretAsync(default!, TestContext.Current.CancellationToken);
@@ -545,18 +557,18 @@ public class SettingsViewModelTests
         var f = new Fixture(CloudTestData.WithEndpoints(), storedKey: "sk-stored");
         await f.Vm.InitializeAsync();
 
-        Assert.True(f.Vm.ActiveEndpoint?.HasKey);
-        Assert.True(f.Vm.TryEnableCloud(translation: true));
+        Assert.True(f.Vm.Endpoints[0].HasKey);
+        Assert.True(f.Vm.TryApplyCloudEndpoint(CloudStep.Translate, "main"));
         Assert.True(f.Last.Cloud.Translate);
     }
 
     [Fact]
-    public async Task DisablingCloud_SwitchesOnlyThatStepOff()
+    public async Task SwitchStageToLocal_SwitchesOnlyThatStepOff()
     {
         var f = new Fixture(CloudTestData.WithEndpoints(translate: true, clean: true), storedKey: "sk");
         await f.Vm.InitializeAsync();
 
-        f.Vm.DisableCloud(translation: true);
+        f.Vm.SwitchStageToLocal(CloudStep.Translate);
 
         Assert.False(f.Last.Cloud.Translate);
         Assert.True(f.Last.Cloud.Clean);
@@ -692,9 +704,9 @@ public class SettingsViewModelTests
     {
         var f = await ConfiguredCloudAsync();
 
-        f.Vm.SetCloud(CloudStep.Clean, on: true);
+        f.Vm.SelectCloudEndpoint(CloudStep.Clean, "main");
 
-        Assert.Equal(CloudStep.Clean, f.Vm.PendingConsent);
+        Assert.Equal(new PendingCloudConsent(CloudStep.Clean, "main", null), f.Vm.PendingConsent);
         Assert.False(f.Vm.CloudClean);
         Assert.Empty(f.Saved);
     }
@@ -703,12 +715,13 @@ public class SettingsViewModelTests
     public async Task Consenting_TurnsOnlyThatStepOn()
     {
         var f = await ConfiguredCloudAsync();
-        f.Vm.SetCloud(CloudStep.Translate, on: true);
+        f.Vm.SelectCloudEndpoint(CloudStep.Translate, "main");
 
         f.Vm.AnswerConsent(allow: true);
 
         Assert.Null(f.Vm.PendingConsent);
         Assert.True(f.Last.Cloud.Translate);
+        Assert.Equal("main", f.Last.Cloud.TranslatorEndpointId);
         Assert.False(f.Last.Cloud.Clean);
     }
 
@@ -716,7 +729,7 @@ public class SettingsViewModelTests
     public async Task RefusingTheConsent_LeavesTheStepOff()
     {
         var f = await ConfiguredCloudAsync();
-        f.Vm.SetCloud(CloudStep.Translate, on: true);
+        f.Vm.SelectCloudEndpoint(CloudStep.Translate, "main");
 
         f.Vm.AnswerConsent(allow: false);
 
@@ -726,11 +739,11 @@ public class SettingsViewModelTests
     }
 
     [Fact]
-    public void TurningAStepOn_WithoutAnEnabledEndpoint_IsRefusedAndFlagged_WithoutAskingForConsent()
+    public void SelectingAnEndpointWithoutAKey_IsRefusedAndFlagged_WithoutAskingForConsent()
     {
-        var f = new Fixture(CloudTestData.WithEndpoints(active: null), storedKey: "sk");
+        var f = new Fixture(CloudTestData.WithEndpoints(), storedKey: null);
 
-        f.Vm.SetCloud(CloudStep.Translate, on: true);
+        f.Vm.SelectCloudEndpoint(CloudStep.Translate, "main");
 
         Assert.Null(f.Vm.PendingConsent);
         Assert.False(f.Vm.CloudTranslate);
@@ -738,24 +751,24 @@ public class SettingsViewModelTests
     }
 
     [Fact]
-    public async Task TurningAStepOff_NeedsNoConsent()
+    public async Task SwitchingToLocal_NeedsNoConsent()
     {
         var f = new Fixture(CloudTestData.WithEndpoints(clean: true), storedKey: "sk");
         await f.Vm.InitializeAsync();
 
-        f.Vm.SetCloud(CloudStep.Clean, on: false);
+        f.Vm.SwitchStageToLocal(CloudStep.Clean);
 
         Assert.Null(f.Vm.PendingConsent);
         Assert.False(f.Last.Cloud.Clean);
     }
 
     [Fact]
-    public async Task AStepThatIsAlreadyOn_IsNotAskedAgain()
+    public async Task SelectingTheAlreadyActiveCloudEndpoint_IsNotAskedAgain()
     {
         var f = new Fixture(CloudTestData.WithEndpoints(translate: true), storedKey: "sk");
         await f.Vm.InitializeAsync();
 
-        f.Vm.SetCloud(CloudStep.Translate, on: true);
+        f.Vm.SelectCloudEndpoint(CloudStep.Translate, "main");
 
         Assert.Null(f.Vm.PendingConsent);
     }
@@ -768,5 +781,135 @@ public class SettingsViewModelTests
         f.Vm.AnswerConsent(allow: true);
 
         Assert.Empty(f.Saved);
+    }
+
+    [Fact]
+    public async Task CloudStage_AllowsDeletingIdleLocalModel_AndSelectingInstalledLocalModelSwitchesOffCloud()
+    {
+        var f = new Fixture(CloudTestData.WithEndpoints(translate: true), storedKey: "sk");
+        f.Models.ListInstalled().Returns([
+            Installed(ModelCatalog.TranslatorFast.Id, ModelCatalog.TranslatorFast.SizeBytes),
+            Installed(ModelCatalog.Cleaner.Id, ModelCatalog.Cleaner.SizeBytes)]);
+        await f.Vm.InitializeAsync();
+
+        // Because translation is currently routed to Cloud ("main"), local 1.8B is idle: it can be activated OR deleted!
+        var inventory = f.Coordinator.GetInstalledInventory();
+        var fastItem = Assert.Single(inventory, item => item.Model.Id == ModelCatalog.TranslatorFast.Id);
+        Assert.False(fastItem.InUse);
+        Assert.True(fastItem.CanActivate);
+        Assert.True(fastItem.CanDelete);
+
+        // ApplyRecommendedModels optimizes local stages without revoking the user's cloud translation choice.
+        f.Vm.ApplyRecommendedModels();
+        Assert.True(f.Vm.CloudTranslate);
+
+        // Selecting an installed local translation model immediately switches translation back to local.
+        Assert.True(f.Vm.SelectModel(ModelCatalog.TranslatorFast.Id));
+        Assert.False(f.Vm.CloudTranslate);
+        Assert.Equal("", f.Last.Cloud.TranslatorEndpointId);
+
+        // Re-enable cloud translation, then verify the idle local model can also be deleted from disk.
+        f.Vm.SelectCloudEndpoint(CloudStep.Translate, "main");
+        f.Vm.AnswerConsent(allow: true);
+        Assert.True(await f.Vm.DeleteModelAsync(ModelCatalog.TranslatorFast.Id));
+    }
+
+    // ---- stage model selection, staged downloads and cleanup --------------------------
+
+    [Fact]
+    public void UnsupportedModel_CannotBeSelectedOrDownloaded()
+    {
+        var f = new Fixture(); // 16 GB Apple Silicon: 9B cleaner is Unsupported
+
+        Assert.False(f.Vm.SelectModel(ModelCatalog.CleanerQuality.Id));
+        Assert.False(f.Vm.DownloadModel(ModelCatalog.CleanerQuality.Id));
+        Assert.Empty(f.Saved);
+    }
+
+    [Fact]
+    public async Task DownloadAndActivate_KeepsInstalledModelServingUntilDownloadCompletes()
+    {
+        var f = new Fixture();
+        f.Models.ListInstalled().Returns([Installed(ModelCatalog.TranslatorFast.Id, ModelCatalog.TranslatorFast.SizeBytes)]);
+        await f.Vm.InitializeAsync();
+
+        // Direct SelectModel refuses to overwrite an installed working model with an uninstalled one.
+        Assert.False(f.Vm.SelectModel(ModelCatalog.TranslatorQuality.Id));
+        Assert.Equal(ModelCatalog.TranslatorFast.Id, f.Vm.ActiveModels.TranslatorModelId);
+
+        // Explicit DownloadModel queues pending activation while keeping 1.8B active.
+        Assert.True(f.Vm.DownloadModel(ModelCatalog.TranslatorQuality.Id));
+        await f.Downloads.Received(1).StartAsync(ModelCatalog.TranslatorQuality);
+        Assert.Equal(ModelCatalog.TranslatorFast.Id, f.Vm.ActiveModels.TranslatorModelId);
+        Assert.Equal(ModelCatalog.TranslatorQuality.Id, f.Coordinator.PendingModelId(LiveLingo.Core.Inference.ModelStage.Translator));
+
+        // Once the download finishes, 7B becomes the active translator automatically.
+        f.Downloads.StateChanged += Raise.Event<Action<ModelDownloadState>>(
+            new ModelDownloadState(ModelCatalog.TranslatorQuality.Id, ModelDownloadStatus.Installed, 100, null));
+
+        Assert.Equal(ModelCatalog.TranslatorQuality.Id, f.Vm.ActiveModels.TranslatorModelId);
+        Assert.Equal(ModelCatalog.TranslatorQuality.Id, f.Last.Composer.TranslatorModel);
+        Assert.Null(f.Coordinator.PendingModelId(LiveLingo.Core.Inference.ModelStage.Translator));
+    }
+
+    [Fact]
+    public async Task CancellingDownload_ClearsPendingActivation_AndKeepsCurrentModel()
+    {
+        var f = new Fixture();
+        f.Models.ListInstalled().Returns([Installed(ModelCatalog.TranslatorFast.Id, ModelCatalog.TranslatorFast.SizeBytes)]);
+        await f.Vm.InitializeAsync();
+
+        f.Vm.DownloadModel(ModelCatalog.TranslatorQuality.Id);
+        f.Vm.CancelModelDownload(ModelCatalog.TranslatorQuality.Id);
+
+        f.Downloads.Received(1).Cancel(ModelCatalog.TranslatorQuality.Id);
+        Assert.Null(f.Coordinator.PendingModelId(LiveLingo.Core.Inference.ModelStage.Translator));
+        Assert.Equal(ModelCatalog.TranslatorFast.Id, f.Vm.ActiveModels.TranslatorModelId);
+    }
+
+    [Fact]
+    public async Task DeleteModel_DeletesUnusedCatalogModel_AndRefusesActiveModel()
+    {
+        var f = new Fixture();
+        f.Models.ListInstalled().Returns([
+            Installed(ModelCatalog.TranslatorFast.Id, ModelCatalog.TranslatorFast.SizeBytes),
+            Installed(ModelCatalog.TranslatorQuality.Id, ModelCatalog.TranslatorQuality.SizeBytes)]);
+        await f.Vm.InitializeAsync();
+
+        Assert.False(await f.Vm.DeleteModelAsync(ModelCatalog.TranslatorFast.Id));
+        Assert.True(await f.Vm.DeleteModelAsync(ModelCatalog.TranslatorQuality.Id));
+
+        await f.Models.Received(1).CleanObsoleteModelsAsync(
+            Arg.Is<IEnumerable<string>>(ids => ids.SequenceEqual(new[] { ModelCatalog.TranslatorQuality.Id })),
+            Arg.Any<CancellationToken>());
+        f.Downloads.Received(1).NotifyDeleted(ModelCatalog.TranslatorQuality.Id);
+    }
+
+    [Fact]
+    public async Task ApplyRecommendedModels_RestoresBestMatchAndQueuesMissingUpgrades()
+    {
+        var initial = new SettingsModel();
+        initial.Composer.SpeechModel = ModelCatalog.SpeechSecondPass.Id;
+        initial.Composer.CleanerModel = ModelCatalog.Cleaner.Id;
+        initial.Composer.TranslatorModel = ModelCatalog.TranslatorFast.Id;
+
+        var workstation = new HardwareProfile("Apple M3 Pro", ComputeBackend.AppleMetal, 36L * 1024 * 1024 * 1024, 12);
+        var f = new Fixture(initial, hardware: workstation);
+        f.Models.ListInstalled().Returns([
+            Installed(ModelCatalog.SpeechSecondPass.Id, ModelCatalog.SpeechSecondPass.SizeBytes),
+            Installed(ModelCatalog.Cleaner.Id, ModelCatalog.Cleaner.SizeBytes),
+            Installed(ModelCatalog.TranslatorQuality.Id, ModelCatalog.TranslatorQuality.SizeBytes)]);
+        await f.Vm.InitializeAsync();
+
+        Assert.False(f.Coordinator.IsRecommendedActive);
+        Assert.True(f.Coordinator.MissingBytesForRecommended() >= ModelCatalog.CleanerQuality.SizeBytes);
+
+        f.Vm.ApplyRecommendedModels();
+
+        // Already-installed recommended 7B translator switches immediately; uninstalled 9B cleaner downloads in background.
+        Assert.Equal(ModelCatalog.TranslatorQuality.Id, f.Vm.ActiveModels.TranslatorModelId);
+        Assert.Equal(ModelCatalog.Cleaner.Id, f.Vm.ActiveModels.CleanerModelId);
+        Assert.Equal(ModelCatalog.CleanerQuality.Id, f.Coordinator.PendingModelId(LiveLingo.Core.Inference.ModelStage.Cleaner));
+        await f.Downloads.Received(1).StartAsync(ModelCatalog.CleanerQuality);
     }
 }

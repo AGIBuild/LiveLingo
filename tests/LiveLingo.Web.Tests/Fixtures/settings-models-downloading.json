@@ -1,0 +1,410 @@
+{
+  "rev": 1,
+  "section": "models",
+  "general": {
+    "hotkey": "Ctrl+Alt+T",
+    "hotkeyInvalid": false,
+    "commitKey": "Enter",
+    "language": "en-US",
+    "theme": "Auto",
+    "reduceMotion": false,
+    "rememberChoices": true,
+    "apps": []
+  },
+  "voice": {
+    "microphones": [
+      "",
+      "USB Mic",
+      "Built-in"
+    ],
+    "microphone": "",
+    "direction": "English",
+    "cleanup": true,
+    "defaultOutput": "Clean",
+    "autoDictate": false,
+    "preloadSpeech": true,
+    "builtInGlossary": true,
+    "terms": [],
+    "corrections": [],
+    "polishPrompt": "润色要求：\n1. 把被停顿切碎的半句话接成完整的句子（删去打断主谓宾或动补关系的错误句号，例如“重现了。很多遍”接为“重现了很多遍”），按意思重新断句，理顺前后的衔接；句首用于反驳前文的“不是”后面补上逗号，避免误读成反义。\n2. 必须删去所有口头语和填充词（呃、嗯、啊、那个、这个、就是、然后呢、但是呢里的“呢”、对吧、你看），以及犹豫、重复和说到一半就放弃的半句；说话人把同一个意思又完整地说了一遍时，只保留完整的那一遍；自我纠正时，只保留纠正后的内容。\n3. 根据全文主题和上下文改正同音/近音错字（如“在/再”）、技术名词的误识别，并补全口语快读漏掉的固定成语或虚词（如“死记背→死记硬背”）；词表里的写法优先；拿不准的词保留原样，不要删除。\n4. 保持说话人自己的口吻，写成通顺、可以直接发送的文字，不要改成公文腔。\n\n示例：\n原文：呃，我觉得这个，就是那个接口的超时。设成十秒。不对，设成三十秒吧。嗯，对，就这样。\n润色：我觉得这个接口的超时设成三十秒吧。",
+    "polishPromptIsDefault": true,
+    "polishPromptInvalid": false
+  },
+  "models": {
+    "tab": "speech",
+    "navBadge": "42%",
+    "hardware": {
+      "summary": "Apple M3 Pro · 36 GB 统一内存 · Metal GPU 加速",
+      "residency": "并发常驻预估 5.7 GB / 安全预算 16.2 GB",
+      "budgetPercent": 35,
+      "overBudget": false,
+      "modeNote": "识别、整理与翻译可在安全预算内同时预热，切换零等待",
+      "diskUsed": "本地已下载共 4.77 GB",
+      "anyCloud": false,
+      "privacyStatus": "语音识别、整理与翻译均在此设备离线完成，数据不出本机",
+      "isRecommended": false,
+      "isRecommendedDownloading": false,
+      "recommendActionLabel": "下载并启用最佳匹配（5.68 GB）"
+    },
+    "downloads": [
+      {
+        "id": "hy-mt2-7b-q4km",
+        "category": "翻译",
+        "name": "Hy-MT2 7B · 旗舰精翻",
+        "statusText": "1.94 GB / 4.62 GB · 42%",
+        "percent": 42,
+        "queued": false,
+        "failed": false,
+        "canCancel": true,
+        "canRetry": false
+      }
+    ],
+    "stages": [
+      {
+        "stage": "speech",
+        "tabTitle": "语音识别",
+        "tabSummary": "Qwen3-ASR",
+        "busy": false,
+        "title": "语音识别模型",
+        "desc": "决定听写成句与录音文件转录的字准率，始终在本机运行（按质量从高到低排序）",
+        "localOnly": true,
+        "notice": null,
+        "cloudStep": null,
+        "cloudRouted": false,
+        "cloudInvalid": false,
+        "cloudOptions": [],
+        "options": [
+          {
+            "id": "qwen3-asr-0.6b-int8",
+            "rank": 1,
+            "name": "Qwen3-ASR 0.6B · 高精度识别",
+            "summary": "支持研发术语与口音纠错热词偏置，口音与中英混说综合字准率最高",
+            "quality": 3,
+            "speed": 2,
+            "footprint": "磁盘占用 879 MB · 运行常驻约 1.3 GB",
+            "fit": "recommended",
+            "fitBadge": "★ 本机最佳匹配",
+            "fitDetail": null,
+            "active": true,
+            "pendingActivation": false,
+            "installed": true,
+            "downloading": false,
+            "downloadPercent": null,
+            "downloadText": null,
+            "error": null,
+            "canSelectImmediate": false,
+            "canDownload": false,
+            "downloadActionLabel": null,
+            "canDelete": false,
+            "deleteActionLabel": null
+          },
+          {
+            "id": "x-asr-offline-int8",
+            "rank": 2,
+            "name": "X-ASR Offline · 轻快识别",
+            "summary": "非自回归轻量架构，常驻省约 0.6 GB 内存，适合低内存设备",
+            "quality": 2,
+            "speed": 3,
+            "footprint": "磁盘占用 136 MB · 运行常驻约 0.8 GB",
+            "fit": "supported",
+            "fitBadge": "可流畅运行",
+            "fitDetail": null,
+            "active": false,
+            "pendingActivation": false,
+            "installed": false,
+            "downloading": false,
+            "downloadPercent": null,
+            "downloadText": null,
+            "error": null,
+            "canSelectImmediate": false,
+            "canDownload": true,
+            "downloadActionLabel": "下载并启用（136 MB）",
+            "canDelete": false,
+            "deleteActionLabel": null
+          }
+        ]
+      },
+      {
+        "stage": "cleaner",
+        "tabTitle": "整理与润色",
+        "tabSummary": "Qwen3.5 4B",
+        "busy": false,
+        "title": "整理与润色模型",
+        "desc": "接上碎句、去掉口头语并结合词表修正同音误识别；同一时间在本机离线模型与云端模型之间二选一",
+        "localOnly": false,
+        "notice": null,
+        "cloudStep": "clean",
+        "cloudRouted": false,
+        "cloudInvalid": false,
+        "cloudOptions": [],
+        "options": [
+          {
+            "id": "qwen3.5-9b-q4km",
+            "rank": 1,
+            "name": "Qwen3.5 9B · 旗舰深层润色",
+            "summary": "长篇多段口述的跨句逻辑缝合与隐蔽同音技术词还原能力最强",
+            "quality": 3,
+            "speed": 1,
+            "footprint": "磁盘占用 5.68 GB · 运行常驻约 6.0 GB",
+            "fit": "recommended",
+            "fitBadge": "★ 本机最佳匹配",
+            "fitDetail": null,
+            "active": false,
+            "pendingActivation": false,
+            "installed": false,
+            "downloading": false,
+            "downloadPercent": null,
+            "downloadText": null,
+            "error": null,
+            "canSelectImmediate": false,
+            "canDownload": true,
+            "downloadActionLabel": "下载并启用（5.68 GB）",
+            "canDelete": false,
+            "deleteActionLabel": null
+          },
+          {
+            "id": "qwen3.5-4b-q4km",
+            "rank": 2,
+            "name": "Qwen3.5 4B · 标准均衡整理",
+            "summary": "准确执行去口头语、自我纠正与全文润色，保真通过率与速度均衡",
+            "quality": 2,
+            "speed": 2,
+            "footprint": "磁盘占用 2.74 GB · 运行常驻约 2.9 GB",
+            "fit": "supported",
+            "fitBadge": "可流畅运行",
+            "fitDetail": null,
+            "active": true,
+            "pendingActivation": false,
+            "installed": true,
+            "downloading": false,
+            "downloadPercent": null,
+            "downloadText": null,
+            "error": null,
+            "canSelectImmediate": false,
+            "canDownload": false,
+            "downloadActionLabel": null,
+            "canDelete": false,
+            "deleteActionLabel": null
+          },
+          {
+            "id": "qwen3.5-2b-q4km",
+            "rank": 3,
+            "name": "Qwen3.5 2B · 轻快基础整理",
+            "summary": "低内存与 CPU 友好，提供快速断句标点与基础语气词清理",
+            "quality": 1,
+            "speed": 3,
+            "footprint": "磁盘占用 1.28 GB · 运行常驻约 1.6 GB",
+            "fit": "supported",
+            "fitBadge": "可流畅运行",
+            "fitDetail": null,
+            "active": false,
+            "pendingActivation": false,
+            "installed": false,
+            "downloading": false,
+            "downloadPercent": null,
+            "downloadText": null,
+            "error": null,
+            "canSelectImmediate": false,
+            "canDownload": true,
+            "downloadActionLabel": "下载并启用（1.28 GB）",
+            "canDelete": false,
+            "deleteActionLabel": null
+          }
+        ]
+      },
+      {
+        "stage": "translator",
+        "tabTitle": "翻译",
+        "tabSummary": "下载中 42%",
+        "busy": true,
+        "title": "翻译模型",
+        "desc": "中英双向翻译与代码结构保留；同一时间在本机离线模型与云端模型之间二选一，绝不静默切换",
+        "localOnly": false,
+        "notice": null,
+        "cloudStep": "translate",
+        "cloudRouted": false,
+        "cloudInvalid": false,
+        "cloudOptions": [],
+        "options": [
+          {
+            "id": "hy-mt2-7b-q4km",
+            "rank": 1,
+            "name": "Hy-MT2 7B · 旗舰精翻",
+            "summary": "技术长句语义方向准确，代码与结构化格式通过率达 94%",
+            "quality": 3,
+            "speed": 2,
+            "footprint": "磁盘占用 4.62 GB · 运行常驻约 4.9 GB",
+            "fit": "recommended",
+            "fitBadge": "★ 本机最佳匹配",
+            "fitDetail": null,
+            "active": false,
+            "pendingActivation": true,
+            "installed": false,
+            "downloading": true,
+            "downloadPercent": 42,
+            "downloadText": "1.94 GB / 4.62 GB · 42%",
+            "error": null,
+            "canSelectImmediate": false,
+            "canDownload": false,
+            "downloadActionLabel": null,
+            "canDelete": false,
+            "deleteActionLabel": null
+          },
+          {
+            "id": "hy-mt2-1.8b-q4km",
+            "rank": 2,
+            "name": "Hy-MT2 1.8B · 极速翻译",
+            "summary": "首字约 0.1 秒，边说边译极快，16 GB 设备可与整理同时常驻",
+            "quality": 2,
+            "speed": 3,
+            "footprint": "磁盘占用 1.13 GB · 运行常驻约 1.4 GB",
+            "fit": "supported",
+            "fitBadge": "可流畅运行",
+            "fitDetail": null,
+            "active": true,
+            "pendingActivation": false,
+            "installed": true,
+            "downloading": false,
+            "downloadPercent": null,
+            "downloadText": null,
+            "error": null,
+            "canSelectImmediate": false,
+            "canDownload": false,
+            "downloadActionLabel": null,
+            "canDelete": false,
+            "deleteActionLabel": null
+          }
+        ]
+      }
+    ],
+    "storage": {
+      "tabTitle": "本地存储",
+      "tabSummary": "4 项 · 4.77 GB",
+      "totalSize": "4.77 GB",
+      "breakdown": "共 4 项，当前全部处于启用或共享依赖状态",
+      "path": "/models",
+      "items": [
+        {
+          "id": "qwen3.5-4b-q4km",
+          "name": "Qwen3.5 4B · 标准均衡整理",
+          "category": "整理与润色",
+          "sizeText": "2.74 GB",
+          "inUse": true,
+          "statusBadge": "正在使用",
+          "canActivate": false,
+          "canDelete": false,
+          "deleteActionLabel": null
+        },
+        {
+          "id": "hy-mt2-1.8b-q4km",
+          "name": "Hy-MT2 1.8B · 极速翻译",
+          "category": "翻译",
+          "sizeText": "1.13 GB",
+          "inUse": true,
+          "statusBadge": "正在使用",
+          "canActivate": false,
+          "canDelete": false,
+          "deleteActionLabel": null
+        },
+        {
+          "id": "qwen3-asr-0.6b-int8",
+          "name": "Qwen3-ASR 0.6B · 高精度识别",
+          "category": "语音识别",
+          "sizeText": "879 MB",
+          "inUse": true,
+          "statusBadge": "正在使用",
+          "canActivate": false,
+          "canDelete": false,
+          "deleteActionLabel": null
+        },
+        {
+          "id": "llama-cpp-b11980-osx-arm64",
+          "name": "llama.cpp · 本地大模型推理引擎",
+          "category": "基础组件",
+          "sizeText": "16 MB",
+          "inUse": true,
+          "statusBadge": "正在使用",
+          "canActivate": false,
+          "canDelete": false,
+          "deleteActionLabel": null
+        }
+      ],
+      "legacy": {
+        "count": 0,
+        "text": ""
+      }
+    },
+    "form": null,
+    "deleteConfirm": null,
+    "consent": null
+  },
+  "about": {
+    "version": "2.0.0",
+    "update": {
+      "status": "尚未检查。",
+      "percent": null,
+      "busy": false,
+      "canCheck": true,
+      "canRestart": false,
+      "canDownload": false
+    },
+    "diagnostics": [
+      {
+        "label": "版本",
+        "value": "2.0.0"
+      },
+      {
+        "label": "系统",
+        "value": "macOS 15.0 Arm64"
+      },
+      {
+        "label": "推理后端",
+        "value": "Metal GPU · 36 GB"
+      },
+      {
+        "label": "界面语言",
+        "value": "en-US"
+      },
+      {
+        "label": "识别模型",
+        "value": "Qwen3-ASR"
+      },
+      {
+        "label": "整理模型",
+        "value": "Qwen3.5 4B"
+      },
+      {
+        "label": "翻译模型",
+        "value": "Hy-MT2-1.8B"
+      },
+      {
+        "label": "整理句子",
+        "value": "开"
+      },
+      {
+        "label": "云端翻译",
+        "value": "关"
+      },
+      {
+        "label": "云端整理",
+        "value": "关"
+      },
+      {
+        "label": "云端服务端点",
+        "value": "0"
+      },
+      {
+        "label": "API 密钥",
+        "value": "未保存"
+      },
+      {
+        "label": "旧版本模型",
+        "value": "0"
+      }
+    ]
+  },
+  "options": {
+    "animations": true,
+    "theme": "Auto"
+  }
+}

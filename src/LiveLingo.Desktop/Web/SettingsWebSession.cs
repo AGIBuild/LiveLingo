@@ -36,11 +36,12 @@ internal sealed class SettingsWebSession : IDisposable
         _intents = new SettingsIntents(vm, section, updates, openUrl, logger);
         _bridge = new WebBridge(
             host, "settings",
-            rev => SettingsViewState.From(vm, texts, _intents.Section, app, UpdateView(texts, app)) with { Rev = rev },
+            rev => SettingsViewState.From(vm, texts, _intents.Section, app, UpdateView(texts, app), _intents.ModelsTab) with { Rev = rev },
             () => new StringsData(texts.Locale, texts.WebStrings()),
             _intents, ui, time, logger);
 
         vm.PropertyChanged += OnViewModelChanged;
+        vm.ModelsChanged += OnModelsChanged;
         _intents.Changed += _bridge.Invalidate;
         _bridge.Started += ReadSystem;
         if (updates is not null)
@@ -57,15 +58,19 @@ internal sealed class SettingsWebSession : IDisposable
     public void Dispose()
     {
         _vm.PropertyChanged -= OnViewModelChanged;
+        _vm.ModelsChanged -= OnModelsChanged;
         if (_updates is not null)
             _updates.StateChanged -= OnUpdateChanged;
         _bridge.Dispose();
+        _vm.Dispose();
     }
 
     private UpdateViewState UpdateView(SettingsTexts texts, AppInfo app) =>
         UpdateViewState.From(_updates?.State ?? UpdateState.Off, _updates?.DownloadPage is not null, texts, app.Version);
 
     private void OnViewModelChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e) => _bridge.Invalidate();
+
+    private void OnModelsChanged() => _ui.Post(_ => _bridge.Invalidate(), null);
 
     // The check runs on a background thread; the bridge is the UI thread's.
     private void OnUpdateChanged() => _ui.Post(_ => _bridge.Invalidate(), null);

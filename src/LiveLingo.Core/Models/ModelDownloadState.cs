@@ -19,8 +19,11 @@ public sealed record ModelDownloadState(
     string ModelId,
     ModelDownloadStatus Status,
     double Percentage,
-    string? ErrorMessage)
+    string? ErrorMessage,
+    long BytesDownloaded = 0,
+    long TotalBytes = 0)
 {
     public bool IsDownloading => Status == ModelDownloadStatus.Downloading;
     public bool IsInstalled => Status == ModelDownloadStatus.Installed;
+    public bool IsFailed => Status == ModelDownloadStatus.Failed;
 }

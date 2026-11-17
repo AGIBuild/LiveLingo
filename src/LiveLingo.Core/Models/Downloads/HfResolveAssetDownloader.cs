@@ -43,8 +43,10 @@ internal sealed class HfResolveAssetDownloader
             throw new InvalidOperationException("Expected a Hugging Face /resolve/ URL.");
 
         var token = string.IsNullOrWhiteSpace(_options.HuggingFaceToken) ? null : _options.HuggingFaceToken!.Trim();
-        var hfProgress = new Progress<HfDownloadProgress>(p =>
-            progress?.Report(new ModelDownloadProgress(modelId, downloadedBeforeAsset + p.DownloadedBytes, totalBytes)));
+        var hfProgress = progress is null
+            ? null
+            : new RelayProgress(p =>
+                progress.Report(new ModelDownloadProgress(modelId, downloadedBeforeAsset + p.DownloadedBytes, totalBytes)));
 
         var hub = _mirror.GetEffectiveHubBase(asset.DownloadUrl);
         try
@@ -64,5 +66,10 @@ internal sealed class HfResolveAssetDownloader
                 "Hugging Face rejected this download. Create a read token at huggingface.co/settings/tokens, paste it under Settings → Advanced → Access token, then click Save.",
                 ex);
         }
+    }
+
+    private sealed class RelayProgress(Action<HfDownloadProgress> onReport) : IProgress<HfDownloadProgress>
+    {
+        public void Report(HfDownloadProgress value) => onReport(value);
     }
 }
