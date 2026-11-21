@@ -70,17 +70,18 @@ public static class ModelAdvisor
     public static ModelSelection Recommend(
         HardwareProfile hardware,
         bool cleanInCloud = false,
-        bool translateInCloud = false)
+        bool translateInCloud = false,
+        bool speechInCloud = false)
     {
         var allLocal = RecommendAllLocal(hardware);
-        if (!cleanInCloud && !translateInCloud)
+        if (!cleanInCloud && !translateInCloud && !speechInCloud)
             return allLocal;
 
-        var speeches = SelectableOrLightest(ModelStage.Speech, hardware);
+        var speeches = speechInCloud ? [allLocal.Speech] : SelectableOrLightest(ModelStage.Speech, hardware);
         var cleaners = cleanInCloud ? [allLocal.Cleaner] : SelectableOrLightest(ModelStage.Cleaner, hardware);
         var translators = translateInCloud ? [allLocal.Translator] : SelectableOrLightest(ModelStage.Translator, hardware);
 
-        return PickBestCombination(speeches, cleaners, translators, hardware, cleanInCloud, translateInCloud);
+        return PickBestCombination(speeches, cleaners, translators, hardware, cleanInCloud, translateInCloud, speechInCloud);
     }
 
     private static ModelSelection RecommendAllLocal(HardwareProfile hardware)
@@ -88,7 +89,7 @@ public static class ModelAdvisor
         var speeches = SelectableOrLightest(ModelStage.Speech, hardware);
         var cleaners = SelectableOrLightest(ModelStage.Cleaner, hardware);
         var translators = SelectableOrLightest(ModelStage.Translator, hardware);
-        return PickBestCombination(speeches, cleaners, translators, hardware, cleanInCloud: false, translateInCloud: false);
+        return PickBestCombination(speeches, cleaners, translators, hardware, cleanInCloud: false, translateInCloud: false, speechInCloud: false);
     }
 
     private static ModelSelection PickBestCombination(
@@ -97,7 +98,8 @@ public static class ModelAdvisor
         IReadOnlyList<ModelDescriptor> translators,
         HardwareProfile hardware,
         bool cleanInCloud,
-        bool translateInCloud)
+        bool translateInCloud,
+        bool speechInCloud)
     {
         ModelSelection? best = null;
         var bestOvershoot = long.MaxValue;
@@ -107,8 +109,8 @@ public static class ModelAdvisor
         foreach (var cleaner in cleaners)
         foreach (var translator in translators)
         {
-            var overshoot = BudgetOvershoot(speech, cleaner, translator, hardware, cleanInCloud, translateInCloud);
-            var utility = EffectiveUtility(speech, hardware)
+            var overshoot = BudgetOvershoot(speech, cleaner, translator, hardware, cleanInCloud, translateInCloud, speechInCloud);
+            var utility = (speechInCloud ? 0 : EffectiveUtility(speech, hardware))
                         + (cleanInCloud ? 0 : EffectiveUtility(cleaner, hardware))
                         + (translateInCloud ? 0 : EffectiveUtility(translator, hardware));
 
@@ -149,19 +151,21 @@ public static class ModelAdvisor
         HardwareProfile hardware,
         ModelSelection? activeSelection = null,
         bool cleanInCloud = false,
-        bool translateInCloud = false)
+        bool translateInCloud = false,
+        bool speechInCloud = false)
     {
         // Evaluating a local option for a stage asks "how well would this option fit if this stage runs locally?"
+        var peerSpeechInCloud = stage == ModelStage.Speech ? false : speechInCloud;
         var peerCleanInCloud = stage == ModelStage.Cleaner ? false : cleanInCloud;
         var peerTranslateInCloud = stage == ModelStage.Translator ? false : translateInCloud;
-        var recommended = Recommend(hardware, peerCleanInCloud, peerTranslateInCloud);
+        var recommended = Recommend(hardware, peerCleanInCloud, peerTranslateInCloud, peerSpeechInCloud);
         var peers = activeSelection ?? recommended;
         var recommendedId = recommended.ModelIdFor(stage);
 
         return
         [
             .. ModelCatalog.OptionsFor(stage)
-                .Select(option => EvaluateOption(option, hardware, peers, recommendedId, peerCleanInCloud, peerTranslateInCloud))
+                .Select(option => EvaluateOption(option, hardware, peers, recommendedId, peerCleanInCloud, peerTranslateInCloud, peerSpeechInCloud))
         ];
     }
 
@@ -171,20 +175,23 @@ public static class ModelAdvisor
         HardwareProfile hardware,
         ModelSelection? activeSelection = null,
         bool cleanInCloud = false,
-        bool translateInCloud = false)
+        bool translateInCloud = false,
+        bool speechInCloud = false)
     {
         var profile = option.Profile
             ?? throw new ArgumentException($"Model '{option.Id}' is not a selectable stage option.", nameof(option));
+        var peerSpeechInCloud = profile.Stage == ModelStage.Speech ? false : speechInCloud;
         var peerCleanInCloud = profile.Stage == ModelStage.Cleaner ? false : cleanInCloud;
         var peerTranslateInCloud = profile.Stage == ModelStage.Translator ? false : translateInCloud;
-        var recommended = Recommend(hardware, peerCleanInCloud, peerTranslateInCloud);
+        var recommended = Recommend(hardware, peerCleanInCloud, peerTranslateInCloud, peerSpeechInCloud);
         return EvaluateOption(
             option,
             hardware,
             activeSelection ?? recommended,
             recommended.ModelIdFor(profile.Stage),
             peerCleanInCloud,
-            peerTranslateInCloud);
+            peerTranslateInCloud,
+            peerSpeechInCloud);
     }
 
     /// <summary>
@@ -196,9 +203,10 @@ public static class ModelAdvisor
         HardwareProfile hardware,
         bool cleanInCloud = false,
         bool translateInCloud = false,
-        bool cleanupEnabled = true)
+        bool cleanupEnabled = true,
+        bool speechInCloud = false)
     {
-        var speechBytes = selection.Speech.Profile!.ResidentBytes;
+        var speechBytes = speechInCloud ? 0 : selection.Speech.Profile!.ResidentBytes;
         var cleanerLocal = cleanupEnabled && !cleanInCloud;
         var translatorLocal = !translateInCloud;
         var cleanerBytes = cleanerLocal ? selection.Cleaner.Profile!.ResidentBytes : 0;
@@ -241,7 +249,7 @@ public static class ModelAdvisor
 
     private static bool PassesHardCeilings(ModelDescriptor option, HardwareProfile hardware)
     {
-        var context = new RuleContext(option, hardware, ModelSelection.Baseline, CleanInCloud: false, TranslateInCloud: false);
+        var context = new RuleContext(option, hardware, ModelSelection.Baseline, CleanInCloud: false, TranslateInCloud: false, SpeechInCloud: false);
         foreach (var rule in Rules)
         {
             if (rule.Evaluate(context).Fit == ModelFit.Unsupported)
@@ -256,9 +264,10 @@ public static class ModelAdvisor
         ModelSelection peers,
         string recommendedId,
         bool cleanInCloud,
-        bool translateInCloud)
+        bool translateInCloud,
+        bool speechInCloud)
     {
-        var context = new RuleContext(option, hardware, peers, cleanInCloud, translateInCloud);
+        var context = new RuleContext(option, hardware, peers, cleanInCloud, translateInCloud, speechInCloud);
         var isHeavy = false;
 
         foreach (var rule in Rules)
@@ -282,11 +291,13 @@ public static class ModelAdvisor
         ModelDescriptor translator,
         HardwareProfile hardware,
         bool cleanInCloud,
-        bool translateInCloud)
+        bool translateInCloud,
+        bool speechInCloud)
     {
+        var speechBytes = speechInCloud ? 0 : speech.Profile!.ResidentBytes;
         var cleanerBytes = cleanInCloud ? 0 : cleaner.Profile!.ResidentBytes;
         var translatorBytes = translateInCloud ? 0 : translator.Profile!.ResidentBytes;
-        var systemTotal = speech.Profile!.ResidentBytes + cleanerBytes + translatorBytes;
+        var systemTotal = speechBytes + cleanerBytes + translatorBytes;
         var systemOvershoot = Math.Max(0, systemTotal - hardware.CoResidentBudgetBytes);
         var vramOvershoot = hardware.VramCoResidentBudgetBytes is { } vramBudget
             ? Math.Max(0, cleanerBytes + translatorBytes - vramBudget)
@@ -299,7 +310,6 @@ public static class ModelAdvisor
         var baseUtility = option.Profile!.UtilityScore;
         // On CPU-only hosts, penalize weights exceeding the interactive CPU turnaround threshold so fast models win Best Match.
         if (hardware.Backend == ComputeBackend.CpuOnly
-            && option.Profile.Stage != ModelStage.Speech
             && option.SizeBytes > hardware.CpuInteractiveWeightCeilingBytes)
         {
             return baseUtility - 20;
@@ -325,7 +335,8 @@ public static class ModelAdvisor
         HardwareProfile Hardware,
         ModelSelection Peers,
         bool CleanInCloud,
-        bool TranslateInCloud);
+        bool TranslateInCloud,
+        bool SpeechInCloud);
 
     private readonly record struct RuleOutcome(
         ModelFit Fit,
@@ -354,7 +365,7 @@ public static class ModelAdvisor
             if (profile.RequiresGpu)
                 return RuleOutcome.Unsupported(ModelUnsupportedReason.RequiresGpuAcceleration);
 
-            if (profile.Stage != ModelStage.Speech && context.Model.SizeBytes > context.Hardware.CpuInteractiveWeightCeilingBytes)
+            if (context.Model.SizeBytes > context.Hardware.CpuInteractiveWeightCeilingBytes)
                 return RuleOutcome.Heavy;
 
             return RuleOutcome.Supported;
@@ -409,7 +420,7 @@ public static class ModelAdvisor
         public RuleOutcome Evaluate(RuleContext context)
         {
             var candidate = context.Peers.With(context.Model.Profile!.Stage, context.Model.Id);
-            var speechBytes = candidate.Speech.Profile!.ResidentBytes;
+            var speechBytes = context.SpeechInCloud ? 0 : candidate.Speech.Profile!.ResidentBytes;
             var cleanerBytes = context.CleanInCloud ? 0 : candidate.Cleaner.Profile!.ResidentBytes;
             var translatorBytes = context.TranslateInCloud ? 0 : candidate.Translator.Profile!.ResidentBytes;
 

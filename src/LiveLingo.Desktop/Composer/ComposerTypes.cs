@@ -89,6 +89,9 @@ public enum BannerKind
     /// <summary>The recording was read but contains no recognizable speech.</summary>
     NoSpeechFound,
 
+    /// <summary>The cloud speech recognition service failed or is misconfigured.</summary>
+    SpeechFailed,
+
     /// <summary>The selected output takes much longer than usual; the user may fall back to the original words.</summary>
     SlowProcessing
 }
@@ -110,6 +113,7 @@ public enum BannerAction
     Background,
     OpenMicrophoneSettings,
     OpenInputSettings,
+    OpenModelSettings,
     UseOriginal,
     KeepWaiting,
     Retarget,
@@ -137,6 +141,7 @@ public sealed record BannerState(BannerKind Kind, string Detail = "", double Pro
         BannerKind.TargetLost => [BannerAction.Retarget, BannerAction.Copy],
         BannerKind.MicrophoneDenied => [BannerAction.OpenMicrophoneSettings, BannerAction.Dismiss],
         BannerKind.NoMicrophone or BannerKind.NoSound => [BannerAction.OpenInputSettings, BannerAction.Dismiss],
+        BannerKind.SpeechFailed => [BannerAction.OpenModelSettings, BannerAction.Dismiss],
         BannerKind.SlowProcessing => [BannerAction.UseOriginal, BannerAction.KeepWaiting],
         _ => []
     };
@@ -190,7 +195,15 @@ public sealed record StatusInfo(
 /// <param name="Animations">False when the user asked to reduce motion.</param>
 /// <param name="Theme">"Auto" (follow the system), "Light" or "Dark".</param>
 /// <param name="Cleanup">False when the user turned cleanup off: "Clean" is not offered and the composer starts on the original wording.</param>
-public sealed record ComposerOptions(bool CloudTranslate, bool CloudClean, CommitKey CommitKey, bool Animations, string Theme, bool Cleanup)
+public sealed record ComposerOptions(
+    bool CloudTranslate,
+    bool CloudClean,
+    CommitKey CommitKey,
+    bool Animations,
+    string Theme,
+    bool Cleanup,
+    bool CloudSpeech = false,
+    bool CustomPolishPrompt = false)
 {
     public static ComposerOptions Default { get; } = new(false, false, CommitKey.Enter, true, "Auto", true);
 

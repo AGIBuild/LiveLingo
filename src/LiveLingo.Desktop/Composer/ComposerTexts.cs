@@ -33,22 +33,26 @@ public sealed class ComposerTexts(ILocalizationService loc, bool? mac = null)
     public string TargetMenuSome(string targetName) => loc.T("composer.menu.target.some", targetName);
     public string TargetMenuNone => loc.T("composer.menu.target.none");
 
-    public string Privacy(bool cloudTranslate, bool cloudClean)
+    public string Privacy(bool cloudTranslate, bool cloudClean, bool cloudSpeech = false)
     {
-        if (!cloudTranslate && !cloudClean)
+        if (!cloudSpeech && !cloudTranslate && !cloudClean)
             return loc.T("composer.privacy.local");
-        return loc.T("composer.privacy.cloud", CloudSteps(cloudTranslate, cloudClean));
+        return loc.T("composer.privacy.cloud", CloudSteps(cloudSpeech, cloudTranslate, cloudClean));
     }
 
-    public string PrivacyAria(bool cloudTranslate, bool cloudClean) =>
-        !cloudTranslate && !cloudClean
+    public string PrivacyAria(bool cloudTranslate, bool cloudClean, bool cloudSpeech = false) =>
+        !cloudSpeech && !cloudTranslate && !cloudClean
             ? loc.T("composer.privacy.aria.local")
-            : loc.T("composer.privacy.aria.cloud", CloudSteps(cloudTranslate, cloudClean));
+            : loc.T("composer.privacy.aria.cloud", CloudSteps(cloudSpeech, cloudTranslate, cloudClean));
 
-    private string CloudSteps(bool translate, bool clean) => string.Join(
+    private string CloudSteps(bool speech, bool translate, bool clean) => string.Join(
         loc.T("composer.privacy.sep"),
-        new[] { translate ? loc.T("composer.privacy.translate") : null, clean ? loc.T("composer.privacy.clean") : null }
-            .Where(step => step is not null));
+        new[]
+        {
+            speech ? loc.T("composer.privacy.speech") : null,
+            translate ? loc.T("composer.privacy.translate") : null,
+            clean ? loc.T("composer.privacy.clean") : null
+        }.Where(step => step is not null));
 
     /// <summary>English stays "English" and Chinese stays "中文" in every interface language, as in the prototype.</summary>
     public string LanguageName(TargetLanguage language) => loc.T("composer.language." + language);
@@ -286,6 +290,7 @@ public sealed class ComposerTexts(ILocalizationService loc, bool? mac = null)
         BannerKind.NoSound => loc.T("composer.banner.noSound"),
         BannerKind.FileFailed => loc.T("composer.banner.fileFailed", banner.Detail),
         BannerKind.NoSpeechFound => loc.T("composer.banner.noSpeech"),
+        BannerKind.SpeechFailed => loc.T("composer.banner.speechFailed", banner.Detail),
         BannerKind.SlowProcessing => loc.T("composer.banner.slow"),
         _ => throw new ArgumentOutOfRangeException(nameof(banner))
     };
@@ -297,6 +302,7 @@ public sealed class ComposerTexts(ILocalizationService loc, bool? mac = null)
         BannerAction.Download => loc.T(banner.Kind == BannerKind.DownloadFailed ? "composer.banner.retry" : "composer.banner.download"),
         BannerAction.OpenMicrophoneSettings => loc.T("composer.banner.openOs"),
         BannerAction.OpenInputSettings => loc.T("composer.banner.checkInput"),
+        BannerAction.OpenModelSettings => loc.T("composer.banner.checkModels"),
         BannerAction.UseOriginal => loc.T("composer.banner.useOriginal"),
         BannerAction.KeepWaiting => loc.T("composer.banner.keepWaiting"),
         BannerAction.Retarget => loc.T("composer.banner.retarget"),

@@ -37,4 +37,25 @@ public sealed class SettingsCloudRoutes(ISettingsService settings, ISecretStore 
             throw new CloudNotConfiguredException($"The cloud model is not configured: {ex.Message}", ex);
         }
     }
+
+    public async Task<SpeechCloudRoute?> GetSpeechAsync(CancellationToken ct)
+    {
+        var cloud = settings.Current.Cloud;
+        var endpointId = cloud.SpeechEndpointId;
+        if (string.IsNullOrEmpty(endpointId))
+            return null;
+
+        if (cloud.Endpoints.FirstOrDefault(item => item.Id == endpointId) is not { } endpoint)
+            throw new CloudNotConfiguredException("The cloud speech model is not configured: the selected cloud endpoint does not exist.");
+
+        var key = await secrets.GetSecretAsync(endpoint.SecretId, ct).ConfigureAwait(false);
+        try
+        {
+            return SpeechCloudRoute.Create(endpoint.BaseUrl, endpoint.Model, key ?? "", endpoint.Name);
+        }
+        catch (ArgumentException ex)
+        {
+            throw new CloudNotConfiguredException($"The cloud speech model is not configured: {ex.Message}", ex);
+        }
+    }
 }

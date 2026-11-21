@@ -11,6 +11,7 @@ public class ModelCatalogTests
         Assert.Equal("Hy-MT2-7B", ModelCatalog.TranslatorQuality.ShortName);
         Assert.Equal("Qwen3.5 4B", ModelCatalog.Cleaner.ShortName);
         Assert.Equal("X-ASR", ModelCatalog.SpeechLive.ShortName);
+        Assert.Equal("Qwen3-ASR 1.7B", ModelCatalog.SpeechQuality.ShortName);
         Assert.Equal("Qwen3-ASR", ModelCatalog.SpeechSecondPass.ShortName);
     }
 
@@ -84,6 +85,9 @@ public class ModelCatalogTests
             ["encoder.int8.onnx", "decoder.onnx", "joiner.int8.onnx", "tokens.txt"],
             ModelCatalog.SpeechLive.ExtractedFiles);
         Assert.Contains("tokenizer/vocab.json", ModelCatalog.SpeechSecondPass.ExtractedFiles);
+        Assert.Equal(ModelArchiveType.None, ModelCatalog.SpeechQuality.ArchiveType);
+        Assert.Contains(ModelCatalog.SpeechQuality.Assets, a => a.RelativePath == "decoder.int8.onnx");
+        Assert.Contains(ModelCatalog.SpeechQuality.Assets, a => a.RelativePath == "tokenizer/vocab.json");
         Assert.Equal(ModelArchiveType.None, ModelCatalog.SpeechVad.ArchiveType);
         Assert.Equal(3, ModelCatalog.Speech.Count);
     }

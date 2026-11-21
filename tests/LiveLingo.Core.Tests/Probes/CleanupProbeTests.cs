@@ -231,20 +231,38 @@ public class CleanupProbeTests(ITestOutputHelper output)
         });
         using var provider = services.BuildServiceProvider();
         var models = provider.GetRequiredService<IModelManager>();
-        var modelDir = models.GetModelDirectory(ModelCatalog.SpeechSecondPass.Id);
         var glossary = Glossary.Parse("LiveLingo, Avalonia, CommunityToolkit\nScale=>Skill\n用色=>润色", includeBuiltIn: true);
         var hotwords = string.Join(", ", glossary.SpeechHotwords());
         output.WriteLine($"hotwords ({glossary.SpeechHotwords().Count}): {hotwords}");
 
-        await using var resident = new ResidentModel<SherpaOnnx.OfflineRecognizer>(
-            "probe-qwen3",
-            hw => LiveLingo.Core.Speech.Native.SherpaQwen3Recognizer.Load(modelDir, hw),
-            TimeSpan.FromMinutes(1));
-        using var recognizer = new LiveLingo.Core.Speech.Native.SherpaQwen3Recognizer(
-            await resident.AcquireAsync(hotwords, CancellationToken.None));
+        foreach (var descriptor in new[] { ModelCatalog.SpeechSecondPass, ModelCatalog.SpeechQuality })
+        {
+            if (!models.HasAllExpectedLocalAssets(descriptor))
+                continue;
 
-        // 27 seconds of audio (675 audio tokens > 512 max_total_len) reproduces GenerateText:913 if not chunked.
-        var longAudio = new float[27 * 16000];
-        _ = recognizer.Recognize(longAudio);
+            var strategy = LiveLingo.Core.Speech.SpeechOptimizationStrategies.ForModel(descriptor.Id);
+            var modelDir = models.GetModelDirectory(descriptor.Id);
+            await using var resident = new ResidentModel<SherpaOnnx.OfflineRecognizer>(
+                $"probe-{descriptor.Id}",
+                hw => LiveLingo.Core.Speech.Native.SherpaQwen3Recognizer.Load(modelDir, hw, maxNewTokens: descriptor == ModelCatalog.SpeechQuality ? 224 : 192),
+                TimeSpan.FromMinutes(1));
+            using var recognizer = new LiveLingo.Core.Speech.Native.SherpaQwen3Recognizer(
+                await resident.AcquireAsync(hotwords, CancellationToken.None),
+                strategy.Profile);
+
+            // 27 seconds of audio (> 512 max_total_len) verifies chunking and zero native GenerateText errors on both 0.6B and 1.7B.
+            var longAudio = new float[27 * 16000];
+            _ = recognizer.Recognize(longAudio);
+
+            var sampleWav = Path.Combine(models.GetModelDirectory(ModelCatalog.SpeechSecondPass.Id), "test_wavs", "codeswitch.wav");
+            if (File.Exists(sampleWav))
+            {
+                var wavSamples = LiveLingo.Core.Transcription.WavReader.ReadFile(sampleWav);
+                var recognized = recognizer.Recognize(wavSamples);
+                output.WriteLine($"[{descriptor.Id}] codeswitch.wav -> {recognized}");
+                Assert.NotEmpty(recognized);
+                Assert.DoesNotContain("<asr_text>", recognized);
+            }
+        }
     }
 }

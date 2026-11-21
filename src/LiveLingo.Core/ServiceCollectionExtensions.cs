@@ -3,6 +3,8 @@ using LiveLingo.Core.Cloud;
 using LiveLingo.Core.Dictation;
 using LiveLingo.Core.Inference;
 using LiveLingo.Core.Models;
+using LiveLingo.Core.Speech;
+using LiveLingo.Core.Speech.Cloud;
 using LiveLingo.Core.Speech.Native;
 using LiveLingo.Core.Transcription;
 using LiveLingo.Core.Translation;
@@ -69,10 +71,18 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<LlamaServerHostOptions>(),
             TimeProvider.System,
             sp.GetRequiredService<ILogger<LlamaServerHost>>()));
+        services.AddSingleton<IQwenWebSocketTransport>(ClientWebSocketTransport.Shared);
         services.AddSingleton<SherpaSpeechEngine>();
-        services.AddSingleton<IDictationSessionFactory>(sp => sp.GetRequiredService<SherpaSpeechEngine>());
-        services.AddSingleton<ISpeechWarmup>(sp => sp.GetRequiredService<SherpaSpeechEngine>());
-        services.AddSingleton<IAudioFileTranscriber>(sp => sp.GetRequiredService<SherpaSpeechEngine>());
+        services.AddSingleton<RoutedSpeechEngine>(sp => new RoutedSpeechEngine(
+            sp.GetRequiredService<ICloudRoutes>(),
+            sp.GetRequiredService<SherpaSpeechEngine>(),
+            sp.GetRequiredService<IQwenWebSocketTransport>(),
+            CloudHttp,
+            sp.GetRequiredService<ILogger<RoutedSpeechEngine>>(),
+            sp.GetRequiredService<ModelUsage>()));
+        services.AddSingleton<IDictationSessionFactory>(sp => sp.GetRequiredService<RoutedSpeechEngine>());
+        services.AddSingleton<ISpeechWarmup>(sp => sp.GetRequiredService<RoutedSpeechEngine>());
+        services.AddSingleton<IAudioFileTranscriber>(sp => sp.GetRequiredService<RoutedSpeechEngine>());
 
         // Everything stays on the machine unless the host registers routes (after this call) that send a role to the cloud.
         services.AddSingleton<ICloudRoutes, LocalOnlyRoutes>();

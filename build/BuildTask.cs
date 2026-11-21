@@ -177,6 +177,8 @@ class BuildTask : NukeBuild
     [
         new(@"IMKCFRunLoopWakeUp", RegexOptions.Compiled),
         new(@"error messaging the mach port", RegexOptions.Compiled),
+        new(@"TSM AdjustCapsLockLEDForKeyTransitionHandling", RegexOptions.Compiled),
+        new(@"_ISSetPhysicalKeyboardCapsLockLED", RegexOptions.Compiled),
     ];
 
     private static void RunProcessLogger(OutputType type, string output)

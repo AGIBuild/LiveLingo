@@ -113,7 +113,7 @@ internal sealed record ComposerViewState(
         var live = vm.IsListening || vm.IsStartingListening || vm.HasTimeline;
         var empty = vm.Lines.Count == 0 && !live && string.IsNullOrWhiteSpace(vm.SourceText);
         var hasResult = vm.Lines.Count > 0 && vm.Output != ComposerOutput.Original;
-        var cloud = vm.CloudTranslate || vm.CloudClean;
+        var cloud = vm.CloudSpeech || vm.CloudTranslate || vm.CloudClean;
         var armed = vm.IsWriteQueued;
         var targetName = vm.TargetName;
 
@@ -124,9 +124,9 @@ internal sealed record ComposerViewState(
                 vm.IsTargetLost ? "lost" : vm.HasTarget ? "target" : "copyOnly"),
             // Once a request went to a cloud model, the chip says so whatever the settings say now.
             Privacy: new PrivacyState(
-                models.CloudUsed ? texts.ModelCloudBadge : texts.Privacy(vm.CloudTranslate, vm.CloudClean),
+                models.CloudUsed ? texts.ModelCloudBadge : texts.Privacy(vm.CloudTranslate, vm.CloudClean, vm.CloudSpeech),
                 cloud || models.CloudUsed,
-                models.CloudUsed ? texts.ModelCloudAria : texts.PrivacyAria(vm.CloudTranslate, vm.CloudClean),
+                models.CloudUsed ? texts.ModelCloudAria : texts.PrivacyAria(vm.CloudTranslate, vm.CloudClean, vm.CloudSpeech),
                 [.. Enum.GetValues<ModelStage>().Select(stage => new ModelRowState(
                     texts.ModelStageLabel(stage),
                     texts.ModelDetailBody(models.Used.GetValueOrDefault(stage), models.Confirmed.GetValueOrDefault(stage))))]),

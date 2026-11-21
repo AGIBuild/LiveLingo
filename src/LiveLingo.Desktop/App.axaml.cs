@@ -114,6 +114,8 @@ public partial class App : Application
         services.AddSingleton<ICloudRoutes, SettingsCloudRoutes>();
 
         _serviceProvider = services.BuildServiceProvider();
+        _serviceProvider.GetRequiredService<CoreOptions>().Models =
+            settings.Composer.ResolveSelection(hardware, _serviceProvider.GetRequiredService<IModelManager>());
         _serviceProvider.GetRequiredService<ServerPidRegistry>().ReapOrphans();
 
         if (!string.IsNullOrEmpty(settings.Update.UpdateUrl))
@@ -263,10 +265,17 @@ public partial class App : Application
         var glossary = settings.Composer.EffectiveGlossary();
         var session = new DraftSession(hasTarget: target is not null, notifyOn: context);
         session.Mutate(d => d.DocumentMode = true);
+        var polishStyle = PolishStyle.Resolve(settings.Composer.PolishPrompt);
+        var customPolishPrompt = polishStyle != PolishStyle.Default;
+        var speechNativeClean = settings.Composer.CleanupEnabled
+            && !customPolishPrompt
+            && SpeechCloudRoute.SupportsNativePolishForModel(settings.Cloud.SpeechEndpoint?.Model);
         var options = new ComposerOptions(
             settings.Cloud.Translate, settings.Cloud.Clean,
             Enum.Parse<CommitKey>(settings.Composer.CommitKey), settings.Appearance.Animations, settings.Appearance.Theme,
-            settings.Composer.CleanupEnabled);
+            settings.Composer.CleanupEnabled,
+            CloudSpeech: settings.Cloud.Speech,
+            CustomPolishPrompt: customPolishPrompt);
         var preferences = services.GetRequiredService<ComposerPreferences>();
         var start = preferences.Resolve(target, options.Outputs) with { LastExport = preferences.LastExportFormat };
         var scheduler = new TranslationScheduler(
@@ -280,7 +289,7 @@ public partial class App : Application
         var polish = settings.Composer.CleanupEnabled
             ? new PolishScheduler(
                 session, services.GetRequiredService<IDictationPolisher>(), glossary.Terms,
-                PolishStyle.Resolve(settings.Composer.PolishPrompt), CleanupContextChars,
+                polishStyle, CleanupContextChars,
                 services.GetRequiredService<ILogger<PolishScheduler>>(),
                 corrections: glossary.Corrections)
             : null;
@@ -296,7 +305,9 @@ public partial class App : Application
             ComposerModelPlan.Create(
                 services.GetRequiredService<CoreOptions>().Models,
                 cleanInCloud: settings.Cloud.Clean,
-                translateInCloud: settings.Cloud.Translate),
+                translateInCloud: settings.Cloud.Translate,
+                speechInCloud: settings.Cloud.Speech,
+                speechNativeClean: speechNativeClean),
             services.GetRequiredService<IModelManager>(),
             services.GetRequiredService<IModelDownloadCoordinator>(),
             platform,
@@ -397,12 +408,22 @@ public partial class App : Application
         var services = _serviceProvider!;
         var core = services.GetRequiredService<CoreOptions>();
         var hardware = services.GetRequiredService<ModelSelectionCoordinator>().Hardware;
+        var modelManager = services.GetRequiredService<IModelManager>();
         var previousModels = core.Models;
         ApplyCoreOptions(settings, core, hardware);
+        core.Models = settings.Composer.ResolveSelection(hardware, modelManager);
+        var polishStyle = PolishStyle.Resolve(settings.Composer.PolishPrompt);
+        var speechNativeClean = settings.Composer.CleanupEnabled
+            && polishStyle == PolishStyle.Default
+            && SpeechCloudRoute.SupportsNativePolishForModel(settings.Cloud.SpeechEndpoint?.Model);
+        _composer?.UpdateModelPlan(ComposerModelPlan.Create(
+            core.Models,
+            cleanInCloud: settings.Cloud.Clean && settings.Composer.CleanupEnabled,
+            translateInCloud: settings.Cloud.Translate,
+            speechInCloud: settings.Cloud.Speech,
+            speechNativeClean: speechNativeClean));
         if (previousModels != core.Models)
         {
-            _composer?.UpdateModelPlan(ComposerModelPlan.Create(core.Models,
-                settings.Cloud.Clean && settings.Composer.CleanupEnabled, settings.Cloud.Translate));
             var warmup = services.GetRequiredService<ModelWarmup>();
             if (previousModels.SpeechModelId != core.Models.SpeechModelId)
                 warmup.OnSpeechModelChanged();

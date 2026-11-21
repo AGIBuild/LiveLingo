@@ -35,10 +35,11 @@ public class ServiceCollectionExtensionsTests
         services.AddLiveLingoCore();
         await using var sp = services.BuildServiceProvider();
 
-        var engine = sp.GetRequiredService<LiveLingo.Core.Speech.Native.SherpaSpeechEngine>();
-        Assert.Same(engine, sp.GetRequiredService<IDictationSessionFactory>());
-        Assert.Same(engine, sp.GetRequiredService<ISpeechWarmup>());
-        Assert.Same(engine, sp.GetRequiredService<LiveLingo.Core.Transcription.IAudioFileTranscriber>());
+        var routed = sp.GetRequiredService<LiveLingo.Core.Speech.RoutedSpeechEngine>();
+        Assert.NotNull(sp.GetService<LiveLingo.Core.Speech.Native.SherpaSpeechEngine>());
+        Assert.Same(routed, sp.GetRequiredService<IDictationSessionFactory>());
+        Assert.Same(routed, sp.GetRequiredService<ISpeechWarmup>());
+        Assert.Same(routed, sp.GetRequiredService<LiveLingo.Core.Transcription.IAudioFileTranscriber>());
     }
 
     [Fact]

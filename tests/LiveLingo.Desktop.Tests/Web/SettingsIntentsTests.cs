@@ -271,6 +271,7 @@ public sealed class SettingsIntentsTests
         var rig = new Rig();
         rig.F.Models.ListInstalled().Returns([
             new InstalledModel(ModelCatalog.TranslatorFast.Id, "fast", "/m/fast", 10, ModelType.Translation, DateTime.UnixEpoch),
+            new InstalledModel(ModelCatalog.Cleaner.Id, "c1", "/m/c1", 10, ModelType.PostProcessing, DateTime.UnixEpoch),
             new InstalledModel(ModelCatalog.CleanerFast.Id, "c2", "/m/c2", 10, ModelType.PostProcessing, DateTime.UnixEpoch)]);
         await rig.Vm.InitializeAsync();
 

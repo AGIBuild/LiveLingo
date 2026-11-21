@@ -3,10 +3,21 @@ namespace LiveLingo.Core.Drafting;
 internal sealed record DocumentPiece(string Text, string Lead, string Trail, bool Owned, bool Attach = false);
 
 /// <summary>A detached input snapshot. Model calls never read a changing draft.</summary>
-internal sealed record DocumentWork(DocumentTicket Ticket, string Source, IReadOnlyList<DocumentPiece> Pieces)
+internal sealed record DocumentWork(
+    DocumentTicket Ticket,
+    string Source,
+    IReadOnlyList<DocumentPiece> Pieces,
+    bool AllNativePolished = false,
+    string? NativePolishedText = null)
 {
     internal static DocumentWork Capture(Draft draft, UnitKind kind)
     {
+        var allNativePolished = kind == UnitKind.Clean
+            && !draft.ForceCleanRepolish
+            && draft.Units.Count > 0
+            && draft.Units.All(u => u.Clean.IsOwned || (u.IsNativePolished && !string.IsNullOrWhiteSpace(u.Clean.Text)));
+        var nativePolishedText = allNativePolished ? draft.PreviewText(UnitKind.Clean) : null;
+
         var pieces = new List<DocumentPiece>();
         var run = new List<(string Lead, string Body, string Trail)>();
         void Flush()
@@ -38,7 +49,7 @@ internal sealed record DocumentWork(DocumentTicket Ticket, string Source, IReadO
             }
             Flush();
         }
-        return new DocumentWork(draft.DocumentTicketFor(kind), clean ?? draft.SourceText(), pieces);
+        return new DocumentWork(draft.DocumentTicketFor(kind), clean ?? draft.SourceText(), pieces, allNativePolished, nativePolishedText);
     }
 
     internal async Task<string> TransformAsync(

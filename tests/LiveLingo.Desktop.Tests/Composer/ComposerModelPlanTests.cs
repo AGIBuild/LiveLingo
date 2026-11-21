@@ -33,12 +33,21 @@ public class ComposerModelPlanTests
     }
 
     [Fact]
-    public void Voice_AlwaysNeedsTheLocalSpeechModels_BecauseAudioNeverLeavesTheMachine()
+    public void Voice_NeedsLocalSpeechModelsByDefault_AndNoneWhenSpeechRunsInCloud()
     {
-        var plan = ComposerModelPlan.Create(TranslatorTier.Fast, cleanInCloud: true, translateInCloud: true);
+        var localSpeech = ComposerModelPlan.Create(TranslatorTier.Fast, cleanInCloud: true, translateInCloud: true);
+        Assert.Equal(ModelCatalog.Speech, localSpeech.Voice);
+        Assert.Empty(localSpeech.For(ComposerOutput.Clean));
 
-        Assert.Equal(ModelCatalog.Speech, plan.Voice);
-        Assert.Empty(plan.For(ComposerOutput.Clean));
+        var cloudSpeech = ComposerModelPlan.Create(
+            ModelSelection.Baseline,
+            cleanInCloud: false,
+            translateInCloud: false,
+            speechInCloud: true,
+            speechNativeClean: true);
+        Assert.Empty(cloudSpeech.Voice);
+        Assert.Empty(cloudSpeech.Transcription);
+        Assert.True(cloudSpeech.SpeechNativeClean);
     }
 
     [Fact]

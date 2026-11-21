@@ -24,6 +24,9 @@ public interface IVoiceInput : IAsyncDisposable
     /// <exception cref="InvalidOperationException">There is no input device or it could not be opened.</exception>
     Task StartAsync(DraftSession draft, IReadOnlyList<string> glossary, CancellationToken ct);
 
+    Task StartAsync(DraftSession draft, SpeechSessionRequest request, CancellationToken ct) =>
+        StartAsync(draft, request.Hotwords, ct);
+
     /// <summary>Closes the microphone, settles what was said into the draft and releases the recognizers.</summary>
     Task StopAsync();
 }
@@ -39,7 +42,7 @@ public sealed class MicrophoneVoiceInput : IVoiceInput
     private readonly IDictationSessionFactory _factory;
     private readonly IMicrophone _microphone;
     private readonly ISpeechWarmup _warmup;
-    private DictationSession? _session;
+    private IDictationSession? _session;
     private SignalMonitor? _monitor;
 
     public MicrophoneVoiceInput(IDictationSessionFactory factory, IMicrophone microphone, ISpeechWarmup warmup)
@@ -64,6 +67,20 @@ public sealed class MicrophoneVoiceInput : IVoiceInput
             throw new InvalidOperationException("Already listening.");
 
         var session = await _factory.CreateAsync(draft, glossary, ct).ConfigureAwait(false);
+        await OpenMicrophoneForAsync(session).ConfigureAwait(false);
+    }
+
+    public async Task StartAsync(DraftSession draft, SpeechSessionRequest request, CancellationToken ct)
+    {
+        if (_session is not null)
+            throw new InvalidOperationException("Already listening.");
+
+        var session = await _factory.CreateAsync(draft, request, ct).ConfigureAwait(false);
+        await OpenMicrophoneForAsync(session).ConfigureAwait(false);
+    }
+
+    private async Task OpenMicrophoneForAsync(IDictationSession session)
+    {
         session.Start();
         var monitor = new SignalMonitor(IdleTimeout);
         _monitor = monitor;

@@ -18,6 +18,18 @@ public sealed class Glossary
     public const int MaxSpeechHotwordChars = 160;
     public const int MaxSpeechHotwordTokens = 36;
 
+    /// <summary>
+    /// Qwen-Audio-3.1-ASR supports two-tier runtime hotword biasing (<c>parameters.vocabulary</c>): up to 50 P0
+    /// super-hotwords (<c>weight=50</c>) for user-defined domain entities and accent targets, plus a P1 candidate pool
+    /// (<c>weight=4</c>) up to 2,000 total terms.
+    /// </summary>
+    public const int CloudSuperHotwordWeight = 50;
+    public const int CloudStandardHotwordWeight = 4;
+    public const int MaxCloudSuperHotwords = 50;
+    public const int MaxCloudTotalHotwords = 2000;
+    public const int MaxCloudNonAsciiHotwordLength = 15;
+    public const int MaxCloudAsciiHotwordWords = 7;
+
     private static readonly char[] EntrySeparators = [',', '，', ';', '；', '\n', '\r'];
     private static readonly string[] CorrectionSeparators = ["=>", "⇒"];
     private static readonly char[] PairSeparators = ['=', ':', '：'];
@@ -37,17 +49,25 @@ public sealed class Glossary
         "macOS", "Windows", "Linux", "Avalonia"
     ];
 
-    public static Glossary Empty { get; } = new([], [], []);
+    public static Glossary Empty { get; } = new([], [], [], []);
 
-    private Glossary(IReadOnlyList<string> terms, IReadOnlyList<GlossaryTerm> pairs, IReadOnlyList<GlossaryCorrection> corrections)
+    private Glossary(
+        IReadOnlyList<string> terms,
+        IReadOnlyList<string> userTerms,
+        IReadOnlyList<GlossaryTerm> pairs,
+        IReadOnlyList<GlossaryCorrection> corrections)
     {
         Terms = terms;
+        UserTerms = userTerms;
         Pairs = pairs;
         Corrections = corrections;
     }
 
     /// <summary>Every canonical term as written, including the source side of each translation pair and canonical side of each correction.</summary>
     public IReadOnlyList<string> Terms { get; }
+
+    /// <summary>Canonical terms explicitly configured by the user (plain terms, pair sources and correction targets), excluding <see cref="BuiltInTerms"/>.</summary>
+    public IReadOnlyList<string> UserTerms { get; }
 
     public IReadOnlyList<GlossaryTerm> Pairs { get; }
 
@@ -71,6 +91,92 @@ public sealed class Glossary
         int maxChars = MaxSpeechHotwordChars,
         int maxTokens = MaxSpeechHotwordTokens) =>
         BoundHotwords(Terms, maxTerms, maxChars, maxTokens);
+
+    /// <summary>
+    /// Builds the two-tier P0/P1 hotword dictionary for cloud generative ASR (such as Qwen-Audio-3.1-ASR):
+    /// explicit user terms receive P0 priority (<see cref="CloudSuperHotwordWeight"/>, up to <paramref name="maxSuperHotwords"/>),
+    /// while remaining terms and <see cref="BuiltInTerms"/> form the P1 candidate pool (<see cref="CloudStandardHotwordWeight"/>).
+    /// Entries violating the cloud hotword length limits are skipped rather than failing the recognition task.
+    /// </summary>
+    public IReadOnlyDictionary<string, int> CloudSpeechVocabulary(
+        int maxSuperHotwords = MaxCloudSuperHotwords,
+        int maxTotalHotwords = MaxCloudTotalHotwords) =>
+        BuildCloudVocabulary(UserTerms, Terms, maxSuperHotwords, maxTotalHotwords);
+
+    public static IReadOnlyDictionary<string, int> BuildCloudVocabulary(
+        IReadOnlyList<string> priorityTerms,
+        IReadOnlyList<string> allTerms,
+        int maxSuperHotwords = MaxCloudSuperHotwords,
+        int maxTotalHotwords = MaxCloudTotalHotwords)
+    {
+        if ((priorityTerms.Count == 0 && allTerms.Count == 0) || maxTotalHotwords <= 0)
+            return new Dictionary<string, int>(StringComparer.Ordinal);
+
+        var result = new Dictionary<string, int>(StringComparer.Ordinal);
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var superCount = 0;
+
+        foreach (var raw in priorityTerms)
+        {
+            if (result.Count >= maxTotalHotwords)
+                break;
+            var term = raw.Trim();
+            if (!IsValidCloudHotword(term) || !seen.Add(term))
+                continue;
+
+            if (superCount < maxSuperHotwords)
+            {
+                result[term] = CloudSuperHotwordWeight;
+                superCount++;
+            }
+            else
+            {
+                result[term] = CloudStandardHotwordWeight;
+            }
+        }
+
+        foreach (var raw in allTerms)
+        {
+            if (result.Count >= maxTotalHotwords)
+                break;
+            var term = raw.Trim();
+            if (!IsValidCloudHotword(term) || !seen.Add(term))
+                continue;
+
+            result[term] = CloudStandardHotwordWeight;
+        }
+
+        return result;
+    }
+
+    public static bool IsValidCloudHotword(string term)
+    {
+        if (string.IsNullOrWhiteSpace(term))
+            return false;
+
+        var trimmed = term.Trim();
+        var hasNonAscii = false;
+        var hasLetterOrDigit = false;
+        foreach (var ch in trimmed)
+        {
+            if (ch > 127)
+                hasNonAscii = true;
+            if (char.IsLetterOrDigit(ch))
+                hasLetterOrDigit = true;
+        }
+
+        if (!hasLetterOrDigit)
+            return false;
+
+        if (hasNonAscii)
+            return trimmed.Length <= MaxCloudNonAsciiHotwordLength;
+
+        if (trimmed.Length > 64)
+            return false;
+
+        var words = trimmed.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return words.Length is >= 1 and <= MaxCloudAsciiHotwordWords;
+    }
 
     public static IReadOnlyList<string> BoundHotwords(
         IReadOnlyList<string> terms,
@@ -166,6 +272,7 @@ public sealed class Glossary
             }
         }
 
+        var userTerms = terms.ToArray();
         if (includeBuiltIn)
         {
             foreach (var builtIn in BuiltInTerms)
@@ -174,7 +281,7 @@ public sealed class Glossary
 
         return terms.Count == 0 && pairs.Count == 0 && corrections.Count == 0
             ? Empty
-            : new Glossary(terms, pairs, corrections);
+            : new Glossary(terms, userTerms, pairs, corrections);
     }
 
     /// <summary>

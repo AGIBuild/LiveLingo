@@ -7,7 +7,8 @@ public sealed record ComposerModelPlan(
     IReadOnlyList<ModelDescriptor> Clean,
     IReadOnlyList<ModelDescriptor> Translate,
     IReadOnlyList<ModelDescriptor> Voice,
-    IReadOnlyList<ModelDescriptor> Transcription)
+    IReadOnlyList<ModelDescriptor> Transcription,
+    bool SpeechNativeClean = false)
 {
     public IReadOnlyList<ModelDescriptor> For(ComposerOutput output) => output switch
     {
@@ -19,16 +20,24 @@ public sealed record ComposerModelPlan(
 
     /// <param name="cleanInCloud">Cleanup runs on the user's cloud endpoint, so no local cleaner is needed.</param>
     /// <param name="translateInCloud">Translation runs on the user's cloud endpoint, so no local translator is needed.</param>
-    public static ComposerModelPlan Create(ModelSelection selection, bool cleanInCloud, bool translateInCloud)
+    /// <param name="speechInCloud">Speech recognition runs on the user's cloud endpoint, so no local ONNX speech models are needed.</param>
+    /// <param name="speechNativeClean">The active cloud speech model natively polishes dictated speech without needing a separate cleaner LLM.</param>
+    public static ComposerModelPlan Create(
+        ModelSelection selection,
+        bool cleanInCloud,
+        bool translateInCloud,
+        bool speechInCloud = false,
+        bool speechNativeClean = false)
     {
         ArgumentNullException.ThrowIfNull(selection);
         return new ComposerModelPlan(
             cleanInCloud ? [] : [ModelCatalog.LlamaRuntime, selection.Cleaner],
             translateInCloud ? [] : [ModelCatalog.LlamaRuntime, selection.Translator],
-            ModelCatalog.SpeechFor(selection.Speech),
-            ModelCatalog.TranscriptionFor(selection.Speech));
+            speechInCloud ? [] : ModelCatalog.SpeechFor(selection.Speech),
+            speechInCloud ? [] : ModelCatalog.TranscriptionFor(selection.Speech),
+            SpeechNativeClean: speechInCloud && speechNativeClean && !cleanInCloud);
     }
 
-    public static ComposerModelPlan Create(TranslatorTier tier, bool cleanInCloud, bool translateInCloud) =>
-        Create(ModelSelection.Baseline with { TranslatorModelId = ModelCatalog.Translator(tier).Id }, cleanInCloud, translateInCloud);
+    public static ComposerModelPlan Create(TranslatorTier tier, bool cleanInCloud, bool translateInCloud, bool speechInCloud = false) =>
+        Create(ModelSelection.Baseline with { TranslatorModelId = ModelCatalog.Translator(tier).Id }, cleanInCloud, translateInCloud, speechInCloud);
 }

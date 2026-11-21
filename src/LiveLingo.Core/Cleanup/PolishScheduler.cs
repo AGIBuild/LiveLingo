@@ -91,6 +91,9 @@ public sealed class PolishScheduler : IAsyncDisposable
 
     private async Task<string> PolishDocumentAsync(DocumentWork work, CancellationToken ct)
     {
+        if (_style == PolishStyle.Default && work.AllNativePolished && !string.IsNullOrWhiteSpace(work.NativePolishedText))
+            return work.NativePolishedText;
+
         var summary = work.Pieces.Count(piece => !piece.Owned) > 1
             ? await _polisher.SummarizeAsync(work.Source, ct).ConfigureAwait(false) : "";
         return await work.TransformAsync(async (target, preceding, token) =>
@@ -326,6 +329,13 @@ public sealed class PolishScheduler : IAsyncDisposable
     {
         if (!IsDue(draft))
             return new Idle();
+
+        if (_style == PolishStyle.Default
+            && draft.Units.Count > 0
+            && draft.Units.All(u => u.Clean.IsOwned || (u.IsNativePolished && !string.IsNullOrWhiteSpace(u.Clean.Text))))
+        {
+            return new Done(draft.DictationRevision, draft.SourceRevision);
+        }
 
         var runs = Runs(draft);
         var source = draft.SourceText();

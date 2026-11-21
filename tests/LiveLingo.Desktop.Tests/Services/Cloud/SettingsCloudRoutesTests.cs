@@ -31,9 +31,29 @@ public class SettingsCloudRoutesTests
     {
         var (routes, _, secrets) = Create();
 
+        Assert.Null(await routes.GetSpeechAsync(CancellationToken.None));
         Assert.Null(await routes.GetAsync(InferenceRole.Translator, CancellationToken.None));
         Assert.Null(await routes.GetAsync(InferenceRole.Cleaner, CancellationToken.None));
         await secrets.DidNotReceiveWithAnyArgs().GetSecretAsync(default!, TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task SpeechRoute_ResolvesQwenAudio31AsrOverWebSocketOrHttps()
+    {
+        var (routes, model, _) = Create();
+        model.Cloud.Endpoints.Add(CloudTestData.Endpoint(
+            "bailian", "百炼", "https://dashscope.aliyuncs.com/api/v1", "qwen-audio-3.1-asr-flash-message"));
+        model.Cloud.SpeechEndpointId = "bailian";
+        // Reuse secret "a"'s SecretId to avoid extra setup, or set bailian's SecretId.
+        model.Cloud.Endpoints[^1].SecretId = CloudTestData.SecretId("a");
+
+        var speech = await routes.GetSpeechAsync(CancellationToken.None);
+
+        Assert.NotNull(speech);
+        Assert.Equal(SpeechCloudProtocol.QwenAudioWebSocket, speech.Protocol);
+        Assert.Equal("wss://dashscope.aliyuncs.com/api-ws/v1/inference", speech.Endpoint.ToString());
+        Assert.Equal("qwen-audio-3.1-asr-flash-message", speech.Model);
+        Assert.True(speech.SupportsNativePolish);
     }
 
     [Fact]

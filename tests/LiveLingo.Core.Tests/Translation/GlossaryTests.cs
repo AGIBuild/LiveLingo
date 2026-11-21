@@ -99,4 +99,29 @@ public class GlossaryTests
         var saved = Glossary.Parse($"{expectedSpoken}=>{expectedCanonical}");
         Assert.Null(saved.SuggestCorrection(original, edited));
     }
+
+    [Fact]
+    public void CloudSpeechVocabulary_AssignsSuperWeightToUserTerms_AndStandardWeightToBuiltIns_WhileEnforcingLimits()
+    {
+        var glossary = Glossary.Parse(
+            "祺元, 璇枢=XuanShu, Scale=>Skill, 这是一个超过十五个字符的超长中文热词测试条目, one two three four five six seven eight",
+            includeBuiltIn: true);
+
+        var vocab = glossary.CloudSpeechVocabulary();
+
+        // User-configured terms and correction canonicals get P0 super-hotword weight (50).
+        Assert.Equal(Glossary.CloudSuperHotwordWeight, vocab["祺元"]);
+        Assert.Equal(Glossary.CloudSuperHotwordWeight, vocab["璇枢"]);
+        Assert.Equal(Glossary.CloudSuperHotwordWeight, vocab["Skill"]);
+
+        // Built-in developer terms stay in the P1 candidate pool (weight 4), uncapped by local ONNX's 24-word ceiling.
+        Assert.Equal(Glossary.CloudStandardHotwordWeight, vocab["Agent"]);
+        Assert.Equal(Glossary.CloudStandardHotwordWeight, vocab["Avalonia"]);
+        Assert.True(vocab.Count > Glossary.MaxSpeechHotwords);
+
+        // Spoken error forms and entries violating DashScope's 15-char / 7-word hotword limits are excluded.
+        Assert.False(vocab.ContainsKey("Scale"));
+        Assert.False(vocab.ContainsKey("这是一个超过十五个字符的超长中文热词测试条目"));
+        Assert.False(vocab.ContainsKey("one two three four five six seven eight"));
+    }
 }

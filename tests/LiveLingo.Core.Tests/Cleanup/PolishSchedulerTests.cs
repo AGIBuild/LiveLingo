@@ -425,4 +425,47 @@ public class PolishSchedulerTests
 
         Assert.Empty(cleaner.Requests);
     }
+
+    [Fact]
+    public async Task NativeAsrPolishedUnits_BypassCascadePolishWithDefaultStyle_UntilCustomStyleOrExplicitRetry()
+    {
+        var session = new DraftSession(hasTarget: true);
+        session.Mutate(d =>
+        {
+            d.DocumentMode = true;
+            d.Output = OutputKind.Clean;
+            d.Recording = true;
+            d.AppendDictated("那个，请把祺元项目的报告发给洛柯。", "请把祺元项目的报告发给洛柯。");
+            d.AppendDictated("下周我们要上线 LiveLingo 系统。", "下周我们要上线 LiveLingo 系统。");
+        });
+
+        var textCleanerCalls = 0;
+        var textCleaner = new CountingTextCleaner(() => Interlocked.Increment(ref textCleanerCalls));
+        var cleaner = new FakeCleaner(request => request.Target.Replace("那个，", "").Replace("下周我们要", "下周我们"));
+        await using var cleanup = new CleanupScheduler(session, textCleaner, ["LiveLingo"], 300);
+        await using var polish = new PolishScheduler(session, cleaner, ["LiveLingo"], PolishStyle.Default, 300);
+
+        session.Mutate(d => d.Recording = false);
+        await WaitUntil(() => session.Read(d => d.Final(UnitKind.Clean).State == DocumentState.Ready));
+
+        Assert.Equal(0, textCleanerCalls);
+        Assert.Empty(cleaner.Requests);
+        Assert.Equal(
+            "请把祺元项目的报告发给洛柯。下周我们要上线 LiveLingo 系统。",
+            session.Read(d => d.Text()));
+
+        // Explicit user "Regenerate full text" runs the LLM polisher on demand.
+        session.Mutate(d => d.RetryDocument(UnitKind.Clean));
+        await WaitUntil(() => cleaner.Requests.Count == 1 && session.Read(d => d.Final(UnitKind.Clean).State == DocumentState.Ready));
+        Assert.Equal("请把祺元项目的报告发给洛柯。下周我们上线 LiveLingo 系统。", session.Read(d => d.Text()));
+    }
+
+    private sealed class CountingTextCleaner(Action onCall) : ITextCleaner
+    {
+        public Task<string> CleanAsync(CleanupRequest request, CancellationToken ct)
+        {
+            onCall();
+            return Task.FromResult(request.Target);
+        }
+    }
 }

@@ -27,6 +27,7 @@ public sealed class SherpaSpeechEngine : IDictationSessionFactory, ISpeechWarmup
 
     private readonly IModelManager _models;
     private readonly CoreOptions _options;
+    private readonly ILogger<SherpaSpeechEngine> _logger;
     private readonly ResidentModel<OnlineRecognizer> _live;
     private readonly ResidentModel<OfflineRecognizer> _secondPass;
     private readonly ModelUsage? _usage;
@@ -35,6 +36,7 @@ public sealed class SherpaSpeechEngine : IDictationSessionFactory, ISpeechWarmup
     {
         _models = models;
         _options = options;
+        _logger = logger;
         _usage = usage;
         _live = new ResidentModel<OnlineRecognizer>(
             "live speech recognizer",
@@ -82,18 +84,24 @@ public sealed class SherpaSpeechEngine : IDictationSessionFactory, ISpeechWarmup
     public async Task WarmAsync(IReadOnlyList<string> glossary, CancellationToken ct = default)
     {
         var selected = _options.Models.Speech;
+        var strategy = SpeechOptimizationStrategies.ForLocal(selected.Id);
         EnsureInstalled(ModelCatalog.SpeechFor(selected));
-        await Task.WhenAll(_live.WarmAsync("", ct), _secondPass.WarmAsync(ResidencyKey(selected, glossary), ct)).ConfigureAwait(false);
+        var key = ResidencyKey(strategy, SpeechSessionRequest.FromHotwords(glossary));
+        await Task.WhenAll(_live.WarmAsync("", ct), _secondPass.WarmAsync(key, ct)).ConfigureAwait(false);
     }
 
-    public async Task<DictationSession> CreateAsync(DraftSession draft, IReadOnlyList<string> glossary, CancellationToken ct)
+    public Task<IDictationSession> CreateAsync(DraftSession draft, IReadOnlyList<string> glossary, CancellationToken ct) =>
+        CreateAsync(draft, SpeechSessionRequest.FromHotwords(glossary), ct);
+
+    public async Task<IDictationSession> CreateAsync(DraftSession draft, SpeechSessionRequest request, CancellationToken ct)
     {
         var selected = _options.Models.Speech;
+        var strategy = SpeechOptimizationStrategies.ForLocal(selected.Id);
         var names = $"{ModelCatalog.SpeechLive.DisplayName} + {selected.DisplayName}";
         var shortNames = $"{ModelCatalog.SpeechLive.ShortName} + {selected.ShortName}";
         _usage?.Report(new ModelUse(ModelStage.Speech, names, Cloud: false, Confirmed: false, shortNames));
         EnsureInstalled(ModelCatalog.SpeechFor(selected));
-        var key = ResidencyKey(selected, glossary);
+        var key = ResidencyKey(strategy, request);
         await Task.WhenAll(_live.WarmAsync("", ct), _secondPass.WarmAsync(key, ct)).ConfigureAwait(false);
         var live = await _live.AcquireAsync("", ct).ConfigureAwait(false);
         ResidentModel<OfflineRecognizer>.Lease secondPass;
@@ -108,10 +116,16 @@ public sealed class SherpaSpeechEngine : IDictationSessionFactory, ISpeechWarmup
         }
 
         var liveRecognizer = new SherpaLiveRecognizer(live);
-        var secondPassRecognizer = new SherpaQwen3Recognizer(secondPass);
+        var secondPassRecognizer = new SherpaQwen3Recognizer(secondPass, strategy.Profile);
         try
         {
-            var session = new DictationSession(liveRecognizer, NewVad(LiveVadMinSilenceSeconds), secondPassRecognizer, draft);
+            var session = new DictationSession(
+                liveRecognizer,
+                NewVad(LiveVadMinSilenceSeconds),
+                secondPassRecognizer,
+                draft,
+                strategy.Profile.Dictation,
+                _logger);
             _usage?.Report(new ModelUse(ModelStage.Speech, names, Cloud: false, Confirmed: true, shortNames));
             return session;
         }
@@ -123,17 +137,26 @@ public sealed class SherpaSpeechEngine : IDictationSessionFactory, ISpeechWarmup
         }
     }
 
+    public Task<IReadOnlyList<TimedSegment>> TranscribeAsync(
+        string path, IReadOnlyList<string> glossary, IProgress<double>? progress, CancellationToken ct) =>
+        TranscribeAsync(path, SpeechSessionRequest.FromHotwords(glossary), progress, ct);
+
     public async Task<IReadOnlyList<TimedSegment>> TranscribeAsync(
-        string path, IReadOnlyList<string> glossary, IProgress<double>? progress, CancellationToken ct)
+        string path, SpeechSessionRequest request, IProgress<double>? progress, CancellationToken ct)
     {
         var selected = _options.Models.Speech;
+        var strategy = SpeechOptimizationStrategies.ForLocal(selected.Id);
         EnsureInstalled(ModelCatalog.TranscriptionFor(selected));
         var samples = await Task.Run(() => WavReader.ReadFile(path), ct).ConfigureAwait(false);
-        using var recognizer = new SherpaQwen3Recognizer(await _secondPass.AcquireAsync(ResidencyKey(selected, glossary), ct).ConfigureAwait(false));
+        var key = ResidencyKey(strategy, request);
+        using var recognizer = new SherpaQwen3Recognizer(
+            await _secondPass.AcquireAsync(key, ct).ConfigureAwait(false),
+            strategy.Profile);
+        var maxSpanSamples = Math.Max(AudioFormat.SampleRate, (strategy.Profile.MaxSegmentSeconds - 1) * AudioFormat.SampleRate);
         return await Task.Run(() =>
         {
             using var vad = NewVad(FileVadMinSilenceSeconds);
-            return FileTranscriber.Transcribe(samples, vad, recognizer, progress, ct);
+            return FileTranscriber.Transcribe(samples, vad, recognizer, progress, ct, maxSpanSamples);
         }, ct).ConfigureAwait(false);
     }
 
@@ -145,23 +168,25 @@ public sealed class SherpaSpeechEngine : IDictationSessionFactory, ISpeechWarmup
 
     private OfflineRecognizer LoadSecondPass(string residencyKey)
     {
-        var separator = residencyKey.IndexOf('\n');
-        var modelId = separator >= 0 ? residencyKey[..separator] : residencyKey;
-        var hotwords = separator >= 0 ? residencyKey[(separator + 1)..] : "";
-        return SecondPassRecognizerStrategies.For(modelId).Load(_models.GetModelDirectory(modelId), hotwords);
+        var parts = residencyKey.Split('\n', 3);
+        var modelId = parts[0];
+        var threads = parts.Length >= 2 && int.TryParse(parts[1], out var parsedThreads) ? parsedThreads : 4;
+        var hotwords = parts.Length >= 3 ? parts[2] : "";
+        return SpeechOptimizationStrategies.ForLocal(modelId).Load(_models.GetModelDirectory(modelId), hotwords, threads);
     }
 
-    private static string ResidencyKey(ModelDescriptor secondPass, IReadOnlyList<string> glossary)
+    private string ResidencyKey(ILocalSecondPassStrategy strategy, SpeechSessionRequest request)
     {
-        var strategy = SecondPassRecognizerStrategies.For(secondPass.Id);
-        return strategy.SupportsHotwords ? $"{secondPass.Id}\n{Hotwords(glossary)}" : secondPass.Id;
+        var threads = strategy.ResolveThreads(_options.InferenceThreads, Environment.ProcessorCount);
+        if (!strategy.Profile.SupportsHotwords)
+            return $"{strategy.Id}\n{threads}";
+
+        var hotwords = string.Join(", ", strategy.SelectPromptHotwords(request.Glossary, request.Hotwords));
+        return $"{strategy.Id}\n{threads}\n{hotwords}";
     }
 
     private SherpaSileroVad NewVad(float minSilenceSeconds) =>
         new(Path.Combine(_models.GetModelDirectory(ModelCatalog.SpeechVad.Id), "silero_vad.onnx"), minSilenceSeconds);
-
-    private static string Hotwords(IReadOnlyList<string> glossary) =>
-        string.Join(", ", Glossary.BoundHotwords(glossary));
 
     private void EnsureInstalled(IEnumerable<ModelDescriptor> required)
     {

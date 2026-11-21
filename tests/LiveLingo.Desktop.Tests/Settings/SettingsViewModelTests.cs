@@ -912,4 +912,30 @@ public class SettingsViewModelTests
         Assert.Equal(ModelCatalog.CleanerQuality.Id, f.Coordinator.PendingModelId(LiveLingo.Core.Inference.ModelStage.Cleaner));
         await f.Downloads.Received(1).StartAsync(ModelCatalog.CleanerQuality);
     }
+
+    [Fact]
+    public async Task UnsetSpeechModelOnHighMemoryHost_KeepsInstalled06BActiveUntil17BIsDownloaded()
+    {
+        var initial = new SettingsModel(); // SpeechModel is "" (unset)
+        var workstation = new HardwareProfile("Apple M3 Max", ComputeBackend.AppleMetal, 48L * 1024 * 1024 * 1024, 16);
+        var f = new Fixture(initial, hardware: workstation);
+        f.Models.ListInstalled().Returns([
+            Installed(ModelCatalog.SpeechLive.Id, ModelCatalog.SpeechLive.SizeBytes),
+            Installed(ModelCatalog.SpeechSecondPass.Id, ModelCatalog.SpeechSecondPass.SizeBytes),
+            Installed(ModelCatalog.SpeechVad.Id, ModelCatalog.SpeechVad.SizeBytes)]);
+        await f.Vm.InitializeAsync();
+
+        // 48 GB recommends 1.7B, but since 1.7B is not installed yet and 0.6B IS installed, 0.6B stays active & working!
+        Assert.Equal(ModelCatalog.SpeechQuality.Id, f.Coordinator.RecommendedSelection.SpeechModelId);
+        Assert.Equal(ModelCatalog.SpeechSecondPass.Id, f.Vm.ActiveModels.SpeechModelId);
+        Assert.False(f.Coordinator.IsRecommendedActive);
+
+        // Downloading 1.7B keeps 0.6B serving until 1.7B finishes, then switches to 1.7B.
+        Assert.True(f.Vm.DownloadModel(ModelCatalog.SpeechQuality.Id));
+        Assert.Equal(ModelCatalog.SpeechSecondPass.Id, f.Vm.ActiveModels.SpeechModelId);
+
+        f.Downloads.StateChanged += Raise.Event<Action<ModelDownloadState>>(
+            new ModelDownloadState(ModelCatalog.SpeechQuality.Id, ModelDownloadStatus.Installed, 100, null));
+        Assert.Equal(ModelCatalog.SpeechQuality.Id, f.Vm.ActiveModels.SpeechModelId);
+    }
 }

@@ -53,8 +53,15 @@ public sealed class DictationOptions
     /// <summary>
     /// A second-pass result with more characters per second of audio than anyone speaks is a decoder repetition loop,
     /// not speech. Such a result is dropped and the live text is kept. Pure English letters reach about 15 per second.
+    /// Set to 0 or less for non-autoregressive models that cannot enter token repetition loops.
     /// </summary>
     public double SecondPassMaxCharsPerSecond { get; init; } = 15;
+
+    /// <summary>
+    /// Holds premature sentence-final periods emitted on isolated segments ending in dangling conjunctions or prepositions.
+    /// Enabled for isolated local segment recognizers; disabled for full-context streaming models.
+    /// </summary>
+    public bool HoldDanglingClausePeriod { get; init; } = true;
 
     /// <summary>How long stopping waits for recognition to drain; segments still unsettled then keep their live text.</summary>
     public int StopTimeoutMs { get; init; } = 15_000;

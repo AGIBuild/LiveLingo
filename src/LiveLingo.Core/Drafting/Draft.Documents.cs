@@ -6,9 +6,28 @@ public sealed partial class Draft
     private readonly DocumentResult _finalTranslation = new();
     private DocumentEditTicket? _documentEdit;
     private int _editGeneration;
+    private bool _forceCleanRepolish;
 
     public bool DocumentMode { get; set; }
     public bool DocumentEditing => _documentEdit is not null;
+    internal bool ForceCleanRepolish => _forceCleanRepolish;
+
+    /// <summary>True when at least one unit or pending regeneration requires a text cleanup/polish LLM beyond native ASR polishing.</summary>
+    public bool RequiresCleanerModel =>
+        _forceCleanRepolish || _units.Any(u => !u.IsNativePolished && !u.Clean.IsOwned);
+
+    /// <summary>Marks all current unowned units as natively polished by the speech recognizer after applying deterministic glossary corrections.</summary>
+    public void MarkUnitsNativePolished(IReadOnlyList<Translation.GlossaryCorrection>? corrections = null)
+    {
+        EnsureEditable();
+        foreach (var unit in _units)
+        {
+            if (unit.Clean.IsOwned)
+                continue;
+            unit.Clean.Text = Translation.Glossary.ApplyCorrections(unit.Raw, corrections);
+            unit.IsNativePolished = true;
+        }
+    }
     public DocumentResult Final(UnitKind kind) => kind == UnitKind.Clean ? _finalClean : _finalTranslation;
     public string PreviewText(UnitKind kind) =>
         TextUnits.Join(_units.Select(unit => (unit.Lead, unit.Result(kind).Text ?? "", unit.Trail)));
@@ -50,6 +69,8 @@ public sealed partial class Draft
         EnsureEditable();
         var result = Final(kind);
         result.IsOwned = false;
+        if (kind == UnitKind.Clean)
+            _forceCleanRepolish = true;
         InvalidateDocument(kind);
         if (kind == UnitKind.Clean)
             InvalidateDocument(UnitKind.Translation);
@@ -84,6 +105,7 @@ public sealed partial class Draft
     private void ResetDocuments()
     {
         _documentEdit = null;
+        _forceCleanRepolish = false;
         _editGeneration++;
         foreach (var kind in Enum.GetValues<UnitKind>())
         {
@@ -151,12 +173,18 @@ public sealed partial class Draft
         result.Error = error;
         result.Revision++;
         if (ticket.Kind == UnitKind.Clean && error.Length == 0)
+        {
+            _forceCleanRepolish = false;
             InvalidateDocument(UnitKind.Translation);
+        }
         return true;
     }
 
     internal string? TranslationDocumentInput() =>
-        ValidFinal(UnitKind.Clean) && !string.IsNullOrWhiteSpace(_finalClean.Text) ? _finalClean.Text : null;
+        ValidFinal(UnitKind.Clean) && !string.IsNullOrWhiteSpace(_finalClean.Text) ? _finalClean.Text
+        : _units.Count > 0 && _units.All(u => (u.IsNativePolished || u.Clean.IsOwned) && !string.IsNullOrWhiteSpace(u.Clean.Text))
+            ? PreviewText(UnitKind.Clean)
+            : null;
 
     public DraftState CaptureState()
     {

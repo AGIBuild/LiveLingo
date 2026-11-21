@@ -14,6 +14,8 @@ public class TextTidyTests
     [Theory]
     [InlineData("还是在指导工作方面，都可。<|endoftext|>Human Rights Watch 是美国的组织。有相应的减轻负担。", "还是在指导工作方面，都可。")]
     [InlineData("<|zh|>你好<|en|>", "你好")]
+    [InlineData("language Chinese<asr_text>请把 LiveLingo 打开。", "请把 LiveLingo 打开。")]
+    [InlineData("language None<asr_text>", "")]
     public void DropsSpecialTokens_AndEverythingAModelInventsAfterItsEndOfText(string input, string expected) =>
         Assert.Equal(expected, TextTidy.Apply(input));
 }

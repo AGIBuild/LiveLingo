@@ -1,5 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using LiveLingo.Core.Cloud;
+using LiveLingo.Core.Dictation;
 using LiveLingo.Core.Drafting;
 using LiveLingo.Core.Models;
 using LiveLingo.Core.Translation;
@@ -75,7 +77,7 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
         Outputs = options.Outputs;
         _output = options.Cleanup ? ComposerOutput.Clean : ComposerOutput.Original;
 
-        _modelsReady = IsInstalled(_plan.For(_output));
+        _modelsReady = IsOutputModelsReady();
         ApplyDraftOutput();
         _session.Changed += OnDraftChanged;
         _downloads.StateChanged += OnDownloadStateChanged;
@@ -150,7 +152,7 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
         if (IsEditing)
             SaveEdit();
         CancelQueuedWrite();
-        ModelsReady = IsInstalled(_plan.For(value));
+        ModelsReady = IsOutputModelsReady();
         ApplyDraftOutput();
         if (Banner.Kind is BannerKind.ModelMissing or BannerKind.DownloadFailed)
             Banner = BannerState.None;
@@ -236,14 +238,19 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
         IsStartingListening = true;
         try
         {
-            await _voice.StartAsync(_session, _glossary, CancellationToken.None).ConfigureAwait(true);
+            await _voice.StartAsync(_session, BuildSpeechRequest(), CancellationToken.None).ConfigureAwait(true);
             IsListening = true;
-            if (Banner.Kind is BannerKind.MicrophoneDenied or BannerKind.NoMicrophone or BannerKind.NoSound)
+            if (Banner.Kind is BannerKind.MicrophoneDenied or BannerKind.NoMicrophone or BannerKind.NoSound or BannerKind.SpeechFailed)
                 Banner = BannerState.None;
         }
         catch (ModelNotReadyException)
         {
             Banner = new BannerState(BannerKind.ModelMissing, MissingSizeLabel());
+        }
+        catch (Exception ex) when (ex is CloudNotConfiguredException or CloudSpeechException
+                                   or HttpRequestException or System.Net.WebSockets.WebSocketException)
+        {
+            Banner = new BannerState(BannerKind.SpeechFailed, ex.Message);
         }
         catch (InvalidOperationException ex)
         {
@@ -289,7 +296,7 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
 
     public StatusInfo StatusInfo => new(
         Status, IsWritten, RecordingSeconds, IsWriteQueued, Lines.Count, Output,
-        CloudTranslate || CloudClean, (int)TranscribeProgress, IsPolishing, _session.Read(d => d.PolishOutcome));
+        CloudSpeech || CloudTranslate || CloudClean, (int)TranscribeProgress, IsPolishing, _session.Read(d => d.PolishOutcome));
 
     /// <summary>Writes the result, or queues the write while it is still being produced.</summary>
     /// <param name="fromKey">The commit key was pressed; the button instead cancels an already queued write.</param>
@@ -387,8 +394,8 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
     {
         CancelQueuedWrite();
         _plan = plan;
-        ModelsReady = IsInstalled(_plan.For(Output));
-        if (Banner.Kind is BannerKind.ModelMissing or BannerKind.DownloadFailed)
+        ModelsReady = IsOutputModelsReady();
+        if (Banner.Kind is BannerKind.ModelMissing or BannerKind.DownloadFailed or BannerKind.SpeechFailed)
             Banner = BannerState.None;
         _session.Mutate(d => d.InvalidateTranslations(preserveEdits: true));
         ApplyDraftOutput();
@@ -458,7 +465,7 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
             return;
         }
 
-        ModelsReady = IsInstalled(_plan.For(Output));
+        ModelsReady = IsOutputModelsReady();
         Banner = BannerState.None;
         ApplyDraftOutput();
         RetryFailed();
@@ -511,6 +518,27 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
     // ---- internals -----------------------------------------------------------
 
     private bool IsInstalled(IEnumerable<ModelDescriptor> models) => models.All(_models.HasAllExpectedLocalAssets);
+
+    private bool IsOutputModelsReady()
+    {
+        if (Output == ComposerOutput.Clean && _plan.SpeechNativeClean)
+        {
+            if (!_session.Read(d => d.RequiresCleanerModel))
+                return true;
+        }
+
+        return IsInstalled(_plan.For(Output));
+    }
+
+    private SpeechSessionRequest BuildSpeechRequest(bool? enableNativePolish = null)
+    {
+        var nativePolish = enableNativePolish ?? _options.Cleanup;
+        return new SpeechSessionRequest(
+            _glossary,
+            ActiveGlossary == Glossary.Empty ? null : ActiveGlossary,
+            EnableNativePolish: nativePolish,
+            NativePolishSatisfiesClean: nativePolish && !_options.CustomPolishPrompt);
+    }
 
     private void ApplyDraftOutput()
     {
@@ -575,6 +603,16 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
     {
         if (IsListening || IsStartingListening)
             ShowDraftSource();
+
+        if (_plan.SpeechNativeClean && Output == ComposerOutput.Clean)
+        {
+            var ready = IsOutputModelsReady();
+            if (ready != ModelsReady)
+            {
+                ModelsReady = ready;
+                ApplyDraftOutput();
+            }
+        }
 
         Refresh();
         if (IsWriteQueued && Status == ComposerStatus.Ready)

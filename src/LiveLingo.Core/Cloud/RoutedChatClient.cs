@@ -7,6 +7,9 @@ public interface ICloudRoutes
 {
     /// <summary>Read on every request, so a settings change applies immediately.</summary>
     Task<CloudRoute?> GetAsync(InferenceRole role, CancellationToken ct);
+
+    /// <summary>Returns the configured cloud speech route, or null when speech recognition runs locally.</summary>
+    Task<SpeechCloudRoute?> GetSpeechAsync(CancellationToken ct) => Task.FromResult<SpeechCloudRoute?>(null);
 }
 
 /// <summary>The default: every role runs on the local model.</summary>

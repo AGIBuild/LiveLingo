@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Threading.Channels;
 using LiveLingo.Core.Drafting;
 using LiveLingo.Core.Transcription;
+using Microsoft.Extensions.Logging;
 
 namespace LiveLingo.Core.Dictation;
 
@@ -11,7 +12,7 @@ namespace LiveLingo.Core.Dictation;
 /// sentences said together) appended in speech order. Cleanup and translation are separate schedulers that observe the same draft.
 /// Capture is never blocked by recognition: <see cref="Push"/> only queues the frame.
 /// </summary>
-public sealed class DictationSession : IAsyncDisposable
+public sealed class DictationSession : IDictationSession
 {
     private const int MidSpeechCutSearchMs = 1200;
     private const int MidSpeechCutTailGuardMs = 80;
@@ -38,6 +39,7 @@ public sealed class DictationSession : IAsyncDisposable
     private readonly DraftSession _draft;
     private readonly int _draftEpoch;
     private readonly DictationOptions _options;
+    private readonly ILogger? _logger;
 
     private readonly AudioBuffer _audio = new();
     private readonly Channel<float[]> _frames = Channel.CreateUnbounded<float[]>(new() { SingleReader = true });
@@ -73,7 +75,8 @@ public sealed class DictationSession : IAsyncDisposable
         IVoiceActivityDetector vad,
         ISegmentRecognizer? secondPass,
         DraftSession draft,
-        DictationOptions? options = null)
+        DictationOptions? options = null,
+        ILogger? logger = null)
     {
         _live = live;
         _vad = vad;
@@ -81,6 +84,7 @@ public sealed class DictationSession : IAsyncDisposable
         _draft = draft;
         _draftEpoch = draft.Read(d => d.Epoch);
         _options = options ?? new DictationOptions();
+        _logger = logger;
     }
 
     public IReadOnlyList<SegmentRecord> Segments
@@ -380,15 +384,18 @@ public sealed class DictationSession : IAsyncDisposable
             {
                 text = TextTidy.Apply(_secondPass!.Recognize(audio));
                 var seconds = audio.Length / (double)AudioFormat.SampleRate;
-                if (string.IsNullOrWhiteSpace(text) || text.Count(char.IsLetterOrDigit) > _options.SecondPassMaxCharsPerSecond * seconds + 10)
+                var rateExceeded = _options.SecondPassMaxCharsPerSecond > 0
+                    && text.Count(char.IsLetterOrDigit) > _options.SecondPassMaxCharsPerSecond * seconds + 10;
+                if (string.IsNullOrWhiteSpace(text) || rateExceeded)
                 {
                     text = segment.LiveFinal;
                     failed = true;
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
                 // The live text is a complete answer; a failing decoder must not cost the user their words.
+                _logger?.LogWarning(ex, "Second-pass speech recognizer failed on segment {SegmentId}; keeping live text.", segment.Id);
                 text = segment.LiveFinal;
                 failed = true;
             }
@@ -432,7 +439,7 @@ public sealed class DictationSession : IAsyncDisposable
                         continue;
                     }
 
-                    if (!passageEnding && HoldPrematurePeriod(text, segment.CutMidSpeech, out var held, out var heldTerminator))
+                    if (!passageEnding && HoldPrematurePeriod(text, segment.CutMidSpeech, _options.HoldDanglingClausePeriod, out var held, out var heldTerminator))
                     {
                         text = held;
                         _tailHeldTerminator = heldTerminator;
@@ -539,7 +546,12 @@ public sealed class DictationSession : IAsyncDisposable
     /// function word ("如果说你还需要更强的。", "他就。", "有这种。"). Holding that premature period while speech
     /// continues lets the next segment complete the sentence; stopping restores the period.
     /// </summary>
-    private static bool HoldPrematurePeriod(string text, bool cutMidSpeech, out string held, out char? terminator)
+    private static bool HoldPrematurePeriod(
+        string text,
+        bool cutMidSpeech,
+        bool holdDanglingClause,
+        out string held,
+        out char? terminator)
     {
         held = text;
         terminator = null;
@@ -564,7 +576,7 @@ public sealed class DictationSession : IAsyncDisposable
             }
         }
 
-        if (!text.EndsWith('。'))
+        if (!holdDanglingClause || !text.EndsWith('。'))
             return false;
 
         var core = text[..^1].TrimEnd();

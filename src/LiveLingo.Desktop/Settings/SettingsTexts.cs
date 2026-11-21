@@ -1,4 +1,5 @@
 using System.Globalization;
+using LiveLingo.Core.Cloud;
 using LiveLingo.Core.Inference;
 using LiveLingo.Core.Models;
 using LiveLingo.Core.Translation;
@@ -33,19 +34,25 @@ public sealed class SettingsTexts(ILocalizationService loc)
         "corrections.add", "corrections.remove", "corrections.hint",
         "terms", "terms.source", "terms.target", "terms.sourceExample", "terms.targetExample", "terms.add", "terms.remove", "terms.hint",
         "privacy.badge.alwaysLocal", "privacy.badge.local", "privacy.badge.cloud", "privacy.routing.allLocal",
-        "cloud.translate", "cloud.clean",
-        "cloud.baseUrl", "cloud.baseUrl.desc", "cloud.model", "cloud.model.desc", "cloud.apiKey", "cloud.apiKey.desc",
+        "cloud.speech", "cloud.translate", "cloud.clean",
+        "cloud.baseUrl", "cloud.baseUrl.desc", "cloud.speech.baseUrl.desc",
+        "cloud.model", "cloud.model.desc", "cloud.speech.model.desc",
+        "cloud.apiKey", "cloud.apiKey.desc",
         "cloud.keyStored", "cloud.invalid",
         "cloud.edit", "cloud.delete", "cloud.keySaved", "cloud.keyMissing",
-        "cloud.name", "cloud.name.example", "cloud.form.add", "cloud.form.edit", "cloud.form.save", "cloud.form.create", "cloud.form.cancel",
+        "cloud.name", "cloud.name.example", "cloud.speech.name.example",
+        "cloud.preset.qwenAsrHint", "cloud.preset.qwenAsr",
+        "cloud.form.add", "cloud.form.edit", "cloud.form.save", "cloud.form.create", "cloud.form.cancel",
         "cloud.error.nameMissing", "cloud.error.nameTaken", "cloud.error.urlInvalid", "cloud.error.modelMissing", "cloud.error.keyMissing",
         "cloud.delete.title", "cloud.delete.body", "cloud.delete.steps", "cloud.delete.keep", "cloud.delete.confirm",
-        "consent.translate", "consent.clean", "consent.body", "consent.switchBody", "consent.keepLocal", "consent.keepCurrent", "consent.allow",
+        "consent.speech", "consent.translate", "consent.clean",
+        "consent.body", "consent.switchBody", "consent.speechBody", "consent.speechSwitchBody",
+        "consent.keepLocal", "consent.keepCurrent", "consent.allow",
         "recent", "recent.desc", "recent.clear",
         "models.hw.title", "models.hw.matched", "models.hw.preparing", "models.hw.gaugeAria",
-        "models.speech.localOnly", "models.group.cloud.title", "models.group.local.title",
-        "models.cloud.empty", "models.cloud.add", "models.cloud.badge",
-        "models.cloud.footprint", "models.cloud.incomplete", "models.cloud.useLocal",
+        "models.speech.localOnly", "models.group.cloud.title", "models.group.cloud.speechTitle", "models.group.local.title",
+        "models.cloud.empty", "models.cloud.speechEmpty", "models.cloud.add", "models.cloud.badge",
+        "models.cloud.footprint", "models.cloud.speechFootprint", "models.cloud.incomplete", "models.cloud.useLocal",
         "models.tabs.aria", "models.dl.title",
         "models.storage.title", "models.storage.desc", "models.storage.total", "models.storage.path",
         "models.storage.listTitle", "models.storage.empty",
@@ -195,38 +202,47 @@ public sealed class SettingsTexts(ILocalizationService loc)
 
     public string StageDescription(ModelStage stage) => loc.T($"settings.models.stage.{StageKey(stage)}.desc");
 
-    public string? StageNotice(ModelStage stage, bool cleanupEnabled) => stage switch
+    public string? StageNotice(ModelStage stage, bool cleanupEnabled, bool cloudSpeech = false, string? speechModel = null) => stage switch
     {
         ModelStage.Cleaner when !cleanupEnabled => loc.T("settings.models.notice.cleanupOff"),
+        ModelStage.Cleaner when cloudSpeech && SpeechCloudRoute.SupportsNativePolishForModel(speechModel) => loc.T("settings.models.notice.speechNativePolish"),
         _ => null
     };
 
-    public string? PeerStageBadge(ModelStage currentStage, bool activeHere, bool usedForClean, bool usedForTranslate)
+    public string? PeerStageBadge(
+        ModelStage currentStage,
+        bool activeHere,
+        bool usedForClean,
+        bool usedForTranslate,
+        bool usedForSpeech = false)
     {
-        var usedByPeer = currentStage switch
-        {
-            ModelStage.Cleaner => usedForTranslate,
-            ModelStage.Translator => usedForClean,
-            _ => false
-        };
-        if (!usedByPeer)
+        var peers = new List<string>(2);
+        if (currentStage != ModelStage.Speech && usedForSpeech)
+            peers.Add(loc.T("settings.models.tab.speech"));
+        if (currentStage != ModelStage.Cleaner && usedForClean)
+            peers.Add(loc.T("settings.output.clean"));
+        if (currentStage != ModelStage.Translator && usedForTranslate)
+            peers.Add(loc.T("settings.output.translate"));
+        if (peers.Count == 0)
             return null;
 
-        var peerName = loc.T(currentStage == ModelStage.Cleaner ? "settings.output.translate" : "settings.output.clean");
-        return loc.T(activeHere ? "settings.cloud.alsoUsedBy" : "settings.cloud.usedBy", peerName);
+        var joined = string.Join(loc.T("settings.cloud.stepJoin"), peers);
+        return loc.T(activeHere ? "settings.cloud.alsoUsedBy" : "settings.cloud.usedBy", joined);
     }
 
-    public string ModelsPrivacyStatus(bool cloudClean, bool cloudTranslate)
+    public string ModelsPrivacyStatus(bool cloudClean, bool cloudTranslate, bool cloudSpeech = false)
     {
-        var steps = AffectedCloudSteps(cloudClean, cloudTranslate);
+        var steps = AffectedCloudSteps(cloudClean, cloudTranslate, cloudSpeech);
         return steps is null
             ? loc.T("settings.models.privacy.allLocal")
-            : loc.T("settings.models.privacy.cloud", steps);
+            : loc.T(cloudSpeech ? "settings.models.privacy.cloudSpeech" : "settings.models.privacy.cloud", steps);
     }
 
-    public string? AffectedCloudSteps(bool usedForClean, bool usedForTranslate)
+    public string? AffectedCloudSteps(bool usedForClean, bool usedForTranslate, bool usedForSpeech = false)
     {
-        var list = new List<string>(2);
+        var list = new List<string>(3);
+        if (usedForSpeech)
+            list.Add(loc.T("settings.cloud.speech"));
         if (usedForClean)
             list.Add(loc.T("settings.cloud.clean"));
         if (usedForTranslate)

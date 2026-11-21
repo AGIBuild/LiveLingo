@@ -22,8 +22,11 @@ public static class FileTranscriber
         IVoiceActivityDetector vad,
         ISegmentRecognizer recognizer,
         IProgress<double>? progress,
-        CancellationToken ct)
+        CancellationToken ct,
+        int maxSpanSamples = MaxSpanSamples)
     {
+        if (maxSpanSamples <= 0)
+            maxSpanSamples = MaxSpanSamples;
         var segments = new List<TimedSegment>();
 
         void Recognize(int start, int end)
@@ -45,9 +48,10 @@ public static class FileTranscriber
             {
                 var start = (int)Math.Clamp(span.StartSample, 0, samples.Length);
                 var end = (int)Math.Clamp(span.EndSample, start, samples.Length);
-                while (end - start > MaxSpanSamples)
+                var searchSamples = Math.Min(CutSearchSamples, maxSpanSamples / 2);
+                while (end - start > maxSpanSamples)
                 {
-                    var cut = QuietestPoint(samples.AsSpan(), start + MaxSpanSamples - CutSearchSamples, start + MaxSpanSamples);
+                    var cut = QuietestPoint(samples.AsSpan(), start + maxSpanSamples - searchSamples, start + maxSpanSamples);
                     Recognize(start, cut);
                     start = cut;
                 }

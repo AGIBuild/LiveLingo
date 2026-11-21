@@ -53,19 +53,46 @@ public sealed class ModelSelectionCoordinator : IDisposable
     /// <summary>Raised on whichever thread observed a download, activation or deletion state change.</summary>
     public event Action? Changed;
 
-    public ModelSelection ActiveSelection => _settings.Current.Composer.ResolveSelection(Hardware);
+    public ModelSelection ActiveSelection
+    {
+        get
+        {
+            var composer = _settings.Current.Composer;
+            var resolved = composer.ResolveSelection(Hardware);
+            return new ModelSelection(
+                PreferInstalledStage(ModelStage.Speech, composer.SpeechModel, resolved.SpeechModelId),
+                PreferInstalledStage(ModelStage.Cleaner, composer.CleanerModel, resolved.CleanerModelId),
+                PreferInstalledStage(ModelStage.Translator, composer.TranslatorModel, resolved.TranslatorModelId));
+        }
+    }
+
+    private string PreferInstalledStage(ModelStage stage, string? explicitId, string resolvedId)
+    {
+        if (!string.IsNullOrWhiteSpace(explicitId))
+            return resolvedId;
+        var resolved = ModelCatalog.FindOption(stage, resolvedId)!;
+        if (IsInstalled(resolved))
+            return resolvedId;
+        foreach (var candidate in ModelCatalog.OptionsFor(stage))
+        {
+            if (IsInstalled(candidate) && ModelAdvisor.Evaluate(candidate, Hardware).IsSelectable)
+                return candidate.Id;
+        }
+        return resolvedId;
+    }
 
     public ModelSelection RecommendedSelection
     {
         get
         {
             var cloud = _settings.Current.Cloud;
-            return ModelAdvisor.Recommend(Hardware, cloud.Clean, cloud.Translate);
+            return ModelAdvisor.Recommend(Hardware, cloud.Clean, cloud.Translate, cloud.Speech);
         }
     }
 
     public bool IsStageInCloud(ModelStage stage) => stage switch
     {
+        ModelStage.Speech => _settings.Current.Cloud.Speech,
         ModelStage.Cleaner => _settings.Current.Cloud.Clean,
         ModelStage.Translator => _settings.Current.Cloud.Translate,
         _ => false
@@ -169,7 +196,9 @@ public sealed class ModelSelectionCoordinator : IDisposable
     {
         var active = ActiveSelection;
         var cloud = _settings.Current.Cloud;
-        var activeLocalStageIds = new HashSet<string>(StringComparer.Ordinal) { active.SpeechModelId };
+        var activeLocalStageIds = new HashSet<string>(StringComparer.Ordinal);
+        if (!cloud.Speech)
+            activeLocalStageIds.Add(active.SpeechModelId);
         if (!cloud.Clean)
             activeLocalStageIds.Add(active.CleanerModelId);
         if (!cloud.Translate)
@@ -190,8 +219,12 @@ public sealed class ModelSelectionCoordinator : IDisposable
 
                 var stage = model.Profile?.Stage;
                 var downloading = _downloads.GetState(model.Id).IsDownloading;
-                var inUse = stage is not null ? activeLocalStageIds.Contains(model.Id) : true;
-                var canActivate = stage is not null && !inUse && ModelAdvisor.Evaluate(model, Hardware, active, cloud.Clean, cloud.Translate).IsSelectable;
+                var inUse = stage is not null
+                    ? activeLocalStageIds.Contains(model.Id)
+                    : ModelCatalog.IsSpeechAsset(model.Id)
+                        ? !cloud.Speech
+                        : !cloud.Clean || !cloud.Translate;
+                var canActivate = stage is not null && !inUse && ModelAdvisor.Evaluate(model, Hardware, active, cloud.Clean, cloud.Translate, cloud.Speech).IsSelectable;
                 var canDelete = stage is not null && !inUse && !downloading;
 
                 items.Add(new InstalledCatalogItem(model, stage, sizeBytes, inUse, canActivate, canDelete));
@@ -332,7 +365,7 @@ public sealed class ModelSelectionCoordinator : IDisposable
 
         var active = ActiveSelection;
         var cloud = _settings.Current.Cloud;
-        if (!ModelAdvisor.Evaluate(option, Hardware, active, cloud.Clean, cloud.Translate).IsSelectable)
+        if (!ModelAdvisor.Evaluate(option, Hardware, active, cloud.Clean, cloud.Translate, cloud.Speech).IsSelectable)
             return false;
 
         var currentOption = active.DescriptorFor(profile.Stage);
@@ -359,7 +392,7 @@ public sealed class ModelSelectionCoordinator : IDisposable
 
         var active = ActiveSelection;
         var cloud = _settings.Current.Cloud;
-        if (!ModelAdvisor.Evaluate(option, Hardware, active, cloud.Clean, cloud.Translate).IsSelectable)
+        if (!ModelAdvisor.Evaluate(option, Hardware, active, cloud.Clean, cloud.Translate, cloud.Speech).IsSelectable)
             return false;
 
         var missing = ModelCatalog.BundleFor(option).Where(artifact => !IsInstalled(artifact)).ToList();
@@ -494,10 +527,9 @@ public sealed class ModelSelectionCoordinator : IDisposable
         if (immediateUpdates.Count > 0)
         {
             var model = _settings.CloneCurrent();
-            var resolved = model.Composer.ResolveSelection(Hardware);
-            model.Composer.SpeechModel = resolved.SpeechModelId;
-            model.Composer.CleanerModel = resolved.CleanerModelId;
-            model.Composer.TranslatorModel = resolved.TranslatorModelId;
+            model.Composer.SpeechModel = active.SpeechModelId;
+            model.Composer.CleanerModel = active.CleanerModelId;
+            model.Composer.TranslatorModel = active.TranslatorModelId;
             foreach (var (stage, id) in immediateUpdates)
                 SetStageOnComposer(model.Composer, stage, id);
             _settings.Replace(model);
@@ -613,11 +645,11 @@ public sealed class ModelSelectionCoordinator : IDisposable
 
     private void PersistStage(ModelStage stage, string modelId)
     {
+        var active = ActiveSelection;
         var model = _settings.CloneCurrent();
-        var resolved = model.Composer.ResolveSelection(Hardware);
-        model.Composer.SpeechModel = resolved.SpeechModelId;
-        model.Composer.CleanerModel = resolved.CleanerModelId;
-        model.Composer.TranslatorModel = resolved.TranslatorModelId;
+        model.Composer.SpeechModel = active.SpeechModelId;
+        model.Composer.CleanerModel = active.CleanerModelId;
+        model.Composer.TranslatorModel = active.TranslatorModelId;
         SetStageOnComposer(model.Composer, stage, modelId);
         ClearCloudOnStage(model.Cloud, stage);
         _settings.Replace(model);
@@ -627,6 +659,7 @@ public sealed class ModelSelectionCoordinator : IDisposable
     {
         switch (stage)
         {
+            case ModelStage.Speech: cloud.SpeechEndpointId = ""; break;
             case ModelStage.Cleaner: cloud.CleanerEndpointId = ""; break;
             case ModelStage.Translator: cloud.TranslatorEndpointId = ""; break;
         }

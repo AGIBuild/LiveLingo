@@ -15,12 +15,17 @@ public static partial class TextTidy
         // A language model that has emitted its end-of-text token and keeps going is hallucinating: observed with Qwen3-ASR on short audio.
         var end = text.IndexOf(EndOfText, StringComparison.Ordinal);
         if (end >= 0) text = text[..end];
+        text = QwenAsrLanguagePrefix().Replace(text, "");
         text = ModelToken().Replace(text, "");
         text = text.Trim();
         text = SpaceBetweenCjk().Replace(text, "");
         text = SpaceAroundFullWidthPunctuation().Replace(text, "");
         return text;
     }
+
+    /// <summary>Strips raw Qwen3-ASR scaffold prefixes (<c>language Chinese&lt;asr_text&gt;</c>) when served without template separation.</summary>
+    [GeneratedRegex(@"^\s*language\s+[A-Za-z][A-Za-z\s-]{0,30}<asr_text>", RegexOptions.CultureInvariant)]
+    private static partial Regex QwenAsrLanguagePrefix();
 
     [GeneratedRegex(@"<\|[^|>]*\|>")]
     private static partial Regex ModelToken();

@@ -94,7 +94,9 @@ public sealed class ModelWarmup : IDisposable
     }
 
     private Task WarmSpeechAsync() =>
-        Warm("speech models", () => _speech.WarmAsync(_settings.Current.Composer.EffectiveGlossary().SpeechHotwords()));
+        _settings.Current.Cloud.Speech
+            ? Task.CompletedTask
+            : Warm("speech models", () => _speech.WarmAsync(_settings.Current.Composer.EffectiveGlossary().SpeechHotwords()));
 
     /// <summary>
     /// Warms the opposite local role right after the starting output when <see cref="ModelAdvisor.AssessPlan"/> confirms
@@ -110,7 +112,8 @@ public sealed class ModelWarmup : IDisposable
             _hardware,
             cleanInCloud: current.Cloud.Clean,
             translateInCloud: current.Cloud.Translate,
-            cleanupEnabled: current.Composer.CleanupEnabled).CanCoResideBothLlms;
+            cleanupEnabled: current.Composer.CleanupEnabled,
+            speechInCloud: current.Cloud.Speech).CanCoResideBothLlms;
 
         return primary switch
         {

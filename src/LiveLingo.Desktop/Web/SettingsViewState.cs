@@ -250,7 +250,8 @@ internal sealed record SettingsViewState(
             hardware,
             cleanInCloud: vm.CloudClean,
             translateInCloud: vm.CloudTranslate,
-            cleanupEnabled: vm.CleanupEnabled);
+            cleanupEnabled: vm.CleanupEnabled,
+            speechInCloud: vm.CloudSpeech);
         var budgetPercent = assessment.SafeBudgetBytes > 0
             ? Math.Clamp((int)Math.Round(assessment.ActiveCoResidentBytes * 100d / assessment.SafeBudgetBytes), 0, 100)
             : 100;
@@ -259,7 +260,7 @@ internal sealed record SettingsViewState(
         var catalogDiskBytes = inventory.Sum(item => item.SizeBytes);
         var totalDiskBytes = catalogDiskBytes + vm.LegacyBytes;
 
-        var anyCloud = vm.CloudClean || vm.CloudTranslate;
+        var anyCloud = vm.CloudSpeech || vm.CloudClean || vm.CloudTranslate;
         var isRecommended = coordinator.IsRecommendedActive;
         var isRecommendedDownloading = coordinator.IsRecommendedDownloading;
         var hardwareView = new HardwareSummaryState(
@@ -270,7 +271,7 @@ internal sealed record SettingsViewState(
             texts.ResidencyMode(assessment),
             texts.DiskUsedSummary(totalDiskBytes),
             anyCloud,
-            texts.ModelsPrivacyStatus(vm.CloudClean, vm.CloudTranslate),
+            texts.ModelsPrivacyStatus(vm.CloudClean, vm.CloudTranslate, vm.CloudSpeech),
             isRecommended,
             isRecommendedDownloading,
             isRecommended || isRecommendedDownloading ? null : texts.RecommendActionLabel(coordinator.MissingBytesForRecommended()));
@@ -310,7 +311,8 @@ internal sealed record SettingsViewState(
                 hardware,
                 active,
                 cleanInCloud: vm.CloudClean,
-                translateInCloud: vm.CloudTranslate);
+                translateInCloud: vm.CloudTranslate,
+                speechInCloud: vm.CloudSpeech);
             var activeDescriptor = active.DescriptorFor(stage);
             var activeId = activeDescriptor.Id;
             var pendingId = coordinator.PendingModelId(stage);
@@ -318,18 +320,21 @@ internal sealed record SettingsViewState(
 
             CloudStep? cloudStep = stage switch
             {
+                ModelStage.Speech => CloudStep.Speech,
                 ModelStage.Cleaner => CloudStep.Clean,
                 ModelStage.Translator => CloudStep.Translate,
                 _ => null
             };
             var stageEndpoint = stage switch
             {
+                ModelStage.Speech => vm.SpeechEndpoint,
                 ModelStage.Cleaner => vm.CleanerEndpoint,
                 ModelStage.Translator => vm.TranslatorEndpoint,
                 _ => null
             };
             var cloudRouted = stage switch
             {
+                ModelStage.Speech => vm.CloudSpeech,
                 ModelStage.Cleaner => vm.CloudClean,
                 ModelStage.Translator => vm.CloudTranslate,
                 _ => false
@@ -339,6 +344,7 @@ internal sealed record SettingsViewState(
                 : vm.Endpoints.Select(endpoint =>
                 {
                     var activeHere = cloudRouted && endpoint.Id == stageEndpoint?.Id;
+                    var usableHere = stage == ModelStage.Speech ? endpoint.SpeechUsable : endpoint.Usable;
                     return new StageCloudOptionState(
                         endpoint.Id,
                         endpoint.Name,
@@ -346,12 +352,12 @@ internal sealed record SettingsViewState(
                         HostOf(endpoint.BaseUrl),
                         endpoint.Model,
                         endpoint.HasKey,
-                        endpoint.Usable,
+                        usableHere,
                         Active: activeHere,
-                        texts.PeerStageBadge(stage, activeHere, endpoint.UsedForClean, endpoint.UsedForTranslate));
+                        texts.PeerStageBadge(stage, activeHere, endpoint.UsedForClean, endpoint.UsedForTranslate, endpoint.UsedForSpeech));
                 }).ToArray();
 
-            var notice = texts.StageNotice(stage, vm.CleanupEnabled);
+            var notice = texts.StageNotice(stage, vm.CleanupEnabled, vm.CloudSpeech, vm.SpeechEndpoint?.Model);
             var hasWorkingCurrent = cloudRouted || currentStageInstalled;
 
             ModelDownloadState? stageRunningDownload = null;
@@ -417,7 +423,7 @@ internal sealed record SettingsViewState(
                 Busy: stageRunningDownload is not null,
                 texts.StageTitle(stage),
                 texts.StageDescription(stage),
-                LocalOnly: stage == ModelStage.Speech,
+                LocalOnly: false,
                 notice,
                 cloudStep,
                 cloudRouted,
@@ -470,7 +476,7 @@ internal sealed record SettingsViewState(
             deleteModal = new DeleteEndpointModalState(
                 deleting.Id,
                 deleting.Name,
-                texts.AffectedCloudSteps(deleting.UsedForClean, deleting.UsedForTranslate));
+                texts.AffectedCloudSteps(deleting.UsedForClean, deleting.UsedForTranslate, deleting.UsedForSpeech));
         }
 
         return new ModelsSettingsState(
@@ -491,7 +497,7 @@ internal sealed record SettingsViewState(
     private static DiagnosticLine[] Diagnostics(SettingsViewModel vm, SettingsTexts texts, AppInfo app)
     {
         var active = vm.ActiveModels;
-        var activeCloudEndpoints = new[] { vm.CleanerEndpoint, vm.TranslatorEndpoint }.Where(e => e is not null).ToArray();
+        var activeCloudEndpoints = new[] { vm.SpeechEndpoint, vm.CleanerEndpoint, vm.TranslatorEndpoint }.Where(e => e is not null).ToArray();
         var keyStored = activeCloudEndpoints.Length > 0
             ? activeCloudEndpoints.All(e => e!.HasKey)
             : vm.Endpoints.Any(e => e.HasKey);
@@ -505,6 +511,7 @@ internal sealed record SettingsViewState(
             new(texts.Label("diag.model.cleaner"), active.Cleaner.ShortName),
             new(texts.Label("diag.model.translator"), active.Translator.ShortName),
             new(texts.Label("cleanup"), texts.OnOff(vm.CleanupEnabled)),
+            new(texts.Label("cloud.speech"), texts.OnOff(vm.CloudSpeech)),
             new(texts.Label("cloud.translate"), texts.OnOff(vm.CloudTranslate)),
             new(texts.Label("cloud.clean"), texts.OnOff(vm.CloudClean)),
             new(texts.Label("cloud.endpoints"), vm.Endpoints.Count.ToString(CultureInfo.InvariantCulture)),

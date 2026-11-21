@@ -20,9 +20,9 @@ public sealed class ModelAdvisorTests
     [InlineData(8, "x-asr-offline-int8", "qwen3.5-2b-q4km", "hy-mt2-1.8b-q4km")]
     [InlineData(16, "qwen3-asr-0.6b-int8", "qwen3.5-4b-q4km", "hy-mt2-1.8b-q4km")]
     [InlineData(24, "qwen3-asr-0.6b-int8", "qwen3.5-4b-q4km", "hy-mt2-7b-q4km")]
-    [InlineData(32, "qwen3-asr-0.6b-int8", "qwen3.5-9b-q4km", "hy-mt2-7b-q4km")]
-    [InlineData(36, "qwen3-asr-0.6b-int8", "qwen3.5-9b-q4km", "hy-mt2-7b-q4km")]
-    [InlineData(64, "qwen3-asr-0.6b-int8", "qwen3.5-9b-q4km", "hy-mt2-7b-q4km")]
+    [InlineData(32, "qwen3-asr-1.7b-int8", "qwen3.5-9b-q4km", "hy-mt2-7b-q4km")]
+    [InlineData(36, "qwen3-asr-1.7b-int8", "qwen3.5-9b-q4km", "hy-mt2-7b-q4km")]
+    [InlineData(64, "qwen3-asr-1.7b-int8", "qwen3.5-9b-q4km", "hy-mt2-7b-q4km")]
     public void AppleSiliconMatrix_SelectsBestMatchGroundedInResidencyBudget(
         int ramGb, string expectedSpeech, string expectedCleaner, string expectedTranslator)
     {
@@ -32,13 +32,17 @@ public sealed class ModelAdvisorTests
     }
 
     [Fact]
-    public void Apple16GbBaseline_MarksBestMatches_Allows7BTranslatorAsHeavy_AndBlocks9BCleaner()
+    public void Apple16GbBaseline_MarksBestMatches_Allows17BSpeechAnd7BTranslatorAsHeavy_AndBlocks9BCleaner()
     {
         var hw = AppleMetal(16);
 
         var speech = ModelAdvisor.EvaluateStage(ModelStage.Speech, hw);
         Assert.Equal(
-            [(ModelCatalog.SpeechSecondPass.Id, ModelFit.Recommended), (ModelCatalog.SpeechFast.Id, ModelFit.Supported)],
+            [
+                (ModelCatalog.SpeechQuality.Id, ModelFit.Heavy),
+                (ModelCatalog.SpeechSecondPass.Id, ModelFit.Recommended),
+                (ModelCatalog.SpeechFast.Id, ModelFit.Supported)
+            ],
             speech.Select(e => (e.Model.Id, e.Fit)));
 
         var cleaners = ModelAdvisor.EvaluateStage(ModelStage.Cleaner, hw);
@@ -106,14 +110,15 @@ public sealed class ModelAdvisorTests
 
         var workstationCpu = CpuHost(32, cores: 16);
         var wsRec = ModelAdvisor.Recommend(workstationCpu);
+        Assert.Equal(ModelCatalog.SpeechQuality.Id, wsRec.SpeechModelId);
         Assert.Equal(ModelCatalog.Cleaner.Id, wsRec.CleanerModelId);
     }
 
     [Theory]
     [InlineData(16, 6, "qwen3-asr-0.6b-int8", "qwen3.5-4b-q4km", "hy-mt2-1.8b-q4km")]
     [InlineData(16, 8, "qwen3-asr-0.6b-int8", "qwen3.5-4b-q4km", "hy-mt2-1.8b-q4km")]
-    [InlineData(32, 12, "qwen3-asr-0.6b-int8", "qwen3.5-4b-q4km", "hy-mt2-7b-q4km")]
-    [InlineData(32, 16, "qwen3-asr-0.6b-int8", "qwen3.5-9b-q4km", "hy-mt2-7b-q4km")]
+    [InlineData(32, 12, "qwen3-asr-1.7b-int8", "qwen3.5-4b-q4km", "hy-mt2-7b-q4km")]
+    [InlineData(32, 16, "qwen3-asr-1.7b-int8", "qwen3.5-9b-q4km", "hy-mt2-7b-q4km")]
     public void DiscreteGpuHosts_RespectDedicatedVideoMemoryCeilings(
         int ramGb, int vramGb, string speech, string cleaner, string translator)
     {
@@ -168,6 +173,11 @@ public sealed class ModelAdvisorTests
         var cloudCleanEvaluations = ModelAdvisor.EvaluateStage(ModelStage.Translator, hw, cleanInCloud: true);
         Assert.Equal(ModelFit.Recommended, cloudCleanEvaluations[0].Fit);
         Assert.Equal(ModelCatalog.TranslatorQuality.Id, ModelAdvisor.Recommend(hw, cleanInCloud: true).TranslatorModelId);
+
+        // When both Cleaner and Translator run in cloud on 16 GB, Qwen3-ASR 1.7B upgrades to Recommended Best Match.
+        var cloudLlmSpeech = ModelAdvisor.EvaluateStage(ModelStage.Speech, hw, cleanInCloud: true, translateInCloud: true);
+        Assert.Equal(ModelFit.Recommended, cloudLlmSpeech[0].Fit);
+        Assert.Equal(ModelCatalog.SpeechQuality.Id, ModelAdvisor.Recommend(hw, cleanInCloud: true, translateInCloud: true).SpeechModelId);
     }
 
     [Fact]
@@ -197,13 +207,15 @@ public sealed class ModelAdvisorTests
     [Fact]
     public void ConstrainedAndPeerDependentBoundaries_EnforceSpeechVramAndCpuCoResidencyRules()
     {
-        // 6 GB host: Qwen3-ASR 0.6B (1350 + 1448 = 2798 MiB > 2549 MiB ceiling) is Unsupported, X-ASR Offline (768 + 1448 = 2216 MiB) is Supported/Recommended.
+        // 6 GB host: Qwen3-ASR 1.7B (requires 12 GB) and 0.6B (requires 8 GB) are Unsupported; X-ASR Offline is Recommended.
         var ram6Gb = AppleMetal(6);
         var speech6Gb = ModelAdvisor.EvaluateStage(ModelStage.Speech, ram6Gb);
         Assert.False(speech6Gb[0].IsSelectable);
-        Assert.Equal((ModelFit.Unsupported, 8), (speech6Gb[0].Fit, speech6Gb[0].RequiredMemoryGb));
-        Assert.True(speech6Gb[1].IsSelectable);
-        Assert.Equal(ModelFit.Recommended, speech6Gb[1].Fit);
+        Assert.Equal((ModelFit.Unsupported, 12), (speech6Gb[0].Fit, speech6Gb[0].RequiredMemoryGb));
+        Assert.False(speech6Gb[1].IsSelectable);
+        Assert.Equal((ModelFit.Unsupported, 8), (speech6Gb[1].Fit, speech6Gb[1].RequiredMemoryGb));
+        Assert.True(speech6Gb[2].IsSelectable);
+        Assert.Equal(ModelFit.Recommended, speech6Gb[2].Fit);
 
         // 4 GB ultra-low host: SelectableOrLightest still produces a valid lightest-rank fallback without crashing.
         var ram4Gb = AppleMetal(4);

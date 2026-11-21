@@ -356,6 +356,36 @@ public class ComposerVoiceTests
     }
 
     [Fact]
+    public async Task CloudSpeechNativeClean_NeedsZeroLocalDownloadsForDictation_AndPromptsOnlyWhenTyping()
+    {
+        await using var h = new Harness(modelsInstalled: false, output: ComposerOutput.Clean);
+        h.Vm.UpdateModelPlan(ComposerModelPlan.Create(
+            ModelSelection.Baseline,
+            cleanInCloud: false,
+            translateInCloud: false,
+            speechInCloud: true,
+            speechNativeClean: true));
+
+        // Empty composer with cloud Qwen-Audio-3.1-ASR native polish shows NO local Cleaner download banner.
+        Assert.True(h.Vm.ModelsReady);
+        Assert.Equal(BannerKind.None, h.Vm.Banner.Kind);
+
+        await h.Vm.StartListeningAsync();
+        Assert.True(h.Vm.IsListening);
+        h.Session.Mutate(d => d.AppendDictated("请把六零九打开。", "请把LiveLingo打开。"));
+        await h.Vm.StopListeningAsync();
+
+        Assert.True(h.Vm.ModelsReady);
+        Assert.Equal(BannerKind.None, h.Vm.Banner.Kind);
+        Assert.Equal("请把LiveLingo打开。", h.Vm.Lines[0].Text);
+
+        // Typing un-polished text by hand needs the local Cleaner LLM, so missing local Cleaner is flagged cleanly.
+        h.Vm.SourceText = "请把六零九打开。再手打一句需要整理的话。";
+        Assert.False(h.Vm.ModelsReady);
+        Assert.Equal(BannerKind.ModelMissing, h.Vm.Banner.Kind);
+    }
+
+    [Fact]
     public async Task Dispose_StopsTheVoiceInput()
     {
         var h = Create();

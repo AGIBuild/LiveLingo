@@ -370,7 +370,7 @@
             <span>${ep.host} · ${ep.hasKey ? LL.t('cloud.keySaved') : LL.t('cloud.keyMissing')}</span>
           </p>
           <p class="mcard-foot">
-            <span>${LL.t('models.cloud.footprint')}</span>
+            <span>${LL.t(stage === 'speech' ? 'models.cloud.speechFootprint' : 'models.cloud.footprint')}</span>
           </p>
         </div>
         <div class="mcard-actions">
@@ -408,7 +408,7 @@
     </div>`}
     ${group.cloudStep && html`<div class="msource-group">
       <div class="msource-head">
-        <h3 class="msource-title">${LL.t('models.group.cloud.title')}</h3>
+        <h3 class="msource-title">${LL.t(group.stage === 'speech' ? 'models.group.cloud.speechTitle' : 'models.group.cloud.title')}</h3>
         <div class="msource-links">
           <button type="button" id=${'stage-cloud-add-' + group.stage} class="link"
             onClick=${() => LL.send('openEndpointForm', { id: null })}>+ ${LL.t('models.cloud.add')}</button>
@@ -417,7 +417,7 @@
       ${group.cloudInvalid && html`<p class="err msource-err" role="alert">${LL.t('cloud.invalid')}</p>`}
       ${group.cloudOptions.length === 0
         ? html`<div id=${'stage-cloud-empty-' + group.stage} class="mcloud-empty">
-            <span>${LL.t('models.cloud.empty')}</span>
+            <span>${LL.t(group.stage === 'speech' ? 'models.cloud.speechEmpty' : 'models.cloud.empty')}</span>
             <button type="button" id=${'stage-cloud-empty-add-' + group.stage} class="btn compact"
               onClick=${() => LL.send('openEndpointForm', { id: null })}>${LL.t('models.cloud.add')}</button>
           </div>`
@@ -544,14 +544,18 @@
     </div>
   </section>`;
 
-  // Selecting a cloud endpoint for any text stage requires explicit user consent; the safe answer is always focused first.
+  // Selecting a cloud endpoint for any stage requires explicit user consent; the safe answer is always focused first.
   const answer = (allow) => LL.send('consent', { allow });
 
   const Consent = ({ c }) => html`<${Modal} id="consent" title=${LL.t('consent.' + c.step)}
     returnTo=${'model-cloud-' + c.step + '-' + c.endpointId} onClose=${() => answer(false)}>
-    <p>${c.previousEndpointName
-      ? fmt('consent.switchBody', c.previousEndpointName, c.endpointName, c.host)
-      : fmt('consent.body', c.endpointName, c.host)}</p>
+    <p>${c.step === 'speech'
+      ? (c.previousEndpointName
+          ? fmt('consent.speechSwitchBody', c.previousEndpointName, c.endpointName, c.host)
+          : fmt('consent.speechBody', c.endpointName, c.host))
+      : (c.previousEndpointName
+          ? fmt('consent.switchBody', c.previousEndpointName, c.endpointName, c.host)
+          : fmt('consent.body', c.endpointName, c.host))}</p>
     <div class="dlg-actions">
       <button type="button" id="consent-keep" class="btn" data-initial onClick=${() => answer(false)}>${LL.t(c.previousEndpointName ? 'consent.keepCurrent' : 'consent.keepLocal')}</button>
       <button type="button" id="consent-allow" class="btn primary" onClick=${() => answer(true)}>${LL.t('consent.allow')}</button>
@@ -577,6 +581,14 @@
 
     field = (name) => (e) => this.setState({ [name]: e.target.value });
 
+    fillQwenAsr = () => {
+      this.setState({
+        name: 'Qwen-Audio-3.1-ASR',
+        url: 'https://dashscope.aliyuncs.com/api/v1',
+        model: 'qwen-audio-3.1-asr-flash-message'
+      }, () => this.pane?.querySelector('#ep-key')?.focus());
+    };
+
     submit = (e) => {
       e.preventDefault();
       const { name, url, model, key } = this.state;
@@ -591,20 +603,28 @@
 
     render({ form, endpoint, stage }, { name, url, model, key }) {
       const adding = form.id === null;
+      const isSpeech = stage === 'speech';
       const bad = (field) => (form.error && FORM_FIELD[form.error] === field ? 'true' : undefined);
       const returnTo = adding ? ('stage-cloud-add-' + stage) : ('stage-cloud-edit-' + stage + '-' + form.id);
       return html`<${Modal} id="endpoint-form" title=${LL.t(adding ? 'cloud.form.add' : 'cloud.form.edit')}
         returnTo=${returnTo} onClose=${() => LL.send('closeEndpointForm')}
         ref=${(modal) => (this.pane = modal?.pane)}>
         <form class="endpoint-form" onSubmit=${this.submit} onKeyDown=${this.onKeyDown} novalidate>
-          <label>${LL.t('cloud.name')}<input id="ep-name" value=${name} maxlength="40" placeholder=${LL.t('cloud.name.example')} data-initial
+          ${adding && isSpeech && html`<div class="ep-preset">
+            <span>${LL.t('cloud.preset.qwenAsrHint')}</span>
+            <button type="button" id="ep-preset-qwen-asr" class="btn compact" onClick=${this.fillQwenAsr}>${LL.t('cloud.preset.qwenAsr')}</button>
+          </div>`}
+          <label>${LL.t('cloud.name')}<input id="ep-name" value=${name} maxlength="40"
+            placeholder=${LL.t(isSpeech ? 'cloud.speech.name.example' : 'cloud.name.example')} data-initial
             autocomplete="off" spellcheck="false" aria-invalid=${bad('ep-name')} onInput=${this.field('name')}/></label>
-          <label>${LL.t('cloud.baseUrl')}<input id="ep-url" type="url" value=${url} placeholder="https://…/v1"
+          <label>${LL.t('cloud.baseUrl')}<input id="ep-url" type="url" value=${url}
+            placeholder=${isSpeech ? 'https://dashscope.aliyuncs.com/api/v1' : 'https://…/v1'}
             autocomplete="off" spellcheck="false" aria-invalid=${bad('ep-url')} onInput=${this.field('url')}/>
-            <small>${LL.t('cloud.baseUrl.desc')}</small></label>
+            <small>${LL.t(isSpeech ? 'cloud.speech.baseUrl.desc' : 'cloud.baseUrl.desc')}</small></label>
           <label>${LL.t('cloud.model')}<input id="ep-model" value=${model}
+            placeholder=${isSpeech ? 'qwen-audio-3.1-asr-flash-message' : ''}
             autocomplete="off" spellcheck="false" aria-invalid=${bad('ep-model')} onInput=${this.field('model')}/>
-            <small>${LL.t('cloud.model.desc')}</small></label>
+            <small>${LL.t(isSpeech ? 'cloud.speech.model.desc' : 'cloud.model.desc')}</small></label>
           <label>${LL.t('cloud.apiKey')}<input id="ep-key" type="password" value=${key} placeholder=${endpoint?.hasKey ? LL.t('cloud.keyStored') : ''}
             autocomplete="off" spellcheck="false" aria-invalid=${bad('ep-key')} onInput=${this.field('key')}/>
             <small>${LL.t('cloud.apiKey.desc')}</small></label>
@@ -676,8 +696,10 @@
         }
       ];
       const activeStage = m.stages.find((g) => g.stage === tab);
-      const cloudStage = tab === 'cleaner' ? 'cleaner' : 'translator';
-      const cloudEndpoints = m.stages.find((g) => g.cloudStep)?.cloudOptions ?? [];
+      const cloudStage = (tab === 'speech' || tab === 'cleaner' || tab === 'translator') ? tab : 'speech';
+      const cloudEndpoints = m.stages.find((g) => g.stage === cloudStage)?.cloudOptions
+        ?? m.stages.find((g) => g.cloudStep)?.cloudOptions
+        ?? [];
 
       return html`<div class="models-page">
         <${HardwareBanner} hw=${m.hardware} onOpenStorage=${() => this.selectTab('storage')}/>

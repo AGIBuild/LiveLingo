@@ -16,11 +16,12 @@ namespace LiveLingo.Desktop.Settings;
 /// <summary>One line of the glossary list; a term whose translation equals it is kept as written.</summary>
 public sealed record TermEntry(string Source, string Target);
 
-/// <summary>The two steps that can run on the user's own cloud endpoint, each authorized on its own.</summary>
+/// <summary>The stages that can run on the user's own cloud endpoint, each authorized on its own.</summary>
 public enum CloudStep
 {
     Translate,
-    Clean
+    Clean,
+    Speech
 }
 
 /// <summary>One saved cloud endpoint as the page shows it; the API key is never part of it, only whether one is stored.</summary>
@@ -32,7 +33,9 @@ public sealed record EndpointEntry(
     bool HasKey,
     bool Usable,
     bool UsedForTranslate,
-    bool UsedForClean);
+    bool UsedForClean,
+    bool UsedForSpeech = false,
+    bool SpeechUsable = false);
 
 /// <summary>Why the add or edit form was not accepted; the page shows the reason beside the field.</summary>
 public enum EndpointError
@@ -109,6 +112,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
         _polishPrompt = PolishStyle.IsUsable(current.Composer.PolishPrompt) ? current.Composer.PolishPrompt : "";
         _microphoneNames = [""];
         _microphoneIndex = 0;
+        _speechEndpointId = current.Cloud.SpeechEndpointId;
         _translatorEndpointId = current.Cloud.TranslatorEndpointId;
         _cleanerEndpointId = current.Cloud.CleanerEndpointId;
         _endpoints = EntriesOf(current.Cloud);
@@ -198,12 +202,18 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
     // ---- privacy and cloud -----------------------------------------------------------------
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CloudSpeech), nameof(SpeechEndpoint))]
+    private string _speechEndpointId;
+
+    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CloudTranslate), nameof(TranslatorEndpoint))]
     private string _translatorEndpointId;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CloudClean), nameof(CleanerEndpoint))]
     private string _cleanerEndpointId;
+
+    public bool CloudSpeech => !string.IsNullOrEmpty(SpeechEndpointId);
 
     public bool CloudTranslate => !string.IsNullOrEmpty(TranslatorEndpointId);
 
@@ -214,8 +224,10 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
 
     /// <summary>The saved endpoints, in the order they were added.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(TranslatorEndpoint), nameof(CleanerEndpoint), nameof(PendingDeleteEndpoint))]
+    [NotifyPropertyChangedFor(nameof(SpeechEndpoint), nameof(TranslatorEndpoint), nameof(CleanerEndpoint), nameof(PendingDeleteEndpoint))]
     private IReadOnlyList<EndpointEntry> _endpoints;
+
+    public EndpointEntry? SpeechEndpoint => Endpoints.FirstOrDefault(endpoint => endpoint.Id == SpeechEndpointId);
 
     public EndpointEntry? TranslatorEndpoint => Endpoints.FirstOrDefault(endpoint => endpoint.Id == TranslatorEndpointId);
 
@@ -446,14 +458,20 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
             return;
         }
 
-        var currentId = step == CloudStep.Translate ? TranslatorEndpointId : CleanerEndpointId;
+        var currentId = step switch
+        {
+            CloudStep.Speech => SpeechEndpointId,
+            CloudStep.Translate => TranslatorEndpointId,
+            _ => CleanerEndpointId
+        };
         if (string.Equals(currentId, endpointId, StringComparison.Ordinal))
         {
             CloudInvalid = false;
             return;
         }
 
-        if (!endpoint.Usable)
+        var usable = step == CloudStep.Speech ? endpoint.SpeechUsable : endpoint.Usable;
+        if (!usable)
         {
             CloudInvalid = true;
             return;
@@ -479,19 +497,28 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
     /// <summary>Binds <paramref name="step"/> to <paramref name="endpointId"/> after explicit consent; refused when unusable.</summary>
     public bool TryApplyCloudEndpoint(CloudStep step, string endpointId)
     {
-        if (Endpoints.FirstOrDefault(item => item.Id == endpointId) is not { Usable: true })
+        if (Endpoints.FirstOrDefault(item => item.Id == endpointId) is not { } endpoint
+            || !(step == CloudStep.Speech ? endpoint.SpeechUsable : endpoint.Usable))
         {
             CloudInvalid = true;
             return false;
         }
 
-        ModelCoordinator.ClearPendingActivation(step == CloudStep.Translate ? ModelStage.Translator : ModelStage.Cleaner);
+        var stage = step switch
+        {
+            CloudStep.Speech => ModelStage.Speech,
+            CloudStep.Translate => ModelStage.Translator,
+            _ => ModelStage.Cleaner
+        };
+        ModelCoordinator.ClearPendingActivation(stage);
         Mutate(cloud =>
         {
-            if (step == CloudStep.Translate)
-                cloud.TranslatorEndpointId = endpointId;
-            else
-                cloud.CleanerEndpointId = endpointId;
+            switch (step)
+            {
+                case CloudStep.Speech: cloud.SpeechEndpointId = endpointId; break;
+                case CloudStep.Translate: cloud.TranslatorEndpointId = endpointId; break;
+                default: cloud.CleanerEndpointId = endpointId; break;
+            }
         });
         return true;
     }
@@ -499,20 +526,23 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
     /// <summary>Immediately returns <paramref name="step"/> to its local model without touching saved cloud endpoints.</summary>
     public void SwitchStageToLocal(CloudStep step)
     {
-        if (step == CloudStep.Translate && CloudTranslate)
+        if (step == CloudStep.Speech && CloudSpeech)
+            Mutate(cloud => cloud.SpeechEndpointId = "");
+        else if (step == CloudStep.Translate && CloudTranslate)
             Mutate(cloud => cloud.TranslatorEndpointId = "");
         else if (step == CloudStep.Clean && CloudClean)
             Mutate(cloud => cloud.CleanerEndpointId = "");
     }
 
-    /// <summary>Immediately switches every text stage back to local offline models.</summary>
+    /// <summary>Immediately switches every stage back to local offline models.</summary>
     public void DisableAllCloud()
     {
-        if (!CloudTranslate && !CloudClean)
+        if (!CloudSpeech && !CloudTranslate && !CloudClean)
             return;
 
         Mutate(cloud =>
         {
+            cloud.SpeechEndpointId = "";
             cloud.TranslatorEndpointId = "";
             cloud.CleanerEndpointId = "";
         });
@@ -578,6 +608,15 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
             }
             else if (!SameService(endpoint.BaseUrl, baseUrl))
             {
+                if (cloud.SpeechEndpointId == id)
+                    cloud.SpeechEndpointId = "";
+                if (cloud.TranslatorEndpointId == id)
+                    cloud.TranslatorEndpointId = "";
+                if (cloud.CleanerEndpointId == id)
+                    cloud.CleanerEndpointId = "";
+            }
+            else if (!IsConfigured(baseUrl, model, hasKey: true))
+            {
                 if (cloud.TranslatorEndpointId == id)
                     cloud.TranslatorEndpointId = "";
                 if (cloud.CleanerEndpointId == id)
@@ -625,6 +664,8 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
         _keyed.Remove(endpoint.Id);
         Mutate(cloud =>
         {
+            if (cloud.SpeechEndpointId == deleteId)
+                cloud.SpeechEndpointId = "";
             if (cloud.TranslatorEndpointId == deleteId)
                 cloud.TranslatorEndpointId = "";
             if (cloud.CleanerEndpointId == deleteId)
@@ -645,6 +686,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
 
     private void SyncCloudSnapshot(CloudSettings cloud)
     {
+        SpeechEndpointId = cloud.SpeechEndpointId;
         TranslatorEndpointId = cloud.TranslatorEndpointId;
         CleanerEndpointId = cloud.CleanerEndpointId;
         Endpoints = EntriesOf(cloud);
@@ -663,7 +705,9 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
                 hasKey,
                 IsConfigured(endpoint.BaseUrl, endpoint.Model, hasKey),
                 endpoint.Id == cloud.TranslatorEndpointId,
-                endpoint.Id == cloud.CleanerEndpointId);
+                endpoint.Id == cloud.CleanerEndpointId,
+                endpoint.Id == cloud.SpeechEndpointId,
+                IsSpeechConfigured(endpoint.BaseUrl, endpoint.Model, hasKey));
         })
     ];
 
@@ -671,7 +715,7 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
     {
         try
         {
-            CloudRoute.Create(baseUrl, "model", "key");
+            SpeechCloudRoute.Create(baseUrl, "model", "key");
             return true;
         }
         catch (ArgumentException)
@@ -686,6 +730,19 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
         try
         {
             CloudRoute.Create(baseUrl, model, hasKey ? "key" : "");
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+    }
+
+    private static bool IsSpeechConfigured(string baseUrl, string model, bool hasKey)
+    {
+        try
+        {
+            SpeechCloudRoute.Create(baseUrl, model, hasKey ? "key" : "");
             return true;
         }
         catch (ArgumentException)

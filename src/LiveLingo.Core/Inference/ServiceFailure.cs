@@ -10,5 +10,5 @@ public static class ServiceFailure
     /// reached, not configured), as opposed to a failure caused by one unit's content.
     /// </summary>
     public static bool IsUnavailable(Exception ex) =>
-        ex is HttpRequestException or LlamaServerStartException or ModelNotReadyException or CloudNotConfiguredException;
+        ex is HttpRequestException or LlamaServerStartException or ModelNotReadyException or CloudNotConfiguredException or CloudSpeechException;
 }

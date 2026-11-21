@@ -46,6 +46,7 @@ public sealed partial class ComposerViewModel
     /// <summary>The sentences of the source pane while listening or showing a transcript.</summary>
     [ObservableProperty] private IReadOnlyList<SourceLine> _sourceLines = [];
 
+    public bool CloudSpeech => _options.CloudSpeech;
     public bool CloudTranslate => _options.CloudTranslate;
     /// <summary>Cleanup runs on the user's endpoint; false when cleanup is off, because then nothing is sent.</summary>
     public bool CloudClean => _options.CloudClean && _options.Cleanup;
@@ -150,6 +151,10 @@ public sealed partial class ComposerViewModel
             case BannerAction.OpenInputSettings:
                 Banner = BannerState.None;
                 SettingsRequested?.Invoke("voice");
+                break;
+            case BannerAction.OpenModelSettings:
+                Banner = BannerState.None;
+                SettingsRequested?.Invoke("models");
                 break;
             case BannerAction.UseOriginal:
                 Banner = BannerState.None;

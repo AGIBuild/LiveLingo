@@ -133,6 +133,7 @@ public sealed class SettingsViewStateTests
         var lines = state.About.Diagnostics.ToDictionary(l => l.Label, l => l.Value);
         Assert.Equal("2.0.0", lines["版本"]);
         Assert.Equal("macOS 15.0 Arm64", lines["系统"]);
+        Assert.Equal("关", lines["云端识别"]);
         Assert.Equal("开", lines["云端翻译"]);
         Assert.Equal("关", lines["云端整理"]);
         Assert.Equal("已保存", lines["API 密钥"]);

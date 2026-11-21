@@ -38,6 +38,8 @@ public sealed class DraftUnit
     public bool IsComplete { get; private set; } = true;
     public UnitResult Clean { get; } = new();
     public UnitResult Translation { get; } = new();
+    /// <summary>True when <see cref="Clean"/> was produced natively by generative speech recognition during decoding.</summary>
+    public bool IsNativePolished { get; internal set; }
     internal int TranslationRevision { get; set; }
 
     internal UnitResult Result(UnitKind kind) => kind == UnitKind.Clean ? Clean : Translation;

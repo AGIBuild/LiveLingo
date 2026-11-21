@@ -47,6 +47,8 @@ internal static class SettingsScenarios
         }),
         ["settings-cloud"] = () => Open("models", m => m.Cloud = CloudTestData.WithEndpoints(translatorId: "main", cleanerId: "main").Cloud, key: "sk-stored", modelsTab: "translator"),
         ["settings-consent"] = () => Open("models", Cloud, key: "sk-stored", modelsTab: "cleaner", then: f => f.Vm.SelectCloudEndpoint(CloudStep.Clean, "main")),
+        ["settings-speech-consent"] = () => Open("models", Cloud, key: "sk-stored", modelsTab: "speech", then: f => f.Vm.SelectCloudEndpoint(CloudStep.Speech, "main")),
+        ["settings-speech-endpoint-add"] = () => Open("models", modelsTab: "speech", then: f => f.Vm.OpenEndpointForm(null)),
         ["settings-cloud-invalid"] = () => Open("models", m => m.Cloud = CloudTestData.WithEndpoints().Cloud, key: null, modelsTab: "translator", then: f => f.Vm.SelectCloudEndpoint(CloudStep.Translate, "main")),
         ["settings-endpoint-add"] = () => Open("models", modelsTab: "translator", then: f => f.Vm.OpenEndpointForm(null)),
         ["settings-endpoint-edit"] = () => Open("models", Cloud, key: "sk-stored", modelsTab: "translator", then: f => f.Vm.OpenEndpointForm("main")),

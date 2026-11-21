@@ -100,11 +100,22 @@ public sealed partial class Draft
         Pending = text;
     }
 
-    public JobTicket Append(string raw)
+    public JobTicket Append(string raw) => AppendDictated(raw, nativeClean: null);
+
+    /// <summary>
+    /// Appends a dictated utterance. When the speech recognizer already performed native disfluency removal and polishing,
+    /// <paramref name="nativeClean"/> populates <see cref="DraftUnit.Clean"/> immediately so cascade LLM cleanup is skipped.
+    /// </summary>
+    public JobTicket AppendDictated(string raw, string? nativeClean = null)
     {
         EnsureEditable();
         SourceRevision++;
         var unit = NewUnit(new SourceUnit(raw));
+        if (nativeClean is not null)
+        {
+            unit.Clean.Text = nativeClean;
+            unit.IsNativePolished = true;
+        }
         _units.Add(unit);
         SourceChanged();
         return TicketFor(unit);
@@ -269,7 +280,10 @@ public sealed partial class Draft
         {
             result.Clear();
             if (kind == UnitKind.Clean)
+            {
+                _units[index].IsNativePolished = false;
                 CleanUnitChanged(_units[index]);
+            }
         }
     }
 
@@ -299,7 +313,10 @@ public sealed partial class Draft
         result.Error = "";
         result.Rejection = null;
         if (kind == UnitKind.Clean)
+        {
+            _units[index].IsNativePolished = false;
             CleanUnitChanged(_units[index]);
+        }
         if (DocumentMode)
         {
             InvalidateDocument(kind);

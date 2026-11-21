@@ -1,8 +1,10 @@
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
+using LiveLingo.Core.Cloud;
 using LiveLingo.Core.Drafting;
 using LiveLingo.Core.Models;
 using LiveLingo.Core.Transcription;
+using LiveLingo.Core.Translation;
 
 namespace LiveLingo.Desktop.Composer;
 
@@ -77,7 +79,7 @@ public sealed partial class ComposerViewModel
                 if (generation == _draftGeneration)
                     TranscribeProgress = fraction * 100;
             });
-            var segments = await _transcriber.TranscribeAsync(path, _glossary, progress, cancellation.Token).ConfigureAwait(true);
+            var segments = await _transcriber.TranscribeAsync(path, BuildSpeechRequest(), progress, cancellation.Token).ConfigureAwait(true);
             if (cancellation.IsCancellationRequested || generation != _draftGeneration)
                 return;
             if (segments.Count == 0)
@@ -95,6 +97,13 @@ public sealed partial class ComposerViewModel
                 return;
             _pendingImport = path;
             Banner = new BannerState(BannerKind.ModelMissing, MissingSizeLabel());
+        }
+        catch (Exception ex) when (ex is CloudNotConfiguredException or CloudSpeechException
+                                   or HttpRequestException or System.Net.WebSockets.WebSocketException)
+        {
+            if (generation != _draftGeneration)
+                return;
+            Banner = new BannerState(BannerKind.SpeechFailed, ex.Message);
         }
         catch (Exception ex) when (ex is UnsupportedAudioException or IOException or UnauthorizedAccessException)
         {
@@ -115,10 +124,14 @@ public sealed partial class ComposerViewModel
         var units = segments
             .Select((segment, i) => new SourceUnit(segment.Text, Trail: i < segments.Count - 1 ? "\n" : ""))
             .ToList();
+        var nativePolishReady = _plan.SpeechNativeClean;
+        var corrections = ActiveGlossary.Corrections;
         _session.Mutate(draft =>
         {
             draft.DocumentMode = false;
             draft.SyncSource(units, DraftRoute.Units);
+            if (nativePolishReady)
+                draft.MarkUnitsNativePolished(corrections);
         });
         HasTimeline = true;
         ShowDraftSource();

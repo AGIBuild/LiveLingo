@@ -40,8 +40,13 @@ public partial class CloudSettings : ObservableObject
     public const string LegacyApiKeySecretId = "cloud-api-key";
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(TranslatorEndpoint), nameof(CleanerEndpoint))]
+    [NotifyPropertyChangedFor(nameof(TranslatorEndpoint), nameof(CleanerEndpoint), nameof(SpeechEndpoint))]
     private List<CloudEndpoint> _endpoints = [];
+
+    /// <summary>The endpoint ID selected for speech recognition, or empty when speech runs on the local model.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Speech), nameof(SpeechEndpoint))]
+    private string _speechEndpointId = "";
 
     /// <summary>The endpoint ID selected for translation, or empty when translation runs on the local model.</summary>
     [ObservableProperty]
@@ -53,6 +58,10 @@ public partial class CloudSettings : ObservableObject
     [NotifyPropertyChangedFor(nameof(Clean), nameof(CleanerEndpoint))]
     private string _cleanerEndpointId = "";
 
+    /// <summary>True when speech recognition is routed to a cloud endpoint.</summary>
+    [JsonIgnore]
+    public bool Speech => !string.IsNullOrEmpty(SpeechEndpointId);
+
     /// <summary>True when translation is routed to a cloud endpoint.</summary>
     [JsonIgnore]
     public bool Translate => !string.IsNullOrEmpty(TranslatorEndpointId);
@@ -60,6 +69,10 @@ public partial class CloudSettings : ObservableObject
     /// <summary>True when cleanup and polish are routed to a cloud endpoint.</summary>
     [JsonIgnore]
     public bool Clean => !string.IsNullOrEmpty(CleanerEndpointId);
+
+    /// <summary>The cloud endpoint currently assigned to speech recognition, or null when speech is local.</summary>
+    [JsonIgnore]
+    public CloudEndpoint? SpeechEndpoint => Endpoints.FirstOrDefault(endpoint => endpoint.Id == SpeechEndpointId);
 
     /// <summary>The cloud endpoint currently assigned to translation, or null when translation is local.</summary>
     [JsonIgnore]
@@ -138,6 +151,7 @@ public partial class CloudSettings : ObservableObject
     public CloudSettings DeepClone() => new()
     {
         Endpoints = [.. Endpoints.Select(endpoint => endpoint.DeepClone())],
+        SpeechEndpointId = SpeechEndpointId,
         TranslatorEndpointId = TranslatorEndpointId,
         CleanerEndpointId = CleanerEndpointId,
         LegacyBaseUrl = LegacyBaseUrl,
@@ -235,8 +249,45 @@ public partial class ComposerSettings : ObservableObject
     public LiveLingo.Core.Translation.Glossary EffectiveGlossary() =>
         LiveLingo.Core.Translation.Glossary.Parse(Glossary, BuiltInGlossary);
 
-    public LiveLingo.Core.Models.ModelSelection ResolveSelection(LiveLingo.Core.Models.HardwareProfile hardware) =>
-        LiveLingo.Core.Models.ModelAdvisor.Resolve(SpeechModel, CleanerModel, TranslatorModel, hardware);
+    public LiveLingo.Core.Models.ModelSelection ResolveSelection(
+        LiveLingo.Core.Models.HardwareProfile hardware,
+        LiveLingo.Core.Models.IModelManager? installedModels = null)
+    {
+        var resolved = LiveLingo.Core.Models.ModelAdvisor.Resolve(SpeechModel, CleanerModel, TranslatorModel, hardware);
+        if (installedModels is null)
+            return resolved;
+
+        return new LiveLingo.Core.Models.ModelSelection(
+            PreferInstalledWhenUnset(LiveLingo.Core.Inference.ModelStage.Speech, SpeechModel, resolved.SpeechModelId, hardware, installedModels),
+            PreferInstalledWhenUnset(LiveLingo.Core.Inference.ModelStage.Cleaner, CleanerModel, resolved.CleanerModelId, hardware, installedModels),
+            PreferInstalledWhenUnset(LiveLingo.Core.Inference.ModelStage.Translator, TranslatorModel, resolved.TranslatorModelId, hardware, installedModels));
+    }
+
+    private static string PreferInstalledWhenUnset(
+        LiveLingo.Core.Inference.ModelStage stage,
+        string? explicitId,
+        string recommendedId,
+        LiveLingo.Core.Models.HardwareProfile hardware,
+        LiveLingo.Core.Models.IModelManager models)
+    {
+        if (!string.IsNullOrWhiteSpace(explicitId))
+            return recommendedId;
+
+        var recommended = LiveLingo.Core.Models.ModelCatalog.FindOption(stage, recommendedId)!;
+        if (models.HasAllExpectedLocalAssets(recommended))
+            return recommendedId;
+
+        foreach (var candidate in LiveLingo.Core.Models.ModelCatalog.OptionsFor(stage))
+        {
+            if (models.HasAllExpectedLocalAssets(candidate)
+                && LiveLingo.Core.Models.ModelAdvisor.Evaluate(candidate, hardware).IsSelectable)
+            {
+                return candidate.Id;
+            }
+        }
+
+        return recommendedId;
+    }
 
     /// <summary>
     /// Converts the earlier single <c>translatorTier</c> field into explicit stage model IDs matching what that version ran,

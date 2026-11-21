@@ -222,9 +222,11 @@ public sealed class SettingsPageTests(BrowserFixture browsers)
         Assert.Equal(1, await page.Page.Locator("#models-hw").CountAsync());
         Assert.Equal(1, await page.Page.Locator("#models-best-badge").CountAsync());
         Assert.Equal(4, await page.Page.Locator("#models-tabs [role=tab]").CountAsync());
-        Assert.Equal(1, await page.Page.Locator("#speech-local-only").CountAsync());
-        Assert.Equal(0, await page.Page.Locator("#stage-cloud-empty-speech").CountAsync());
-        Assert.Equal(["#1", "#2"], await page.Page.Locator("#stage-speech .mrank").AllInnerTextsAsync());
+        Assert.Equal(1, await page.Page.Locator("#stage-cloud-empty-speech").CountAsync());
+        Assert.Contains("Qwen-Audio-3.1-ASR", await page.Page.Locator("#stage-cloud-empty-speech").InnerTextAsync());
+        Assert.Equal(["#1", "#2", "#3"], await page.Page.Locator("#stage-speech .mcard:not(.cloud) .mrank").AllInnerTextsAsync());
+        Assert.Contains("Qwen3-ASR 1.7B", await page.Page.Locator("#model-card-qwen3-asr-1\\.7b-int8").InnerTextAsync());
+        Assert.Equal(1, await page.Page.Locator("#model-download-qwen3-asr-1\\.7b-int8").CountAsync());
         Assert.Equal(0, await page.Page.Locator("#stage-cleaner").CountAsync());
         Assert.Equal(0, await page.Page.Locator("#stage-translator").CountAsync());
 
@@ -674,6 +676,35 @@ public sealed class SettingsPageTests(BrowserFixture browsers)
         await page.Page.Keyboard.PressAsync("Escape");
 
         Assert.False((await page.LastIntentAsync<EndpointAnswerIntent>()).Allow);
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public async Task SpeechStage_OffersQwenAudioPreset_AndAsksExplicitAudioUploadConsent(string engine)
+    {
+        await using var page = await browsers.OpenSettingsAsync(engine, "settings-speech-endpoint-add");
+
+        Assert.Equal(1, await page.Page.Locator("#ep-preset-qwen-asr").CountAsync());
+        await page.Page.Locator("#ep-preset-qwen-asr").ClickAsync();
+        Assert.Equal("Qwen-Audio-3.1-ASR", await page.Page.Locator("#ep-name").InputValueAsync());
+        Assert.Equal("https://dashscope.aliyuncs.com/api/v1", await page.Page.Locator("#ep-url").InputValueAsync());
+        Assert.Equal("qwen-audio-3.1-asr-flash-message", await page.Page.Locator("#ep-model").InputValueAsync());
+        Assert.Equal("ep-key", await page.Page.EvaluateAsync<string>("document.activeElement.id"));
+
+        await page.Page.Locator("#ep-key").FillAsync("sk-dashscope");
+        await page.Page.Locator("#ep-save").ClickAsync();
+        Assert.Equal(
+            new SaveEndpointIntent(
+                "Qwen-Audio-3.1-ASR",
+                "https://dashscope.aliyuncs.com/api/v1",
+                "qwen-audio-3.1-asr-flash-message",
+                "sk-dashscope") { V = 1 },
+            await page.LastIntentAsync<SaveEndpointIntent>());
+
+        await page.PushAsync("settings-speech-consent");
+        var dialog = page.Page.GetByRole(AriaRole.Dialog);
+        Assert.Equal(S("consent.speech"), (await dialog.Locator("h2").InnerTextAsync()).Trim());
+        Assert.Contains("麦克风语音", await dialog.InnerTextAsync());
     }
 
     // --- the hotkey -------------------------------------------------------------------------------------------------
