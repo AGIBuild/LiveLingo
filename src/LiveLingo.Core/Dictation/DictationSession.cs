@@ -384,10 +384,19 @@ public sealed class DictationSession : IDictationSession
             {
                 text = TextTidy.Apply(_secondPass!.Recognize(audio));
                 var seconds = audio.Length / (double)AudioFormat.SampleRate;
-                var rateExceeded = _options.SecondPassMaxCharsPerSecond > 0
+                var guardAutoregressiveLoops = _options.SecondPassMaxCharsPerSecond > 0;
+                var rateExceeded = guardAutoregressiveLoops
                     && text.Count(char.IsLetterOrDigit) > _options.SecondPassMaxCharsPerSecond * seconds + 10;
-                if (string.IsNullOrWhiteSpace(text) || rateExceeded)
+                var repetitionLoop = guardAutoregressiveLoops
+                    && HasDegenerateRepetition(text)
+                    && !HasDegenerateRepetition(segment.LiveFinal);
+                var truncatedCollapse = guardAutoregressiveLoops
+                    && IsTruncatedCollapse(segment.LiveFinal, text, seconds);
+                if (string.IsNullOrWhiteSpace(text) || rateExceeded || repetitionLoop || truncatedCollapse)
                 {
+                    _logger?.LogDebug(
+                        "Second-pass result rejected on segment {SegmentId} (empty={Empty}, rateExceeded={RateExceeded}, repetitionLoop={RepetitionLoop}, truncatedCollapse={TruncatedCollapse}); keeping live text.",
+                        segment.Id, string.IsNullOrWhiteSpace(text), rateExceeded, repetitionLoop, truncatedCollapse);
                     text = segment.LiveFinal;
                     failed = true;
                 }
@@ -604,6 +613,92 @@ public sealed class DictationSession : IDictationSession
     }
 
     private static bool IsAsciiLetter(char c) => c is (>= 'A' and <= 'Z') or (>= 'a' and <= 'z');
+
+    /// <summary>
+    /// Detects autoregressive phrase/token cycles (4+ token phrases that bypass sherpa-onnx's 3-token window or stay
+    /// below <see cref="DictationOptions.SecondPassMaxCharsPerSecond"/> on longer slices): any period <c>p &lt;= 20</c>
+    /// repeated at least 5 consecutive times covering at least 12 alphanumeric characters.
+    /// </summary>
+    internal static bool HasDegenerateRepetition(ReadOnlySpan<char> text)
+    {
+        if (text.Length < 12)
+            return false;
+
+        Span<char> buffer = text.Length <= 512 ? stackalloc char[text.Length] : new char[text.Length];
+        var n = 0;
+        foreach (var c in text)
+        {
+            if (char.IsLetterOrDigit(c))
+                buffer[n++] = char.ToLowerInvariant(c);
+        }
+
+        if (n < 12)
+            return false;
+
+        var maxPeriod = Math.Min(20, n / 5);
+        for (var p = 1; p <= maxPeriod; p++)
+        {
+            var requiredMatches = Math.Max(4 * p, 12 - p);
+            var matched = 0;
+            for (var i = p; i < n; i++)
+            {
+                if (buffer[i] == buffer[i - p])
+                {
+                    if (++matched >= requiredMatches)
+                        return true;
+                }
+                else
+                {
+                    matched = 0;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Detects when an autoregressive second-pass decoder collapsed into a repetition loop mid-utterance and native
+    /// tail truncation dropped the remainder of a long segment (&gt;= 4.5 s and &gt;= 16 live speech units, leaving &lt; 25%
+    /// of the live units and &lt; 1.2 units/s).
+    /// </summary>
+    internal static bool IsTruncatedCollapse(ReadOnlySpan<char> liveFinal, ReadOnlySpan<char> secondPass, double audioSeconds)
+    {
+        if (audioSeconds < 4.5)
+            return false;
+        var liveUnits = EstimateSpeechUnits(liveFinal);
+        if (liveUnits < 16)
+            return false;
+        var secondPassUnits = EstimateSpeechUnits(secondPass);
+        return secondPassUnits * 4 < liveUnits && secondPassUnits < audioSeconds * 1.2;
+    }
+
+    internal static int EstimateSpeechUnits(ReadOnlySpan<char> text)
+    {
+        var units = 0;
+        var asciiRun = 0;
+        foreach (var c in text)
+        {
+            if (c < 128 && char.IsLetterOrDigit(c))
+            {
+                asciiRun++;
+            }
+            else
+            {
+                if (asciiRun > 0)
+                {
+                    units += (asciiRun + 2) / 3;
+                    asciiRun = 0;
+                }
+                if (char.IsLetterOrDigit(c))
+                    units++;
+            }
+        }
+
+        if (asciiRun > 0)
+            units += (asciiRun + 2) / 3;
+        return units;
+    }
 
     private static bool IsDanglingClause(string tail)
     {

@@ -779,4 +779,72 @@ public class DictationSessionTests
         await midCutSession.StopAsync();
         Assert.Equal(["第一句已经说完了。", "第二句切在半路也接上了。"], midCutDraft.Read(d => d.Units.Select(u => u.Raw).ToList()));
     }
+
+    [Fact]
+    public async Task SecondPassPhraseRepetitionBelowRateCap_IsDropped_WhileNaturalEmphasisAndSpokenRepeatsAreKept()
+    {
+        // 5 s segment allows ~85 chars under SecondPassMaxCharsPerSecond (15 chars/s + 10), so a 20-char 4-token
+        // phrase loop ("这个问题" x 5) slips under the rate cap unless HasDegenerateRepetition catches it.
+        var script = new[] { new ScriptedSegment(200, 5_200, "帮我仔细检查一下这个问题。") };
+        var phraseLoop = "这个问题，这个问题，这个问题，这个问题，这个问题。";
+        await using var loopHarness = new Harness(script, secondPass: new ScriptedSegmentRecognizer(() => phraseLoop));
+
+        loopHarness.Push(5_800);
+        await loopHarness.Session.StopAsync();
+
+        Assert.Equal(["帮我仔细检查一下这个问题。"], loopHarness.Raws);
+        Assert.True(loopHarness.Session.Segments[0].SecondPassFailed);
+
+        // Natural 3x emphasis ("不要改，不要改，不要改") must never be mistaken for a decoder repetition loop.
+        var emphasis = "重要的事情说三遍，不要改，不要改，不要改。";
+        await using var emphasisHarness = new Harness(script, secondPass: new ScriptedSegmentRecognizer(() => emphasis));
+
+        emphasisHarness.Push(5_800);
+        await emphasisHarness.Session.StopAsync();
+
+        Assert.Equal([emphasis], emphasisHarness.Raws);
+        Assert.False(emphasisHarness.Session.Segments[0].SecondPassFailed);
+    }
+
+    [Fact]
+    public async Task SecondPassTruncatedCollapse_KeepsCompleteLiveText_WithoutRejectingBilingualOrNonAutoregressiveDecodes()
+    {
+        // Simulates sherpa-onnx GenerateText:1099 truncating a mid-utterance Qwen3-ASR repetition collapse down to the
+        // first few tokens while the streaming transducer captured the full 26-character sentence.
+        var longLive = "如果说你还需要更强的润色描述或者说机制也可以澄清出来。";
+        var script = new[] { new ScriptedSegment(200, 6_200, longLive) };
+        await using var collapsed = new Harness(script, secondPass: new ScriptedSegmentRecognizer(() => "如果说你还需"));
+
+        collapsed.Push(6_800);
+        await collapsed.Session.StopAsync();
+
+        Assert.Equal([longLive], collapsed.Raws);
+        Assert.True(collapsed.Session.Segments[0].SecondPassFailed);
+
+        // Legitimate bilingual + numeric normalization ("百分之五十" -> "50%", phonetic CJK -> "Agent"/"Skill"/"configuration") is accepted.
+        var bilingual = "如果说你还需要更强的 Agent configuration 或者 50% 的 Skill 机制也可以澄清。";
+        await using var validBilingual = new Harness(script, secondPass: new ScriptedSegmentRecognizer(() => bilingual));
+
+        validBilingual.Push(6_800);
+        await validBilingual.Session.StopAsync();
+
+        Assert.Equal([bilingual], validBilingual.Raws);
+        Assert.False(validBilingual.Session.Segments[0].SecondPassFailed);
+
+        // Non-autoregressive recognizers (SecondPassMaxCharsPerSecond = 0, e.g. X-ASR Offline) bypass autoregressive loop guards.
+        var draft = new DraftSession(hasTarget: true);
+        await using var nonAutoregressive = new DictationSession(
+            new ScriptedLive(script),
+            new ScriptedVad(script),
+            new ScriptedSegmentRecognizer(() => "短句。"),
+            draft,
+            new DictationOptions { HardPauseMs = 300, PassageMaxChars = 1, SecondPassMaxCharsPerSecond = 0 });
+        nonAutoregressive.Start();
+        for (var pushed = 0; pushed < 6_800; pushed += 40)
+            nonAutoregressive.Push(new float[AudioFormat.MsToSamples(40)]);
+        await nonAutoregressive.StopAsync();
+
+        Assert.Equal(["短句。"], draft.Read(d => d.Units.Select(u => u.Raw).ToList()));
+        Assert.False(nonAutoregressive.Segments[0].SecondPassFailed);
+    }
 }

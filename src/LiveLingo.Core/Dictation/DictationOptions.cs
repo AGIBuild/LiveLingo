@@ -53,6 +53,7 @@ public sealed class DictationOptions
     /// <summary>
     /// A second-pass result with more characters per second of audio than anyone speaks is a decoder repetition loop,
     /// not speech. Such a result is dropped and the live text is kept. Pure English letters reach about 15 per second.
+    /// Also gates autoregressive phrase-repetition and truncated-collapse guards against the live transcript.
     /// Set to 0 or less for non-autoregressive models that cannot enter token repetition loops.
     /// </summary>
     public double SecondPassMaxCharsPerSecond { get; init; } = 15;
