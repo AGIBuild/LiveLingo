@@ -426,7 +426,7 @@ coverage-report/
 stryker-run.log
 
 # Nuke temp
-.nuke/temp/
+.fallout/temp/
 .DS_Store
 
 # Local agent scratch space

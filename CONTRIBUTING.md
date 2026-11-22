@@ -10,7 +10,7 @@ Thanks for your interest in contributing! This guide covers everything you need 
 |------|---------|-------|
 | [.NET SDK](https://dotnet.microsoft.com/download) | 10.0+ | Required |
 | Git | Any recent | Required |
-| [Nuke](https://nuke.build/) | Via `dotnet tool restore` | Build automation |
+| [Fallout](https://github.com/Fallout-build/Fallout) | Via NuGet (`./build.sh` / `./build.ps1`) | Build automation |
 | [Velopack](https://velopack.io/) | Via `dotnet tool restore` | Windows (.msi) and macOS packaging, updates |
 | [Stryker.NET](https://stryker-mutator.io/) | Via `dotnet tool restore` | Mutation testing |
 
@@ -28,7 +28,7 @@ dotnet tool restore
 # Run in development mode
 dotnet run --project src/LiveLingo.Desktop
 
-# Or use Nuke
+# Or use Fallout
 ./build.sh Run       # macOS / Linux
 ./build.ps1 Run      # Windows
 ```
@@ -67,7 +67,7 @@ LiveLingo/
 │   └── LiveLingo.Web.Tests/         # Playwright tests of the page on WebKit and Chromium
 │                                    #   (golden fixtures are written by Desktop.Tests with UPDATE_FIXTURES=1)
 │
-├── build/                           # Nuke build automation
+├── build/                           # Fallout build automation
 │   ├── BuildTask.cs                 # All build targets
 │   └── macos/                       # macOS packaging scripts
 │
@@ -110,7 +110,7 @@ This is the single most important rule. It ensures ViewModels are fully testable
 
 ## Build Targets
 
-LiveLingo uses [Nuke](https://nuke.build/) for build automation. All targets are defined in `build/BuildTask.cs`.
+LiveLingo uses [Fallout](https://github.com/Fallout-build/Fallout) for build automation. All targets are defined in `build/BuildTask.cs`.
 
 ```bash
 # Common targets
@@ -214,7 +214,7 @@ The `Test` target enforces three quality gates. **All must pass for CI to succee
 - Window shells and the web view host (`ComposerWindow`, `SettingsWindow`, `WebSurface`, `StorageFileDialogs`)
 - Infrastructure (`Program`, `App`, `VelopackUpdateService`)
 - AI model hosts and native adapters (`Inference.LlamaServerHost*`, `Speech.Native.*`)
-  — covered by end-to-end Nuke probe targets instead of unit-test mocks
+  — covered by end-to-end Fallout probe targets instead of unit-test mocks
 
 ### 2. Mutation Testing
 

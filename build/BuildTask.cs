@@ -5,15 +5,15 @@ using System.Linq;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
-using Nuke.Common;
-using Nuke.Common.IO;
-using Nuke.Common.ProjectModel;
-using Nuke.Common.Tooling;
-using Nuke.Common.Tools.DotNet;
+using Fallout.Common;
+using Fallout.Common.IO;
+using Fallout.Solutions;
+using Fallout.Common.Tooling;
+using Fallout.Common.Tools.DotNet;
 using Serilog;
-using static Nuke.Common.Tools.DotNet.DotNetTasks;
+using static Fallout.Common.Tools.DotNet.DotNetTasks;
 
-class BuildTask : NukeBuild
+class BuildTask : FalloutBuild
 {
     public static int Main() => Execute<BuildTask>(x => x.Build);
 
@@ -168,17 +168,18 @@ class BuildTask : NukeBuild
             Log.Information("Mutation score:  {Score:F1}% (threshold {Threshold}%)", score, MutationThreshold);
         });
 
-    // macOS frameworks occasionally spam NSLog to stderr during input-method
-    // bring-up. These lines are benign but Nuke otherwise reclassifies them
-    // as build errors and dumps them under "Errors & Warnings" at the end of
-    // the Run target. We recognise and demote them to informational logs so
-    // the real errors stay actionable.
+    // macOS frameworks (input method, WebKit pasteboard) and native speech libraries
+    // emit benign or already-recovered notices to stderr. The build runner otherwise
+    // reclassifies them as errors and dumps them under "Errors & Warnings" at the end
+    // of the Run target. We recognise and demote them to debug logs so real errors stay actionable.
     private static readonly Regex[] BenignAppStderrPatterns =
     [
         new(@"IMKCFRunLoopWakeUp", RegexOptions.Compiled),
         new(@"error messaging the mach port", RegexOptions.Compiled),
         new(@"TSM AdjustCapsLockLEDForKeyTransitionHandling", RegexOptions.Compiled),
         new(@"_ISSetPhysicalKeyboardCapsLockLED", RegexOptions.Compiled),
+        new(@"CFPasteboardSetExpirationDate", RegexOptions.Compiled),
+        new(@"qwen3-asr: decode collapsed into a repetition loop after \d+ tokens; truncating the repetition", RegexOptions.Compiled),
     ];
 
     private static void RunProcessLogger(OutputType type, string output)
