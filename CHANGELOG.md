@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.0] - 2026-11-22
+
+Adds `Qwen-Audio-3.1-ASR` cloud speech and local `Qwen3-ASR 1.7B` support with per-model optimization strategies,
+hardens second-pass dictation against autoregressive repetition collapses, and migrates build automation to Fallout.
+
+### Added
+- **Qwen-Audio-3.1-ASR cloud speech & local Qwen3-ASR 1.7B**: supports `Qwen-Audio-3.1-ASR` (Message WebSocket & Flash
+  HTTP) with P0/P1 hierarchical hotwords, rolling context, and native polish bypass, alongside local free
+  `Qwen3-ASR 1.7B` ONNX support.
+- **Per-model `SpeechOptimizationStrategies`**: isolates chunk bounds, `MaxNewTokens`, loop guards, hotword modes, and
+  native polish vs cascade LLM cleanup across `1.7B`, `0.6B`, `X-ASR Offline`, and cloud `3.1` models.
+
+### Fixed
+- **Second-pass autoregressive repetition & truncation guard**: `DictationSession` now detects multi-token phrase
+  repetition loops below the character-rate cap and mid-utterance collapses truncated by `sherpa-onnx`, falling back to
+  the complete live transcript without affecting non-autoregressive recognizers.
+- **Cleaner local run output**: demotes benign macOS `CFPasteboardSetExpirationDate` and already-truncated `qwen3-asr`
+  repetition-loop notices from stderr errors to debug logs.
+
+### Changed
+- **Build automation**: migrated from Nuke to [Fallout](https://github.com/Fallout-build/Fallout).
+
 ## [2.3.0] - 2026-11-14
 
 Bilingual dictation and polish recognize mixed Chinese-English technical speech far more reliably, learn user accent
