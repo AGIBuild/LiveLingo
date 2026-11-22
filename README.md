@@ -8,6 +8,44 @@ release is tag `v1.4.2`.
 
 ![Composer prototype](docs/superpowers/prototypes/livelingo-ux-v3/overview.png)
 
+## Installation
+
+Download the latest installer from [GitHub Releases](https://github.com/AGIBuild/LiveLingo/releases/latest).
+
+### macOS (Apple Silicon `osx-arm64`)
+
+Download `LiveLingo-<version>-osx-arm64.pkg`.
+
+Because the `.pkg` installer is not signed with an Apple Developer ID certificate, macOS Gatekeeper blocks it by default.
+Clear the quarantine attribute on the downloaded package before opening it:
+
+```bash
+xattr -d com.apple.quarantine ~/Downloads/LiveLingo-*-osx-arm64.pkg
+open ~/Downloads/LiveLingo-*-osx-arm64.pkg
+```
+
+If macOS also blocks `/Applications/LiveLingo.app` on first launch, clear quarantine on the app bundle (or allow it
+under **System Settings → Privacy & Security → Open Anyway**):
+
+```bash
+xattr -dr com.apple.quarantine /Applications/LiveLingo.app
+```
+
+On first run, grant **Microphone** and **Accessibility** permissions in **System Settings → Privacy & Security** so
+LiveLingo can record audio, listen for the global hotkey, and paste text into other apps.
+
+### Windows (`win-x64`)
+
+1. Download `LiveLingo-<version>-win-x64.msi` and double-click to install (per-user install, no administrator
+   privileges required).
+2. If Windows SmartScreen warns about an unrecognized app, click **More info → Run anyway**.
+3. Windows 11 includes **WebView2** out of the box. On Windows 10, install the
+   [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/) if it is not
+   already present.
+4. Allow **Microphone** access in **Settings → Privacy & security → Microphone** when prompted.
+
+> Both platforms support automatic in-app updates via GitHub Releases once installed.
+
 ## How it works
 
 1. **Summon** with a global hotkey (default `Ctrl+Alt+T`). The composer opens above the input box you were in.
