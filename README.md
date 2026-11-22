@@ -16,19 +16,21 @@ Download the latest installer from [GitHub Releases](https://github.com/AGIBuild
 
 Download `LiveLingo-<version>-osx-arm64.pkg`.
 
-Because the `.pkg` installer is not signed with an Apple Developer ID certificate, macOS Gatekeeper blocks it by default.
-Clear the quarantine attribute on the downloaded package before opening it:
+Because the `.pkg` installer is not signed with an Apple Developer ID certificate, macOS Gatekeeper blocks opening it
+directly (even if `com.apple.quarantine` is not set). Install it from Terminal with `installer`:
 
 ```bash
-xattr -d com.apple.quarantine ~/Downloads/LiveLingo-*-osx-arm64.pkg
-open ~/Downloads/LiveLingo-*-osx-arm64.pkg
+sudo installer -pkg ~/Downloads/LiveLingo-*-osx-arm64.pkg -target /
 ```
 
-If macOS also blocks `/Applications/LiveLingo.app` on first launch, clear quarantine on the app bundle (or allow it
-under **System Settings → Privacy & Security → Open Anyway**):
+Alternatively, double-click the `.pkg` in Finder, dismiss the Gatekeeper dialog, and click **Open Anyway** in
+**System Settings → Privacy & Security**.
+
+If macOS blocks `/Applications/LiveLingo.app` on first launch, clear any quarantine attribute (ignoring if absent) or
+allow it under **System Settings → Privacy & Security → Open Anyway**:
 
 ```bash
-xattr -dr com.apple.quarantine /Applications/LiveLingo.app
+xattr -dr com.apple.quarantine /Applications/LiveLingo.app 2>/dev/null || true
 ```
 
 On first run, grant **Microphone** and **Accessibility** permissions in **System Settings → Privacy & Security** so
