@@ -1,0 +1,39 @@
+src/LiveLingo.Desktop/Composer/ComposerWindow.cs
+  s_1497fa1ac720c7::t_c684e7ecb3c768 35
+  s_1497fa1ac720c7::t_5406d84591ecd1 84,87,95-97,108,112
+  s_1497fa1ac720c7::t_3d91e92f503b93 89,91-94
+  s_1497fa1ac720c7::t_a7b9c700b33516 167
+  s_1497fa1ac720c7::t_9d10f65a1de7f6 253-259,276-283
+  s_1497fa1ac720c7::t_8c92f7120a65ac 358-359,363-394,404-449
+  s_1497fa1ac720c7::t_f44a24daa9bf64 360-362
+  s_1497fa1ac720c7::t_fa29772f5b23e4 450
+src/LiveLingo.Desktop/Platform/macOS/MacNativeMethods.cs
+  s_1497fa1ac720c7::t_65f8dcf1c29e1b 163-165
+src/LiveLingo.Desktop/Platform/Windows/NativeMethods.cs
+  s_1497fa1ac720c7::t_2b50440c4c9260 189-196
+tests/LiveLingo.Desktop.Tests/Composer/ComposerPlacementTests.cs
+  s_1497fa1ac720c7::t_49ad65de71366a 296-323
+  s_1497fa1ac720c7::t_d08d77f65858b8 1
+src/LiveLingo.Desktop/Platform/macOS/MacWindowMover.cs
+  s_1497fa1ac720c7::t_85145b8c988f96 26-34
+src/LiveLingo.Desktop/Platform/IWindowMover.cs
+  s_1497fa1ac720c7::t_948b642ea845c5 16-21
+src/LiveLingo.Desktop/Platform/Windows/Win32WindowMover.cs
+  s_1497fa1ac720c7::t_4b18080d318090 32-44
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "88684fdf4905cb237fa6c24332331bef099681a1",
+  "prompts": {},
+  "sessions": {
+    "s_1497fa1ac720c7": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "16dd6215-5257-4969-a895-d02d0a862364",
+        "model": "claude-sonnet-5-5"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
