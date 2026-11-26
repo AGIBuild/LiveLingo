@@ -186,6 +186,14 @@ internal static partial class NativeMethods
     public static partial IntPtr SendMessageW(IntPtr hWnd, uint Msg, IntPtr wParam, IntPtr lParam);
 
     public const uint WM_KEYUP = 0x0101;
+    public const int GWL_EXSTYLE = -20;
+    public const nint WS_EX_TRANSPARENT = 0x00000020;
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    public static partial nint GetWindowLongPtrW(IntPtr hWnd, int nIndex);
+
+    [LibraryImport("user32.dll", SetLastError = true)]
+    public static partial nint SetWindowLongPtrW(IntPtr hWnd, int nIndex, nint dwNewLong);
 
     [LibraryImport("user32.dll", StringMarshalling = StringMarshalling.Utf16, SetLastError = true)]
     public static partial IntPtr FindWindowExW(

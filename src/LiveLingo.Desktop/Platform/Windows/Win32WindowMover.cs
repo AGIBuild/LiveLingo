@@ -29,4 +29,17 @@ internal sealed class Win32WindowMover : IWindowMover
         NativeMethods.SendMessageW(window.Handle, WM_NCLBUTTONDOWN, HTCAPTION, IntPtr.Zero);
         return Task.CompletedTask;
     }
+
+    public void SetMousePassthrough(IPlatformHandle window, bool passthrough)
+    {
+        if (window.Handle == IntPtr.Zero)
+            return;
+
+        var current = NativeMethods.GetWindowLongPtrW(window.Handle, NativeMethods.GWL_EXSTYLE);
+        var updated = passthrough
+            ? current | NativeMethods.WS_EX_TRANSPARENT
+            : current & ~NativeMethods.WS_EX_TRANSPARENT;
+        if (updated != current)
+            NativeMethods.SetWindowLongPtrW(window.Handle, NativeMethods.GWL_EXSTYLE, updated);
+    }
 }

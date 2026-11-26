@@ -32,6 +32,7 @@ internal sealed class ComposerWindow : Window
     private bool _placed;
     private bool _dragging;
     private readonly Queue<(int X, int Y)> _issuedPositions = new(8);
+    private readonly ParkGuard _parkGuard = new(ParkedAt);
     private int? _appliedPanelLimit;
     private bool _appliedFixedHeight;
 
@@ -80,14 +81,20 @@ internal sealed class ComposerWindow : Window
     /// <summary>Shows the window once, invisible and off screen, so its page is loaded before the first summon.</summary>
     public void Park()
     {
-        Opacity = 0;
+        _parkGuard.Reset();
         _placed = false;
         _issuedPositions.Clear();
+        SetInteractive(false);
         // Show before moving: a window whose first position is far off screen comes up 0 x 0 on macOS.
+        // Showing raises Screens.Changed before the window is parked; that is not drift.
         if (!IsVisible)
-            Show();
-        RecordIssuedPosition(ParkedAt);
-        Position = ParkedAt;
+        {
+            using (_parkGuard.BeginMove())
+                Show();
+        }
+        // Re-apply after Show() because the native NSWindow/HWND only exists once the window has been shown.
+        SetMousePassthrough(true);
+        MoveToParked();
     }
 
     /// <summary>Puts the composer in front of the user; completes when it was dismissed (written, hidden, or toggled away).</summary>
@@ -98,9 +105,11 @@ internal sealed class ComposerWindow : Window
         _dragCts = new CancellationTokenSource();
         _target = target;
         _dragging = false;
+        _parkGuard.Reset();
         _issuedPositions.Clear();
         _appliedPanelLimit = null;
         _appliedFixedHeight = false;
+        SetInteractive(false);
         _dismissed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         _session = new ComposerWebSession(
             vm, texts, recent, new StorageFileDialogs(StorageProvider, texts), _web,
@@ -155,7 +164,7 @@ internal sealed class ComposerWindow : Window
 
         // The first measurement of this summon: the page has drawn the snapshot, so the window can be shown as it is.
         _placed = true;
-        Opacity = 1;
+        SetInteractive(true);
         Activate();
         _web.View.Focus();
     }
@@ -241,7 +250,13 @@ internal sealed class ComposerWindow : Window
 
     private void OnPositionChanged()
     {
-        if (_session is null || _frame is null || !_placed || _dragging)
+        if (_session is null)
+        {
+            EnforceParked("position-changed");
+            return;
+        }
+
+        if (_frame is null || !_placed || _dragging)
             return;
 
         // Native frame changes arrive asynchronously on macOS; ignore echoes of positions Apply() itself issued, and
@@ -258,7 +273,14 @@ internal sealed class ComposerWindow : Window
 
     private void OnDisplayChanged()
     {
-        if (_session is null || _frame is null || _dragging)
+        if (_session is null)
+        {
+            _parkGuard.ResetDriftRetries();
+            EnforceParked("display-changed");
+            return;
+        }
+
+        if (_frame is null || _dragging)
             return;
 
         Apply();
@@ -333,6 +355,43 @@ internal sealed class ComposerWindow : Window
         }
     }
 
+    private void SetInteractive(bool interactive)
+    {
+        // Topmost stays on: a window the target app covers is occluded and WebKit stops running animation frames,
+        // so the page would never report its size and the composer would never appear. Click-through is what
+        // keeps an invisible window from swallowing clicks.
+        SetMousePassthrough(!interactive);
+        Opacity = interactive ? 1 : 0;
+    }
+
+    private void SetMousePassthrough(bool passthrough)
+    {
+        if (TryGetPlatformHandle() is { } handle)
+            _mover.SetMousePassthrough(handle, passthrough);
+    }
+
+    private void MoveToParked()
+    {
+        using (_parkGuard.BeginMove())
+        {
+            RecordIssuedPosition(ParkedAt);
+            Position = ParkedAt;
+        }
+    }
+
+    private void EnforceParked(string reason)
+    {
+        if (!IsVisible)
+            return;
+
+        SetInteractive(false);
+        if (!_parkGuard.ShouldRePark(Position))
+            return;
+
+        _geometryLog.Warn("parked-window-drifted", Geometry(), $"reason={reason} expected=({ParkedAt.X},{ParkedAt.Y})px");
+        MoveToParked();
+    }
+
     private void RecordIssuedPosition(PixelPoint point)
     {
         if (_issuedPositions.Count >= 8)
@@ -341,4 +400,51 @@ internal sealed class ComposerWindow : Window
     }
 
     private static PixelBounds BoundsOf(PixelRect rect) => new(rect.X, rect.Y, rect.Width, rect.Height);
+}
+
+/// <summary>
+/// Prevents a parked off-screen window from drifting back onto a display (e.g. after macOS wake or display
+/// reconfiguration) while bounding re-park attempts so OS-enforced frame constraints cannot trigger a move loop.
+/// </summary>
+internal sealed class ParkGuard(PixelPoint parkedAt, int maxRetries = 2)
+{
+    private bool _moving;
+    private int _retries;
+
+    public IDisposable BeginMove()
+    {
+        _moving = true;
+        return new Scope(this);
+    }
+
+    public bool ShouldRePark(PixelPoint current)
+    {
+        if (_moving)
+            return false;
+
+        if (Math.Abs(current.X - parkedAt.X) <= 1 && Math.Abs(current.Y - parkedAt.Y) <= 1)
+        {
+            _retries = 0;
+            return false;
+        }
+
+        if (_retries >= maxRetries)
+            return false;
+
+        _retries++;
+        return true;
+    }
+
+    public void ResetDriftRetries() => _retries = 0;
+
+    public void Reset()
+    {
+        _moving = false;
+        _retries = 0;
+    }
+
+    private sealed class Scope(ParkGuard guard) : IDisposable
+    {
+        public void Dispose() => guard._moving = false;
+    }
 }

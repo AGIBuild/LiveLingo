@@ -13,4 +13,10 @@ public interface IWindowMover
     /// Starts the drag from the mouse button that is held down right now and completes once the button is released.
     /// </summary>
     Task DragAsync(IPlatformHandle window, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Toggles native click-through on the window so a parked or not-yet-visible transparent window can never swallow
+    /// pointer events for apps underneath even if the OS pulls it back onto a display.
+    /// </summary>
+    void SetMousePassthrough(IPlatformHandle window, bool passthrough);
 }

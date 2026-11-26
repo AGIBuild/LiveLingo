@@ -1,3 +1,4 @@
+using Avalonia;
 using LiveLingo.Desktop.Composer;
 using LiveLingo.Desktop.Platform;
 
@@ -291,5 +292,33 @@ public class ComposerPlacementTests
         Assert.False(ComposerFrame.IsExternalMove((428, 708), issued));
         Assert.False(ComposerFrame.IsExternalMove((429, 519), issued));
         Assert.True(ComposerFrame.IsExternalMove((24, 33), issued));
+    }
+
+    [Fact]
+    public void ParkGuard_ReParksDriftedWindow_UpToRetryBudget_AndIgnoresOwnMove()
+    {
+        var parked = new PixelPoint(-20000, -20000);
+        var guard = new ParkGuard(parked, maxRetries: 2);
+
+        // Already parked (within 1px) does not trigger re-park.
+        Assert.False(guard.ShouldRePark(parked));
+        Assert.False(guard.ShouldRePark(new PixelPoint(-19999, -20001)));
+
+        // Re-entrant position change during our own move is ignored.
+        using (guard.BeginMove())
+            Assert.False(guard.ShouldRePark(new PixelPoint(400, 300)));
+
+        // OS pulling the parked window back onto screen triggers re-park up to the retry budget.
+        Assert.True(guard.ShouldRePark(new PixelPoint(400, 300)));
+        Assert.True(guard.ShouldRePark(new PixelPoint(400, 300)));
+        Assert.False(guard.ShouldRePark(new PixelPoint(400, 300)));
+
+        // A display change resets the budget so the guard can re-park once display geometry settles.
+        guard.ResetDriftRetries();
+        Assert.True(guard.ShouldRePark(new PixelPoint(400, 300)));
+
+        // Landing back at the parked coordinates clears retries.
+        Assert.False(guard.ShouldRePark(parked));
+        Assert.True(guard.ShouldRePark(new PixelPoint(100, 100)));
     }
 }

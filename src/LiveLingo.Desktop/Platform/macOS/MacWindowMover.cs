@@ -23,6 +23,15 @@ internal sealed class MacWindowMover : IWindowMover
     private static readonly IntPtr SharedApplicationSel = sel_registerName("sharedApplication");
     private static readonly IntPtr CurrentEventSel = sel_registerName("currentEvent");
     private static readonly IntPtr PerformWindowDragSel = sel_registerName("performWindowDragWithEvent:");
+    private static readonly IntPtr SetIgnoresMouseEventsSel = sel_registerName("setIgnoresMouseEvents:");
+
+    public void SetMousePassthrough(IPlatformHandle window, bool passthrough)
+    {
+        if (window is not IMacOSTopLevelPlatformHandle { NSWindow: not 0 } top)
+            return;
+
+        objc_msgSend_bool(top.NSWindow, SetIgnoresMouseEventsSel, passthrough);
+    }
 
     public async Task DragAsync(IPlatformHandle window, CancellationToken cancellationToken = default)
     {
