@@ -330,4 +330,88 @@ public class FidelityGateTests
             "坚持方法，这是深井。");
         Assert.Equal(GateReason.Deleted, rejected.Rejection?.Reason);
     }
+
+    [Fact]
+    public void Accepts_arabic_digits_retracted_by_spoken_self_correction_without_excusing_sole_negated_numbers()
+    {
+        var accepted = FidelityGate.Check(
+            "把下载超时设成 10 秒，不对，设成 30 秒。",
+            "把下载超时设成 30 秒。");
+        Assert.True(accepted.Accepted, accepted.Rejection?.ToString());
+
+        var contrastAccepted = FidelityGate.Check(
+            "超时设为 30 秒，不是 15 分钟，请确认好。",
+            "超时设为 30 秒，请确认好。",
+            relaxedVerbatim: true);
+        Assert.True(contrastAccepted.Accepted, contrastAccepted.Rejection?.ToString());
+
+        // When 8080 is the only number in the statement, "不是 8080" is the point of the sentence and must never be dropped.
+        var soleNegatedRejected = FidelityGate.Check("端口不是 8080。", "端口改一下。");
+        Assert.Equal(new GateRejection(GateReason.NumberLost, "8080"), soleNegatedRejected.Rejection);
+    }
+
+    [Fact]
+    public void Accepts_prefix_truncated_and_consonant_close_glossary_repairs_even_when_canonical_already_occurs_later()
+    {
+        var ageToAgent = FidelityGate.Check(
+            "把一个产品经理变成一个前端 age 的一个测试，这就是我们这个 Agent 思路。",
+            "把一个产品经理变成一个前端 Agent 和一个测试，这就是我们这个 Agent 思路。",
+            ["Agent"]);
+        Assert.True(ageToAgent.Accepted, ageToAgent.Rejection?.ToString());
+
+        var ipsecToDeepSeek = FidelityGate.Check(
+            "今天借着这个话头聊聊 ipsec 最新报告，看看 DeepSeek 是怎么拆的。",
+            "今天借着这个话头聊聊 DeepSeek 最新报告，看看 DeepSeek 是怎么拆的。",
+            ["DeepSeek"]);
+        Assert.True(ipsecToDeepSeek.Accepted, ipsecToDeepSeek.Rejection?.ToString());
+    }
+
+    [Fact]
+    public void SpokenDocument_CleansBgmLoopsStutteredNegationsAndAsrNoise_WhileGuardingCodeSymbolsAndMarkdown()
+    {
+        const string noisyRaw =
+            "噔噔噔噔噔噔噔噔。感谢晚风的小心心啊！打的还不错，的可以点点人气票呀，点人气票呀。" +
+            "是不是没有皮肤就没有手感？当然不是啊！我我他那五分儿，说实在的上半五分啊！是啊，上半五分啊！皮肤不重要。" +
+            "<thibbe Na na牛魔来，你大招呀？OK，真好，给牛没收了。来得好，来得好。" +
+            "哥，能不能给打给给龙输了？哥，能不能给龙输了？给龙输了，没有别的意外了，直接打呀。Like any power.快打！快打！";
+
+        const string polished =
+            "感谢晚风的小心心！打得还不错，可以点点人气票。" +
+            "是不是没有皮肤就没有手感？当然不是！他那五分，说实在的上半五分，皮肤不重要。" +
+            "牛魔来，你大招？OK，真好，给牛魔收了。来得好。" +
+            "哥，能不能给龙输了？没有别的意外了，直接打，快打！";
+
+        var gate = FidelityGate.Check(noisyRaw, polished, Glossary.BuiltInTerms, allowParagraphs: true, relaxedVerbatim: true, spokenDocument: true);
+        Assert.True(gate.Accepted, gate.Rejection?.ToString());
+
+        // Restoring a proper English entity ("Rockstar") from spoken Chinese ("R星") in spokenDocument mode is accepted.
+        var rockstar = FidelityGate.Check(
+            "这次 R星 往里面塞的细节真的是有史以来前所未有。",
+            "这次 Rockstar 往里面塞的细节真的是有史以来前所未有。",
+            Glossary.BuiltInTerms,
+            allowParagraphs: true,
+            relaxedVerbatim: true,
+            spokenDocument: true);
+        Assert.True(rockstar.Accepted, rockstar.Rejection?.ToString());
+
+        // Code symbols and glossary terms remain strictly protected in spokenDocument mode.
+        var droppedSymbol = FidelityGate.Check(
+            "请把 CacheService 的超时调成三十秒。",
+            "请把缓存服务的超时调成三十秒。",
+            Glossary.BuiltInTerms,
+            allowParagraphs: true,
+            relaxedVerbatim: true,
+            spokenDocument: true);
+        Assert.Equal(GateReason.TermLost, droppedSymbol.Rejection?.Reason);
+
+        // Inventing Markdown headings in natural Verbatim mode is refused.
+        var inventedHeading = FidelityGate.Check(
+            "先把接口改掉，然后补测试。",
+            "### 目标\n先把接口改掉，然后补测试。",
+            Glossary.BuiltInTerms,
+            allowParagraphs: true,
+            relaxedVerbatim: true,
+            spokenDocument: true);
+        Assert.Equal(GateReason.Added, inventedHeading.Rejection?.Reason);
+    }
 }

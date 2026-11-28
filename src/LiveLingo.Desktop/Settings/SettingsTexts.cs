@@ -28,8 +28,16 @@ public sealed class SettingsTexts(ILocalizationService loc)
         "direction", "direction.desc", "direction.zhEn", "direction.enZh",
         "output", "output.desc", "output.clean", "output.translate", "output.original",
         "autoDictate", "autoDictate.desc", "preload", "preload.desc", "builtInTerms", "builtInTerms.desc", "remember", "remember.desc",
+        "defaultPolish", "defaultPolish.desc", "smartHostPolish", "smartHostPolish.desc",
+        "presets", "presets.desc", "presets.add", "presets.builtIn", "presets.custom", "presets.defaultBadge", "presets.tunedBadge",
+        "presets.gate.verbatim", "presets.gate.factAnchor", "presets.inspect", "presets.edit", "presets.reset", "presets.delete",
+        "presets.form.add", "presets.form.starters", "presets.form.name", "presets.form.nameExample",
+        "presets.form.desc", "presets.form.descExample", "presets.form.gate", "presets.form.gate.factAnchor", "presets.form.gate.verbatim",
+        "presets.form.instructions", "presets.form.note",
+        "presets.error.nameMissing", "presets.error.nameTaken", "presets.error.descInvalid", "presets.error.instructionsInvalid",
+        "presets.delete.title", "presets.delete.body",
         "polish", "polish.desc", "polish.reset", "polish.custom", "polish.invalid", "polish.save",
-        "apps", "apps.desc", "apps.empty", "apps.forget", "apps.clear",
+        "apps", "apps.desc", "apps.empty", "apps.forget", "apps.clear", "apps.followDefault",
         "corrections", "corrections.spoken", "corrections.canonical", "corrections.spokenExample", "corrections.canonicalExample",
         "corrections.add", "corrections.remove", "corrections.hint",
         "terms", "terms.source", "terms.target", "terms.sourceExample", "terms.targetExample", "terms.add", "terms.remove", "terms.hint",
@@ -202,12 +210,36 @@ public sealed class SettingsTexts(ILocalizationService loc)
 
     public string StageDescription(ModelStage stage) => loc.T($"settings.models.stage.{StageKey(stage)}.desc");
 
-    public string? StageNotice(ModelStage stage, bool cleanupEnabled, bool cloudSpeech = false, string? speechModel = null) => stage switch
+    public string? StageNotice(
+        ModelStage stage,
+        bool cleanupEnabled,
+        bool cloudSpeech = false,
+        string? speechModel = null,
+        string? cleanerModelId = null,
+        bool cleanInCloud = false) => stage switch
     {
         ModelStage.Cleaner when !cleanupEnabled => loc.T("settings.models.notice.cleanupOff"),
+        ModelStage.Cleaner when !cleanInCloud && string.Equals(cleanerModelId, ModelCatalog.CleanerFast.Id, StringComparison.Ordinal) =>
+            loc.T("settings.models.notice.cleaner2bQuality"),
         ModelStage.Cleaner when cloudSpeech && SpeechCloudRoute.SupportsNativePolishForModel(speechModel) => loc.T("settings.models.notice.speechNativePolish"),
         _ => null
     };
+
+    public string PresetDisplayName(LiveLingo.Core.Cleanup.PolishPreset preset) =>
+        preset.BuiltIn ? loc.T($"composer.polish.{preset.Id}.name") : preset.Name;
+
+    public string PresetDescription(LiveLingo.Core.Cleanup.PolishPreset preset) =>
+        preset.BuiltIn ? loc.T($"composer.polish.{preset.Id}.desc") : preset.Description;
+
+    public string PresetToggleAria(string name) => loc.T("settings.presets.toggleAria", name);
+
+    public string PresetEditTitle(string name) => loc.T("settings.presets.form.edit", name);
+
+    public string AppModeAria(string appName) => loc.T("settings.apps.modeAria", appName);
+
+    public string StarterTemplateName(string id) => loc.T($"settings.presets.starter.{id}.name");
+
+    public string StarterTemplateDesc(string id) => loc.T($"settings.presets.starter.{id}.desc");
 
     public string? PeerStageBadge(
         ModelStage currentStage,
@@ -327,7 +359,10 @@ public sealed class SettingsTexts(ILocalizationService loc)
     public string AppName(string name) => _composer.ContextName(name);
 
     /// <summary>The remembered choice in the words of the output menu.</summary>
-    public string AppSummary(ComposerOutput output, TargetLanguage target) => _composer.OutputMenu(output, target);
+    public string AppSummary(ComposerOutput output, TargetLanguage target, LiveLingo.Core.Cleanup.PolishPreset? preset = null) =>
+        _composer.OutputMenu(output, target, preset);
+
+    public string TranslateChoiceLabel(TargetLanguage target) => _composer.OutputMenu(ComposerOutput.Translate, target);
 
     public string Date(DateTimeOffset when) => when.ToLocalTime().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 

@@ -12,7 +12,7 @@ namespace LiveLingo.Core.Dictation;
 /// sentences said together) appended in speech order. Cleanup and translation are separate schedulers that observe the same draft.
 /// Capture is never blocked by recognition: <see cref="Push"/> only queues the frame.
 /// </summary>
-public sealed class DictationSession : IDictationSession
+public sealed partial class DictationSession : IDictationSession
 {
     private const int MidSpeechCutSearchMs = 1200;
     private const int MidSpeechCutTailGuardMs = 80;
@@ -382,7 +382,9 @@ public sealed class DictationSession : IDictationSession
             var failed = false;
             try
             {
-                text = TextTidy.Apply(_secondPass!.Recognize(audio));
+                var rawDecoded = _secondPass!.Recognize(audio);
+                var hadFenceHallucination = rawDecoded.Contains("```", StringComparison.Ordinal);
+                text = TextTidy.Apply(rawDecoded);
                 var seconds = audio.Length / (double)AudioFormat.SampleRate;
                 var guardAutoregressiveLoops = _options.SecondPassMaxCharsPerSecond > 0;
                 var rateExceeded = guardAutoregressiveLoops
@@ -392,11 +394,15 @@ public sealed class DictationSession : IDictationSession
                     && !HasDegenerateRepetition(segment.LiveFinal);
                 var truncatedCollapse = guardAutoregressiveLoops
                     && IsTruncatedCollapse(segment.LiveFinal, text, seconds);
-                if (string.IsNullOrWhiteSpace(text) || rateExceeded || repetitionLoop || truncatedCollapse)
+                var promptEcho = guardAutoregressiveLoops
+                    && (hadFenceHallucination
+                        || IsPromptEchoHallucination(segment.LiveFinal, text)
+                        || HasUngroundedEnglishSentenceHallucination(segment.LiveFinal, text));
+                if (string.IsNullOrWhiteSpace(text) || rateExceeded || repetitionLoop || truncatedCollapse || promptEcho)
                 {
                     _logger?.LogDebug(
-                        "Second-pass result rejected on segment {SegmentId} (empty={Empty}, rateExceeded={RateExceeded}, repetitionLoop={RepetitionLoop}, truncatedCollapse={TruncatedCollapse}); keeping live text.",
-                        segment.Id, string.IsNullOrWhiteSpace(text), rateExceeded, repetitionLoop, truncatedCollapse);
+                        "Second-pass result rejected on segment {SegmentId} (empty={Empty}, rateExceeded={RateExceeded}, repetitionLoop={RepetitionLoop}, truncatedCollapse={TruncatedCollapse}, promptEcho={PromptEcho}); keeping live text.",
+                        segment.Id, string.IsNullOrWhiteSpace(text), rateExceeded, repetitionLoop, truncatedCollapse, promptEcho);
                     text = segment.LiveFinal;
                     failed = true;
                 }
@@ -659,19 +665,118 @@ public sealed class DictationSession : IDictationSession
 
     /// <summary>
     /// Detects when an autoregressive second-pass decoder collapsed into a repetition loop mid-utterance and native
-    /// tail truncation dropped the remainder of a long segment (&gt;= 4.5 s and &gt;= 16 live speech units, leaving &lt; 25%
-    /// of the live units and &lt; 1.2 units/s).
+    /// tail truncation dropped a large share of a long segment (&gt;= 4.0 s and &gt;= 16 live speech units, leaving &lt; 55%
+    /// of the live acoustic speech units).
     /// </summary>
     internal static bool IsTruncatedCollapse(ReadOnlySpan<char> liveFinal, ReadOnlySpan<char> secondPass, double audioSeconds)
     {
-        if (audioSeconds < 4.5)
+        if (audioSeconds < 4.0)
             return false;
         var liveUnits = EstimateSpeechUnits(liveFinal);
         if (liveUnits < 16)
             return false;
         var secondPassUnits = EstimateSpeechUnits(secondPass);
-        return secondPassUnits * 4 < liveUnits && secondPassUnits < audioSeconds * 1.2;
+        return secondPassUnits * 20 < liveUnits * 11;
     }
+
+    /// <summary>
+    /// Detects when an autoregressive second-pass ASR decoder echoes a run of 3+ consecutive English glossary/prompt
+    /// terms (e.g. "Agent Skill Prompt Token..." or "Git GitHub Copilot Claude Cursor") that have no basis in the
+    /// frame-synchronous acoustic stream (<paramref name="liveFinal"/>).
+    /// </summary>
+    internal static bool IsPromptEchoHallucination(ReadOnlySpan<char> liveFinal, string secondPass)
+    {
+        if (string.IsNullOrEmpty(secondPass))
+            return false;
+
+        var liveText = liveFinal.ToString();
+        var consecutive = 0;
+        var idx = 0;
+        while (idx < secondPass.Length)
+        {
+            while (idx < secondPass.Length && !char.IsAsciiLetter(secondPass[idx]))
+            {
+                if (!char.IsWhiteSpace(secondPass[idx]) && secondPass[idx] is not (',' or '/'))
+                    consecutive = 0;
+                idx++;
+            }
+            if (idx >= secondPass.Length)
+                break;
+
+            var wordStart = idx;
+            while (idx < secondPass.Length && (char.IsAsciiLetterOrDigit(secondPass[idx]) || secondPass[idx] is '-' or '.'))
+                idx++;
+            var word = secondPass.AsSpan(wordStart, idx - wordStart);
+
+            // Handle two-word "VS Code" as a single term when present.
+            if (word.Equals("VS", StringComparison.OrdinalIgnoreCase) && idx + 5 <= secondPass.Length
+                && secondPass.AsSpan(idx, 5).Equals(" Code", StringComparison.OrdinalIgnoreCase))
+            {
+                idx += 5;
+                word = secondPass.AsSpan(wordStart, idx - wordStart);
+            }
+
+            var termStr = word.ToString();
+            var isKnownPromptTerm = LiveLingo.Core.Translation.Glossary.BuiltInTerms
+                .Any(t => string.Equals(t, termStr, StringComparison.OrdinalIgnoreCase));
+            var absentInLive = !liveText.Contains(termStr, StringComparison.OrdinalIgnoreCase);
+
+            if (isKnownPromptTerm && absentInLive)
+            {
+                if (++consecutive >= 3)
+                    return true;
+            }
+            else
+            {
+                consecutive = 0;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Detects when an autoregressive second-pass ASR decoder hallucinates a standalone 3+ word non-glossary English
+    /// sentence (such as "Like any power." or "Thank you for watching.") on noisy Chinese audio whose acoustic
+    /// first-pass stream (<paramref name="liveFinal"/>) contained zero ASCII letters.
+    /// </summary>
+    internal static bool HasUngroundedEnglishSentenceHallucination(ReadOnlySpan<char> liveFinal, string secondPass)
+    {
+        if (string.IsNullOrEmpty(secondPass) || EstimateSpeechUnits(liveFinal) < 2)
+            return false;
+
+        foreach (var c in liveFinal)
+        {
+            if (char.IsAsciiLetter(c))
+                return false;
+        }
+
+        // Only guard predominantly CJK utterances where a stray multi-word English phrase was spliced into Chinese speech.
+        var cjkCount = 0;
+        foreach (var c in secondPass)
+        {
+            if (c is >= '\u4e00' and <= '\u9fff')
+                cjkCount++;
+        }
+        if (cjkCount < 4)
+            return false;
+
+        foreach (System.Text.RegularExpressions.Match match in MultiWordEnglishPhrase().Matches(secondPass))
+        {
+            var words = match.Value.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (words.Length < 3)
+                continue;
+            var anyKnownTerm = words.Any(w => LiveLingo.Core.Translation.Glossary.BuiltInTerms
+                .Any(t => string.Equals(t, w.Trim('.'), StringComparison.OrdinalIgnoreCase)));
+            if (!anyKnownTerm)
+                return true;
+        }
+
+        return false;
+    }
+
+    [System.Text.RegularExpressions.GeneratedRegex(@"(?<![A-Za-z])[A-Za-z]{2,}(?:\s+[A-Za-z]{2,}){2,}\.?", System.Text.RegularExpressions.RegexOptions.CultureInvariant)]
+    private static partial System.Text.RegularExpressions.Regex MultiWordEnglishPhrase();
 
     internal static int EstimateSpeechUnits(ReadOnlySpan<char> text)
     {

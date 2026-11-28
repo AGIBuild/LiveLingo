@@ -73,27 +73,89 @@
       onClick=${() => LL.send('edit', { i: row.i })}><${Icon} name="edit"/></button>
   </div>`;
 
-  const Document = ({ result, options }) => {
-    const doc = result.document;
-    return html`<div class="document-body">
-      ${doc.editing
-        ? html`<${EditRow} key="document-editor" row=${{ editAria: LL.t('documentEdit') }} text=${result.editText} options=${options} document=${true}/>`
-        : html`<p id="final-text" class="document-text">${doc.text}</p>
-            <p class=${'document-notice' + (doc.needsChoice ? ' warn' : '')} role="status">${doc.notice}</p>
-            <div class="document-actions">
-              <button type="button" id="edit-full" disabled=${!doc.canEdit} onClick=${() => LL.send('editDocument')}>${LL.t('documentEdit')}</button>
-              ${(doc.needsChoice || doc.owned) && html`<button type="button" disabled=${!doc.canEdit} onClick=${() => LL.send('retryDocument')}>${LL.t('documentRetry')}</button>`}
-              ${doc.needsChoice && html`${doc.canAcceptPreview && html`<button type="button" onClick=${() => LL.send('acceptPreview')}>${LL.t('documentAccept')}</button>`}
-                ${doc.canClean && html`<button type="button" id="clean-original" disabled=${!doc.canEdit} onClick=${() => LL.send('output', { value: 'clean' })}>${LL.t('documentClean')}</button>`}
-                <button type="button" disabled=${!doc.canEdit} onClick=${() => LL.send('output', { value: 'original' })}>${LL.t('documentOriginal')}</button>`}
-            </div>`}
-    </div>`;
+  // Non-destructive syntax highlighting via VNodes: every character of the plain text stays intact.
+  const renderInline = (line) => {
+    const parts = line.split(/(`[^`\n]+`)/g);
+    return parts.map((part, idx) => (part.length >= 2 && part.startsWith('`') && part.endsWith('`')
+      ? html`<code class="md-code" key=${idx}>${part}</code>`
+      : part));
   };
+
+  const renderStructuredText = (text) => {
+    if (!text) return text;
+    const lines = text.split('\n');
+    const out = [];
+    for (let i = 0; i < lines.length; i++) {
+      if (i > 0) out.push('\n');
+      const line = lines[i];
+      if (/^#{2,3}\s+/.test(line)) {
+        out.push(html`<span class="md-h" key=${'l' + i}>${line}</span>`);
+      } else if (/^-\s+\[[ xX]\]\s+/.test(line)) {
+        const prefix = line.slice(0, 6);
+        out.push(html`<span key=${'l' + i}><span class="md-cb">${prefix}</span>${renderInline(line.slice(6))}</span>`);
+      } else {
+        out.push(html`<span key=${'l' + i}>${renderInline(line)}</span>`);
+      }
+    }
+    return out;
+  };
+
+  class Document extends preact.Component {
+    stickBottom = true;
+
+    setBody = (el) => {
+      this.body = el;
+    };
+
+    onBodyScroll = () => {
+      const el = this.body;
+      if (!el) return;
+      this.stickBottom = el.scrollHeight - el.scrollTop - el.clientHeight <= 32;
+    };
+
+    componentDidUpdate() {
+      const doc = this.props.result?.document;
+      if (!doc?.streaming) {
+        this.stickBottom = true;
+        return;
+      }
+      if (this.body && this.stickBottom) {
+        this.body.scrollTop = this.body.scrollHeight;
+      }
+    }
+
+    render({ result, options }) {
+      const doc = result.document;
+      const pending = doc.state === 'pending';
+      const streaming = pending && !!doc.streaming;
+      const textClass = 'document-text' + (streaming ? ' streaming' : pending ? ' previewing' : '');
+      return html`<div class="document-body" ref=${this.setBody} onScroll=${this.onBodyScroll} aria-busy=${pending ? 'true' : undefined}>
+        ${doc.editing
+          ? html`<${EditRow} key="document-editor" row=${{ editAria: LL.t('documentEdit') }} text=${result.editText} options=${options} document=${true}/>`
+          : html`${pending && !streaming && html`<div class="doc-generating" aria-hidden="true"><div class="skel"></div><div class="skel short"></div></div>`}
+              <p id="final-text" class=${textClass}>${renderStructuredText(doc.text)}${streaming && html`<span class="stream-caret" aria-hidden="true"></span>`}</p>
+              <p class=${'document-notice' + ((doc.needsChoice || doc.hasWarning) ? ' warn' : '')} role="status">${doc.notice}</p>
+              <div class="document-actions">
+                <button type="button" id="edit-full" disabled=${!doc.canEdit || pending} onClick=${() => LL.send('editDocument')}>${LL.t('documentEdit')}</button>
+                ${(doc.needsChoice || doc.owned || doc.hasWarning) && html`<button type="button" disabled=${!doc.canEdit} onClick=${() => LL.send('retryDocument')}>${LL.t('documentRetry')}</button>`}
+                ${doc.needsChoice && html`${doc.canAcceptPreview && html`<button type="button" onClick=${() => LL.send('acceptPreview')}>${LL.t('documentAccept')}</button>`}
+                  ${doc.canClean && html`<button type="button" id="clean-original" disabled=${!doc.canEdit} onClick=${() => LL.send('output', { value: 'clean' })}>${LL.t('documentClean')}</button>`}`}
+                ${(doc.needsChoice || doc.hasWarning) && html`<button type="button" disabled=${!doc.canEdit} onClick=${() => LL.send('output', { value: 'original' })}>${LL.t('documentOriginal')}</button>`}
+              </div>`}
+      </div>`;
+    }
+  }
 
   LL.Result = ({ result, options }) => {
     if (!result.visible) return null;
+    const gateBadge = result.document?.gateBadge;
+    const gateTone = result.document?.gateTone;
+    const chipTone = gateTone === 'warn' ? 'warn' : gateTone === 'info' ? 'info' : 'ok';
     return html`<section id="res" class="pane res" aria-label=${LL.t('resultAria')}>
-      <div class="pane-label"><span id="res-label">${result.label}</span></div>
+      <div class="pane-label">
+        <span id="res-label">${result.label}</span>
+        ${gateBadge && html`<span id="gate-badge" class=${'chip mini gate-chip ' + chipTone}>${gateBadge}</span>`}
+      </div>
       ${result.document ? html`<${Document} result=${result} options=${options}/>` : html`<div id="rows" class="rows">${result.rows.map((row) => html`<article key=${row.i} class=${'unit' + (row.warn ? ' warn' : '') + (row.owned ? ' owned' : '')}>
         ${row.editing ? html`<${EditRow} row=${row} text=${result.editText} options=${options} rememberCorrection=${result.rememberCorrection}/>` : html`<${Body} row=${row}/>`}
         ${row.canEdit && !row.editing && html`<${Tools} row=${row} canUseOriginal=${row.canUseOriginal}/>`}

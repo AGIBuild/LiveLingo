@@ -438,6 +438,21 @@ public class JsonSettingsServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task EarlierCustomPolishPrompt_SeedsNaturalPresetOverrideOnLoad()
+    {
+        await File.WriteAllTextAsync(_settingsPath, """
+            { "schemaVersion": 3, "composer": { "polishPrompt": "Keep my concise colloquial voice." } }
+            """, TestContext.Current.CancellationToken);
+        var svc = new JsonSettingsService(_settingsPath);
+
+        await svc.LoadAsync(TestContext.Current.CancellationToken);
+
+        var natural = svc.Current.Composer.EffectivePolishPresets().Single(p => p.Id == "natural");
+        Assert.True(natural.IsCustomized);
+        Assert.Equal("Keep my concise colloquial voice.", natural.EffectiveInstructions);
+    }
+
+    [Fact]
     public void Constructor_NoPath_UsesDefault()
     {
         var svc = new JsonSettingsService();

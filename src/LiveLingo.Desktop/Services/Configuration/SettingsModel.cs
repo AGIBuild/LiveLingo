@@ -183,6 +183,27 @@ public partial class HotkeySettings : ObservableObject
     public HotkeySettings DeepClone() => new() { Summon = Summon };
 }
 
+/// <summary>One built-in override or user-created custom polish preset stored in <c>settings.json</c>.</summary>
+public sealed class PolishPresetEntry
+{
+    public string Id { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string Description { get; set; } = "";
+    public string Gate { get; set; } = nameof(LiveLingo.Core.Cleanup.PolishGateKind.FactAnchor);
+    public bool Enabled { get; set; } = true;
+    public string Instructions { get; set; } = "";
+
+    public PolishPresetEntry DeepClone() => new()
+    {
+        Id = Id,
+        Name = Name,
+        Description = Description,
+        Gate = Gate,
+        Enabled = Enabled,
+        Instructions = Instructions
+    };
+}
+
 public partial class ComposerSettings : ObservableObject
 {
     /// <summary>Selected speech second-pass model ID (<see cref="LiveLingo.Core.Models.ModelCatalog.SpeechModels"/>), or empty to use hardware Best Match.</summary>
@@ -241,10 +262,84 @@ public partial class ComposerSettings : ObservableObject
     [ObservableProperty] private bool _rememberChoices = true;
 
     /// <summary>
-    /// The user's polish requirements (see <c>PolishStyle</c>); empty means the built-in ones. A text that is not usable
-    /// (damaged file, too long) is treated as empty wherever it is used.
+    /// The user's polish requirements (see <c>PolishStyle</c>); empty means the built-in ones. Kept for seamless
+    /// legacy migration and single-prompt compatibility alongside <see cref="PolishPresets"/>.
     /// </summary>
     [ObservableProperty] private string _polishPrompt = "";
+
+    /// <summary>Default scenario polish mode ID (<see cref="LiveLingo.Core.Cleanup.PolishPresets"/>) when no app choice applies.</summary>
+    [ObservableProperty] private string _defaultPolishMode = LiveLingo.Core.Cleanup.PolishPresets.NaturalId;
+
+    /// <summary>Whether known target host apps (IDEs/terminals, issue trackers, docs, mail) start on their matching polish preset.</summary>
+    [ObservableProperty] private bool _smartHostPolish = true;
+
+    /// <summary>Built-in preset overrides (visibility or tuned instructions) and user-created custom polish presets.</summary>
+    [ObservableProperty] private List<PolishPresetEntry> _polishPresets = [];
+
+    public IReadOnlyList<LiveLingo.Core.Cleanup.PolishPreset> EffectivePolishPresets()
+    {
+        var defaultId = string.IsNullOrWhiteSpace(DefaultPolishMode)
+            ? LiveLingo.Core.Cleanup.PolishPresets.NaturalId
+            : DefaultPolishMode;
+        var result = new List<LiveLingo.Core.Cleanup.PolishPreset>();
+
+        foreach (var builtIn in LiveLingo.Core.Cleanup.PolishPresets.BuiltIns)
+        {
+            var entry = PolishPresets.FirstOrDefault(e => string.Equals(e.Id, builtIn.Id, StringComparison.Ordinal));
+            var customText = entry?.Instructions ?? "";
+            if (customText.Length == 0 && builtIn.Id == LiveLingo.Core.Cleanup.PolishPresets.NaturalId
+                && LiveLingo.Core.Cleanup.PolishStyle.IsUsable(PolishPrompt)
+                && LiveLingo.Core.Cleanup.PolishStyle.ToStored(PolishPrompt) is { Length: > 0 } legacyPrompt)
+            {
+                customText = legacyPrompt;
+            }
+            var enabled = (entry?.Enabled ?? true) || string.Equals(builtIn.Id, defaultId, StringComparison.Ordinal);
+            result.Add(builtIn with { Enabled = enabled, CustomInstructions = customText });
+        }
+
+        foreach (var entry in PolishPresets)
+        {
+            if (string.IsNullOrWhiteSpace(entry.Id) || LiveLingo.Core.Cleanup.PolishPresets.IsBuiltInId(entry.Id))
+                continue;
+            if (!LiveLingo.Core.Cleanup.PolishPresets.IsValidName(entry.Name)
+                || !LiveLingo.Core.Cleanup.PolishStyle.IsUsable(entry.Instructions))
+                continue;
+
+            var gate = Enum.TryParse<LiveLingo.Core.Cleanup.PolishGateKind>(entry.Gate, ignoreCase: true, out var parsed)
+                ? parsed
+                : LiveLingo.Core.Cleanup.PolishGateKind.FactAnchor;
+            var route = gate == LiveLingo.Core.Cleanup.PolishGateKind.FactAnchor
+                ? LiveLingo.Core.Cleanup.PolishRouteKind.Holistic
+                : LiveLingo.Core.Cleanup.PolishRouteKind.Piecewise;
+            var enabled = entry.Enabled || string.Equals(entry.Id, defaultId, StringComparison.Ordinal);
+            result.Add(new LiveLingo.Core.Cleanup.PolishPreset(
+                entry.Id,
+                entry.Name.Trim(),
+                LiveLingo.Core.Cleanup.PolishPresets.IsValidDescription(entry.Description) ? entry.Description.Trim() : "",
+                gate,
+                route,
+                BuiltIn: false,
+                Enabled: enabled,
+                DefaultInstructions: entry.Instructions,
+                CustomInstructions: entry.Instructions));
+        }
+
+        if (!result.Any(p => string.Equals(p.Id, defaultId, StringComparison.Ordinal) && p.Enabled))
+        {
+            var idx = result.FindIndex(p => p.Id == LiveLingo.Core.Cleanup.PolishPresets.NaturalId);
+            if (idx >= 0)
+                result[idx] = result[idx] with { Enabled = true };
+        }
+
+        return result;
+    }
+
+    public string ResolvedDefaultPolishMode()
+    {
+        var all = EffectivePolishPresets();
+        return all.FirstOrDefault(p => string.Equals(p.Id, DefaultPolishMode, StringComparison.Ordinal) && p.Enabled)?.Id
+            ?? LiveLingo.Core.Cleanup.PolishPresets.NaturalId;
+    }
 
     public LiveLingo.Core.Translation.Glossary EffectiveGlossary() =>
         LiveLingo.Core.Translation.Glossary.Parse(Glossary, BuiltInGlossary);
@@ -291,12 +386,28 @@ public partial class ComposerSettings : ObservableObject
 
     /// <summary>
     /// Converts the earlier single <c>translatorTier</c> field into explicit stage model IDs matching what that version ran,
-    /// so upgrading never triggers an unconsented multi-gigabyte model swap.
+    /// and migrates a custom single <c>polishPrompt</c> onto the built-in <c>natural</c> preset override.
     /// </summary>
     public bool MigrateLegacy()
     {
+        var changed = false;
+
+        if (!string.IsNullOrWhiteSpace(PolishPrompt)
+            && LiveLingo.Core.Cleanup.PolishStyle.ToStored(PolishPrompt) is { Length: > 0 } customNatural
+            && !PolishPresets.Any(e => e.Id == LiveLingo.Core.Cleanup.PolishPresets.NaturalId))
+        {
+            PolishPresets.Add(new PolishPresetEntry
+            {
+                Id = LiveLingo.Core.Cleanup.PolishPresets.NaturalId,
+                Enabled = true,
+                Gate = nameof(LiveLingo.Core.Cleanup.PolishGateKind.Verbatim),
+                Instructions = customNatural
+            });
+            changed = true;
+        }
+
         if (LegacyTranslatorTier is null)
-            return false;
+            return changed;
 
         if (string.IsNullOrWhiteSpace(SpeechModel))
             SpeechModel = LiveLingo.Core.Models.ModelCatalog.SpeechSecondPass.Id;
@@ -325,6 +436,9 @@ public partial class ComposerSettings : ObservableObject
         PreloadSpeech = PreloadSpeech,
         RememberChoices = RememberChoices,
         PolishPrompt = PolishPrompt,
+        DefaultPolishMode = DefaultPolishMode,
+        SmartHostPolish = SmartHostPolish,
+        PolishPresets = [.. PolishPresets.Select(entry => entry.DeepClone())],
         SpeechModel = SpeechModel,
         CleanerModel = CleanerModel,
         TranslatorModel = TranslatorModel,

@@ -134,6 +134,24 @@ internal sealed class ScriptedCleaner : ITextCleaner
     }
 }
 
+internal sealed class ScriptedPolisher : IDictationPolisher
+{
+    public Func<PolishRequest, CancellationToken, Task<string>> Handler { get; set; } =
+        (request, _) => Task.FromResult(request.Gate == PolishGateKind.FactAnchor ? "- [ ] " + request.Target : request.Target);
+
+    public List<PolishRequest> Requests { get; } = [];
+
+    public Task<string> PolishAsync(PolishRequest request, CancellationToken ct)
+    {
+        lock (Requests)
+            Requests.Add(request);
+        return Handler(request, ct);
+    }
+
+    public Task<string> SummarizeAsync(string document, CancellationToken ct) =>
+        Task.FromResult(document.Length > 60 ? document[..60] : document);
+}
+
 /// <summary>A voice input that lets a test "speak" by appending recognized sentences to the draft.</summary>
 internal sealed class FakeVoiceInput : IVoiceInput
 {
@@ -203,10 +221,12 @@ internal sealed class Harness : IAsyncDisposable
     public DraftSession Session { get; }
     public ScriptedTranslator Translator { get; } = new();
     public ScriptedCleaner Cleaner { get; } = new();
+    public ScriptedPolisher Polisher { get; } = new();
     public FakeVoiceInput Voice { get; } = new();
     public ScriptedTranscriber Transcriber { get; } = new();
     public TranslationScheduler Scheduler { get; }
     public CleanupScheduler Cleanup { get; }
+    public PolishScheduler? Polish { get; }
     public IModelManager Models { get; } = Substitute.For<IModelManager>();
     public IModelDownloadCoordinator Downloads { get; } = Substitute.For<IModelDownloadCoordinator>();
     public IPlatformServices Platform { get; } = Substitute.For<IPlatformServices>();
@@ -232,8 +252,11 @@ internal sealed class Harness : IAsyncDisposable
     {
         Session = new DraftSession(hasTarget, notifyOn);
         Session.Mutate(d => d.DocumentMode = documentMode);
+        var effectiveOptions = options ?? ComposerOptions.Default;
         Scheduler = new TranslationScheduler(Session, Translator, TargetLanguage.English, TimeSpan.FromHours(1));
         Cleanup = new CleanupScheduler(Session, Cleaner, [], contextChars: 300);
+        if (documentMode && effectiveOptions.Cleanup)
+            Polish = new PolishScheduler(Session, Polisher, [], effectiveOptions.EffectivePresets, contextChars: 300);
         Models.HasAllExpectedLocalAssets(Arg.Any<ModelDescriptor>()).Returns(modelsInstalled);
         Downloads.GetState(Arg.Any<string>()).Returns(call => new ModelDownloadState(call.Arg<string>(), ModelDownloadStatus.Idle, 0, null));
         Platform.TextInjector.Returns(Injector);
@@ -246,7 +269,7 @@ internal sealed class Harness : IAsyncDisposable
             [Runtime, CleanerModel], [Runtime, TranslatorModel], ModelCatalog.Speech, ModelCatalog.Transcription);
         Vm = new ComposerViewModel(
             Session, Scheduler, plan, Models, Downloads, Platform, Voice, Transcriber, [],
-            options ?? ComposerOptions.Default, hasTarget ? Target : null, notifyOn, Time);
+            effectiveOptions, hasTarget ? Target : null, notifyOn, Time);
         if (output is { } start)
             Vm.Output = start;
         Vm.Completed += () => Events.Add("completed");
@@ -256,6 +279,8 @@ internal sealed class Harness : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         await Vm.DisposeAsync();
+        if (Polish is not null)
+            await Polish.DisposeAsync();
         await Cleanup.DisposeAsync();
         await Scheduler.DisposeAsync();
     }

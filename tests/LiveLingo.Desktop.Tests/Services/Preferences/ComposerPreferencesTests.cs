@@ -289,4 +289,55 @@ public class ComposerPreferencesTests
         Assert.Equal("a.b", Assert.Single(sut.Apps).AppId);
         Assert.Equal(ExportFormat.Markdown, sut.LastExportFormat);
     }
+
+    // ---- scenario polish modes & smart host defaults ----------------------------------
+
+    [Theory]
+    [InlineData("Cursor", "com.todesktop.cursor", "ai-task")]
+    [InlineData("Code", "com.microsoft.VSCode", "ai-task")]
+    [InlineData("Warp", "dev.warp.Warp-Stable", "ai-task")]
+    [InlineData("Linear", "com.linear", "todo")]
+    [InlineData("Notion", "notion.id", "report")]
+    [InlineData("Mail", "com.apple.mail", "formal")]
+    public void SmartHostPolish_StartsKnownAppsWithTheirMatchingMode_WhenUnremembered(string name, string appId, string expectedMode)
+    {
+        var rig = new Rig();
+        var target = new TargetWindowInfo(10, 0, name, "", 0, 0, 800, 600, appId);
+
+        var start = rig.Sut.Resolve(target, AllOutputs);
+
+        Assert.Equal(ComposerOutput.Clean, start.Output);
+        Assert.Equal(expectedMode, start.PolishMode);
+        Assert.Equal("natural", start.DefaultPolishMode);
+        Assert.False(start.Remember!.Applied);
+    }
+
+    [Fact]
+    public void SmartHostPolish_Disabled_UsesDefaultPolishMode()
+    {
+        var rig = new Rig();
+        rig.Settings.Composer.SmartHostPolish = false;
+        rig.Settings.Composer.DefaultPolishMode = "formal";
+
+        var start = rig.Sut.Resolve(Cursor, AllOutputs);
+
+        Assert.Equal("formal", start.PolishMode);
+    }
+
+    [Fact]
+    public void RememberedPolishMode_OverridesSmartHostDefault_AndCanBeEditedOrForgotten()
+    {
+        var rig = new Rig();
+        rig.Sut.Remember(Cursor, ComposerOutput.Clean, TargetLanguage.English, "todo");
+
+        var remembered = rig.Sut.Resolve(Cursor, AllOutputs);
+        Assert.Equal("todo", remembered.PolishMode);
+        Assert.True(remembered.Remember!.Applied);
+
+        rig.Sut.SetAppChoice(Cursor.AppId, "Cursor", ComposerOutput.Clean, TargetLanguage.English, "report");
+        Assert.Equal("report", rig.Sut.Resolve(Cursor, AllOutputs).PolishMode);
+
+        rig.Sut.ForgetPolishMode("report");
+        Assert.Equal("natural", rig.Sut.Resolve(Cursor, AllOutputs).PolishMode);
+    }
 }

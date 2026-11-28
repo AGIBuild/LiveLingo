@@ -72,6 +72,18 @@ public sealed class WebIntentTests
     [InlineData("""{"v":1,"name":"cancelModelDownload","modelId":"qwen3.5-4b-q4km"}""", typeof(CancelModelDownloadIntent))]
     [InlineData("""{"v":1,"name":"deleteModel","modelId":"x-asr-offline-int8"}""", typeof(DeleteModelIntent))]
     [InlineData("""{"v":1,"name":"applyRecommendedModels"}""", typeof(ApplyRecommendedModelsIntent))]
+    [InlineData("""{"v":1,"name":"polishMode","id":"ai-task"}""", typeof(PolishModeIntent))]
+    [InlineData("""{"v":1,"name":"openPresetForm","id":null}""", typeof(OpenPresetFormIntent))]
+    [InlineData("""{"v":1,"name":"openPresetForm","id":"ai-task"}""", typeof(OpenPresetFormIntent))]
+    [InlineData("""{"v":1,"name":"closePresetForm"}""", typeof(ClosePresetFormIntent))]
+    [InlineData("""{"v":1,"name":"savePreset","label":"Bug 单","description":"复现","gate":"FactAnchor","instructions":"提炼复现步骤、预期行为与实际报错。"}""", typeof(SavePresetIntent))]
+    [InlineData("""{"v":1,"name":"resetPreset","id":"natural"}""", typeof(ResetPresetIntent))]
+    [InlineData("""{"v":1,"name":"togglePreset","id":"formal","enabled":false}""", typeof(TogglePresetIntent))]
+    [InlineData("""{"v":1,"name":"deletePreset","id":"custom-123"}""", typeof(DeletePresetIntent))]
+    [InlineData("""{"v":1,"name":"presetAnswer","allow":true}""", typeof(PresetAnswerIntent))]
+    [InlineData("""{"v":1,"name":"setAppChoice","appId":"com.linear","appName":"Linear","choice":"clean:todo"}""", typeof(SetAppChoiceIntent))]
+    [InlineData("""{"v":1,"name":"setting","key":"defaultPolishMode","value":"ai-task"}""", typeof(SettingIntent))]
+    [InlineData("""{"v":1,"name":"setting","key":"smartHostPolish","value":"true"}""", typeof(SettingIntent))]
     public void Parse_AcceptsEveryIntentOfTheClosedSet(string json, Type expected)
     {
         var intent = WebIntent.Parse(json, out var reason);
@@ -128,6 +140,8 @@ public sealed class WebIntentTests
     [InlineData("""{"v":1,"name":"setting","key":"commitKey","value":"enter"}""", "invalid")]
     [InlineData("""{"v":1,"name":"setting","key":"reduceMotion","value":"yes"}""", "invalid")]
     [InlineData("""{"v":1,"name":"setting","key":"cleanup","value":"yes"}""", "invalid")]
+    [InlineData("""{"v":1,"name":"polishMode","id":"../bad"}""", "invalid")]
+    [InlineData("""{"v":1,"name":"savePreset","label":"x","description":"y","gate":"None","instructions":"1234567890"}""", "invalid")]
     [InlineData("""{"v":1,"name":"setting","key":"tier","value":"Fast"}""", "invalid")]
     [InlineData("""{"v":1,"name":"selectModel","modelId":"silero-vad"}""", "invalid")]
     [InlineData("""{"v":1,"name":"downloadModel","modelId":"../etc/passwd"}""", "invalid")]

@@ -137,4 +137,23 @@ public class RoutedChatClientTests
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) =>
             Task.FromResult(new HttpResponseMessage(HttpStatusCode.Unauthorized));
     }
+
+    [Fact]
+    public async Task WarmPromptAsync_WarmsLocalOnly_AndSkipsWhenCloudRouteIsActive()
+    {
+        var (localClient, local, handler, routes) = Create(route: null);
+        await localClient.WarmPromptAsync("system", Extra, CancellationToken.None);
+        await local.Received(1).WarmPromptAsync("system", Extra, CancellationToken.None);
+        Assert.Empty(handler.Requests);
+
+        routes.GetAsync(InferenceRole.Translator, Arg.Any<CancellationToken>())
+            .Returns(CloudRoute.Create("https://api.example.com/v1", "m", "k"));
+        await localClient.WarmPromptAsync("system-2", Extra, CancellationToken.None);
+        await local.Received(1).WarmPromptAsync(
+            Arg.Any<string>(),
+            Arg.Any<IReadOnlyDictionary<string, object>>(),
+            Arg.Any<CancellationToken>(),
+            Arg.Any<string>());
+        Assert.Empty(handler.Requests);
+    }
 }

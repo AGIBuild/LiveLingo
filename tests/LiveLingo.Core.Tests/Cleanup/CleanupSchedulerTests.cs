@@ -433,6 +433,28 @@ public class CleanupSchedulerTests
     }
 
     [Fact]
+    public async Task DocumentMode_SkipsLivePassageCleanupWhileRecording_AndCancelsInFlightWorkWhenEntered()
+    {
+        await using var h = new Harness();
+        h.Session.Mutate(d =>
+        {
+            d.DocumentMode = true;
+            d.Recording = true;
+        });
+        h.Speak("新的政策又下来了。", "十八号下了班就放假了吗？十九号休到三号，对吧？");
+        await Task.Delay(50);
+        Assert.Empty(h.Cleaner.Calls);
+
+        // When DocumentMode is false (e.g. imported timeline), unit cleanup runs; entering DocumentMode cancels it at once.
+        h.Session.Mutate(d => d.DocumentMode = false);
+        var call = await h.NextCall(1);
+        h.Session.Mutate(d => d.DocumentMode = true);
+
+        await WaitUntil(() => call.Token.IsCancellationRequested);
+        Assert.Single(h.Cleaner.Calls);
+    }
+
+    [Fact]
     public async Task Dispose_CancelsTheRequestInFlight_AndStopsTheTimer()
     {
         var h = new Harness();

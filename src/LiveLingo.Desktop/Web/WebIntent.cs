@@ -21,6 +21,7 @@ namespace LiveLingo.Desktop.Web;
 [JsonDerivedType(typeof(SourceIntent), "source")]
 [JsonDerivedType(typeof(MicToggleIntent), "micToggle")]
 [JsonDerivedType(typeof(OutputIntent), "output")]
+[JsonDerivedType(typeof(PolishModeIntent), "polishMode")]
 [JsonDerivedType(typeof(SwapLanguageIntent), "swapLanguage")]
 [JsonDerivedType(typeof(RestoreDefaultsIntent), "restoreDefaults")]
 [JsonDerivedType(typeof(CommitIntent), "commit")]
@@ -72,6 +73,14 @@ namespace LiveLingo.Desktop.Web;
 [JsonDerivedType(typeof(OpenDownloadsIntent), "openDownloads")]
 [JsonDerivedType(typeof(ForgetAppIntent), "forgetApp")]
 [JsonDerivedType(typeof(ClearAppsIntent), "clearApps")]
+[JsonDerivedType(typeof(SetAppChoiceIntent), "setAppChoice")]
+[JsonDerivedType(typeof(OpenPresetFormIntent), "openPresetForm")]
+[JsonDerivedType(typeof(ClosePresetFormIntent), "closePresetForm")]
+[JsonDerivedType(typeof(SavePresetIntent), "savePreset")]
+[JsonDerivedType(typeof(ResetPresetIntent), "resetPreset")]
+[JsonDerivedType(typeof(TogglePresetIntent), "togglePreset")]
+[JsonDerivedType(typeof(DeletePresetIntent), "deletePreset")]
+[JsonDerivedType(typeof(PresetAnswerIntent), "presetAnswer")]
 internal abstract record WebIntent
 {
     public const int Version = 1;
@@ -95,6 +104,9 @@ internal abstract record WebIntent
     protected static bool IsModelsTab(string value) => ModelsTabs.Contains(value);
 
     protected static bool IsEndpointId(string value) => value.Length is >= 1 and <= 64;
+
+    protected static bool IsPresetId(string value) =>
+        value.Length is >= 1 and <= 64 && value.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_');
 
     protected static bool IsSelectableModelId(string value) => ModelCatalog.FindSelectable(value) is not null;
 
@@ -201,6 +213,11 @@ internal sealed record MicToggleIntent : WebIntent;
 
 internal sealed record OutputIntent(ComposerOutput Value) : WebIntent;
 
+internal sealed record PolishModeIntent(string Id) : WebIntent
+{
+    protected override bool IsValid => IsPresetId(Id);
+}
+
 internal sealed record SwapLanguageIntent : WebIntent;
 
 /// <summary>"Restore defaults" of the remembered-choice note: back to the settings' output and direction, and forget the memory.</summary>
@@ -287,6 +304,8 @@ internal sealed record SettingIntent(string Key, string Value) : WebIntent
         public const string PreloadSpeech = "preloadSpeech";
         public const string BuiltInGlossary = "builtInGlossary";
         public const string RememberChoices = "rememberChoices";
+        public const string DefaultPolishMode = "defaultPolishMode";
+        public const string SmartHostPolish = "smartHostPolish";
         public const string PolishPrompt = "polishPrompt";
     }
 
@@ -297,12 +316,14 @@ internal sealed record SettingIntent(string Key, string Value) : WebIntent
         Names.Microphone => Value.Length <= 256,
         // Bounded only; whether the text is a usable set of requirements is the view model's call (it flags it).
         Names.PolishPrompt => Value.Length <= 4_000,
+        Names.DefaultPolishMode => IsPresetId(Value),
         Names.CommitKey => SettingsViewModel.CommitKeys.Contains(Value),
         Names.Language => SettingsViewModel.Languages.Contains(Value),
         Names.Theme => SettingsViewModel.Themes.Contains(Value),
         Names.Direction => SettingsViewModel.Targets.Contains(Value),
         Names.DefaultOutput => SettingsViewModel.DefaultOutputs.Contains(Value),
-        Names.ReduceMotion or Names.Cleanup or Names.AutoDictate or Names.PreloadSpeech or Names.BuiltInGlossary or Names.RememberChoices => Value is "true" or "false",
+        Names.ReduceMotion or Names.Cleanup or Names.AutoDictate or Names.PreloadSpeech or Names.BuiltInGlossary
+            or Names.RememberChoices or Names.SmartHostPolish => Value is "true" or "false",
         _ => false
     };
 }
@@ -405,3 +426,40 @@ internal sealed record ForgetAppIntent(string AppId) : WebIntent
 }
 
 internal sealed record ClearAppsIntent : WebIntent;
+
+internal sealed record SetAppChoiceIntent(string AppId, string AppName, string Choice) : WebIntent
+{
+    protected override bool IsValid => AppId.Length is >= 1 and <= 512 && AppName.Length <= 128 && Choice.Length is >= 1 and <= 80;
+}
+
+internal sealed record OpenPresetFormIntent(string? Id) : WebIntent
+{
+    protected override bool IsValid => Id is null || IsPresetId(Id);
+}
+
+internal sealed record ClosePresetFormIntent : WebIntent;
+
+internal sealed record SavePresetIntent(string Label, string Description, string Gate, string Instructions) : WebIntent
+{
+    protected override bool IsValid =>
+        Label.Length <= 80 && Description.Length <= 120
+        && Gate is "FactAnchor" or "Verbatim"
+        && Instructions.Length <= 4_000;
+}
+
+internal sealed record ResetPresetIntent(string Id) : WebIntent
+{
+    protected override bool IsValid => IsPresetId(Id);
+}
+
+internal sealed record TogglePresetIntent(string Id, bool Enabled) : WebIntent
+{
+    protected override bool IsValid => IsPresetId(Id);
+}
+
+internal sealed record DeletePresetIntent(string Id) : WebIntent
+{
+    protected override bool IsValid => IsPresetId(Id);
+}
+
+internal sealed record PresetAnswerIntent(bool Allow) : WebIntent;

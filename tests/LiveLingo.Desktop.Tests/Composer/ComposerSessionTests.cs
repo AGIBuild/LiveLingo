@@ -191,11 +191,12 @@ public class ComposerSessionTests
     public async Task TheWideAndWholeSwitches_ChangeTheLayoutAndTheRoute()
     {
         await using var h = await Translated("先检查缓存。");
-        Assert.False(h.Vm.IsWide);
+        Assert.True(h.Vm.ForceWide);
+        Assert.True(h.Vm.IsWide);
         Assert.False(h.Vm.IsWholeRoute);
 
-        h.Vm.ForceWide = true;
-        Assert.True(h.Vm.IsWide);
+        h.Vm.ForceWide = false;
+        Assert.False(h.Vm.IsWide);
 
         h.Vm.ForceWhole = true;
         Assert.True(h.Vm.IsWholeRoute);

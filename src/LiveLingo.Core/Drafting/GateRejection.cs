@@ -16,7 +16,13 @@ public enum GateReason
     Deleted,
 
     /// <summary>The model's answer was cut off (it ran past its output limit), so it cannot be trusted as a whole.</summary>
-    Incomplete
+    Incomplete,
+
+    /// <summary>The model answered or executed the spoken request instead of polishing it into an instruction.</summary>
+    ExecutionHijack,
+
+    /// <summary>The model injected unrequested generic persona/roleplay boilerplate into an AI instruction.</summary>
+    RoleplaySlop
 }
 
 /// <summary>

@@ -7,7 +7,16 @@ using LiveLingo.Desktop.Services.Update;
 namespace LiveLingo.Desktop.Web;
 
 /// <summary>One application the composer remembers a choice for; the summary reads like the output menu ("Translate to English").</summary>
-internal sealed record AppPreferenceState(string Id, string Name, string Summary, string Used);
+internal sealed record AppChoiceOptionState(string Value, string Label);
+
+internal sealed record AppPreferenceState(
+    string Id,
+    string RawName,
+    string Name,
+    string Summary,
+    string Choice,
+    string ModeAria,
+    string Used);
 
 /// <param name="Theme">One of <see cref="SettingsViewModel.Themes"/>.</param>
 internal sealed record GeneralSettingsState(
@@ -18,11 +27,48 @@ internal sealed record GeneralSettingsState(
     string Theme,
     bool ReduceMotion,
     bool RememberChoices,
-    IReadOnlyList<AppPreferenceState> Apps);
+    IReadOnlyList<AppPreferenceState> Apps,
+    IReadOnlyList<AppChoiceOptionState> AppChoices);
 
 internal sealed record TermState(int I, string Source, string Target);
 
 internal sealed record CorrectionState(int I, string Spoken, string Canonical);
+
+internal sealed record PolishPresetItemState(
+    string Id,
+    string Name,
+    string Description,
+    string Gate,
+    string GateBadge,
+    bool BuiltIn,
+    bool Enabled,
+    bool IsDefault,
+    bool Customized,
+    bool CanToggle,
+    string ToggleAria,
+    string DefaultInstructions,
+    string EffectiveInstructions);
+
+internal sealed record StarterTemplateState(
+    string Id,
+    string Name,
+    string Description,
+    string Gate,
+    string Instructions);
+
+internal sealed record PresetFormModalState(
+    string? Id,
+    string Title,
+    bool BuiltIn,
+    string Name,
+    string Description,
+    string Gate,
+    string Instructions,
+    string? Error);
+
+internal sealed record DeletePresetModalState(
+    string Id,
+    string Name);
 
 /// <param name="Microphones">Device names; the first, empty one is the system default.</param>
 /// <param name="DefaultOutput">One of <see cref="SettingsViewModel.DefaultOutputs"/>.</param>
@@ -32,7 +78,12 @@ internal sealed record CorrectionState(int I, string Spoken, string Canonical);
 internal sealed record VoiceSettingsState(
     IReadOnlyList<string> Microphones, string Microphone, string Direction, bool Cleanup, string DefaultOutput, bool AutoDictate,
     bool PreloadSpeech, bool BuiltInGlossary, IReadOnlyList<TermState> Terms, IReadOnlyList<CorrectionState> Corrections,
-    string PolishPrompt, bool PolishPromptIsDefault, bool PolishPromptInvalid);
+    string PolishPrompt, bool PolishPromptIsDefault, bool PolishPromptInvalid,
+    string DefaultPolishMode, bool SmartHostPolish,
+    IReadOnlyList<PolishPresetItemState> Presets,
+    IReadOnlyList<StarterTemplateState> StarterTemplates,
+    PresetFormModalState? PresetForm,
+    DeletePresetModalState? DeletePreset);
 
 internal sealed record ConsentModalState(
     CloudStep Step,
@@ -206,6 +257,60 @@ internal sealed record SettingsViewState(
         string modelsTab = "speech")
     {
         var theme = SettingsViewModel.Themes[vm.ThemeIndex];
+        var presets = vm.Presets;
+        var enabledPresets = presets.Where(p => p.Enabled).ToArray();
+        var appChoices = BuildAppChoices(enabledPresets, texts);
+        var presetItems = presets.Select(p =>
+        {
+            var name = texts.PresetDisplayName(p);
+            var isDefault = string.Equals(p.Id, vm.DefaultPolishMode, StringComparison.Ordinal);
+            var gateBadge = p.Gate == LiveLingo.Core.Cleanup.PolishGateKind.FactAnchor
+                ? texts.Label("presets.gate.factAnchor")
+                : texts.Label("presets.gate.verbatim");
+            return new PolishPresetItemState(
+                p.Id,
+                name,
+                texts.PresetDescription(p),
+                p.Gate.ToString(),
+                gateBadge,
+                p.BuiltIn,
+                p.Enabled,
+                isDefault,
+                p.IsCustomized,
+                CanToggle: !isDefault,
+                texts.PresetToggleAria(name),
+                p.DefaultInstructions,
+                p.EffectiveInstructions);
+        }).ToArray();
+
+        PresetFormModalState? presetForm = null;
+        if (vm.ActivePresetForm is { } form)
+        {
+            var editing = form.Id is null ? null : presets.FirstOrDefault(p => p.Id == form.Id);
+            var editingName = editing is null ? "" : texts.PresetDisplayName(editing);
+            var errorKey = form.Error switch
+            {
+                PresetFormError.NameMissing => "nameMissing",
+                PresetFormError.NameTaken => "nameTaken",
+                PresetFormError.DescriptionInvalid => "descInvalid",
+                PresetFormError.InstructionsInvalid => "instructionsInvalid",
+                _ => null
+            };
+            presetForm = new PresetFormModalState(
+                form.Id,
+                editing is null ? texts.Label("presets.form.add") : texts.PresetEditTitle(editingName),
+                editing?.BuiltIn == true,
+                editing is null ? "" : editingName,
+                editing is null ? "" : texts.PresetDescription(editing),
+                editing?.Gate.ToString() ?? nameof(LiveLingo.Core.Cleanup.PolishGateKind.FactAnchor),
+                editing?.EffectiveInstructions ?? "",
+                errorKey);
+        }
+
+        DeletePresetModalState? deletePreset = vm.PendingDeletePreset is { } deletingPreset
+            ? new DeletePresetModalState(deletingPreset.Id, deletingPreset.Name)
+            : null;
+
         return new SettingsViewState(
             Rev: 0,
             section,
@@ -217,7 +322,26 @@ internal sealed record SettingsViewState(
                 theme,
                 vm.ReduceMotion,
                 vm.RememberChoices,
-                [.. vm.Apps.Select(a => new AppPreferenceState(a.AppId, texts.AppName(a.Name), texts.AppSummary(a.Output, a.Target), texts.Date(a.UsedAt)))]),
+                [.. vm.Apps.Select(a =>
+                {
+                    var displayName = texts.AppName(a.Name);
+                    var resolvedMode = string.IsNullOrWhiteSpace(a.PolishMode) || !enabledPresets.Any(p => p.Id == a.PolishMode)
+                        ? vm.DefaultPolishMode
+                        : a.PolishMode;
+                    var preset = presets.FirstOrDefault(p => p.Id == resolvedMode);
+                    var choice = a.Output == LiveLingo.Desktop.Composer.ComposerOutput.Translate
+                        ? "translate:" + a.Target
+                        : "clean:" + resolvedMode;
+                    return new AppPreferenceState(
+                        a.AppId,
+                        a.Name,
+                        displayName,
+                        texts.AppSummary(a.Output, a.Target, preset),
+                        choice,
+                        texts.AppModeAria(displayName),
+                        texts.Date(a.UsedAt));
+                })],
+                appChoices),
             new VoiceSettingsState(
                 vm.MicrophoneNames,
                 vm.MicrophoneNames[vm.MicrophoneIndex],
@@ -231,10 +355,34 @@ internal sealed record SettingsViewState(
                 [.. vm.Corrections.Select((corr, i) => new CorrectionState(i, corr.Spoken, corr.Canonical))],
                 vm.PolishPromptShown,
                 vm.PolishPromptIsDefault,
-                vm.PolishPromptInvalid),
+                vm.PolishPromptInvalid,
+                vm.DefaultPolishMode,
+                vm.SmartHostPolish,
+                presetItems,
+                [.. LiveLingo.Core.Cleanup.PolishPresets.StarterTemplates.Select(t => new StarterTemplateState(
+                    t.Id,
+                    texts.StarterTemplateName(t.Id),
+                    texts.StarterTemplateDesc(t.Id),
+                    t.Gate.ToString(),
+                    t.Instructions))],
+                presetForm,
+                deletePreset),
             BuildModelsState(vm, texts, modelsTab),
             new AboutSettingsState(app.Version, update, Diagnostics(vm, texts, app)),
             new SettingsOptionsState(!vm.ReduceMotion, theme));
+    }
+
+    private static IReadOnlyList<AppChoiceOptionState> BuildAppChoices(
+        IReadOnlyList<LiveLingo.Core.Cleanup.PolishPreset> enabledPresets,
+        SettingsTexts texts)
+    {
+        var list = new List<AppChoiceOptionState>(enabledPresets.Count + 3);
+        foreach (var preset in enabledPresets)
+            list.Add(new AppChoiceOptionState("clean:" + preset.Id, texts.PresetDisplayName(preset)));
+        list.Add(new AppChoiceOptionState("translate:English", texts.TranslateChoiceLabel(LiveLingo.Core.Translation.TargetLanguage.English)));
+        list.Add(new AppChoiceOptionState("translate:Chinese", texts.TranslateChoiceLabel(LiveLingo.Core.Translation.TargetLanguage.Chinese)));
+        list.Add(new AppChoiceOptionState("default", texts.Label("apps.followDefault")));
+        return list;
     }
 
     private static ModelsSettingsState BuildModelsState(
@@ -357,7 +505,7 @@ internal sealed record SettingsViewState(
                         texts.PeerStageBadge(stage, activeHere, endpoint.UsedForClean, endpoint.UsedForTranslate, endpoint.UsedForSpeech));
                 }).ToArray();
 
-            var notice = texts.StageNotice(stage, vm.CleanupEnabled, vm.CloudSpeech, vm.SpeechEndpoint?.Model);
+            var notice = texts.StageNotice(stage, vm.CleanupEnabled, vm.CloudSpeech, vm.SpeechEndpoint?.Model, activeId, cloudRouted);
             var hasWorkingCurrent = cloudRouted || currentStageInstalled;
 
             ModelDownloadState? stageRunningDownload = null;

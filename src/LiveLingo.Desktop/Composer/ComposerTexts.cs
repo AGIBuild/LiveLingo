@@ -60,19 +60,34 @@ public sealed class ComposerTexts(ILocalizationService loc, bool? mac = null)
     public static TargetLanguage OtherLanguage(TargetLanguage target) =>
         target == TargetLanguage.English ? TargetLanguage.Chinese : TargetLanguage.English;
 
-    public string OutputPill(ComposerOutput output, TargetLanguage target) => output switch
+    public string OutputPill(ComposerOutput output, TargetLanguage target, LiveLingo.Core.Cleanup.PolishPreset? preset = null) => output switch
     {
+        ComposerOutput.Clean when preset is not null => preset.BuiltIn
+            ? loc.T($"composer.polish.{preset.Id}.pill")
+            : loc.T("composer.polish.custom.pill", preset.Name),
         ComposerOutput.Clean => loc.T("composer.out.clean"),
         ComposerOutput.Translate => loc.T("composer.out.translate", LanguageName(target)),
         _ => loc.T("composer.out.raw")
     };
 
-    public string OutputMenu(ComposerOutput output, TargetLanguage target) => output switch
+    public string OutputMenu(ComposerOutput output, TargetLanguage target, LiveLingo.Core.Cleanup.PolishPreset? preset = null) => output switch
     {
+        ComposerOutput.Clean when preset is not null && preset.Id != LiveLingo.Core.Cleanup.PolishPresets.NaturalId =>
+            PresetName(preset),
         ComposerOutput.Clean => loc.T("composer.out.menu.clean"),
         ComposerOutput.Translate => loc.T("composer.out.menu.translate", LanguageName(target)),
         _ => loc.T("composer.out.menu.raw")
     };
+
+    public string PolishGroupTitle => loc.T("composer.polish.group");
+    public string PolishManageLabel => loc.T("composer.polish.manage");
+    public string PolishDefaultSuffix => loc.T("composer.polish.defaultSuffix");
+
+    public string PresetName(LiveLingo.Core.Cleanup.PolishPreset preset) =>
+        preset.BuiltIn ? loc.T($"composer.polish.{preset.Id}.name") : preset.Name;
+
+    public string PresetDescription(LiveLingo.Core.Cleanup.PolishPreset preset) =>
+        preset.BuiltIn ? loc.T($"composer.polish.{preset.Id}.desc") : preset.Description;
 
     public string SwapMenu(TargetLanguage target) =>
         loc.T("composer.out.swap", LanguageName(OtherLanguage(target)));
@@ -94,8 +109,12 @@ public sealed class ComposerTexts(ILocalizationService loc, bool? mac = null)
     public string ContextName(string name) => name.Length > 0 ? name : loc.T("composer.remember.clipboard");
 
     /// <summary>"Using your last choice for Slack: translate to English", shown while a remembered choice stands.</summary>
-    public string RememberedNote(RememberContext context, ComposerOutput output, TargetLanguage target) =>
-        loc.T("composer.remember.note", ContextName(context.Name), OutputMenu(output, target));
+    public string RememberedNote(
+        RememberContext context,
+        ComposerOutput output,
+        TargetLanguage target,
+        LiveLingo.Core.Cleanup.PolishPreset? preset = null) =>
+        loc.T("composer.remember.note", ContextName(context.Name), OutputMenu(output, target, preset));
 
     /// <summary>The line of the output menu that says whose choices are remembered.</summary>
     public string RememberMenuNote(RememberContext context) => loc.T("composer.remember.menu", ContextName(context.Name));
@@ -116,11 +135,26 @@ public sealed class ComposerTexts(ILocalizationService loc, bool? mac = null)
     public string RouteChip => loc.T("composer.route.whole");
     public string ResultAria => loc.T("composer.res.aria");
 
-    public string SourceLabel(bool listening, bool timeline, string fileName) =>
-        timeline ? loc.T("composer.src.transcript", fileName) : listening ? loc.T("composer.src.listening") : loc.T("composer.src.label");
+    public string SourceLabel(
+        bool listening,
+        bool timeline,
+        string fileName,
+        LiveLingo.Core.Cleanup.PolishPreset? deferredPolish = null) =>
+        timeline ? loc.T("composer.src.transcript", fileName)
+        : listening && deferredPolish is not null
+            ? (deferredPolish.Id == LiveLingo.Core.Cleanup.PolishPresets.NaturalId
+                ? loc.T("composer.src.listeningClean")
+                : loc.T("composer.src.listeningMode", PresetName(deferredPolish)))
+        : listening ? loc.T("composer.src.listening")
+        : loc.T("composer.src.label");
 
-    public string ResultLabel(ComposerOutput output, TargetLanguage target) =>
-        output == ComposerOutput.Translate ? loc.T("composer.res.labelTo", LanguageName(target)) : loc.T("composer.res.label");
+    public string ResultLabel(ComposerOutput output, TargetLanguage target, LiveLingo.Core.Cleanup.PolishPreset? preset = null) => output switch
+    {
+        ComposerOutput.Translate => loc.T("composer.res.labelTo", LanguageName(target)),
+        ComposerOutput.Clean when preset is not null && preset.Id != LiveLingo.Core.Cleanup.PolishPresets.NaturalId =>
+            loc.T("composer.res.labelMode", PresetName(preset)),
+        _ => loc.T("composer.res.label")
+    };
 
     public string HintMic => loc.T("composer.hint.mic", Cap("dictate"));
     public string HintWrite => loc.T("composer.hint.write");
@@ -205,20 +239,90 @@ public sealed class ComposerTexts(ILocalizationService loc, bool? mac = null)
     public string ModelCloudAria => loc.T("composer.model.cloud.aria");
     public string CleanupPreview => loc.T("composer.result.preview");
 
-    public string DocumentNotice(DocumentState state, bool owned, bool translating = false) =>
-        loc.T(state switch
+    public string CleanupPreviewFor(LiveLingo.Core.Cleanup.PolishPreset? preset = null) =>
+        preset is not null && preset.Id != LiveLingo.Core.Cleanup.PolishPresets.NaturalId
+            ? loc.T("composer.result.previewMode", PresetName(preset))
+            : CleanupPreview;
+
+    public string? DocumentGateBadge(
+        DocumentState state,
+        bool owned,
+        LiveLingo.Core.Cleanup.PolishGateKind gate,
+        string error = "",
+        GateRejection? warning = null) => state switch
+    {
+        DocumentState.Pending => loc.T("composer.document.gate.generating"),
+        DocumentState.Ready when !owned && warning is not null => loc.T("composer.document.gate.reviewWarn"),
+        DocumentState.Ready when !owned && gate == LiveLingo.Core.Cleanup.PolishGateKind.FactAnchor => loc.T("composer.document.gate.factOk"),
+        DocumentState.Ready when !owned => loc.T("composer.document.gate.verbatimOk"),
+        DocumentState.Failed when error.StartsWith("Final polish refused:", StringComparison.Ordinal) => loc.T("composer.document.gate.intercepted"),
+        DocumentState.Failed when error.Length == 0 => loc.T("composer.document.gate.intercepted"),
+        DocumentState.Failed => loc.T("composer.document.gate.failed"),
+        DocumentState.Stale => loc.T("composer.document.gate.staleBadge"),
+        _ => null
+    };
+
+    public string DocumentNotice(
+        DocumentState state,
+        bool owned,
+        bool translating = false,
+        LiveLingo.Core.Cleanup.PolishPreset? preset = null,
+        string error = "",
+        GateRejection? warning = null)
+    {
+        if (state == DocumentState.Pending && !translating && preset is not null
+            && preset.Id != LiveLingo.Core.Cleanup.PolishPresets.NaturalId)
+        {
+            return loc.T("composer.document.pendingMode", PresetName(preset));
+        }
+
+        if (state == DocumentState.Ready && !owned && !translating && warning is { } warn)
+        {
+            return loc.T("composer.document.readyWarn", loc.T($"composer.gate.{warn.Reason}", warn.Detail));
+        }
+
+        var baseText = loc.T(state switch
         {
             DocumentState.Failed => "composer.document.failed",
             DocumentState.Stale => "composer.document.stale",
             DocumentState.Ready when owned => "composer.document.owned",
             DocumentState.Ready => "composer.document.ready",
             _ => "composer.document.pending"
-        }) + (translating && state == DocumentState.Failed ? " " + loc.T("composer.document.translateHint") : "");
+        });
 
-    public string DocumentStatus(DocumentState state, bool editing, bool armed) =>
+        if (translating && state == DocumentState.Failed)
+            return baseText + " " + loc.T("composer.document.translateHint");
+
+        if (!translating && state == DocumentState.Failed && TryFormatRefusalReason(error) is { } reasonText)
+            return baseText + " " + loc.T("composer.document.failedReason", reasonText);
+
+        return baseText;
+    }
+
+    private string? TryFormatRefusalReason(string error)
+    {
+        const string prefix = "Final polish refused: ";
+        if (!error.StartsWith(prefix, StringComparison.Ordinal))
+            return null;
+
+        var rest = error[prefix.Length..].Trim();
+        var openParen = rest.IndexOf('(');
+        var reasonStr = openParen > 0 ? rest[..openParen].Trim() : rest;
+        var detail = openParen > 0 && rest.EndsWith(')') ? rest[(openParen + 1)..^1] : "";
+        return Enum.TryParse<GateReason>(reasonStr, out var reason)
+            ? loc.T($"composer.gate.{reason}", detail)
+            : null;
+    }
+
+    public string DocumentStatus(
+        DocumentState state,
+        bool editing,
+        bool armed,
+        bool translating = false,
+        LiveLingo.Core.Cleanup.PolishPreset? preset = null) =>
         editing ? loc.T("composer.document.editing")
         : armed ? loc.T("composer.status.armed")
-        : DocumentNotice(state, owned: false);
+        : DocumentNotice(state, owned: false, translating: translating, preset: preset);
 
     public string Status(StatusInfo info)
     {

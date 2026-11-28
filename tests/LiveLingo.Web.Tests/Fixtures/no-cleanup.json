@@ -25,20 +25,28 @@
   },
   "output": {
     "value": "original",
+    "polishMode": "natural",
     "pill": "原话",
     "globe": false,
+    "sparkle": false,
+    "polishGroup": null,
+    "manageLabel": null,
     "menu": [
       {
         "id": "translate",
         "label": "翻译成 English",
         "checked": false,
-        "enabled": true
+        "enabled": true,
+        "sub": null,
+        "group": null
       },
       {
         "id": "original",
         "label": "原话（不整理）",
         "checked": true,
-        "enabled": true
+        "enabled": true,
+        "sub": null,
+        "group": null
       }
     ],
     "swap": "翻译目标改为 中文",
@@ -89,7 +97,7 @@
     }
   },
   "layout": {
-    "wide": false
+    "wide": true
   },
   "options": {
     "animations": true,
@@ -106,22 +114,46 @@
         "cap": "⌘D"
       },
       {
-        "id": "clean",
+        "id": "polish:ai-task",
         "code": "Digit1",
         "shift": false,
         "cap": "⌘1"
       },
       {
-        "id": "translate",
+        "id": "polish:natural",
         "code": "Digit2",
         "shift": false,
         "cap": "⌘2"
       },
       {
-        "id": "original",
+        "id": "polish:formal",
         "code": "Digit3",
         "shift": false,
         "cap": "⌘3"
+      },
+      {
+        "id": "polish:todo",
+        "code": "Digit4",
+        "shift": false,
+        "cap": "⌘4"
+      },
+      {
+        "id": "polish:report",
+        "code": "Digit5",
+        "shift": false,
+        "cap": "⌘5"
+      },
+      {
+        "id": "translate",
+        "code": "KeyT",
+        "shift": false,
+        "cap": "⌘T"
+      },
+      {
+        "id": "original",
+        "code": "Digit0",
+        "shift": false,
+        "cap": "⌘0"
       },
       {
         "id": "swap",
@@ -179,13 +211,17 @@
         "id": "target",
         "label": "Slack 输入框",
         "checked": true,
-        "enabled": true
+        "enabled": true,
+        "sub": null,
+        "group": null
       },
       {
         "id": "copyOnly",
         "label": "没有输入框 · 仅复制",
         "checked": false,
-        "enabled": true
+        "enabled": true,
+        "sub": null,
+        "group": null
       }
     ],
     "more": [
@@ -193,43 +229,57 @@
         "id": "new",
         "label": "新草稿",
         "checked": false,
-        "enabled": true
+        "enabled": true,
+        "sub": null,
+        "group": null
       },
       {
         "id": "recent",
         "label": "最近草稿",
         "checked": false,
-        "enabled": true
+        "enabled": true,
+        "sub": null,
+        "group": null
       },
       {
         "id": "import",
         "label": "导入录音…",
         "checked": false,
-        "enabled": false
+        "enabled": false,
+        "sub": null,
+        "group": null
       },
       {
         "id": "export",
         "label": "导出…",
         "checked": false,
-        "enabled": true
+        "enabled": true,
+        "sub": null,
+        "group": null
       },
       {
         "id": "wide",
         "label": "宽屏对照",
-        "checked": false,
-        "enabled": true
+        "checked": true,
+        "enabled": true,
+        "sub": null,
+        "group": null
       },
       {
         "id": "whole",
         "label": "整段处理（保留格式）",
         "checked": false,
-        "enabled": true
+        "enabled": true,
+        "sub": null,
+        "group": null
       },
       {
         "id": "settings",
         "label": "设置",
         "checked": false,
-        "enabled": true
+        "enabled": true,
+        "sub": null,
+        "group": null
       }
     ]
   },

@@ -558,4 +558,151 @@ public class FinalDocumentTests
         Assert.Equal(DocumentState.Ready, draft.Final(UnitKind.Clean).State);
         Assert.Equal("终稿。", draft.Text());
     }
+
+    [Fact]
+    public async Task MultiScenarioPolish_SynthesizesHolisticallyAcrossNewlines_CachesPerMode_AndIsolatesTranslationInput()
+    {
+        var session = Session();
+        var polisher = new Polisher
+        {
+            Answer = (req, _) => Task.FromResult(req.Gate == PolishGateKind.FactAnchor
+                ? (req.Style.Contains("待办与派单", StringComparison.Ordinal)
+                    ? "- [ ] 将 `CacheService` 超时设为 30 秒"
+                    : "### 任务目标\n排查 `CacheService` 并保持 30 秒超时。")
+                : req.Target.Replace("呃，", ""))
+        };
+        await using var scheduler = new PolishScheduler(session, polisher, [], PolishPresets.BuiltIns, 300);
+
+        // Multi-line source over 800 chars (1,000 chars) stays ONE holistic call in AI Task mode instead of splitting per newline.
+        var multiLine = "第一行铺垫：" + new string('背', 480) + "\n第二行核心：把 `CacheService` 超时设为 30 秒，" + new string('细', 480);
+        session.Mutate(d =>
+        {
+            d.SetPolishMode(PolishPresets.AiTaskId);
+            d.Append(multiLine);
+        });
+        await Ready(session, UnitKind.Clean);
+        Assert.Single(polisher.Calls);
+        Assert.Equal("### 任务目标\n排查 `CacheService` 并保持 30 秒超时。", session.Read(d => d.Text()));
+
+        // Manually edit AI Task mode, switch to Todo, then switch back -> manual AI Task edit is preserved without extra LLM call!
+        session.Mutate(d => d.SaveDocumentEdit(d.BeginDocumentEdit(UnitKind.Clean), "### 任务目标\n人工确认过的 `CacheService` 30 秒指令。"));
+        session.Mutate(d => d.SetPolishMode(PolishPresets.TodoId));
+        await Ready(session, UnitKind.Clean);
+        Assert.Equal("- [ ] 将 `CacheService` 超时设为 30 秒", session.Read(d => d.Text()));
+
+        var callsBeforeBack = polisher.Calls.Count;
+        session.Mutate(d => d.SetPolishMode(PolishPresets.AiTaskId));
+        Assert.Equal(DocumentState.Ready, session.Read(d => d.Final(UnitKind.Clean).State));
+        Assert.Equal("### 任务目标\n人工确认过的 `CacheService` 30 秒指令。", session.Read(d => d.Text()));
+        Assert.Equal(callsBeforeBack, polisher.Calls.Count);
+
+        // TranslationDocumentInput NEVER reads structured AI Task or Todo output; it only consumes "natural" verbatim cleanup.
+        Assert.Null(session.Read(d => d.TranslationDocumentInput()));
+        session.Mutate(d => d.SetPolishMode(PolishPresets.NaturalId));
+        await Ready(session, UnitKind.Clean);
+        Assert.NotNull(session.Read(d => d.TranslationDocumentInput()));
+        Assert.DoesNotContain("### 任务目标", session.Read(d => d.TranslationDocumentInput())!);
+    }
+
+    [Fact]
+    public async Task StructuredMode_PerformsOneTargetedSelfRepairRetryInSameMode_WhenFirstOutputViolatesGate()
+    {
+        var session = Session();
+        var attempt = 0;
+        var polisher = new Polisher
+        {
+            Answer = (req, _) =>
+            {
+                if (Interlocked.Increment(ref attempt) == 1)
+                    return Task.FromResult("好的，下面是为你编写的代码：\n```csharp\nvar x = 30;\n```");
+                Assert.Contains("越界回答", req.RepairFeedback);
+                return Task.FromResult("### 任务目标\n将 `CacheService` 超时设为 30 秒，不要直接改代码。");
+            }
+        };
+        await using var scheduler = new PolishScheduler(session, polisher, [], PolishPresets.BuiltIns, 300);
+
+        session.Mutate(d =>
+        {
+            d.SetPolishMode(PolishPresets.AiTaskId);
+            d.Append("帮我把 `CacheService` 超时设为 30 秒，先给方案不要直接改代码。");
+        });
+        await Ready(session, UnitKind.Clean);
+
+        Assert.Equal(2, polisher.Calls.Count);
+        Assert.Equal(DocumentState.Ready, session.Read(d => d.Final(UnitKind.Clean).State));
+        Assert.Equal("### 任务目标\n将 `CacheService` 超时设为 30 秒，不要直接改代码。", session.Read(d => d.Text()));
+    }
+
+    [Fact]
+    public async Task SwitchingPolishMode_StartsImmediatelyWithoutTypingDebounce_AndReSelectingFailedModeRetries()
+    {
+        var session = Session();
+        var shouldFailTodo = true;
+        var polisher = new Polisher
+        {
+            Answer = (req, _) =>
+            {
+                if (req.Style.Contains("待办与派单", StringComparison.Ordinal))
+                {
+                    if (shouldFailTodo)
+                        throw new HttpRequestException("temporary failure");
+                    return Task.FromResult("- [ ] 确认 18 号下班放假与 19 号至 3 号排班");
+                }
+                return Task.FromResult("确认十八号下班放假及十九号至三号的休假安排。");
+            }
+        };
+        var fakeClock = new LiveLingo.Core.Tests.Support.ManualTimeProvider();
+        await using var scheduler = new PolishScheduler(
+            session, polisher, [], PolishPresets.BuiltIns, 300, time: fakeClock);
+
+        // SyncSource bumps EditRevision, which normally starts a 400 ms typing pause; switching polish mode must bypass it immediately (0 ms).
+        session.Mutate(d => d.SyncSource(TextUnits.Split("十八号下了班就放假了吗？十九号休到三号，对吧？"), DraftRoute.Units));
+        session.Mutate(d => d.SetPolishMode(PolishPresets.TodoId));
+        await Ready(session, UnitKind.Clean);
+        Assert.Equal(DocumentState.Failed, session.Read(d => d.Final(UnitKind.Clean).State));
+
+        // Switching to formal succeeds immediately without advancing fakeClock, and switching back to failed todo retries automatically.
+        shouldFailTodo = false;
+        session.Mutate(d => d.SetPolishMode(PolishPresets.FormalId));
+        await Ready(session, UnitKind.Clean);
+        Assert.Equal(DocumentState.Ready, session.Read(d => d.Final(UnitKind.Clean).State));
+
+        session.Mutate(d => d.SetPolishMode(PolishPresets.TodoId));
+        await Ready(session, UnitKind.Clean);
+        Assert.Equal(DocumentState.Ready, session.Read(d => d.Final(UnitKind.Clean).State));
+        Assert.Contains("18", session.Read(d => d.Text()));
+    }
+
+    [Fact]
+    public async Task SoftGateWarning_PreservesGeneratedDocumentWithWarning_WhileHardHijackStillFails_AndCleanPreviewNeverTurnsBlank()
+    {
+        var session = Session();
+        session.Mutate(d => d.AppendDictated("讨论一下多智能体调度，跑五次有四次成功。"));
+        // Before any unit cleanup runs, PreviewText(Clean) falls back to Raw instead of returning an empty string.
+        Assert.Equal("讨论一下多智能体调度，跑五次有四次成功。", session.Read(d => d.PreviewText(UnitKind.Clean)));
+
+        var polisher = new Polisher
+        {
+            Answer = (req, _) =>
+            {
+                if (req.Style.Contains("AI 任务指令", StringComparison.Ordinal))
+                    return Task.FromResult("```python\nprint('hijack')\n```");
+                return Task.FromResult("### 核心结论\n多智能体调度在 99% 虚构指标下稳定。");
+            }
+        };
+        await using var scheduler = new PolishScheduler(session, polisher, [], PolishPresets.BuiltIns, 300);
+
+        // Soft warning ("99" invented number in report mode after 1x repair): keeps generated document Ready + Warning!
+        session.Mutate(d => d.SetPolishMode(PolishPresets.ReportId));
+        await Ready(session, UnitKind.Clean);
+        var reportFinal = session.Read(d => d.Final(UnitKind.Clean));
+        Assert.Equal(DocumentState.Ready, reportFinal.State);
+        Assert.Contains("核心结论", reportFinal.Text);
+        Assert.Equal(new GateRejection(GateReason.NumberInvented, "99"), reportFinal.Warning);
+
+        // Hard failure (ExecutionHijack code block in ai-task mode after 1x repair): blocked as Failed!
+        session.Mutate(d => d.SetPolishMode(PolishPresets.AiTaskId));
+        await Ready(session, UnitKind.Clean);
+        Assert.Equal(DocumentState.Failed, session.Read(d => d.Final(UnitKind.Clean).State));
+    }
 }

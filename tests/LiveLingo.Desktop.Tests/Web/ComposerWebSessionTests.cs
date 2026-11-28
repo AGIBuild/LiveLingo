@@ -206,12 +206,13 @@ public sealed class ComposerWebSessionTests
         var changes = 0;
         rig.Session.WideChanged += () => changes++;
 
-        rig.H.Vm.ForceWide = true;
-        rig.H.Vm.SourceText = "still wide";
+        Assert.True(rig.Session.Wide);
         rig.H.Vm.ForceWide = false;
+        rig.H.Vm.SourceText = "narrow";
+        rig.H.Vm.ForceWide = true;
 
         Assert.Equal(2, changes);
-        Assert.False(rig.Session.Wide);
+        Assert.True(rig.Session.Wide);
     }
 
     [Fact]

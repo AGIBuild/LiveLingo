@@ -14,7 +14,11 @@ public sealed record PolishRequest(
     string Summary,
     IReadOnlyList<string> Glossary,
     string Style,
-    IReadOnlyList<GlossaryCorrection>? Corrections = null);
+    IReadOnlyList<GlossaryCorrection>? Corrections = null,
+    PolishGateKind Gate = PolishGateKind.Verbatim,
+    string? RepairFeedback = null,
+    Action<string>? OnPartial = null,
+    string? TurnHint = null);
 
 /// <summary>
 /// The polish of a finished dictation: a longer text than one passage, read in one piece. Unlike
@@ -31,4 +35,11 @@ public interface IDictationPolisher
     /// <exception cref="HttpRequestException">The inference endpoint could not serve the request.</exception>
     /// <exception cref="InvalidDataException">The model output was incomplete.</exception>
     Task<string> PolishAsync(PolishRequest request, CancellationToken ct);
+
+    /// <summary>Pre-warms the local inference KV cache for the active preset's system prompt and glossary prefix while recording.</summary>
+    Task WarmPresetAsync(
+        string style,
+        PolishGateKind gate,
+        IReadOnlyList<string>? glossary = null,
+        CancellationToken ct = default) => Task.CompletedTask;
 }

@@ -36,6 +36,17 @@ internal static class SettingsScenarios
         ["settings-polish-custom"] = () => Open("voice", model: m =>
             m.Composer.PolishPrompt = "保留我的口语风格，修正明显错字，按完整意思分段，不要添加信息。"),
         ["settings-polish-invalid"] = () => Open("voice", then: f => f.Vm.PolishPrompt = "bad"),
+        ["settings-preset-add"] = () => Open("voice", then: f => f.Vm.OpenPresetForm(null)),
+        ["settings-preset-edit"] = () => Open("voice", then: f => f.Vm.OpenPresetForm("ai-task")),
+        ["settings-preset-delete"] = () => Open("voice", model: m => m.Composer.PolishPresets.Add(new PolishPresetEntry
+        {
+            Id = "custom-bug",
+            Name = "Bug 缺陷单",
+            Description = "复现与报错",
+            Gate = "FactAnchor",
+            Enabled = true,
+            Instructions = "提炼复现步骤、预期行为与实际报错。"
+        }), then: f => f.Vm.DeletePreset("custom-bug")),
         ["settings-apps"] = () => Open("general", remembered: new PreferencesData
         {
             Apps =

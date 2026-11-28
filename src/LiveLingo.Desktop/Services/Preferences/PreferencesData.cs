@@ -6,7 +6,14 @@ namespace LiveLingo.Desktop.Services.Preferences;
 /// <summary>What the user chose for one application the last time (an application is the scenario).</summary>
 /// <param name="AppId">The platform's stable identity of the application; <see cref="ComposerPreferences.ClipboardId"/> for "no input box".</param>
 /// <param name="UsedAt">When the user last chose something there; the oldest is dropped first beyond the capacity.</param>
-public sealed record AppChoice(string AppId, string Name, ComposerOutput Output, TargetLanguage Target, DateTimeOffset UsedAt);
+/// <param name="PolishMode">Scenario polish mode ID when <paramref name="Output"/> is <see cref="ComposerOutput.Clean"/>; empty uses the default.</param>
+public sealed record AppChoice(
+    string AppId,
+    string Name,
+    ComposerOutput Output,
+    TargetLanguage Target,
+    DateTimeOffset UsedAt,
+    string PolishMode = "");
 
 /// <summary>
 /// Everything remembered, as stored. Only the identity of applications, two choices each and one export format:

@@ -19,6 +19,14 @@ public sealed class Glossary
     public const int MaxSpeechHotwordTokens = 36;
 
     /// <summary>
+    /// Local Qwen3-ASR ONNX uses an autoregressive LLM prompt head that can echo generic English hotword lists during
+    /// noisy/fast speech; restrict local prompt hotwords strictly to explicit user terms and accent correction targets.
+    /// </summary>
+    public const int MaxLocalUserSpeechHotwords = 12;
+    public const int MaxLocalUserSpeechHotwordChars = 96;
+    public const int MaxLocalUserSpeechHotwordTokens = 24;
+
+    /// <summary>
     /// Qwen-Audio-3.1-ASR supports two-tier runtime hotword biasing (<c>parameters.vocabulary</c>): up to 50 P0
     /// super-hotwords (<c>weight=50</c>) for user-defined domain entities and accent targets, plus a P1 candidate pool
     /// (<c>weight=4</c>) up to 2,000 total terms.
@@ -91,6 +99,16 @@ public sealed class Glossary
         int maxChars = MaxSpeechHotwordChars,
         int maxTokens = MaxSpeechHotwordTokens) =>
         BoundHotwords(Terms, maxTerms, maxChars, maxTokens);
+
+    /// <summary>
+    /// User-only speech hotwords for local autoregressive Qwen3-ASR, omitting <see cref="BuiltInTerms"/> so generic
+    /// English lists never trigger prompt-echo hallucination while keeping user terms and accent targets biased.
+    /// </summary>
+    public IReadOnlyList<string> UserSpeechHotwords(
+        int maxTerms = MaxLocalUserSpeechHotwords,
+        int maxChars = MaxLocalUserSpeechHotwordChars,
+        int maxTokens = MaxLocalUserSpeechHotwordTokens) =>
+        BoundHotwords(UserTerms, maxTerms, maxChars, maxTokens);
 
     /// <summary>
     /// Builds the two-tier P0/P1 hotword dictionary for cloud generative ASR (such as Qwen-Audio-3.1-ASR):

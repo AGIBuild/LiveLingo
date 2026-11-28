@@ -203,9 +203,13 @@ public sealed record ComposerOptions(
     string Theme,
     bool Cleanup,
     bool CloudSpeech = false,
-    bool CustomPolishPrompt = false)
+    bool CustomPolishPrompt = false,
+    IReadOnlyList<Core.Cleanup.PolishPreset>? Presets = null,
+    string DefaultPolishMode = Core.Cleanup.PolishPresets.NaturalId)
 {
     public static ComposerOptions Default { get; } = new(false, false, CommitKey.Enter, true, "Auto", true);
+
+    public IReadOnlyList<Core.Cleanup.PolishPreset> EffectivePresets => Presets ?? Core.Cleanup.PolishPresets.BuiltIns;
 
     /// <summary>The outputs the composer offers: "Clean" only while cleanup is on; the original wording is always there.</summary>
     public IReadOnlyList<ComposerOutput> Outputs => Cleanup
@@ -223,12 +227,17 @@ public sealed record ComposerStart(
     ComposerOutput DefaultOutput,
     Core.Translation.TargetLanguage DefaultTarget,
     RememberContext? Remember,
-    ExportFormat? LastExport = null);
+    ExportFormat? LastExport = null,
+    string PolishMode = Core.Cleanup.PolishPresets.NaturalId,
+    string DefaultPolishMode = Core.Cleanup.PolishPresets.NaturalId);
 
 /// <param name="AppId">Identity of the application (or the clipboard context) the choices belong to.</param>
 /// <param name="Name">What the user knows it as; empty for the clipboard context (the window says "copy only").</param>
 /// <param name="Applied">The start is a remembered choice that differs from the defaults, which the composer says so.</param>
 public sealed record RememberContext(string AppId, string Name, bool Applied);
 
-/// <summary>What the user chose in the composer: the output and the direction in force after the choice.</summary>
-public sealed record ComposerChoice(ComposerOutput Output, Core.Translation.TargetLanguage Target);
+/// <summary>What the user chose in the composer: the output, polish mode and direction in force after the choice.</summary>
+public sealed record ComposerChoice(
+    ComposerOutput Output,
+    Core.Translation.TargetLanguage Target,
+    string PolishMode = Core.Cleanup.PolishPresets.NaturalId);

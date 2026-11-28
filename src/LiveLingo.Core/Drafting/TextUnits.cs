@@ -21,6 +21,10 @@ public static partial class TextUnits
     public static IReadOnlyList<(int Start, int End)> LiteralSpans(string source) =>
         LiteralPattern().Matches(source).Select(m => (m.Index, m.Index + m.Length)).ToArray();
 
+    /// <summary>Non-backtick literal spans (URLs and template placeholders) safe to enforce even on spoken ASR transcripts.</summary>
+    public static IReadOnlyList<(int Start, int End)> NonCodeLiteralSpans(string source) =>
+        NonCodeLiteralPattern().Matches(source).Select(m => (m.Index, m.Index + m.Length)).ToArray();
+
     /// <summary>
     /// Splits text into sentence and line units. Whitespace around a unit is layout, not content:
     /// indentation after a line break (or at the very start) and whitespace before a line break (or at the very end)
@@ -152,6 +156,9 @@ public static partial class TextUnits
 
     [GeneratedRegex(@"```[\s\S]*?```|`[^`\r\n]+`|https?://[^\s<>`，。！？；“”]+|\$\{[A-Za-z_]\w*\}|\{[A-Za-z_]\w*\}")]
     private static partial Regex LiteralPattern();
+
+    [GeneratedRegex(@"https?://[^\s<>`，。！？；“”]+|\$\{[A-Za-z_]\w*\}|\{[A-Za-z_]\w*\}")]
+    private static partial Regex NonCodeLiteralPattern();
 
     [GeneratedRegex(@"^\s*(#{1,6}\s|[-*]\s|\d+\.\s|[{}\[\]<]|```)")]
     private static partial Regex StructuredLine();

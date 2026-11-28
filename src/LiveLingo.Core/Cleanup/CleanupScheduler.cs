@@ -70,8 +70,14 @@ public sealed class CleanupScheduler : IAsyncDisposable
 
             ObserveEdits(_time.GetUtcNow());
 
-            if (_inFlight is { } flight && _session.Read(draft => draft.Polishing || !draft.IsCurrent(flight.Ticket, UnitKind.Clean)))
+            if (_inFlight is { } flight && _session.Read(draft =>
+                draft.Polishing
+                || draft.DocumentMode
+                || draft.Output != OutputKind.Clean
+                || !draft.IsCurrent(flight.Ticket, UnitKind.Clean)))
+            {
                 flight.Cancel.Cancel();
+            }
 
             StartWorkerIfNeeded();
         }
@@ -173,7 +179,7 @@ public sealed class CleanupScheduler : IAsyncDisposable
             return (cleaned, null);
 
         // A multi-line unit is a document whose layout would be lost by splitting it.
-        if (request.Target.Contains('\n') || HasLiveBacklogBehind(ticket))
+        if (request.Target.Contains('\n') || HasLiveBacklogBehind(ticket) || _session.Read(d => d.DocumentMode))
             return (request.Target, gate.Rejection);
 
         var sentences = TextUnits.Split(request.Target);
@@ -226,10 +232,16 @@ public sealed class CleanupScheduler : IAsyncDisposable
     /// <summary>The next unit to clean, or how long typing must stay still before the last unit is cleaned.</summary>
     private ((JobTicket Ticket, CleanupRequest Request)? Next, TimeSpan? Wait) Find(Draft draft, DateTimeOffset now)
     {
-        // The polish of the whole dictation reads the original text and goes first; units it could not polish are cleaned after it.
+        // In DocumentMode, live dictation stays zero-LLM and full-context polishing runs once when recording stops.
         if (draft.Snapshot is not null || draft.Output != OutputKind.Clean || draft.Polishing || draft.DocumentEditing
-            || (draft.DocumentMode && !draft.Recording))
+            || draft.DocumentMode)
             return (null, null);
+
+        if (draft.EditRevision != _seenEditRevision)
+        {
+            _seenEditRevision = draft.EditRevision;
+            _editedAt = now;
+        }
 
         var units = draft.Units;
         for (var i = 0; i < units.Count; i++)

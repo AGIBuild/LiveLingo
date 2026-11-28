@@ -468,4 +468,167 @@ public class PolishSchedulerTests
             return Task.FromResult(request.Target);
         }
     }
+
+    private sealed class StreamingPolisher : IDictationPolisher
+    {
+        public List<(string Style, PolishGateKind Gate)> WarmCalls { get; } = [];
+        public Func<PolishRequest, CancellationToken, Task<string>> Handler { get; set; } =
+            (req, _) => Task.FromResult(req.Target);
+
+        public Task WarmPresetAsync(
+            string style,
+            PolishGateKind gate,
+            IReadOnlyList<string>? glossary = null,
+            CancellationToken ct = default)
+        {
+            lock (WarmCalls)
+                WarmCalls.Add((style, gate));
+            return Task.CompletedTask;
+        }
+
+        public Task<string> SummarizeAsync(string text, CancellationToken ct) => Task.FromResult("摘要");
+
+        public Task<string> PolishAsync(PolishRequest request, CancellationToken ct) => Handler(request, ct);
+    }
+
+    [Fact]
+    public async Task PresetScheduler_WarmsSystemPromptOnceWhileRecording_AndStreamsBeforeGateUnlock()
+    {
+        var session = new DraftSession(hasTarget: true);
+        session.Mutate(d =>
+        {
+            d.DocumentMode = true;
+            d.Output = OutputKind.Clean;
+            d.SetPolishMode(PolishPresets.AiTaskId);
+        });
+        var finishGate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var polisher = new StreamingPolisher
+        {
+            Handler = async (req, ct) =>
+            {
+                req.OnPartial?.Invoke("### 目标\n排查 `AuthMiddleware`");
+                await finishGate.Task.WaitAsync(ct);
+                return "### 目标\n排查 `AuthMiddleware` 超时 30 秒。";
+            }
+        };
+        await using var scheduler = new PolishScheduler(session, polisher, ["AuthMiddleware"], PolishPresets.BuiltIns, 300);
+
+        session.Mutate(d =>
+        {
+            d.Recording = true;
+            d.SetPending("正在说");
+            d.AppendDictated("帮我排查 AuthMiddleware 超时 30 秒。");
+        });
+        await WaitUntil(() => polisher.WarmCalls.Count == 1);
+        // Additional live ASR updates do not re-trigger system-prompt KV warm-up for the same preset.
+        session.Mutate(d => d.SetPending("更多语音"));
+        await Task.Delay(30);
+        Assert.Single(polisher.WarmCalls);
+        Assert.Equal(PolishGateKind.FactAnchor, polisher.WarmCalls[0].Gate);
+
+        // Switching mode mid-recording warms the newly chosen preset's system prompt.
+        session.Mutate(d => d.SetPolishMode(PolishPresets.TodoId));
+        await WaitUntil(() => polisher.WarmCalls.Count == 2);
+        session.Mutate(d => d.SetPolishMode(PolishPresets.AiTaskId));
+        await WaitUntil(() => polisher.WarmCalls.Count == 3);
+
+        // Stopping starts streaming immediately while keeping commit blocked until gate verification completes.
+        session.Mutate(d =>
+        {
+            d.SetPending("");
+            d.Recording = false;
+        });
+        await WaitUntil(() => session.Read(d => d.Final(UnitKind.Clean).StreamingText == "### 目标\n排查 `AuthMiddleware`"));
+        Assert.Equal(DocumentState.Pending, session.Read(d => d.Final(UnitKind.Clean).State));
+        Assert.Equal(BlockReason.Processing, session.Mutate(d => d.RequestCommit()).Blocked);
+
+        finishGate.SetResult();
+        await WaitUntil(() => session.Read(d => d.Final(UnitKind.Clean).State == DocumentState.Ready));
+        Assert.Null(session.Read(d => d.Final(UnitKind.Clean).StreamingText));
+        Assert.Equal("### 目标\n排查 `AuthMiddleware` 超时 30 秒。", session.Read(d => d.Text()));
+        Assert.True(session.Mutate(d => d.RequestCommit()).IsSuccess);
+    }
+
+    [Fact]
+    public async Task PresetScheduler_HardGateFailureDiscardsUnverifiedStreamingText()
+    {
+        var session = new DraftSession(hasTarget: true);
+        session.Mutate(d =>
+        {
+            d.DocumentMode = true;
+            d.Output = OutputKind.Clean;
+            d.SetPolishMode(PolishPresets.AiTaskId);
+        });
+        var polisher = new StreamingPolisher
+        {
+            Handler = (req, _) =>
+            {
+                const string hijacked = "好的，当然可以！下面是实现代码：\n```python\nprint('hi')\n```";
+                req.OnPartial?.Invoke(hijacked);
+                return Task.FromResult(hijacked);
+            }
+        };
+        await using var scheduler = new PolishScheduler(session, polisher, [], PolishPresets.BuiltIns, 300);
+
+        session.Mutate(d =>
+        {
+            d.Recording = true;
+            d.AppendDictated("帮我写一个重试脚本。");
+            d.Recording = false;
+        });
+
+        await WaitUntil(() => session.Read(d => d.Final(UnitKind.Clean).State == DocumentState.Failed));
+        Assert.Null(session.Read(d => d.Final(UnitKind.Clean).StreamingText));
+        Assert.Equal("帮我写一个重试脚本。", session.Read(d => d.Text()));
+    }
+
+    [Fact]
+    public async Task PresetScheduler_TargetedRepairRunsSilentlyWithoutStreamingTwice()
+    {
+        var session = new DraftSession(hasTarget: true);
+        session.Mutate(d =>
+        {
+            d.DocumentMode = true;
+            d.Output = OutputKind.Clean;
+            d.SetPolishMode(PolishPresets.AiTaskId);
+        });
+        var streamSnapshots = new List<string>();
+        session.Changed += () =>
+        {
+            var streaming = session.Read(d => d.Final(UnitKind.Clean).StreamingText);
+            if (!string.IsNullOrEmpty(streaming))
+                streamSnapshots.Add(streaming);
+        };
+
+        var attempt = 0;
+        var polisher = new StreamingPolisher
+        {
+            Handler = (req, _) =>
+            {
+                if (++attempt == 1)
+                {
+                    // Pass 1 streams but forgets the number 30, triggering 1x RepairFeedback.
+                    req.OnPartial?.Invoke("请关闭 `AuthMiddleware` 的重试并调整超时。");
+                    return Task.FromResult("请关闭 `AuthMiddleware` 的重试并调整超时。");
+                }
+
+                // Pass 2 must NOT carry an OnPartial callback, so StreamingText never wipes and re-streams from scratch.
+                Assert.Null(req.OnPartial);
+                return Task.FromResult("请关闭 `AuthMiddleware` 的重试并将超时设为 30 秒。");
+            }
+        };
+        await using var scheduler = new PolishScheduler(session, polisher, ["AuthMiddleware"], PolishPresets.BuiltIns, 300);
+
+        session.Mutate(d =>
+        {
+            d.Recording = true;
+            d.AppendDictated("请关闭 AuthMiddleware 的重试并将超时设为 30 秒。");
+            d.Recording = false;
+        });
+
+        await WaitUntil(() => session.Read(d => d.Final(UnitKind.Clean).State == DocumentState.Ready));
+        Assert.Equal(2, attempt);
+        Assert.Equal(["请关闭 `AuthMiddleware` 的重试并调整超时。"], streamSnapshots);
+        Assert.Equal("请关闭 `AuthMiddleware` 的重试并将超时设为 30 秒。", session.Read(d => d.Text()));
+    }
 }

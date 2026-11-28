@@ -18,13 +18,19 @@
   // Menu labels follow the interface language, except the names of the languages themselves (as in the composer).
   const choices = (values, labelKeys) => values.map((value, i) => [value, LL.t(labelKeys[i])]);
 
-  const Apps = ({ apps }) => html`<section class="apps" aria-labelledby="apps-title">
+  const Apps = ({ apps, appChoices }) => html`<section class="apps" aria-labelledby="apps-title">
     <div class="apps-head"><div><h2 id="apps-title">${LL.t('apps')}</h2><p class="hint">${LL.t('apps.desc')}</p></div>
       <button type="button" id="apps-clear" class="btn" disabled=${apps.length === 0} onClick=${() => LL.send('clearApps')}>${LL.t('apps.clear')}</button></div>
     ${apps.length === 0
       ? html`<p id="apps-empty" class="hint">${LL.t('apps.empty')}</p>`
       : html`<ul class="app-list">${apps.map((app) => html`<li class="app" key=${app.id}>
-          <span class="app-name">${app.name}</span><span class="app-summary">${app.summary}</span><time>${app.used}</time>
+          <span class="app-name">${app.name}</span>
+          <span class="app-summary">${app.summary}</span>
+          <select class="app-select" id=${'app-mode-' + app.id} aria-label=${app.modeAria} value=${app.choice}
+            onChange=${(e) => LL.send('setAppChoice', { appId: app.id, appName: app.rawName, choice: e.target.value })}>
+            ${appChoices.map((opt) => html`<option key=${opt.value} value=${opt.value} selected=${opt.value === app.choice}>${opt.label}</option>`)}
+          </select>
+          <time>${app.used}</time>
           <button type="button" class="danger" aria-label=${LL.t('apps.forget') + ' ' + app.name}
             onClick=${() => LL.send('forgetApp', { appId: app.id })}>${LL.t('apps.forget')}</button>
         </li>`)}</ul>`}
@@ -53,7 +59,7 @@
     <${Row} id="remember" title=${LL.t('remember')} desc=${LL.t('remember.desc')}>
       <${Switch} id="remember" checked=${g.rememberChoices} onChange=${(on) => set('rememberChoices')(String(on))}/>
     <//>
-    <${Apps} apps=${g.apps}/>
+    <${Apps} apps=${g.apps} appChoices=${g.appChoices}/>
   </div>`;
 
   class Terms extends preact.Component {
@@ -162,32 +168,183 @@
     }
   }
 
-  const Voice = ({ v }) => html`<div>
-    <${Row} id="mic" title=${LL.t('mic')} desc=${LL.t('mic.desc')}>
-      <${Select} id="mic" value=${v.microphone} options=${v.microphones.map((name) => [name, name || LL.t('mic.default')])} onChange=${set('microphone')}/>
-    <//>
-    <${Row} id="cleanup" title=${LL.t('cleanup')} desc=${LL.t('cleanup.desc')}>
-      <${Switch} id="cleanup" checked=${v.cleanup} onChange=${(on) => set('cleanup')(String(on))}/>
-    <//>
-    <${Row} id="direction" title=${LL.t('direction')} desc=${LL.t('direction.desc')}>
-      <${Select} id="direction" value=${v.direction} options=${choices(['English', 'Chinese'], ['direction.zhEn', 'direction.enZh'])} onChange=${set('direction')}/>
-    <//>
-    <${Row} id="output" title=${LL.t('output')} desc=${LL.t('output.desc')}>
-      <${Select} id="output" value=${v.defaultOutput} options=${choices(['Clean', 'Translate', 'Original'], ['output.clean', 'output.translate', 'output.original'])} onChange=${set('defaultOutput')}/>
-    <//>
-    <${Row} id="auto-dictate" title=${LL.t('autoDictate')} desc=${LL.t('autoDictate.desc')}>
-      <${Switch} id="auto-dictate" checked=${v.autoDictate} onChange=${(on) => set('autoDictate')(String(on))}/>
-    <//>
-    <${Row} id="preload" title=${LL.t('preload')} desc=${LL.t('preload.desc')}>
-      <${Switch} id="preload" checked=${v.preloadSpeech} onChange=${(on) => set('preloadSpeech')(String(on))}/>
-    <//>
-    <${Row} id="builtin-terms" title=${LL.t('builtInTerms')} desc=${LL.t('builtInTerms.desc')}>
-      <${Switch} id="builtin-terms" checked=${v.builtInGlossary} onChange=${(on) => set('builtInGlossary')(String(on))}/>
-    <//>
-    <${Polish} p=${{ text: v.polishPrompt, isDefault: v.polishPromptIsDefault, invalid: v.polishPromptInvalid }}/>
-    <${Corrections} corrections=${v.corrections}/>
-    <${Terms} terms=${v.terms}/>
-  </div>`;
+  const PRESET_FIELD = {
+    nameMissing: 'pf-name',
+    nameTaken: 'pf-name',
+    descInvalid: 'pf-desc',
+    instructionsInvalid: 'pf-instructions'
+  };
+
+  class PresetFormModal extends preact.Component {
+    constructor(props) {
+      super(props);
+      const f = props.form;
+      this.state = {
+        name: f.name,
+        description: f.description,
+        gate: f.gate,
+        instructions: f.instructions
+      };
+    }
+
+    componentDidUpdate(before) {
+      const { form } = this.props;
+      if (this.submitted && form !== before.form) {
+        this.submitted = false;
+        if (form.error) this.pane?.querySelector('#' + PRESET_FIELD[form.error])?.focus();
+      }
+    }
+
+    applyStarter = (tpl) => {
+      this.setState({
+        name: tpl.name,
+        description: tpl.description,
+        gate: tpl.gate,
+        instructions: tpl.instructions
+      }, () => this.pane?.querySelector('#pf-instructions')?.focus());
+    };
+
+    submit = (e) => {
+      e.preventDefault();
+      this.submitted = true;
+      const { name, description, gate, instructions } = this.state;
+      LL.send('savePreset', { label: name, description, gate, instructions });
+    };
+
+    onKeyDown = (e) => {
+      if (e.key === 'Enter' && e.target?.tagName !== 'TEXTAREA' && (e.isComposing || e.keyCode === 229)) {
+        e.preventDefault();
+      }
+    };
+
+    render({ form, starters }, { name, description, gate, instructions }) {
+      const adding = form.id === null;
+      const builtIn = form.builtIn;
+      const bad = (field) => (form.error && PRESET_FIELD[form.error] === field ? 'true' : undefined);
+      const returnTo = adding ? 'preset-add' : ('preset-edit-' + form.id);
+      return html`<${Modal} id="preset-form" title=${form.title} returnTo=${returnTo}
+        onClose=${() => LL.send('closePresetForm')}
+        ref=${(modal) => (this.pane = modal?.pane)}>
+        <form class="endpoint-form preset-form" onSubmit=${this.submit} onKeyDown=${this.onKeyDown} novalidate>
+          ${adding && starters.length > 0 && html`<div class="starter-bar">
+            <span class="starter-lbl">${LL.t('presets.form.starters')}</span>
+            <div class="starter-chips">${starters.map((tpl) => html`<button type="button" key=${tpl.id}
+              id=${'starter-' + tpl.id} class="btn compact starter-chip"
+              onClick=${() => this.applyStarter(tpl)}>+ ${tpl.name}</button>`)}</div>
+          </div>`}
+          ${!builtIn && html`<label>${LL.t('presets.form.name')}<input id="pf-name" value=${name} maxlength="32"
+            placeholder=${LL.t('presets.form.nameExample')} data-initial autocomplete="off" spellcheck="false"
+            aria-invalid=${bad('pf-name')} onInput=${(e) => this.setState({ name: e.target.value })}/></label>
+          <label>${LL.t('presets.form.desc')}<input id="pf-desc" value=${description} maxlength="60"
+            placeholder=${LL.t('presets.form.descExample')} autocomplete="off" spellcheck="false"
+            aria-invalid=${bad('pf-desc')} onInput=${(e) => this.setState({ description: e.target.value })}/></label>
+          <label>${LL.t('presets.form.gate')}<select id="pf-gate" value=${gate}
+            onChange=${(e) => this.setState({ gate: e.target.value })}>
+            <option value="FactAnchor" selected=${gate === 'FactAnchor'}>${LL.t('presets.form.gate.factAnchor')}</option>
+            <option value="Verbatim" selected=${gate === 'Verbatim'}>${LL.t('presets.form.gate.verbatim')}</option>
+          </select></label>`}
+          <label>${LL.t('presets.form.instructions')}<textarea id="pf-instructions" rows="7" spellcheck="false"
+            data-initial=${builtIn ? true : undefined} aria-invalid=${bad('pf-instructions')}
+            value=${instructions} onInput=${(e) => this.setState({ instructions: e.target.value })}></textarea></label>
+          <p class="hint preset-note">${LL.t('presets.form.note')}</p>
+          ${form.error && html`<p class="err" role="alert">${LL.t('presets.error.' + form.error)}</p>`}
+          <div class="dlg-actions">
+            <button type="button" id="pf-cancel" class="btn" onClick=${() => LL.send('closePresetForm')}>${LL.t('cloud.form.cancel')}</button>
+            <button type="submit" id="pf-save" class="btn primary">${LL.t(adding ? 'cloud.form.create' : 'cloud.form.save')}</button>
+          </div>
+        </form>
+      <//>`;
+    }
+  }
+
+  const presetAnswer = (allow) => LL.send('presetAnswer', { allow });
+
+  const DeletePresetDialog = ({ d }) => html`<${Modal} id="preset-delete" title=${fmt('presets.delete.title', d.name)}
+    returnTo=${'preset-del-' + d.id} onClose=${() => presetAnswer(false)}>
+    <p>${LL.t('presets.delete.body')}</p>
+    <div class="dlg-actions">
+      <button type="button" id="preset-keep" class="btn" data-initial autofocus onClick=${() => presetAnswer(false)}>${LL.t('cloud.delete.keep')}</button>
+      <button type="button" id="preset-confirm" class="btn primary destructive" onClick=${() => presetAnswer(true)}>${LL.t('cloud.delete.confirm')}</button>
+    </div>
+  <//>`;
+
+  const Presets = ({ v }) => html`<section id="presets-section" class="presets" aria-labelledby="presets-title">
+    <div class="presets-head">
+      <div>
+        <h2 id="presets-title">${LL.t('presets')}</h2>
+        <p class="hint">${LL.t('presets.desc')}</p>
+      </div>
+      <button type="button" id="preset-add" class="btn compact primary" onClick=${() => LL.send('openPresetForm', { id: null })}>+ ${LL.t('presets.add')}</button>
+    </div>
+    <ul class="preset-list">${v.presets.map((p) => html`<li id=${'preset-row-' + p.id} class=${'preset-row' + (!p.enabled ? ' disabled' : '')} key=${p.id}>
+      <div class="preset-main">
+        <div class="preset-title-row">
+          <b class="preset-name">${p.name}</b>
+          <span class=${'chip mini' + (p.builtIn ? '' : ' rec')}>${LL.t(p.builtIn ? 'presets.builtIn' : 'presets.custom')}</span>
+          <span class="chip mini">${p.gateBadge}</span>
+          ${p.isDefault && html`<span class="chip mini ok">${LL.t('presets.defaultBadge')}</span>`}
+          ${p.builtIn && p.customized && html`<span class="chip mini warn">${LL.t('presets.tunedBadge')}</span>`}
+        </div>
+        ${p.description && html`<p class="preset-desc">${p.description}</p>`}
+      </div>
+      <div class="preset-actions">
+        <button type="button" id=${'preset-edit-' + p.id} class="btn compact"
+          aria-label=${LL.t(p.builtIn ? 'presets.inspect' : 'presets.edit') + ' ' + p.name}
+          onClick=${() => LL.send('openPresetForm', { id: p.id })}>${LL.t(p.builtIn ? 'presets.inspect' : 'presets.edit')}</button>
+        ${p.builtIn && p.customized && html`<button type="button" id=${'preset-reset-' + p.id} class="link"
+          aria-label=${LL.t('presets.reset') + ' ' + p.name}
+          onClick=${() => LL.send('resetPreset', { id: p.id })}>${LL.t('presets.reset')}</button>`}
+        ${!p.builtIn && html`<button type="button" id=${'preset-del-' + p.id} class="link danger"
+          aria-label=${LL.t('presets.delete') + ' ' + p.name}
+          onClick=${() => LL.send('deletePreset', { id: p.id })}>${LL.t('presets.delete')}</button>`}
+        <input type="checkbox" role="switch" id=${'preset-on-' + p.id} aria-label=${p.toggleAria}
+          checked=${p.enabled} disabled=${!p.canToggle}
+          onChange=${(e) => {
+            e.target.checked = p.enabled;
+            LL.send('togglePreset', { id: p.id, enabled: !p.enabled });
+          }}/>
+      </div>
+    </li>`)}</ul>
+  </section>`;
+
+  const Voice = ({ v }) => {
+    const enabledPresetOpts = v.presets.filter((p) => p.enabled).map((p) => [p.id, p.name]);
+    return html`<div>
+      <${Row} id="mic" title=${LL.t('mic')} desc=${LL.t('mic.desc')}>
+        <${Select} id="mic" value=${v.microphone} options=${v.microphones.map((name) => [name, name || LL.t('mic.default')])} onChange=${set('microphone')}/>
+      <//>
+      <${Row} id="cleanup" title=${LL.t('cleanup')} desc=${LL.t('cleanup.desc')}>
+        <${Switch} id="cleanup" checked=${v.cleanup} onChange=${(on) => set('cleanup')(String(on))}/>
+      <//>
+      <${Row} id="direction" title=${LL.t('direction')} desc=${LL.t('direction.desc')}>
+        <${Select} id="direction" value=${v.direction} options=${choices(['English', 'Chinese'], ['direction.zhEn', 'direction.enZh'])} onChange=${set('direction')}/>
+      <//>
+      <${Row} id="output" title=${LL.t('output')} desc=${LL.t('output.desc')}>
+        <${Select} id="output" value=${v.defaultOutput} options=${choices(['Clean', 'Translate', 'Original'], ['output.clean', 'output.translate', 'output.original'])} onChange=${set('defaultOutput')}/>
+      <//>
+      <${Row} id="default-polish" title=${LL.t('defaultPolish')} desc=${LL.t('defaultPolish.desc')}>
+        <${Select} id="default-polish" value=${v.defaultPolishMode} options=${enabledPresetOpts} onChange=${set('defaultPolishMode')}/>
+      <//>
+      <${Row} id="smart-host-polish" title=${LL.t('smartHostPolish')} desc=${LL.t('smartHostPolish.desc')}>
+        <${Switch} id="smart-host-polish" checked=${v.smartHostPolish} onChange=${(on) => set('smartHostPolish')(String(on))}/>
+      <//>
+      <${Row} id="auto-dictate" title=${LL.t('autoDictate')} desc=${LL.t('autoDictate.desc')}>
+        <${Switch} id="auto-dictate" checked=${v.autoDictate} onChange=${(on) => set('autoDictate')(String(on))}/>
+      <//>
+      <${Row} id="preload" title=${LL.t('preload')} desc=${LL.t('preload.desc')}>
+        <${Switch} id="preload" checked=${v.preloadSpeech} onChange=${(on) => set('preloadSpeech')(String(on))}/>
+      <//>
+      <${Row} id="builtin-terms" title=${LL.t('builtInTerms')} desc=${LL.t('builtInTerms.desc')}>
+        <${Switch} id="builtin-terms" checked=${v.builtInGlossary} onChange=${(on) => set('builtInGlossary')(String(on))}/>
+      <//>
+      <${Presets} v=${v}/>
+      <${Polish} p=${{ text: v.polishPrompt, isDefault: v.polishPromptIsDefault, invalid: v.polishPromptInvalid }}/>
+      <${Corrections} corrections=${v.corrections}/>
+      <${Terms} terms=${v.terms}/>
+      ${v.presetForm && html`<${PresetFormModal} key=${v.presetForm.id ?? 'add'} form=${v.presetForm} starters=${v.starterTemplates}/>`}
+      ${v.deletePreset && html`<${DeletePresetDialog} d=${v.deletePreset}/>`}
+    </div>`;
+  };
 
   // The page only has the strings; the placeholders ({0}, {1}…) are filled here.
   const fmt = (key, ...args) => args.reduce((text, arg, i) => text.split('{' + i + '}').join(arg), LL.t(key));
@@ -215,7 +372,7 @@
         e.preventDefault();
         this.props.onClose();
       } else if (e.key === 'Tab') {
-        const items = [...this.pane.querySelectorAll('button, input')];
+        const items = [...this.pane.querySelectorAll('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled)')];
         const at = items.indexOf(document.activeElement);
         const next = (at + (e.shiftKey ? -1 : 1) + items.length) % items.length;
         e.preventDefault();

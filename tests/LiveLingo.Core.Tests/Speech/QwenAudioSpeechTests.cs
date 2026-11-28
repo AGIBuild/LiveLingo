@@ -247,14 +247,16 @@ public class QwenAudioSpeechTests
         var cloud31 = SpeechOptimizationStrategies.ForCloud(SpeechCloudProtocol.QwenAudioWebSocket, "qwen-audio-3.1-asr-flash-message");
         var vllm17B = SpeechCloudRoute.Create("http://localhost:8000/v1", "Qwen/Qwen3-ASR-1.7B", "local-key");
 
-        // 1. Qwen3-ASR 1.7B: verbatim ASR (keeps LLM cleanup active!), wider clause window (6.5s/11s/15s), bounded 36-token hotwords, up to 8 CPU threads.
+        // 1. Qwen3-ASR 1.7B: verbatim ASR (keeps LLM cleanup active!), balanced clause window (5.5s/9s/11s, 288 max_new_tokens), bounded user hotwords, up to 8 CPU threads.
         Assert.False(qwen17B.Profile.SupportsNativePolish);
         Assert.Equal(SpeechHotwordMode.BoundedPromptHead, qwen17B.Profile.HotwordMode);
         Assert.True(qwen17B.Profile.Dictation.SoftMaxUtteranceMs > qwen06B.Profile.Dictation.SoftMaxUtteranceMs);
         Assert.True(qwen17B.Profile.Dictation.HardMaxUtteranceMs > qwen06B.Profile.Dictation.HardMaxUtteranceMs);
         Assert.True(qwen17B.Profile.Dictation.StopTimeoutMs > qwen06B.Profile.Dictation.StopTimeoutMs);
-        Assert.Equal(15, qwen17B.Profile.MaxSegmentSeconds);
+        Assert.Equal(11, qwen17B.Profile.MaxSegmentSeconds);
         Assert.Equal(8, qwen17B.ResolveThreads(configuredThreads: 0, logicalCores: 16));
+        Assert.Empty(qwen17B.SelectPromptHotwords(Glossary.Parse("", includeBuiltIn: true), []));
+        Assert.Equal(["璇枢"], qwen17B.SelectPromptHotwords(Glossary.Parse("璇枢", includeBuiltIn: true), []));
 
         // 2. X-ASR Offline (non-autoregressive transducer): freed from 0.6B's 13s KV slicing, chunk period stripping, hotwords, and LLM loop rate guard.
         Assert.Equal(SpeechHotwordMode.None, xAsr.Profile.HotwordMode);

@@ -42,4 +42,16 @@ public sealed class RoutedChatClient(
             usage?.Report(role, served, cloud: true, confirmed: true, endpoint: route.Name);
         return completion;
     }
+
+    public async Task WarmPromptAsync(
+        string systemPrompt,
+        IReadOnlyDictionary<string, object>? extra = null,
+        CancellationToken ct = default,
+        string userPrefix = "目标：")
+    {
+        if (await routes.GetAsync(role, ct).ConfigureAwait(false) is not null)
+            return;
+
+        await local.WarmPromptAsync(systemPrompt, extra, ct, userPrefix).ConfigureAwait(false);
+    }
 }

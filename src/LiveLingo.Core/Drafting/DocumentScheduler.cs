@@ -1,11 +1,17 @@
+using Microsoft.Extensions.Logging;
+
 namespace LiveLingo.Core.Drafting;
 
 /// <summary>One version-guarded final job, shared by polish and translation. Preview schedulers remain unit-backed.</summary>
 internal sealed class DocumentScheduler : IAsyncDisposable
 {
+    private static readonly TimeSpan StreamThrottle = TimeSpan.FromMilliseconds(32);
+
     private readonly DraftSession _session;
     private readonly UnitKind _kind;
-    private readonly Func<DocumentWork, CancellationToken, Task<string>> _produce;
+    private readonly Func<DocumentWork, Action<string>?, CancellationToken, Task<DocumentOutput>> _produce;
+    private readonly Func<Draft, bool>? _holistic;
+    private readonly ILogger? _logger;
     private readonly TimeProvider _time;
     private readonly ITimer _timer;
     private readonly object _gate = new();
@@ -14,17 +20,38 @@ internal sealed class DocumentScheduler : IAsyncDisposable
     private DocumentTicket? _ticket;
     private int _seenEdit = -1;
     private int _seenEpoch = -1;
+    private int _seenModeSwitch = -1;
     private DateTimeOffset _editedAt = DateTimeOffset.MinValue;
     private Task _worker = Task.CompletedTask;
     private bool _running;
     private bool _disposed;
 
     internal DocumentScheduler(DraftSession session, UnitKind kind,
-        Func<DocumentWork, CancellationToken, Task<string>> produce, TimeProvider? time = null)
+        Func<DocumentWork, CancellationToken, Task<string>> produce, TimeProvider? time = null,
+        Func<Draft, bool>? holistic = null,
+        ILogger? logger = null)
+        : this(session, kind, async (work, _, ct) => new DocumentOutput(await produce(work, ct).ConfigureAwait(false)), time, holistic, logger)
+    {
+    }
+
+    internal DocumentScheduler(DraftSession session, UnitKind kind,
+        Func<DocumentWork, CancellationToken, Task<DocumentOutput>> produce, TimeProvider? time = null,
+        Func<Draft, bool>? holistic = null,
+        ILogger? logger = null)
+        : this(session, kind, (work, _, ct) => produce(work, ct), time, holistic, logger)
+    {
+    }
+
+    internal DocumentScheduler(DraftSession session, UnitKind kind,
+        Func<DocumentWork, Action<string>?, CancellationToken, Task<DocumentOutput>> produce, TimeProvider? time = null,
+        Func<Draft, bool>? holistic = null,
+        ILogger? logger = null)
     {
         _session = session;
         _kind = kind;
         _produce = produce;
+        _holistic = holistic;
+        _logger = logger;
         _time = time ?? TimeProvider.System;
         _timer = _time.CreateTimer(_ => OnChanged(), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
         _session.Changed += OnChanged;
@@ -38,6 +65,11 @@ internal sealed class DocumentScheduler : IAsyncDisposable
             _seenEdit = draft.EditRevision;
             _seenEpoch = draft.Epoch;
             _editedAt = draft.EditRevision > 0 ? _time.GetUtcNow() : DateTimeOffset.MinValue;
+        }
+        if (_seenModeSwitch != draft.ModeSwitchRevision)
+        {
+            _seenModeSwitch = draft.ModeSwitchRevision;
+            _editedAt = DateTimeOffset.MinValue;
         }
         if (draft.Recording)
             _editedAt = DateTimeOffset.MinValue;
@@ -95,7 +127,8 @@ internal sealed class DocumentScheduler : IAsyncDisposable
                 _flight = cancel;
                 try
                 {
-                    work = _session.Read(draft => draft.IsCurrent(ticket) ? DocumentWork.Capture(draft, _kind) : null);
+                    work = _session.Read(draft =>
+                        draft.IsCurrent(ticket) ? DocumentWork.Capture(draft, _kind, _holistic?.Invoke(draft) == true) : null);
                 }
                 catch (Exception ex) { captureError = ex; }
             }
@@ -105,23 +138,37 @@ internal sealed class DocumentScheduler : IAsyncDisposable
                     throw captureError;
                 if (work is null)
                     continue;
-                var text = await _produce(work, cancel.Token).ConfigureAwait(false);
+                long lastStreamTicks = 0;
+                void ReportPartial(string partial)
+                {
+                    if (cancel.IsCancellationRequested || string.IsNullOrEmpty(partial))
+                        return;
+                    var now = System.Diagnostics.Stopwatch.GetTimestamp();
+                    if (lastStreamTicks != 0 && System.Diagnostics.Stopwatch.GetElapsedTime(lastStreamTicks) < StreamThrottle)
+                        return;
+                    lastStreamTicks = now;
+                    _session.MutateIf(draft => !cancel.IsCancellationRequested && draft.StreamDocument(ticket, partial));
+                }
+
+                var output = await _produce(work, ReportPartial, cancel.Token).ConfigureAwait(false);
                 cancel.Token.ThrowIfCancellationRequested();
-                if (string.IsNullOrWhiteSpace(text))
+                if (string.IsNullOrWhiteSpace(output.Text))
                     throw new InvalidDataException("Empty final document response.");
                 _session.Mutate(draft =>
                 {
                     if (!cancel.IsCancellationRequested)
-                        draft.CompleteDocument(ticket, text);
+                        draft.CompleteDocument(ticket, output.Text, warning: output.Warning);
                 });
             }
             catch (OperationCanceledException) when (cancel.IsCancellationRequested) { }
             catch (Exception ex)
             {
+                var err = string.IsNullOrWhiteSpace(ex.Message) ? ex.GetType().Name : ex.Message;
+                _logger?.LogWarning("Final {Kind} document failed (mode={Mode}): {Error}", _kind, ticket.PolishModeId, err);
                 _session.Mutate(draft =>
                 {
                     if (!cancel.IsCancellationRequested)
-                        draft.CompleteDocument(ticket, null, string.IsNullOrWhiteSpace(ex.Message) ? ex.GetType().Name : ex.Message);
+                        draft.CompleteDocument(ticket, null, err);
                 });
             }
             finally

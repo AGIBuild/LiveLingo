@@ -72,6 +72,6 @@ public sealed class JsonPreferencesStoreTests : IDisposable
         var names = System.Text.Json.JsonDocument.Parse(System.IO.File.ReadAllText(File_)).RootElement
             .GetProperty("apps")[0].EnumerateObject().Select(p => p.Name).Order().ToArray();
 
-        Assert.Equal(["appId", "name", "output", "target", "usedAt"], names);
+        Assert.Equal(["appId", "name", "output", "polishMode", "target", "usedAt"], names);
     }
 }

@@ -73,6 +73,14 @@ internal sealed class SettingsIntents : IIntentHandler
             case ClearRecentIntent: _vm.ClearRecentCommand.Execute(null); break;
             case ForgetAppIntent forget: _vm.ForgetApp(forget.AppId); break;
             case ClearAppsIntent: _vm.ClearApps(); break;
+            case SetAppChoiceIntent setApp: _vm.SetAppPreference(setApp.AppId, setApp.AppName, setApp.Choice); break;
+            case OpenPresetFormIntent openPreset: _vm.OpenPresetForm(openPreset.Id); break;
+            case ClosePresetFormIntent: _vm.ClosePresetForm(); break;
+            case SavePresetIntent savePreset: _vm.SavePreset(savePreset.Label, savePreset.Description, savePreset.Gate, savePreset.Instructions); break;
+            case ResetPresetIntent resetPreset: _vm.ResetBuiltInPreset(resetPreset.Id); break;
+            case TogglePresetIntent togglePreset: _vm.SetPresetEnabled(togglePreset.Id, togglePreset.Enabled); break;
+            case DeletePresetIntent deletePreset: _vm.DeletePreset(deletePreset.Id); break;
+            case PresetAnswerIntent presetAnswer: _vm.AnswerDeletePreset(presetAnswer.Allow); break;
             case SelectModelIntent selectModel: _vm.SelectModel(selectModel.ModelId); break;
             case DownloadModelIntent downloadModel: _vm.DownloadModel(downloadModel.ModelId); break;
             case CancelModelDownloadIntent cancelDownload: _vm.CancelModelDownload(cancelDownload.ModelId); break;
@@ -109,6 +117,8 @@ internal sealed class SettingsIntents : IIntentHandler
             case SettingIntent.Names.PreloadSpeech: _vm.PreloadSpeech = value == "true"; break;
             case SettingIntent.Names.BuiltInGlossary: _vm.BuiltInGlossary = value == "true"; break;
             case SettingIntent.Names.RememberChoices: _vm.RememberChoices = value == "true"; break;
+            case SettingIntent.Names.DefaultPolishMode: _vm.DefaultPolishMode = value; break;
+            case SettingIntent.Names.SmartHostPolish: _vm.SmartHostPolish = value == "true"; break;
             case SettingIntent.Names.PolishPrompt: _vm.PolishPrompt = value; break;
             case SettingIntent.Names.ReduceMotion: _vm.ReduceMotion = value == "true"; break;
             case SettingIntent.Names.Cleanup: _vm.CleanupEnabled = value == "true"; break;

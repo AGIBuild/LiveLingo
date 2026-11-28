@@ -432,6 +432,38 @@ public sealed class SettingsPageTests(BrowserFixture browsers)
 
         await page.Page.Locator("#apps-clear").ClickAsync();
         Assert.IsType<ClearAppsIntent>((await page.IntentsAsync()).Last());
+
+        await page.ClearIntentsAsync();
+        await page.Page.Locator("#app-mode-com\\.microsoft\\.VSCode").SelectOptionAsync("clean:ai-task");
+        var appChoice = await page.LastIntentAsync<SetAppChoiceIntent>();
+        Assert.Equal(("com.microsoft.VSCode", "Code", "clean:ai-task"), (appChoice.AppId, appChoice.AppName, appChoice.Choice));
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public async Task PolishPresets_SupportStarterTemplatesInspectToggleAndSafeDeleteDialog(string engine)
+    {
+        await using var page = await browsers.OpenSettingsAsync(engine, "settings-voice");
+
+        Assert.Equal(5, await page.Page.Locator(".preset-row").CountAsync());
+        await page.Page.Locator("#preset-on-formal").ClickAsync();
+        Assert.Equal(new TogglePresetIntent("formal", false) { V = 1 }, await page.LastIntentAsync<TogglePresetIntent>());
+
+        await page.Page.Locator("#preset-add").ClickAsync();
+        Assert.Equal(new OpenPresetFormIntent(null) { V = 1 }, await page.LastIntentAsync<OpenPresetFormIntent>());
+
+        await page.PushAsync("settings-preset-add");
+        await page.Page.Locator("#starter-bug-report").ClickAsync();
+        Assert.Equal("Bug 缺陷与复现", await page.Page.Locator("#pf-name").InputValueAsync());
+        await page.Page.Locator("#pf-save").ClickAsync();
+        var saved = await page.LastIntentAsync<SavePresetIntent>();
+        Assert.Equal("Bug 缺陷与复现", saved.Label);
+        Assert.Equal("FactAnchor", saved.Gate);
+
+        await page.PushAsync("settings-preset-delete");
+        Assert.Equal("preset-keep", await page.Page.EvaluateAsync<string>("document.activeElement.id"));
+        await page.Page.Keyboard.PressAsync("Escape");
+        Assert.False((await page.LastIntentAsync<PresetAnswerIntent>()).Allow);
     }
 
     [Theory]

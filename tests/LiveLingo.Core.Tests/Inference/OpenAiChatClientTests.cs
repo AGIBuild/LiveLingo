@@ -219,4 +219,40 @@ public class OpenAiChatClientTests
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => ClientFor(handler).CompleteAsync(
             new ChatRequest("p", 8, 0, NoExtra), cts.Token));
     }
+
+    [Fact]
+    public async Task CompleteAsync_InvokesOnDeltaInOrderForEachStreamChunk()
+    {
+        var handler = new StubHandler(_ => Sse(Delta("### 目标\n"), Delta("排查 `Auth`"), Stop, "data: [DONE]"));
+        var deltas = new List<string>();
+
+        var result = await ClientFor(handler).CompleteAsync(
+            new ChatRequest("p", 64, 0, NoExtra, OnDelta: deltas.Add),
+            CancellationToken.None);
+
+        Assert.Equal(["### 目标\n", "排查 `Auth`"], deltas);
+        Assert.Equal("### 目标\n排查 `Auth`", result.Text);
+    }
+
+    [Fact]
+    public async Task WarmPromptAsync_PrefillsLocalLlamaServerSlot_AndNeverSendsToHostedEndpoints()
+    {
+        var localHandler = new StubHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("{\"choices\":[{\"finish_reason\":\"length\"}]}", Encoding.UTF8, "application/json")
+        });
+        var extra = new Dictionary<string, object> { ["seed"] = 42, ["cache_prompt"] = true };
+        await ClientFor(localHandler, extras: true).WarmPromptAsync("系统提示词", extra, CancellationToken.None);
+
+        Assert.NotNull(localHandler.RequestBody);
+        using var body = System.Text.Json.JsonDocument.Parse(localHandler.RequestBody!);
+        Assert.False(body.RootElement.GetProperty("stream").GetBoolean());
+        Assert.Equal(1, body.RootElement.GetProperty("max_tokens").GetInt32());
+        Assert.True(body.RootElement.GetProperty("cache_prompt").GetBoolean());
+        Assert.Equal("系统提示词", body.RootElement.GetProperty("messages")[0].GetProperty("content").GetString());
+
+        var cloudHandler = new StubHandler(_ => throw new InvalidOperationException("Cloud must not receive warm-up."));
+        await ClientFor(cloudHandler, extras: false).WarmPromptAsync("系统提示词", extra, CancellationToken.None);
+        Assert.Null(cloudHandler.RequestBody);
+    }
 }

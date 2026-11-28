@@ -938,4 +938,74 @@ public class SettingsViewModelTests
             new ModelDownloadState(ModelCatalog.SpeechQuality.Id, ModelDownloadStatus.Installed, 100, null));
         Assert.Equal(ModelCatalog.SpeechQuality.Id, f.Vm.ActiveModels.SpeechModelId);
     }
+
+    // ---- scenario polish presets & app choices ---------------------------------------
+
+    [Fact]
+    public void CustomPreset_CanBeAddedEditedToggledAndDeleted_AndValidationGuardsErrors()
+    {
+        var f = new Fixture();
+        Assert.Equal(5, f.Vm.Presets.Count);
+
+        f.Vm.OpenPresetForm(null);
+        Assert.False(f.Vm.SavePreset("", "desc", "FactAnchor", "Valid custom instructions here."));
+        Assert.Equal(PresetFormError.NameMissing, f.Vm.ActivePresetForm?.Error);
+
+        Assert.False(f.Vm.SavePreset("Bug 单", "desc", "FactAnchor", "short"));
+        Assert.Equal(PresetFormError.InstructionsInvalid, f.Vm.ActivePresetForm?.Error);
+
+        Assert.True(f.Vm.SavePreset("Bug 单", "复现与预期", "FactAnchor", "提炼复现步骤、预期行为与实际报错。"));
+        Assert.Null(f.Vm.ActivePresetForm);
+        var added = Assert.Single(f.Vm.Presets, p => !p.BuiltIn);
+        Assert.Equal("Bug 单", added.Name);
+        Assert.Equal(PolishGateKind.FactAnchor, added.Gate);
+
+        // Duplicate name rejected when adding another
+        f.Vm.OpenPresetForm(null);
+        Assert.False(f.Vm.SavePreset("bug 单", "dup", "FactAnchor", "提炼复现步骤、预期行为与实际报错。"));
+        Assert.Equal(PresetFormError.NameTaken, f.Vm.ActivePresetForm?.Error);
+        f.Vm.ClosePresetForm();
+
+        // Set as default: cannot disable the active default preset
+        f.Vm.DefaultPolishMode = added.Id;
+        f.Vm.SetPresetEnabled(added.Id, false);
+        Assert.True(f.Vm.Presets.Single(p => p.Id == added.Id).Enabled);
+
+        // Configure an app to use this preset, then delete it: app & default revert cleanly to natural
+        f.Vm.SetAppPreference("com.linear", "Linear", $"clean:{added.Id}");
+        Assert.Equal(added.Id, Assert.Single(f.Vm.Apps).PolishMode);
+
+        f.Vm.DeletePreset(added.Id);
+        Assert.Equal(added.Id, f.Vm.PendingDeletePreset?.Id);
+        f.Vm.AnswerDeletePreset(allow: false);
+        Assert.Contains(f.Vm.Presets, p => p.Id == added.Id);
+
+        f.Vm.DeletePreset(added.Id);
+        f.Vm.AnswerDeletePreset(allow: true);
+        Assert.DoesNotContain(f.Vm.Presets, p => p.Id == added.Id);
+        Assert.Equal(PolishPresets.NaturalId, f.Vm.DefaultPolishMode);
+        Assert.Equal("", Assert.Single(f.Vm.Apps).PolishMode);
+    }
+
+    [Fact]
+    public void BuiltInPreset_CanBeCustomizedResetAndToggled_AndAppPreferenceSupportsTranslateAndDefault()
+    {
+        var f = new Fixture();
+
+        f.Vm.OpenPresetForm(PolishPresets.AiTaskId);
+        Assert.True(f.Vm.SavePreset("", "", "FactAnchor", "始终用无序列表整理核心目标与护栏限制。"));
+        Assert.True(f.Vm.Presets.Single(p => p.Id == PolishPresets.AiTaskId).IsCustomized);
+
+        f.Vm.SetPresetEnabled(PolishPresets.FormalId, false);
+        Assert.False(f.Vm.Presets.Single(p => p.Id == PolishPresets.FormalId).Enabled);
+
+        f.Vm.ResetBuiltInPreset(PolishPresets.AiTaskId);
+        Assert.False(f.Vm.Presets.Single(p => p.Id == PolishPresets.AiTaskId).IsCustomized);
+
+        f.Vm.SetAppPreference("com.slack", "Slack", "translate:English");
+        Assert.Equal(LiveLingo.Desktop.Composer.ComposerOutput.Translate, Assert.Single(f.Vm.Apps).Output);
+
+        f.Vm.SetAppPreference("com.slack", "Slack", "default");
+        Assert.Empty(f.Vm.Apps);
+    }
 }

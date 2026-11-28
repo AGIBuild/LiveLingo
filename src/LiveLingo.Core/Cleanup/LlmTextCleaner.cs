@@ -1,4 +1,5 @@
 using System.Text;
+using System.Text.RegularExpressions;
 using LiveLingo.Core.Dictation;
 using LiveLingo.Core.Inference;
 using LiveLingo.Core.Translation;
@@ -11,7 +12,7 @@ namespace LiveLingo.Core.Cleanup;
 /// the recognizer cuts speech at pauses, so a sentence alone is often half a thought, and a repeated or misheard
 /// word can only be recognized from the sentences around it.
 /// </summary>
-public sealed class LlmTextCleaner(IChatCompletionClient client) : ITextCleaner
+public sealed partial class LlmTextCleaner(IChatCompletionClient client) : ITextCleaner
 {
     private const int MaxOutputTokens = 1700;
 
@@ -88,11 +89,59 @@ public sealed class LlmTextCleaner(IChatCompletionClient client) : ITextCleaner
 
     private static readonly char[] EchoSeparators = [' ', '\n', '，', ',', '。', '！', '？', '；', '、', '.', '!', '?', ';'];
 
+    private static readonly string[] MetaPrefixes = ["目标：", "润色结果：", "润色后：", "润色：", "输出："];
+
     internal static string Tidy(string output)
     {
-        var text = output.Trim();
-        if (text.StartsWith("目标：", StringComparison.Ordinal))
-            text = text["目标：".Length..].Trim();
+        var text = ClosedThinkBlock().Replace(output, "");
+        text = EditorMetaParenthetical().Replace(text, "").Trim();
+        foreach (var prefix in MetaPrefixes)
+        {
+            if (text.StartsWith(prefix, StringComparison.Ordinal))
+            {
+                text = text[prefix.Length..].Trim();
+                break;
+            }
+        }
         return text.Trim('"', '“', '”');
     }
+
+    /// <summary>
+    /// Sanitizes an in-progress streaming buffer without stripping meaningful trailing newlines: hides closed or
+    /// still-open <c>&lt;think&gt;</c> blocks and holds back partial meta prefixes so reasoning or labels never flash.
+    /// </summary>
+    internal static string TidyStreaming(string partial)
+    {
+        var text = ClosedThinkBlock().Replace(partial, "");
+        var openThink = text.IndexOf("<think", StringComparison.OrdinalIgnoreCase);
+        if (openThink >= 0)
+            text = text[..openThink];
+        text = EditorMetaParenthetical().Replace(text, "");
+
+        text = text.TrimStart();
+        if (text.Length == 0)
+            return "";
+
+        if (text[0] == '<' && "<think>".StartsWith(text, StringComparison.OrdinalIgnoreCase))
+            return "";
+
+        foreach (var prefix in MetaPrefixes)
+        {
+            if (text.Length < prefix.Length && prefix.StartsWith(text, StringComparison.Ordinal))
+                return "";
+            if (text.StartsWith(prefix, StringComparison.Ordinal))
+            {
+                text = text[prefix.Length..].TrimStart();
+                break;
+            }
+        }
+
+        return text.TrimStart('"', '“');
+    }
+
+    [GeneratedRegex(@"<think>[\s\S]*?</think>", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant)]
+    private static partial Regex ClosedThinkBlock();
+
+    [GeneratedRegex(@"[（(]\s*(?:原[文话](?:提及|提到|未提及|中)|注[:：]\s*原[文话]|此处保留)[^）)\n]*[）)]", RegexOptions.CultureInvariant)]
+    private static partial Regex EditorMetaParenthetical();
 }

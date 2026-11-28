@@ -161,8 +161,8 @@ public static class SpeechOptimizationStrategies
     /// <summary>
     /// Local Qwen/Qwen3-ASR-1.7B (INT8 ONNX):
     /// - Verbatim ASR (no native disfluency polish -> must NOT bypass CleanupScheduler / PolishScheduler).
-    /// - Larger 28-layer Qwen3 LM benefits from intact multi-clause context (6.5s soft / 11s hard / 15s chunk cap = 195 audio tokens &lt;&lt; 512 KV).
-    /// - Raises MaxNewTokens to 224 so dense bilingual code-switched segments never truncate at Sherpa's 128-token default.
+    /// - Balanced 5.5s soft / 9s hard / 11s chunk cap (~138 audio tokens + &lt;=44 prompt tokens = 182 input tokens &lt;&lt; 512 KV),
+    ///   paired with MaxNewTokens = 288 (&gt;26 tokens/sec headroom; 182 + 288 = 470 &lt;= 512 KV) so rapid broadcast speech never truncates.
     /// - Scales CPU threads up to 8 on multi-core hosts to feed the 2.04 GB INT8 decoder bandwidth, with a 25s stop drain timeout.
     /// </summary>
     private sealed class Qwen3Asr17BLocalStrategy : ILocalSecondPassStrategy
@@ -174,14 +174,14 @@ public static class SpeechOptimizationStrategies
             HotwordMode: SpeechHotwordMode.BoundedPromptHead,
             SupportsNativePolish: false,
             SupportsRollingContext: false,
-            MaxSegmentSeconds: 15,
+            MaxSegmentSeconds: 11,
             StripChunkBoundaryPeriod: true,
             HoldDanglingClausePeriod: true,
             MaxCharsPerSecondGuard: 15.0,
             Dictation: new DictationOptions
             {
-                SoftMaxUtteranceMs = 6_500,
-                HardMaxUtteranceMs = 11_000,
+                SoftMaxUtteranceMs = 5_500,
+                HardMaxUtteranceMs = 9_000,
                 StopTimeoutMs = 25_000,
                 SecondPassMaxCharsPerSecond = 15.0,
                 HoldDanglingClausePeriod = true
@@ -191,19 +191,25 @@ public static class SpeechOptimizationStrategies
             configuredThreads > 0 ? configuredThreads : Math.Clamp(logicalCores / 2, 4, 8);
 
         public IReadOnlyList<string> SelectPromptHotwords(Glossary? glossary, IReadOnlyList<string> fallbackHotwords) =>
-            glossary is not null ? glossary.SpeechHotwords() : Glossary.BoundHotwords(fallbackHotwords);
+            glossary is not null
+                ? glossary.UserSpeechHotwords()
+                : Glossary.BoundHotwords(
+                    fallbackHotwords,
+                    Glossary.MaxLocalUserSpeechHotwords,
+                    Glossary.MaxLocalUserSpeechHotwordChars,
+                    Glossary.MaxLocalUserSpeechHotwordTokens);
 
         public IReadOnlyDictionary<string, int> SelectCloudVocabulary(Glossary? glossary, IReadOnlyList<string> fallbackHotwords) =>
             new Dictionary<string, int>(StringComparer.Ordinal);
 
         public OfflineRecognizer Load(string modelDir, string hotwords, int threads) =>
-            SherpaQwen3Recognizer.Load(modelDir, hotwords, threads, maxNewTokens: 224);
+            SherpaQwen3Recognizer.Load(modelDir, hotwords, threads, maxNewTokens: 288);
     }
 
     /// <summary>
     /// Local Qwen/Qwen3-ASR-0.6B (INT8 ONNX):
-    /// - Compact 0.6B LM tuned for fast turnaround on 8–16 GB devices (4s soft / 8s hard / 13s chunk cap).
-    /// - Bounded 36-token prompt-head hotwords and 192 max_new_tokens within 512 KV.
+    /// - Compact 0.6B LM tuned for fast turnaround on 8–16 GB devices (4s soft / 7.5s hard / 10s chunk cap).
+    /// - Bounded user hotwords and 256 max_new_tokens within 512 KV (125 audio + 44 prompt + 256 output = 425 &lt;= 512).
     /// </summary>
     private sealed class Qwen3Asr06BLocalStrategy : ILocalSecondPassStrategy
     {
@@ -214,14 +220,14 @@ public static class SpeechOptimizationStrategies
             HotwordMode: SpeechHotwordMode.BoundedPromptHead,
             SupportsNativePolish: false,
             SupportsRollingContext: false,
-            MaxSegmentSeconds: 13,
+            MaxSegmentSeconds: 10,
             StripChunkBoundaryPeriod: true,
             HoldDanglingClausePeriod: true,
             MaxCharsPerSecondGuard: 15.0,
             Dictation: new DictationOptions
             {
                 SoftMaxUtteranceMs = 4_000,
-                HardMaxUtteranceMs = 8_000,
+                HardMaxUtteranceMs = 7_500,
                 StopTimeoutMs = 15_000,
                 SecondPassMaxCharsPerSecond = 15.0,
                 HoldDanglingClausePeriod = true
@@ -231,13 +237,19 @@ public static class SpeechOptimizationStrategies
             configuredThreads > 0 ? configuredThreads : Math.Clamp(logicalCores / 2, 4, 6);
 
         public IReadOnlyList<string> SelectPromptHotwords(Glossary? glossary, IReadOnlyList<string> fallbackHotwords) =>
-            glossary is not null ? glossary.SpeechHotwords() : Glossary.BoundHotwords(fallbackHotwords);
+            glossary is not null
+                ? glossary.UserSpeechHotwords()
+                : Glossary.BoundHotwords(
+                    fallbackHotwords,
+                    Glossary.MaxLocalUserSpeechHotwords,
+                    Glossary.MaxLocalUserSpeechHotwordChars,
+                    Glossary.MaxLocalUserSpeechHotwordTokens);
 
         public IReadOnlyDictionary<string, int> SelectCloudVocabulary(Glossary? glossary, IReadOnlyList<string> fallbackHotwords) =>
             new Dictionary<string, int>(StringComparer.Ordinal);
 
         public OfflineRecognizer Load(string modelDir, string hotwords, int threads) =>
-            SherpaQwen3Recognizer.Load(modelDir, hotwords, threads, maxNewTokens: 192);
+            SherpaQwen3Recognizer.Load(modelDir, hotwords, threads, maxNewTokens: 256);
     }
 
     /// <summary>

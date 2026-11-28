@@ -22,7 +22,7 @@ public sealed partial class ComposerViewModel
     [ObservableProperty] private bool _forceWhole;
 
     /// <summary>Always show the source and the result side by side (the "wide" menu item).</summary>
-    [ObservableProperty] private bool _forceWide;
+    [ObservableProperty] private bool _forceWide = true;
 
     /// <summary>The user chose "no input box · copy only" for this draft.</summary>
     [ObservableProperty] private bool _copyOnly;

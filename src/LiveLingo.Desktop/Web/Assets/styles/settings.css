@@ -140,6 +140,24 @@ button.danger:hover { background: var(--hover); }
 .about-title { font-size: 18px; font-weight: 700; }
 .about-hero .hint { margin-top: 2px; font-size: 13px; color: var(--muted); }
 
+.presets { padding-top: 14px; border-top: 1px solid var(--line); margin-bottom: 12px; }
+.presets-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.presets .hint { padding: 2px 0 8px; }
+.preset-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.preset-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 11px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+.preset-row.disabled { opacity: .68; background: var(--hover); }
+.preset-main { flex: 1; min-width: 0; }
+.preset-title-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.preset-name { font-size: 14px; font-weight: 600; }
+.preset-desc { margin-top: 3px; font-size: 12px; color: var(--muted); }
+.preset-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+.starter-bar { display: grid; gap: 6px; padding: 9px 11px; border: 1px dashed var(--line-strong); border-radius: 10px; background: var(--hover); }
+.starter-lbl { font-size: 12px; font-weight: 600; color: var(--muted); }
+.starter-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.preset-form textarea { width: 100%; min-height: 150px; font: 13px/1.55 var(--font); resize: vertical; }
+.preset-form select { width: 100%; font-weight: 400; }
+.preset-note { padding: 0; margin: 0; font-size: 12px; }
+
 .polish { padding-top: 12px; border-top: 1px solid var(--line); }
 .polish-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .polish-head h2 { display: flex; align-items: center; gap: 8px; }
@@ -163,6 +181,7 @@ button.danger:hover { background: var(--hover); }
 .app { display: flex; align-items: center; gap: 12px; padding: 9px 0; border-top: 1px solid var(--line); }
 .app-name { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .app-summary { flex: 1; min-width: 0; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.app-select { max-width: 210px; font-size: 13px; padding: 5px 9px; }
 .app time { color: var(--faint); font-size: 12px; }
 
 button.link { padding: 4px 8px; border-radius: 8px; color: var(--muted); }
@@ -177,8 +196,8 @@ button.link.danger { color: var(--danger); }
 .endpoint-form .err { color: var(--danger); font-size: 13px; }
 .btn.primary.destructive, .btn.primary.destructive:hover:not(:disabled) { background: var(--danger); }
 
-.scrim { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; background: rgba(10, 14, 22, .4); }
-.scrim .dialog { width: min(520px, calc(100% - 48px)); padding: 20px 22px; border: 1px solid var(--line); border-radius: 18px; background: var(--panel); box-shadow: var(--shadow); }
+.scrim { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; background: rgba(10, 14, 22, .4); overscroll-behavior: contain; }
+.scrim .dialog { width: min(560px, calc(100% - 48px)); max-height: calc(100vh - 48px); overflow-y: auto; overscroll-behavior: contain; padding: 20px 22px; border: 1px solid var(--line); border-radius: 18px; background: var(--panel); box-shadow: var(--shadow); }
 .diag { display: grid; grid-template-columns: max-content 1fr; gap: 6px 18px; margin: 8px 0 0; user-select: text; }
 .diag > div { display: contents; }
 .diag dt { color: var(--muted); }

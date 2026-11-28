@@ -16,6 +16,12 @@ public class TextTidyTests
     [InlineData("<|zh|>你好<|en|>", "你好")]
     [InlineData("language Chinese<asr_text>请把 LiveLingo 打开。", "请把 LiveLingo 打开。")]
     [InlineData("language None<asr_text>", "")]
+    [InlineData("从头到尾干完了```tableular data``` ```text\nlanguage Chinese啊，乖乖。", "从头到尾干完了啊，乖乖。")]
+    [InlineData("皮肤不重要。<thibbe Na na牛魔来，你大招呀？", "皮肤不重要。牛魔来，你大招呀？")]
+    [InlineData("很多人会自行购买，{ \"language\": \"Chinese\", \"text\": \"抗病毒药物，建议在临床医生的指导下进行用药。\" }", "很多人会自行购买，抗病毒药物，建议在临床医生的指导下进行用药。")]
+    [InlineData("{ \"language\": \"Chinese\", \"text\": \"半截被截断的识别文本", "半截被截断的识别文本")]
+    [InlineData("测试 <unk> 结束", "测试结束")]
+    [InlineData("a < b && c > d", "a < b && c > d")]
     public void DropsSpecialTokens_AndEverythingAModelInventsAfterItsEndOfText(string input, string expected) =>
         Assert.Equal(expected, TextTidy.Apply(input));
 }

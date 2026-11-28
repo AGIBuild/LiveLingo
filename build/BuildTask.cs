@@ -180,6 +180,7 @@ class BuildTask : FalloutBuild
         new(@"_ISSetPhysicalKeyboardCapsLockLED", RegexOptions.Compiled),
         new(@"CFPasteboardSetExpirationDate", RegexOptions.Compiled),
         new(@"qwen3-asr: decode collapsed into a repetition loop after \d+ tokens; truncating the repetition", RegexOptions.Compiled),
+        new(@"Result is truncated\. max_new_tokens \d+ is too small for this audio input", RegexOptions.Compiled),
     ];
 
     private static void RunProcessLogger(OutputType type, string output)
@@ -224,6 +225,27 @@ class BuildTask : FalloutBuild
                 $"--configuration {Configuration} " +
                 $"--no-build " +
                 $"--filter \"FullyQualifiedName~TranslationProbeTests\" " +
+                $"--logger \"console;verbosity=detailed\" " +
+                $"--nologo",
+                environmentVariables: env);
+        });
+
+    // End-to-end probe of multi-scenario polish quality across AI pair-working and office cases.
+    Target ProbePolish => _ => _
+        .DependsOn(Build)
+        .Executes(() =>
+        {
+            var env = new Dictionary<string, string>
+            {
+                ["LIVELINGO_ENABLE_POLISH_PROBE"] = "1",
+                ["LIVELINGO_PROBE_MODEL_PATH"] = ProbeModelPath
+            }.AsReadOnly();
+
+            DotNet(
+                $"test \"{TestsDir / "LiveLingo.Core.Tests" / "LiveLingo.Core.Tests.csproj"}\" " +
+                $"--configuration {Configuration} " +
+                $"--no-build " +
+                $"--filter \"FullyQualifiedName~PolishQualityProbeTests\" " +
                 $"--logger \"console;verbosity=detailed\" " +
                 $"--nologo",
                 environmentVariables: env);

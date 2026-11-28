@@ -32,6 +32,7 @@ public sealed class PolishScheduler : IAsyncDisposable
     private readonly IReadOnlyList<string> _glossary;
     private readonly IReadOnlyList<GlossaryCorrection> _corrections;
     private readonly string _style;
+    private readonly bool _usePresets;
     private readonly int _contextChars;
     private readonly ILogger<PolishScheduler> _logger;
 
@@ -39,8 +40,15 @@ public sealed class PolishScheduler : IAsyncDisposable
     private readonly CancellationTokenSource _stop = new();
     private readonly HashSet<int> _polished = [];
     private readonly HashSet<string> _tried = [];
+    private IReadOnlyList<PolishPreset> _presets;
 
     private string? _summary;
+    private string? _cachedDocSummarySource;
+    private string? _cachedDocSummary;
+    private string? _warmedKey;
+    private string? _warmingKey;
+    private CancellationTokenSource? _warmCts;
+    private Task _warmTask = Task.CompletedTask;
     private int _revision = -1;
     private int _sourceRevision = -1;
     private CancellationTokenSource? _flight;
@@ -61,13 +69,68 @@ public sealed class PolishScheduler : IAsyncDisposable
         _glossary = glossary;
         _corrections = corrections ?? [];
         _style = PolishStyle.Resolve(style);
+        _usePresets = false;
+        _presets = PolishPresets.BuiltIns;
         _contextChars = contextChars;
         _logger = logger ?? NullLogger<PolishScheduler>.Instance;
-        _documents = new DocumentScheduler(session, UnitKind.Clean, PolishDocumentAsync, time);
+        _documents = new DocumentScheduler(session, UnitKind.Clean, (work, ct) => PolishDocumentAsync(work, null, ct), time, logger: _logger);
         _session.Mutate(draft => draft.PolishExpected = true);
         _session.Changed += OnChanged;
         OnChanged();
     }
+
+    /// <summary>Scenario-preset constructor used by the multi-scenario Composer.</summary>
+    public PolishScheduler(
+        DraftSession session,
+        IDictationPolisher polisher,
+        IReadOnlyList<string> glossary,
+        IReadOnlyList<PolishPreset> presets,
+        int contextChars,
+        ILogger<PolishScheduler>? logger = null,
+        IReadOnlyList<GlossaryCorrection>? corrections = null,
+        TimeProvider? time = null)
+    {
+        _session = session;
+        _polisher = polisher;
+        _glossary = glossary;
+        _corrections = corrections ?? [];
+        _style = PolishStyle.Default;
+        _usePresets = true;
+        _presets = presets is { Count: > 0 } ? presets : PolishPresets.BuiltIns;
+        _contextChars = contextChars;
+        _logger = logger ?? NullLogger<PolishScheduler>.Instance;
+        _documents = new DocumentScheduler(
+            session,
+            UnitKind.Clean,
+            PolishDocumentAsync,
+            time,
+            holistic: draft => ResolvePreset(draft.PolishModeId).Route == PolishRouteKind.Holistic,
+            logger: _logger);
+        _session.Mutate(draft => draft.PolishExpected = true);
+        _session.Changed += OnChanged;
+        OnChanged();
+    }
+
+    /// <summary>Updates the configured preset catalog when the user edits or adds presets in Settings.</summary>
+    public void UpdatePresets(IReadOnlyList<PolishPreset> presets)
+    {
+        lock (_gate)
+            _presets = presets is { Count: > 0 } ? presets : PolishPresets.BuiltIns;
+    }
+
+    private PolishPreset ResolvePreset(string modeId)
+    {
+        lock (_gate)
+            return PolishPresets.Resolve(modeId, _presets);
+    }
+
+    private static string BasePresetStyle(PolishPreset preset) =>
+        preset.EffectiveInstructions + (preset.Gate == PolishGateKind.FactAnchor
+            ? "\n代码、URL、占位符和技术标识符必须逐字保留。"
+            : "\n保留显式段落、缩进和列表结构；代码、URL、占位符和技术标识符必须逐字保留。");
+
+    private static string PresetCacheKey(PolishPreset preset) =>
+        $"{preset.Gate}:{BasePresetStyle(preset)}";
 
     private void OnChanged()
     {
@@ -76,7 +139,15 @@ public sealed class PolishScheduler : IAsyncDisposable
             if (_disposed)
                 return;
 
-            var due = _session.Read(Observe);
+            var (due, recording, cleanSelected, frozen, modeId) = _session.Read(draft => (
+                Due: Observe(draft),
+                Recording: _usePresets && draft.DocumentMode && draft.Recording,
+                CleanSelected: draft.Output == OutputKind.Clean,
+                Frozen: draft.Snapshot is not null,
+                ModeId: draft.PolishModeId));
+
+            UpdatePromptWarmupLocked(recording, cleanSelected, frozen, modeId);
+
             if (_running || !due)
                 return;
 
@@ -85,11 +156,309 @@ public sealed class PolishScheduler : IAsyncDisposable
         }
     }
 
+    private void UpdatePromptWarmupLocked(bool recording, bool cleanSelected, bool frozen, string modeId)
+    {
+        if (!cleanSelected || frozen)
+        {
+            if (_warmCts is { } active)
+            {
+                active.Cancel();
+                _warmCts = null;
+                _warmingKey = null;
+            }
+            return;
+        }
+
+        var preset = PolishPresets.Resolve(modeId, _presets);
+        var key = PresetCacheKey(preset);
+        if (!recording)
+        {
+            // Keep an already-running warm-up for the same preset alive across Recording=false so a cold llama-server
+            // startup or nearly-finished KV prefill is never aborted and restarted; only cancel mismatched presets.
+            if (_warmCts is { } active && !string.Equals(_warmingKey, key, StringComparison.Ordinal))
+            {
+                active.Cancel();
+                _warmCts = null;
+                _warmingKey = null;
+            }
+            return;
+        }
+
+        var style = BasePresetStyle(preset);
+        if (string.Equals(_warmedKey, key, StringComparison.Ordinal) ||
+            string.Equals(_warmingKey, key, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _warmCts?.Cancel();
+        var cts = CancellationTokenSource.CreateLinkedTokenSource(_stop.Token);
+        _warmCts = cts;
+        _warmingKey = key;
+        var gate = preset.Gate;
+        _warmTask = Task.Run(() => WarmPresetCoreAsync(style, gate, key, cts));
+    }
+
+    private async Task WarmPresetCoreAsync(
+        string style,
+        PolishGateKind gate,
+        string key,
+        CancellationTokenSource cts)
+    {
+        try
+        {
+            await _polisher.WarmPresetAsync(style, gate, _glossary, cts.Token).ConfigureAwait(false);
+            lock (_gate)
+            {
+                if (!cts.IsCancellationRequested && ReferenceEquals(_warmCts, cts))
+                {
+                    _warmedKey = key;
+                    _warmingKey = null;
+                    _warmCts = null;
+                }
+            }
+        }
+        catch (OperationCanceledException) when (cts.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Skipped prompt KV warm-up for polish preset.");
+        }
+        finally
+        {
+            lock (_gate)
+            {
+                if (ReferenceEquals(_warmCts, cts))
+                {
+                    _warmingKey = null;
+                    _warmCts = null;
+                }
+            }
+            cts.Dispose();
+        }
+    }
+
     /// <summary>A recording just stopped and the polish is not done: only for the cleanup output, and not for a frozen draft.</summary>
     private static bool IsDue(Draft draft) =>
         !draft.DocumentMode && draft.Polishing && !draft.Recording && draft.Snapshot is null && draft.Output == OutputKind.Clean;
 
-    private async Task<string> PolishDocumentAsync(DocumentWork work, CancellationToken ct)
+    private async Task<DocumentOutput> PolishDocumentAsync(
+        DocumentWork work,
+        Action<string>? onPartial,
+        CancellationToken ct)
+    {
+        if (!_usePresets)
+            return new DocumentOutput(await PolishLegacyDocumentAsync(work, ct).ConfigureAwait(false));
+
+        var preset = ResolvePreset(work.Ticket.PolishModeId);
+        if (preset.IsDefaultNatural && work.AllNativePolished && !string.IsNullOrWhiteSpace(work.NativePolishedText))
+            return new DocumentOutput(work.NativePolishedText);
+
+        var unownedCount = work.Pieces.Count(piece => !piece.Owned);
+        var summary = unownedCount > 1
+            ? await GetOrSummarizeDocumentAsync(work.Source, ct).ConfigureAwait(false) : "";
+        var pieceIndex = 0;
+        GateRejection? softWarning = null;
+        var assembled = await work.TransformAsync(async (target, preceding, piecePartial, token) =>
+        {
+            var isContinuation = pieceIndex++ > 0 && preset.Route == PolishRouteKind.Holistic;
+            string? turnHint = null;
+            if (isContinuation)
+                turnHint = "【分段衔接提示：这是长口述的后续分段，前文已包含开头小节，请直接延续要点，不要重复生成顶层总标题。】";
+            else if (preset.Id == PolishPresets.AiTaskId && target.Trim().Length <= 90 && !target.Contains('\n'))
+                turnHint = "【当前原话有效长度较短：请直接输出 1～2 句平铺直叙的精炼指令，严禁使用 `###` 标题分节！】";
+
+            var request = new PolishRequest(
+                target,
+                preceding,
+                summary,
+                _glossary,
+                BasePresetStyle(preset),
+                _corrections,
+                preset.Gate,
+                OnPartial: piecePartial,
+                TurnHint: turnHint);
+
+            string text = "";
+            GateRejection? rejection = null;
+            var isHardFailure = false;
+            try
+            {
+                text = (await _polisher.PolishAsync(request, token).ConfigureAwait(false)).Trim();
+                lock (_gate)
+                    _warmedKey = PresetCacheKey(preset);
+            }
+            catch (InvalidDataException)
+            {
+                rejection = new GateRejection(GateReason.Incomplete);
+                isHardFailure = true;
+            }
+            token.ThrowIfCancellationRequested();
+
+            if (rejection is null)
+                rejection = ValidatePresetOutput(preset, target, text, work.SpokenSource, out isHardFailure);
+
+            if (rejection is { } firstRejection)
+            {
+                _logger.LogInformation("Preset '{Preset}' rejected on first pass ({Reason}: {Detail}); running targeted repair.",
+                    preset.Id, firstRejection.Reason, firstRejection.Detail);
+                if (firstRejection.Reason is GateReason.ExecutionHijack or GateReason.RoleplaySlop or GateReason.MultiLine)
+                    _session.MutateIf(draft => draft.ClearStreamingDocument(work.Ticket));
+                var repairHint = FormatRepairFeedback(firstRejection);
+                try
+                {
+                    // Run 1x targeted self-repair silently (OnPartial = null) so the right pane never wipes and types twice.
+                    text = (await _polisher.PolishAsync(
+                        request with { RepairFeedback = repairHint, OnPartial = null },
+                        token).ConfigureAwait(false)).Trim();
+                    rejection = ValidatePresetOutput(preset, target, text, work.SpokenSource, out isHardFailure);
+                }
+                catch (InvalidDataException)
+                {
+                    rejection = new GateRejection(GateReason.Incomplete);
+                    isHardFailure = true;
+                }
+                token.ThrowIfCancellationRequested();
+            }
+
+            if (rejection is { } finalRejection)
+            {
+                // Soft warnings (e.g. spoken ratio conversions, entity restorations like "R星"->"Rockstar", or heavy
+                // spoken disfluency compression after 1x repair) preserve the polished document and surface a review badge.
+                if (!isHardFailure && !string.IsNullOrWhiteSpace(text))
+                {
+                    _logger.LogWarning("Preset '{Preset}' completed with soft warning ({Reason}: {Detail}).",
+                        preset.Id, finalRejection.Reason, finalRejection.Detail);
+                    softWarning ??= finalRejection;
+                    return text;
+                }
+
+                if (preset.Route == PolishRouteKind.Piecewise)
+                {
+                    _logger.LogWarning("Piecewise preset '{Preset}' kept source chunk after repair ({Reason}: {Detail}).",
+                        preset.Id, finalRejection.Reason, finalRejection.Detail);
+                    softWarning ??= finalRejection;
+                    return Glossary.ApplyCorrections(target, _corrections);
+                }
+
+                throw new InvalidDataException(FormatGateFailure(finalRejection));
+            }
+            return text;
+        }, _contextChars, onPartial, ct).ConfigureAwait(false);
+
+        return new DocumentOutput(assembled, softWarning);
+    }
+
+    private async Task<string> GetOrSummarizeDocumentAsync(string source, CancellationToken ct)
+    {
+        lock (_gate)
+        {
+            if (_cachedDocSummarySource == source && _cachedDocSummary is not null)
+                return _cachedDocSummary;
+        }
+
+        var summary = await _polisher.SummarizeAsync(source, ct).ConfigureAwait(false);
+        lock (_gate)
+        {
+            _cachedDocSummarySource = source;
+            _cachedDocSummary = summary;
+        }
+        return summary;
+    }
+
+    private GateRejection? ValidatePresetOutput(
+        PolishPreset preset,
+        string target,
+        string candidate,
+        bool spokenSource,
+        out bool isHardFailure)
+    {
+        if (preset.Gate == PolishGateKind.FactAnchor)
+        {
+            var anchor = FactAnchorGate.CheckDetailed(
+                target,
+                candidate,
+                _glossary,
+                _corrections,
+                preset.ForbidExecution,
+                preset.AllowSelectiveExtraction || !preset.BuiltIn,
+                spokenSource,
+                out isHardFailure);
+            return anchor.Rejection;
+        }
+
+        if (preset.ForbidExecution && FactAnchorGate.HasHardSafetyViolation(target, candidate.Trim(), spokenSource, out var safetyReason))
+        {
+            isHardFailure = true;
+            return new GateRejection(safetyReason);
+        }
+
+        var targetSpans = spokenSource ? TextUnits.NonCodeLiteralSpans(target) : TextUnits.LiteralSpans(target);
+        var candidateSpans = spokenSource ? TextUnits.NonCodeLiteralSpans(candidate) : TextUnits.LiteralSpans(candidate);
+        var targetLiterals = targetSpans.Select(span => target[span.Start..span.End]);
+        var candidateLiterals = candidateSpans.Select(span => candidate[span.Start..span.End]);
+        if (!targetLiterals.SequenceEqual(candidateLiterals))
+        {
+            isHardFailure = true;
+            return new GateRejection(GateReason.TermLost, "literal");
+        }
+
+        var gate = FidelityGate.Check(
+            target,
+            candidate,
+            _glossary,
+            allowParagraphs: true,
+            corrections: _corrections,
+            relaxedVerbatim: preset.RelaxedVerbatim,
+            spokenDocument: spokenSource);
+        if (gate.Rejection is { } rej)
+        {
+            var reason = rej.Reason;
+            isHardFailure = !spokenSource
+                || reason is GateReason.Empty
+                    or GateReason.Incomplete
+                    or GateReason.MultiLine
+                    or GateReason.Brackets
+                    or GateReason.ExecutionHijack
+                    or GateReason.RoleplaySlop
+                    or GateReason.NumberLost
+                    or GateReason.NumberInvented
+                || (reason == GateReason.Added
+                    && (rej.Detail == "markdown"
+                        || rej.Detail.Any(c => "不没别无非未否".Contains(c))))
+                || (reason == GateReason.Deleted
+                    && rej.Detail.Any(c => "不没别无非未否".Contains(c)));
+            return rej;
+        }
+
+        isHardFailure = false;
+        return null;
+    }
+
+    private static string FormatRepairFeedback(GateRejection rejection)
+    {
+        const string noMetaNote = "只输出修正后的干净正文，绝对禁止在正文中附带“（原文提及…）”、“（删除编造的…）”等任何修改说明或编辑批注。";
+        var specific = rejection.Reason switch
+        {
+            GateReason.ExecutionHijack => "上一版越界回答了问题或编写了实现代码；请只将原话整理为指令文本，绝对不要回答问题或生成代码块。",
+            GateReason.RoleplaySlop => "上一版注入了原话没有的角色扮演套话（如“你是一位资深…”）；请删除所有角色套话，直接输出正文。",
+            GateReason.NumberLost => $"上一版丢失或改动了生效数字「{rejection.Detail}」；请按原话保留该数字。",
+            GateReason.NumberInvented => $"上一版出现了原话未提及的数字「{rejection.Detail}」；请直接使用原话自述的数字与时间表述，不要自行换算或推演新数字。",
+            GateReason.TermLost => $"上一版丢失了关键术语或代码标识符「{rejection.Detail}」；请原样保留。",
+            GateReason.TermNotInGlossary => $"上一版凭空补全了原话未提及的名称或分类「{rejection.Detail}」；请彻底删除「{rejection.Detail}」，保持原话的泛指表述。",
+            GateReason.Incomplete => "上一版输出被截断不完整；请精炼表达并输出完整内容。",
+            _ => $"上一版未通过保真校验（{rejection.Reason}: {rejection.Detail}）；请在不增删事实、数字与否定词的前提下重新整理。"
+        };
+        return specific + noMetaNote;
+    }
+
+    private static string FormatGateFailure(GateRejection rejection) =>
+        rejection.Detail.Length > 0
+            ? $"Final polish refused: {rejection.Reason} ({rejection.Detail})"
+            : $"Final polish refused: {rejection.Reason}";
+
+    private async Task<string> PolishLegacyDocumentAsync(DocumentWork work, CancellationToken ct)
     {
         if (_style == PolishStyle.Default && work.AllNativePolished && !string.IsNullOrWhiteSpace(work.NativePolishedText))
             return work.NativePolishedText;
@@ -408,16 +777,18 @@ public sealed class PolishScheduler : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         Task worker;
+        Task warmTask;
         lock (_gate)
         {
             _disposed = true;
             worker = _worker;
+            warmTask = _warmTask;
         }
 
         _session.Changed -= OnChanged;
         await _documents.DisposeAsync().ConfigureAwait(false);
         await _stop.CancelAsync().ConfigureAwait(false);
-        await worker.ConfigureAwait(false);
+        await Task.WhenAll(worker, warmTask).ConfigureAwait(false);
         _stop.Dispose();
     }
 }

@@ -30,8 +30,12 @@ public sealed partial class ComposerViewModel
         _start = start;
         _announceRemembered = start.Remember?.Applied == true;
         LastExportFormat = start.LastExport;
+        PolishMode = _presets.Any(p => p.Enabled && string.Equals(p.Id, start.PolishMode, StringComparison.Ordinal))
+            ? start.PolishMode
+            : LiveLingo.Core.Cleanup.PolishPresets.NaturalId;
         Output = start.Output;
         TargetLanguage = start.Target;
+        OnPropertyChanged(nameof(DefaultPolishMode));
         OnPropertyChanged(nameof(Remembered));
         OnPropertyChanged(nameof(RememberFor));
         AttachToRunningDownloads();
@@ -55,11 +59,28 @@ public sealed partial class ComposerViewModel
         Chosen();
     }
 
+    public void ChoosePolishMode(string modeId)
+    {
+        if (!Outputs.Contains(ComposerOutput.Clean)
+            || !_presets.Any(p => p.Enabled && string.Equals(p.Id, modeId, StringComparison.Ordinal)))
+            throw new ArgumentOutOfRangeException(nameof(modeId), modeId, "That polish mode is not offered.");
+
+        var sameMode = string.Equals(PolishMode, modeId, StringComparison.Ordinal);
+        PolishMode = modeId;
+        Output = ComposerOutput.Clean;
+        if (sameMode && FinalState == Core.Drafting.DocumentState.Failed && _committed is null)
+        {
+            _session.Mutate(d => d.RetryDocument(Core.Drafting.UnitKind.Clean));
+            Refresh();
+        }
+        Chosen();
+    }
+
     private void Chosen()
     {
         _announceRemembered = false;
         OnPropertyChanged(nameof(Remembered));
-        ChoiceMade?.Invoke(new ComposerChoice(Output, TargetLanguage));
+        ChoiceMade?.Invoke(new ComposerChoice(Output, TargetLanguage, PolishMode));
     }
 
     [RelayCommand]
@@ -69,6 +90,9 @@ public sealed partial class ComposerViewModel
             return;
 
         _announceRemembered = false;
+        PolishMode = _presets.Any(p => p.Enabled && string.Equals(p.Id, start.DefaultPolishMode, StringComparison.Ordinal))
+            ? start.DefaultPolishMode
+            : LiveLingo.Core.Cleanup.PolishPresets.NaturalId;
         Output = start.DefaultOutput;
         TargetLanguage = start.DefaultTarget;
         OnPropertyChanged(nameof(Remembered));

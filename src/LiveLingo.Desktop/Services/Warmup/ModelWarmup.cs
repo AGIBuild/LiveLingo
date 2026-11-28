@@ -96,7 +96,7 @@ public sealed class ModelWarmup : IDisposable
     private Task WarmSpeechAsync() =>
         _settings.Current.Cloud.Speech
             ? Task.CompletedTask
-            : Warm("speech models", () => _speech.WarmAsync(_settings.Current.Composer.EffectiveGlossary().SpeechHotwords()));
+            : Warm("speech models", () => _speech.WarmAsync(_settings.Current.Composer.EffectiveGlossary().UserSpeechHotwords()));
 
     /// <summary>
     /// Warms the opposite local role right after the starting output when <see cref="ModelAdvisor.AssessPlan"/> confirms

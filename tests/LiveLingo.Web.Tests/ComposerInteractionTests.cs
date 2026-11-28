@@ -312,9 +312,13 @@ public sealed class ComposerInteractionTests(BrowserFixture browsers)
         foreach (var engine in new[] { "webkit", "chromium" })
         {
             data.Add(engine, "Meta+D", nameof(MicToggleIntent));
-            data.Add(engine, "Meta+1", nameof(OutputIntent));
-            data.Add(engine, "Meta+2", nameof(OutputIntent));
-            data.Add(engine, "Meta+3", nameof(OutputIntent));
+            data.Add(engine, "Meta+1", nameof(PolishModeIntent));
+            data.Add(engine, "Meta+2", nameof(PolishModeIntent));
+            data.Add(engine, "Meta+3", nameof(PolishModeIntent));
+            data.Add(engine, "Meta+4", nameof(PolishModeIntent));
+            data.Add(engine, "Meta+5", nameof(PolishModeIntent));
+            data.Add(engine, "Meta+T", nameof(OutputIntent));
+            data.Add(engine, "Meta+0", nameof(OutputIntent));
             data.Add(engine, "Meta+L", nameof(SwapLanguageIntent));
             data.Add(engine, "Meta+Shift+C", nameof(CopyIntent));
             data.Add(engine, "Meta+N", nameof(NewDraftIntent));
@@ -342,7 +346,7 @@ public sealed class ComposerInteractionTests(BrowserFixture browsers)
 
     [Theory]
     [MemberData(nameof(Engines))]
-    public async Task OutputShortcuts_SelectTheOutputOfTheirNumber(string engine)
+    public async Task OutputShortcuts_SelectThePolishModesAndOutputsOfTheirKeys(string engine)
     {
         await using var page = await browsers.OpenAsync(engine, "translate-ready");
         await page.Page.Locator("#src").FocusAsync();
@@ -350,10 +354,15 @@ public sealed class ComposerInteractionTests(BrowserFixture browsers)
 
         await page.Page.Keyboard.PressAsync("Meta+1");
         await page.Page.Keyboard.PressAsync("Meta+2");
-        await page.Page.Keyboard.PressAsync("Meta+3");
+        await page.Page.Keyboard.PressAsync("Meta+4");
+        await page.Page.Keyboard.PressAsync("Meta+T");
+        await page.Page.Keyboard.PressAsync("Meta+0");
 
         Assert.Equal(
-            [LiveLingo.Desktop.Composer.ComposerOutput.Clean, LiveLingo.Desktop.Composer.ComposerOutput.Translate, LiveLingo.Desktop.Composer.ComposerOutput.Original],
+            ["ai-task", "natural", "todo"],
+            (await page.IntentsAsync()).OfType<PolishModeIntent>().Select(i => i.Id));
+        Assert.Equal(
+            [LiveLingo.Desktop.Composer.ComposerOutput.Translate, LiveLingo.Desktop.Composer.ComposerOutput.Original],
             (await page.IntentsAsync()).OfType<OutputIntent>().Select(i => i.Value));
     }
 
@@ -366,6 +375,7 @@ public sealed class ComposerInteractionTests(BrowserFixture browsers)
 
         await page.Page.Keyboard.PressAsync("Meta+1");
 
+        Assert.Equal(0, await page.CountAsync<PolishModeIntent>());
         Assert.Equal(0, await page.CountAsync<OutputIntent>());
     }
 
@@ -587,7 +597,7 @@ public sealed class ComposerInteractionTests(BrowserFixture browsers)
 
         await page.Page.Locator("#out-pill").ClickAsync();
         Assert.Equal("true", await page.Page.EvaluateAsync<string>("document.activeElement.getAttribute('aria-checked')"));
-        Assert.Equal(4, await page.Page.Locator(".menu button").CountAsync());
+        Assert.Equal(9, await page.Page.Locator(".menu button").CountAsync());
 
         await page.Page.Keyboard.PressAsync("ArrowDown");
         await page.Page.Keyboard.PressAsync("Enter");
@@ -606,13 +616,13 @@ public sealed class ComposerInteractionTests(BrowserFixture browsers)
         const string active = "document.activeElement.textContent";
 
         await page.Page.Keyboard.PressAsync("End");
-        Assert.Contains("翻译目标改为", await page.Page.EvaluateAsync<string>(active));
+        Assert.Contains("管理润色方式", await page.Page.EvaluateAsync<string>(active));
         await page.Page.Keyboard.PressAsync("ArrowDown");
-        Assert.Contains("整理", await page.Page.EvaluateAsync<string>(active));
+        Assert.Contains("AI 任务指令", await page.Page.EvaluateAsync<string>(active));
         await page.Page.Keyboard.PressAsync("ArrowUp");
-        Assert.Contains("翻译目标改为", await page.Page.EvaluateAsync<string>(active));
+        Assert.Contains("管理润色方式", await page.Page.EvaluateAsync<string>(active));
         await page.Page.Keyboard.PressAsync("Home");
-        Assert.Contains("整理", await page.Page.EvaluateAsync<string>(active));
+        Assert.Contains("AI 任务指令", await page.Page.EvaluateAsync<string>(active));
     }
 
     [Theory]
@@ -668,11 +678,11 @@ public sealed class ComposerInteractionTests(BrowserFixture browsers)
     [MemberData(nameof(Engines))]
     public async Task MoreMenu_SwitchesSendTheirNewValueAndCloseTheMenu(string engine)
     {
-        await using var page = await browsers.OpenAsync(engine, "translate-ready");
+        await using var page = await browsers.OpenAsync(engine, "translate-ready", BrowserFixture.WideWidth);
         await page.Page.Locator("#more").ClickAsync();
         await page.Page.Locator(".menu button", new() { HasText = "宽屏" }).ClickAsync();
 
-        Assert.True((await page.LastIntentAsync<WideIntent>()).On);
+        Assert.False((await page.LastIntentAsync<WideIntent>()).On);
         Assert.Equal(0, await page.Page.Locator(".menu").CountAsync());
 
         await page.Page.Locator("#more").ClickAsync();
@@ -684,15 +694,56 @@ public sealed class ComposerInteractionTests(BrowserFixture browsers)
 
     [Theory]
     [MemberData(nameof(Engines))]
-    public async Task MoreMenu_ACheckedSwitchSendsOff(string engine)
+    public async Task MoreMenu_AnUncheckedSwitchSendsOn(string engine)
     {
-        await using var page = await browsers.OpenAsync(engine, "whole-wide", BrowserFixture.WideWidth);
-        await page.PushAsync("whole-wide", s => s["menus"]!["more"]![4]!["checked"] = true);
+        await using var page = await browsers.OpenAsync(engine, "whole-wide", BrowserFixture.NarrowWidth);
+        await page.PushAsync("whole-wide", s => s["menus"]!["more"]![4]!["checked"] = false);
         await page.Page.Locator("#more").ClickAsync();
 
         await page.Page.Locator(".menu button", new() { HasText = "宽屏" }).ClickAsync();
 
-        Assert.False((await page.LastIntentAsync<WideIntent>()).On);
+        Assert.True((await page.LastIntentAsync<WideIntent>()).On);
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public async Task OutputMenu_ExpandsInOneShotWithoutScrollingOrGrowingAcrossTicks(string engine)
+    {
+        // Reproduce the exact compact listening window (190px tall) before opening #out-pill on the 5th preset.
+        await using var page = await browsers.OpenAsync(engine, "model-listening", BrowserFixture.WideWidth);
+        await page.Page.SetViewportSizeAsync(BrowserFixture.WideWidth, 190);
+        await page.ReceiveAsync("limit", new JsonObject { ["maxHeight"] = 664 });
+        await page.PushAsync("model-listening", s =>
+        {
+            s["output"]!["polishMode"] = "report";
+            s["output"]!["pill"] = "润色 · 汇报与纪要";
+            foreach (var item in s["output"]!["menu"]!.AsArray())
+                item!["checked"] = item["id"]?.GetValue<string>() == "polish:report";
+        });
+        await page.Page.WaitForTimeoutAsync(50);
+        await page.ClearIntentsAsync();
+
+        await page.Page.Locator("#out-pill").ClickAsync();
+        await page.WaitForIntentAsync("size");
+        var firstSize = await page.LastIntentAsync<SizeIntent>();
+
+        // The menu must render all items unclipped with zero scrollbar on the very first frame.
+        var metrics = await page.Page.Locator(".menu.output-menu").EvaluateAsync<double[]>(
+            "el => [el.scrollHeight, el.clientHeight, el.scrollTop]");
+        Assert.True(metrics[0] <= metrics[1] + 1, $"Menu scrolled ({metrics[0]} > {metrics[1]}) instead of expanding in full.");
+        Assert.Equal(0, metrics[2]);
+        Assert.True(await page.Page.Locator(".menu button", new() { HasText = "AI 任务指令" }).IsVisibleAsync());
+        Assert.True(await page.Page.Locator(".menu button", new() { HasText = "汇报与纪要" }).IsVisibleAsync());
+
+        // Simulating the native window growing to firstSize and subsequent 1s clock ticks or hover transitions must emit zero extra SizeIntents.
+        await page.ClearIntentsAsync();
+        await page.Page.SetViewportSizeAsync(firstSize.Width, firstSize.Height);
+        await page.PushAsync("model-listening", s => s["footer"]!["status"]!["text"] = "正在听 · 0:08 · 点麦克风或按 ⌘D 结束");
+        await page.Page.Locator(".menu button", new() { HasText = "AI 任务指令" }).HoverAsync();
+        await page.Page.Locator(".menu button", new() { HasText = "管理润色方式" }).HoverAsync();
+        await page.Page.WaitForTimeoutAsync(60);
+
+        Assert.Equal(0, await page.CountAsync<SizeIntent>());
     }
 
     [Theory]

@@ -111,6 +111,7 @@ public sealed partial class Draft
         EnsureEditable();
         SourceRevision++;
         var unit = NewUnit(new SourceUnit(raw));
+        unit.IsDictated = true;
         if (nativeClean is not null)
         {
             unit.Clean.Text = nativeClean;

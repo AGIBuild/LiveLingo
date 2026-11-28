@@ -15,10 +15,20 @@ internal sealed record ModelRowState(string Label, string Text);
 /// <param name="Title">The full details of the stage, for the tooltip.</param>
 internal sealed record ModelLineState(string Text, string Tone, string Title);
 
-internal sealed record MenuItemState(string Id, string Label, bool Checked, bool Enabled);
+internal sealed record MenuItemState(string Id, string Label, bool Checked, bool Enabled, string? Sub = null, string? Group = null);
 
 /// <param name="Note">Whose choices are remembered ("Your choice is remembered for Slack"); null when remembering is off or unknown.</param>
-internal sealed record OutputState(string Value, string Pill, bool Globe, IReadOnlyList<MenuItemState> Menu, string Swap, string? Note);
+internal sealed record OutputState(
+    string Value,
+    string PolishMode,
+    string Pill,
+    bool Globe,
+    bool Sparkle,
+    string? PolishGroup,
+    string? ManageLabel,
+    IReadOnlyList<MenuItemState> Menu,
+    string Swap,
+    string? Note);
 
 internal sealed record ActionState(string Id, string Label);
 
@@ -49,7 +59,7 @@ internal sealed record CorrectionHintState(string Spoken, string Canonical, stri
 
 internal sealed record DocumentView(
     string State, string Text, string Notice, bool Editing, bool CanEdit, bool NeedsChoice, bool Owned, bool CanClean,
-    bool CanAcceptPreview);
+    bool CanAcceptPreview, string? GateBadge = null, string GateTone = "ok", bool HasWarning = false, bool Streaming = false);
 
 /// <param name="EditText">The page takes it once, when a sentence starts being edited.</param>
 /// <param name="RememberCorrection">Offered inside the active row editor when the user fixed a concise misrecognition.</param>
@@ -110,12 +120,17 @@ internal sealed record ComposerViewState(
     public static ComposerViewState From(ComposerViewModel vm, ComposerTexts texts, RecentDrafts recent, int sourceRev, ModelReport? models = null)
     {
         models ??= ModelReport.None;
-        var live = vm.IsListening || vm.IsStartingListening || vm.HasTimeline;
+        var liveVoice = vm.IsListening || vm.IsStartingListening;
+        var live = liveVoice || vm.HasTimeline;
+        var deferCleanWhileSpeaking = vm.DocumentMode && liveVoice && vm.Output == ComposerOutput.Clean;
         var empty = vm.Lines.Count == 0 && !live && string.IsNullOrWhiteSpace(vm.SourceText);
-        var hasResult = vm.Lines.Count > 0 && vm.Output != ComposerOutput.Original;
+        var hasResult = vm.Lines.Count > 0 && vm.Output != ComposerOutput.Original && !deferCleanWhileSpeaking;
         var cloud = vm.CloudSpeech || vm.CloudTranslate || vm.CloudClean;
         var armed = vm.IsWriteQueued;
         var targetName = vm.TargetName;
+        var activePreset = vm.ActivePreset;
+        var cleanOffered = vm.Outputs.Contains(ComposerOutput.Clean);
+        var outputMenu = BuildOutputMenu(vm, texts, cleanOffered);
 
         return new ComposerViewState(
             Rev: 0,
@@ -132,9 +147,13 @@ internal sealed record ComposerViewState(
                     texts.ModelDetailBody(models.Used.GetValueOrDefault(stage), models.Confirmed.GetValueOrDefault(stage))))]),
             Output: new OutputState(
                 Name(vm.Output),
-                texts.OutputPill(vm.Output, vm.TargetLanguage),
+                vm.PolishMode,
+                texts.OutputPill(vm.Output, vm.TargetLanguage, activePreset),
                 vm.Output == ComposerOutput.Translate,
-                [.. vm.Outputs.Select(o => new MenuItemState(Name(o), texts.OutputMenu(o, vm.TargetLanguage), vm.Output == o, true))],
+                vm.Output == ComposerOutput.Clean && activePreset.Id != LiveLingo.Core.Cleanup.PolishPresets.NaturalId,
+                cleanOffered ? texts.PolishGroupTitle : null,
+                cleanOffered ? texts.PolishManageLabel : null,
+                outputMenu,
                 texts.SwapMenu(vm.TargetLanguage),
                 vm.RememberFor is { } rememberFor ? texts.RememberMenuNote(rememberFor) : null),
             Banner: BannerOf(vm.Banner, texts),
@@ -143,7 +162,7 @@ internal sealed record ComposerViewState(
                 vm.SourceText,
                 sourceRev,
                 vm.IsEditable,
-                texts.SourceLabel(vm.IsListening || vm.IsStartingListening, vm.HasTimeline, vm.TranscriptName),
+                texts.SourceLabel(liveVoice, vm.HasTimeline, vm.TranscriptName, deferCleanWhileSpeaking ? activePreset : null),
                 vm.IsWholeRoute,
                 empty,
                 [.. vm.SourceLines.Select(line => new SourceLineState(line.Time, line.Text, line.IsTail))],
@@ -151,7 +170,7 @@ internal sealed record ComposerViewState(
                     ? new ResumeState(0, ComposerTexts.RecentPreview(unsent))
                     : null,
                 empty && vm.Remembered is { } remembered
-                    ? new RememberedState(texts.RememberedNote(remembered, vm.Output, vm.TargetLanguage), texts.RestoreDefaults)
+                    ? new RememberedState(texts.RememberedNote(remembered, vm.Output, vm.TargetLanguage, activePreset), texts.RestoreDefaults)
                     : null,
                 !vm.IsClearing && !vm.IsWritten && (vm.SourceText.Length > 0 || vm.HasTimeline || vm.IsListening || vm.IsStartingListening || vm.IsTranscribing),
                 vm.DocumentMode && !vm.IsWide && !live && vm.Output != ComposerOutput.Original &&
@@ -159,26 +178,39 @@ internal sealed record ComposerViewState(
             Result: new ResultState(
                 hasResult,
                 vm.IsListening && vm.Output == ComposerOutput.Clean
-                    ? texts.CleanupPreview
-                    : texts.ResultLabel(vm.Output, vm.TargetLanguage),
+                    ? texts.CleanupPreviewFor(activePreset)
+                    : texts.ResultLabel(vm.Output, vm.TargetLanguage, activePreset),
                 hasResult ? [.. vm.Lines.Select(line => Row(line, vm, texts))] : [],
                 vm.EditText,
                 vm.SuggestedCorrection is { } corr
                     ? new CorrectionHintState(corr.Spoken, corr.Canonical, texts.RememberCorrectionLabel(corr))
                     : null,
                 vm.DocumentMode && !live && hasResult
-                    ? new DocumentView(vm.FinalState.ToString().ToLowerInvariant(), vm.FinalText,
-                        texts.DocumentNotice(vm.FinalState, vm.FinalIsOwned, vm.Output == ComposerOutput.Translate), vm.IsEditingDocument,
-                        vm.CanEditDocument, vm.NeedsFinalChoice, vm.FinalIsOwned,
-                        vm.Output == ComposerOutput.Translate && vm.Outputs.Contains(ComposerOutput.Clean),
-                        vm.CanAcceptPreview)
+                    ? new DocumentView(
+                        vm.FinalState.ToString().ToLowerInvariant(),
+                        vm.FinalText,
+                        texts.DocumentNotice(vm.FinalState, vm.FinalIsOwned, vm.Output == ComposerOutput.Translate, activePreset, vm.FinalError, vm.FinalWarning),
+                        vm.IsEditingDocument,
+                        vm.CanEditDocument,
+                        vm.NeedsFinalChoice,
+                        vm.FinalIsOwned,
+                        vm.Output == ComposerOutput.Translate && cleanOffered,
+                        vm.CanAcceptPreview,
+                        vm.Output == ComposerOutput.Clean
+                            ? texts.DocumentGateBadge(vm.FinalState, vm.FinalIsOwned, activePreset.Gate, vm.FinalError, vm.FinalWarning)
+                            : null,
+                        vm.FinalState == DocumentState.Pending
+                            ? "info"
+                            : (vm.FinalState is DocumentState.Failed or DocumentState.Stale || (!vm.FinalIsOwned && vm.FinalWarning is not null)) ? "warn" : "ok",
+                        HasWarning: vm.FinalState == DocumentState.Ready && !vm.FinalIsOwned && vm.FinalWarning is not null,
+                        Streaming: vm.IsStreamingDocument)
                     : null),
             Footer: new FooterState(
                 new MicState(vm.IsListening, vm.IsListening ? texts.MicStop : texts.MicStart,
                     !vm.IsClearing),
                 new StatusState(
                     vm.DocumentMode && !live && vm.Output != ComposerOutput.Original && !empty && !vm.IsWritten
-                        ? texts.DocumentStatus(vm.FinalState, vm.IsEditingDocument, armed)
+                        ? texts.DocumentStatus(vm.FinalState, vm.IsEditingDocument, armed, vm.Output == ComposerOutput.Translate, activePreset)
                         : texts.Status(vm.StatusInfo),
                     !vm.IsListening && (vm.Status == ComposerStatus.Failed ||
                         vm.Output == ComposerOutput.Clean && vm.StatusInfo.PolishOutcome == LiveLingo.Core.Drafting.PolishOutcome.KeptPreview)
@@ -221,6 +253,34 @@ internal sealed record ComposerViewState(
                 [.. recent.Items.Select((draft, i) => new RecentItemState(i, ComposerTexts.RecentItem(draft)))],
                 vm.CanReplaceDraft,
                 new ExportState(true, true, vm.HasTimeline, vm.LastExportFormat is { } last ? Name(last) : null)));
+    }
+
+    private static IReadOnlyList<MenuItemState> BuildOutputMenu(ComposerViewModel vm, ComposerTexts texts, bool cleanOffered)
+    {
+        var items = new List<MenuItemState>();
+        if (cleanOffered)
+        {
+            foreach (var preset in vm.Presets.Where(p => p.Enabled))
+            {
+                var isDefault = string.Equals(preset.Id, vm.DefaultPolishMode, StringComparison.Ordinal);
+                items.Add(new MenuItemState(
+                    "polish:" + preset.Id,
+                    texts.PresetName(preset) + (isDefault ? texts.PolishDefaultSuffix : ""),
+                    vm.Output == ComposerOutput.Clean && string.Equals(vm.PolishMode, preset.Id, StringComparison.Ordinal),
+                    Enabled: true,
+                    Sub: texts.PresetDescription(preset),
+                    Group: "polish"));
+            }
+        }
+        foreach (var output in vm.Outputs.Where(o => o != ComposerOutput.Clean))
+        {
+            items.Add(new MenuItemState(
+                Name(output),
+                texts.OutputMenu(output, vm.TargetLanguage),
+                vm.Output == output,
+                Enabled: true));
+        }
+        return items;
     }
 
     private static string Name(ExportFormat format) => format switch

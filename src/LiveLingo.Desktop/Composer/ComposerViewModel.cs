@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using LiveLingo.Core.Cleanup;
 using LiveLingo.Core.Cloud;
 using LiveLingo.Core.Dictation;
 using LiveLingo.Core.Drafting;
@@ -42,6 +43,7 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
     private Task? _startingVoice;
     private Task? _stoppingVoice;
     private int _draftGeneration;
+    private IReadOnlyList<PolishPreset> _presets;
 
     public ComposerViewModel(
         DraftSession session,
@@ -73,10 +75,15 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
         _notifyOn = notifyOn;
         _time = time ?? TimeProvider.System;
         _targetLanguage = scheduler.Target;
+        _presets = options.EffectivePresets;
+        _polishMode = _presets.Any(p => p.Enabled && p.Id == options.DefaultPolishMode)
+            ? options.DefaultPolishMode
+            : PolishPresets.NaturalId;
 
         Outputs = options.Outputs;
         _output = options.Cleanup ? ComposerOutput.Clean : ComposerOutput.Original;
 
+        _session.Mutate(d => d.SetPolishMode(_polishMode));
         _modelsReady = IsOutputModelsReady();
         ApplyDraftOutput();
         _session.Changed += OnDraftChanged;
@@ -105,6 +112,7 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
 
     [ObservableProperty] private string _sourceText = "";
     [ObservableProperty] private ComposerOutput _output = ComposerOutput.Clean;
+    [ObservableProperty] private string _polishMode = PolishPresets.NaturalId;
     [ObservableProperty] private TargetLanguage _targetLanguage;
     [ObservableProperty] private IReadOnlyList<ResultLine> _lines = [];
     [ObservableProperty] private ComposerStatus _status = ComposerStatus.Empty;
@@ -147,6 +155,10 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
         _session.Mutate(draft => draft.SyncSource(units, route));
     }
 
+    public IReadOnlyList<PolishPreset> Presets => _presets;
+    public string DefaultPolishMode => _start?.DefaultPolishMode ?? _options.DefaultPolishMode;
+    public PolishPreset ActivePreset => PolishPresets.Resolve(PolishMode, _presets);
+
     partial void OnOutputChanged(ComposerOutput value)
     {
         if (IsEditing)
@@ -156,6 +168,23 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
         ApplyDraftOutput();
         if (Banner.Kind is BannerKind.ModelMissing or BannerKind.DownloadFailed)
             Banner = BannerState.None;
+        Refresh();
+    }
+
+    partial void OnPolishModeChanged(string value)
+    {
+        if (IsEditing)
+            SaveEdit();
+        CancelQueuedWrite();
+        if (_committed is null)
+            _session.Mutate(d => d.SetPolishMode(value));
+        ModelsReady = IsOutputModelsReady();
+        ApplyDraftOutput();
+        if (Banner.Kind is BannerKind.ModelMissing or BannerKind.DownloadFailed or BannerKind.SlowProcessing)
+            Banner = BannerState.None;
+        if (_slowTimer is not null)
+            RestartSlowTimer();
+        OnPropertyChanged(nameof(ActivePreset));
         Refresh();
     }
 
@@ -390,6 +419,18 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
 
     public void OpenSettings(string section = "general") => SettingsRequested?.Invoke(section);
 
+    public void UpdatePresets(IReadOnlyList<PolishPreset> presets)
+    {
+        _presets = presets;
+        if (!_presets.Any(p => p.Enabled && string.Equals(p.Id, PolishMode, StringComparison.Ordinal)))
+            PolishMode = _presets.FirstOrDefault(p => p.Enabled && p.Id == DefaultPolishMode)?.Id ?? PolishPresets.NaturalId;
+        ModelsReady = IsOutputModelsReady();
+        ApplyDraftOutput();
+        OnPropertyChanged(nameof(Presets));
+        OnPropertyChanged(nameof(ActivePreset));
+        Refresh();
+    }
+
     public void UpdateModelPlan(ComposerModelPlan plan)
     {
         CancelQueuedWrite();
@@ -521,7 +562,7 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
 
     private bool IsOutputModelsReady()
     {
-        if (Output == ComposerOutput.Clean && _plan.SpeechNativeClean)
+        if (Output == ComposerOutput.Clean && _plan.SpeechNativeClean && ActivePreset.IsDefaultNatural && !_options.CustomPolishPrompt)
         {
             if (!_session.Read(d => d.RequiresCleanerModel))
                 return true;
@@ -537,7 +578,7 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
             _glossary,
             ActiveGlossary == Glossary.Empty ? null : ActiveGlossary,
             EnableNativePolish: nativePolish,
-            NativePolishSatisfiesClean: nativePolish && !_options.CustomPolishPrompt);
+            NativePolishSatisfiesClean: nativePolish && ActivePreset.IsDefaultNatural && !_options.CustomPolishPrompt);
     }
 
     private void ApplyDraftOutput()
@@ -726,9 +767,11 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
             OnPropertyChanged(nameof(CanEditRows));
             OnPropertyChanged(nameof(CanEditDocument));
             OnPropertyChanged(nameof(FinalState));
+            OnPropertyChanged(nameof(IsStreamingDocument));
             OnPropertyChanged(nameof(FinalIsOwned));
             OnPropertyChanged(nameof(FinalText));
             OnPropertyChanged(nameof(FinalError));
+            OnPropertyChanged(nameof(FinalWarning));
             OnPropertyChanged(nameof(NeedsFinalChoice));
             OnPropertyChanged(nameof(CanAcceptPreview));
 

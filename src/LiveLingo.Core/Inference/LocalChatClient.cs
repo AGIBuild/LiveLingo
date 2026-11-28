@@ -14,4 +14,17 @@ public sealed class LocalChatClient(
         usage?.Report(role, lease.Model.DisplayName, cloud: false, confirmed: true, lease.Model.ShortName);
         return await lease.Client.CompleteAsync(request, ct).ConfigureAwait(false);
     }
+
+    public async Task WarmPromptAsync(
+        string systemPrompt,
+        IReadOnlyDictionary<string, object>? extra = null,
+        CancellationToken ct = default,
+        string userPrefix = "目标：")
+    {
+        if (string.IsNullOrWhiteSpace(systemPrompt))
+            return;
+
+        using var lease = await host.AcquireAsync(role, model(), ct).ConfigureAwait(false);
+        await lease.Client.WarmPromptAsync(systemPrompt, extra, ct, userPrefix).ConfigureAwait(false);
+    }
 }

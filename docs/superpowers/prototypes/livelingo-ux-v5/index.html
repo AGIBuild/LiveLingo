@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="zh-CN" data-platform="mac" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>LiveLingo · 产品原型 v5（多场景润色）</title>
+  <link rel="stylesheet" href="style.css">
+  <script defer src="draft.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+<svg class="sprite" width="0" height="0" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></symbol>
+    <symbol id="i-stop" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2.5" fill="currentColor"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5.5" cy="12" r="1.7" fill="currentColor"/><circle cx="12" cy="12" r="1.7" fill="currentColor"/><circle cx="18.5" cy="12" r="1.7" fill="currentColor"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="M7 10l5 5 5-5"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2.5"/><path d="M5 15V6a2 2 0 0 1 2-2h9"/></symbol>
+    <symbol id="i-edit" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></symbol>
+    <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></symbol>
+    <symbol id="i-target" viewBox="0 0 24 24"><path d="M7 17L17 7M8 7h9v9"/></symbol>
+    <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></symbol>
+    <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z"/><path d="M18.5 16l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9.9-2.1z"/></symbol>
+    <symbol id="i-enter" viewBox="0 0 24 24"><path d="M20 5v7a3 3 0 0 1-3 3H5m0 0l4-4m-4 4l4 4"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></symbol>
+    <symbol id="i-swap" viewBox="0 0 24 24"><path d="M7 4L3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"/></symbol>
+    <symbol id="i-theme" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5z"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-history" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M12 4v11m0 0l-4-4m4 4l4-4M5 20h14"/></symbol>
+    <symbol id="i-expand" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17h.01"/></symbol>
+  </defs>
+</svg>
+
+<header class="top">
+  <a class="brand" href="#play"><span class="logo" aria-hidden="true">li</span><span>LiveLingo</span><span class="tag">原型 v5 · 多场景润色</span></a>
+  <nav aria-label="原型页面">
+    <button type="button" class="tab" data-page="play" aria-current="page">体验</button>
+    <button type="button" class="tab" data-page="settings">设置</button>
+    <button type="button" class="tab" data-page="notes">设计说明</button>
+  </nav>
+  <div class="top-tools">
+    <div class="seg" role="radiogroup" aria-label="系统样式">
+      <button type="button" role="radio" aria-checked="true" data-platform="mac">macOS</button>
+      <button type="button" role="radio" aria-checked="false" data-platform="win">Windows</button>
+    </div>
+    <button type="button" id="theme-btn" class="icon-btn" aria-label="切换浅色 / 深色"><svg class="ic" aria-hidden="true"><use href="#i-theme"/></svg></button>
+  </div>
+</header>
+
+<main>
+  <section id="page-play" class="page">
+    <div class="play-grid">
+      <div class="desktop" id="desktop">
+        <div class="menubar">
+          <span class="menubar-title" id="menubar-title">Cursor</span>
+          <button type="button" id="tray-btn" class="tray" aria-haspopup="menu" aria-expanded="false" popovertarget="tray-menu" aria-label="LiveLingo 托盘菜单"><span class="logo sm" aria-hidden="true">li</span></button>
+          <div id="tray-menu" class="menu" popover="auto">
+            <div focusgroup="menu nomemory" aria-labelledby="tray-btn">
+              <button type="button" data-act="summon"><span>打开浮窗</span><kbd class="k-summon"></kbd></button>
+              <button type="button" data-act="history"><span>最近草稿</span></button>
+              <button type="button" data-act="settings"><span>设置</span></button>
+              <button type="button" data-act="hide"><span>隐藏浮窗</span></button>
+            </div>
+          </div>
+        </div>
+        <div class="app-window" aria-label="模拟前台应用">
+          <div class="titlebar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span id="target-title">Cursor — Agent</span></div>
+          <div class="chat" id="app-context">
+            <p class="bubble me">我们继续讨论缓存和错误处理。</p>
+            <p class="bubble ai">代码已读完。告诉我你的边界条件，我先给出修改方案，不直接改业务代码。</p>
+          </div>
+          <div class="dock">
+            <section id="composer" class="composer" aria-label="LiveLingo 浮窗">
+              <header class="c-head">
+                <button type="button" id="dest" class="chip dest" aria-haspopup="menu" aria-expanded="false" popovertarget="menu-target" aria-label="回填目标"></button>
+                <div id="menu-target" class="menu" popover="auto">
+                  <div focusgroup="menu nomemory" aria-labelledby="dest">
+                    <button type="button" role="menuitemradio" data-target="agent"><span>Cursor · Agent 输入框</span></button>
+                    <button type="button" role="menuitemradio" data-target="linear"><span>Linear · 新建任务</span></button>
+                    <button type="button" role="menuitemradio" data-target="report-doc"><span>飞书文档 · 周报纪要</span></button>
+                    <button type="button" role="menuitemradio" data-target="notes"><span>Slack · 团队沟通</span></button>
+                    <hr>
+                    <button type="button" role="menuitemradio" data-target="none"><span>没有输入框 · 仅复制</span></button>
+                  </div>
+                </div>
+                <span class="spacer"></span>
+                <button type="button" id="privacy" class="chip privacy" aria-expanded="false" popovertarget="menu-models"></button>
+                <div id="menu-models" class="menu model-card" popover="auto" aria-label="本次窗口使用的模型">
+                  <h3>本次窗口使用的模型</h3>
+                  <dl id="models-list"></dl>
+                </div>
+                <button type="button" id="out-pill" class="pill" aria-haspopup="menu" aria-expanded="false" popovertarget="menu-output" aria-label="输出与润色方式"></button>
+                <div id="menu-output" class="menu output-menu" popover="auto">
+                  <div focusgroup="menu nomemory" aria-labelledby="out-pill" id="output-items"></div>
+                </div>
+                <button type="button" id="more" class="icon-btn" aria-haspopup="menu" aria-expanded="false" popovertarget="menu-more" aria-label="更多操作"><svg class="ic" aria-hidden="true"><use href="#i-more"/></svg></button>
+                <div id="menu-more" class="menu" popover="auto">
+                  <div focusgroup="menu nomemory" aria-labelledby="more">
+                    <button type="button" data-act="new"><span>新草稿</span></button>
+                    <button type="button" data-act="history"><span>最近草稿</span></button>
+                    <button type="button" data-act="import"><span>导入录音…</span></button>
+                    <button type="button" data-act="export"><span>导出…</span></button>
+                    <hr>
+                    <button type="button" role="menuitemcheckbox" aria-checked="false" data-act="wide"><span>宽屏对照</span></button>
+                    <button type="button" role="menuitemcheckbox" aria-checked="false" data-act="whole"><span>整段处理（保留格式）</span></button>
+                    <hr>
+                    <button type="button" data-act="polish-settings"><span>管理润色方式…</span></button>
+                    <button type="button" data-act="settings"><span>设置</span></button>
+                  </div>
+                </div>
+                <button type="button" id="close" class="icon-btn" aria-label="隐藏并保留草稿"><svg class="ic" aria-hidden="true"><use href="#i-close"/></svg></button>
+              </header>
+              <div id="banner" class="banner" hidden></div>
+              <div class="c-body">
+                <div class="pane src" aria-labelledby="src-label">
+                  <div class="pane-label">
+                    <span id="src-label">原话</span>
+                    <span id="route-chip" class="chip mini" hidden>整段 · 保留格式</span>
+                    <button type="button" id="src-toggle" class="link-inline src-toggle" aria-expanded="true" hidden></button>
+                  </div>
+                  <p id="src-collapsed" class="src-collapsed" hidden></p>
+                  <textarea id="src" rows="2" spellcheck="false" placeholder="说话，或直接输入、粘贴…" aria-labelledby="src-label"></textarea>
+                  <div id="src-live" class="src-live" hidden></div>
+                  <p id="hint" class="hint">按住麦克风说话 · <kbd class="k-mod-range">⌘1–5</kbd> 切换润色 · <kbd class="k-commit">↵</kbd> 写入 · <kbd>⇧↵</kbd> 换行 · <kbd>Esc</kbd> 隐藏</p>
+                  <p id="remembered" class="remembered" hidden><span id="remembered-text"></span><button type="button" id="restore-defaults" class="link-inline">恢复默认</button></p>
+                </div>
+                <div id="res" class="pane res" hidden aria-labelledby="res-label">
+                  <div class="pane-label"><span id="res-label">将写入</span><span id="gate-chip" class="chip mini" hidden></span></div>
+                  <div id="rows" class="rows"></div>
+                  <div id="doc-view" class="doc-view" hidden></div>
+                </div>
+              </div>
+              <footer class="c-foot">
+                <button type="button" id="mic" class="mic" aria-label="开始听写"><svg class="ic mic-ic" aria-hidden="true"><use href="#i-mic"/></svg><span class="bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span></button>
+                <div class="status-block">
+                  <p id="status" class="status" role="status" aria-live="polite"></p>
+                  <p id="model-line" class="model-line" role="status" aria-live="polite" hidden></p>
+                </div>
+                <button type="button" id="copy" class="icon-btn copy-btn" aria-label="复制将写入的内容"><svg class="ic" aria-hidden="true"><use id="copy-ic" href="#i-copy"/></svg></button>
+                <button type="button" id="commit" class="btn primary" disabled></button>
+              </footer>
+            </section>
+            <div class="field">
+              <label class="sr-only" for="target-text">原应用输入框</label>
+              <textarea id="target-text" rows="2" placeholder="给 Agent 发消息…"></textarea>
+              <span class="field-note" id="field-note">回填只写入文字，不会自动发送</span>
+            </div>
+          </div>
+        </div>
+        <div id="toast" class="toast" role="status" hidden></div>
+      </div>
+
+      <aside class="rail" aria-label="场景">
+        <button type="button" id="summon" class="btn primary block">模拟全局呼出 <kbd class="k-summon"></kbd></button>
+        <h2>AI 结对与多场景润色（质量优先）</h2>
+        <button type="button" class="scenario" data-scenario="compare"><b>AI 结对 · 复杂委派（含改口剪枝）</b><span>倒叙目标置顶 + 剔除改口废案 + 对比 5 模式</span></button>
+        <button type="button" class="scenario" data-scenario="ai-steer"><b>AI 结对 · 短句纠偏（免套壳直出）</b><span>2 句中途纠偏自适应直出，绝不硬凑空标题</span></button>
+        <button type="button" class="scenario" data-scenario="todo"><b>Linear · 待办与派单</b><span>过滤废案铺垫，提取 - [ ] 行动项与负责人</span></button>
+        <button type="button" class="scenario" data-scenario="report"><b>飞书文档 · 汇报与纪要</b><span>结论先行（BLUF），归纳关键决策与跟进</span></button>
+        <h2>日常沟通与跨语种</h2>
+        <button type="button" class="scenario" data-scenario="pair"><b>日常沟通 · 口语顺句</b><span>去口头语与重复，保留真人说话语气</span></button>
+        <button type="button" class="scenario" data-scenario="translate"><b>说中文，写英文</b><span>边说边译，直接回填</span></button>
+        <button type="button" class="scenario" data-scenario="document"><b>翻译技术文档</b><span>整段处理，保留代码与格式</span></button>
+        <button type="button" class="scenario" data-scenario="meeting"><b>会议转录</b><span>导入录音，带时间轴</span></button>
+        <label class="field-label" for="edge">质量门禁与异常边界</label>
+        <select id="edge">
+          <option value="">选择一种情况…</option>
+          <option value="prompt-hijack">AI 任务指令：拦截模型越界写代码</option>
+          <option value="prompt-slop">AI 任务指令：拦截角色扮演套话污染</option>
+          <option value="fact-anchor">待办润色：拦截篡改生效数字</option>
+          <option value="gate">口语顺句：字级保真门禁拦截</option>
+          <option value="slow">处理很慢</option>
+          <option value="failure">翻译失败</option>
+          <option value="lost">原输入框失效</option>
+          <option value="no-target">没有输入框</option>
+          <option value="no-audio">麦克风没有声音</option>
+          <option value="permission">麦克风权限未开</option>
+          <option value="download">语音模型下载中</option>
+          <option value="model-preparing">语音模型准备中</option>
+          <option value="model-switch">翻译模型切换中</option>
+        </select>
+        <p class="rail-note">设计演示：使用预设语料，不访问麦克风、模型、网络，也不写入真实应用。</p>
+      </aside>
+    </div>
+  </section>
+
+  <section id="page-settings" class="page" hidden>
+    <h1>设置</h1>
+    <p class="lead">所有设置只保存在本页内存中，刷新即恢复。</p>
+    <div class="settings">
+      <div class="settings-nav" focusgroup="tablist nomemory" aria-label="设置分类">
+        <button type="button" id="tab-general" aria-selected="true" focusgroupstart data-sec="general">通用</button>
+        <button type="button" id="tab-voice" aria-selected="false" data-sec="voice">语音与润色</button>
+        <button type="button" id="tab-privacy" aria-selected="false" data-sec="privacy">隐私与云端</button>
+        <button type="button" id="tab-models" aria-selected="false" data-sec="models">模型与关于</button>
+      </div>
+      <div class="settings-body">
+        <div id="panel-general" role="tabpanel" aria-labelledby="tab-general" data-panel="general">
+          <div class="row"><div><label for="summon-binding">呼出快捷键</label><p>在任何应用里唤起浮窗</p></div><input id="summon-binding" value="Ctrl+Alt+T" autocomplete="off"></div>
+          <div class="row"><div><label for="commit-binding">回填快捷键</label><p>Shift+Enter 换行；输入法候选确认优先</p></div><select id="commit-binding"><option value="enter">Enter</option><option value="ctrl-enter">Ctrl + Enter</option></select></div>
+          <div class="row"><div><label for="theme">外观</label><p>浅色、深色或跟随系统</p></div><select id="theme"><option value="auto">跟随系统</option><option value="light">浅色</option><option value="dark">深色</option></select></div>
+          <div class="row"><div><label for="reduce-motion">减少动画</label><p>同时遵守系统的“减少动态效果”</p></div><input id="reduce-motion" type="checkbox" role="switch"></div>
+          <div class="row"><div><label for="remember-apps">记住每个应用的上次选择</label><p>只记应用标识、输出与润色方式（如 Cursor → AI 提示词），不记标题与正文</p></div><input id="remember-apps" type="checkbox" role="switch" checked></div>
+          <div class="apps-box">
+            <div class="endpoints-head"><div><h2 id="apps-title">应用偏好记忆与预设</h2><p>每个应用可固定不同的默认润色方式或翻译去向；浮窗里切换也会自动更新此处</p></div><button type="button" id="clear-apps" class="btn">清除全部</button></div>
+            <ul id="apps-list" class="item-list" role="list" aria-labelledby="apps-title"></ul>
+          </div>
+        </div>
+        <div id="panel-voice" role="tabpanel" aria-labelledby="tab-voice" data-panel="voice" hidden="until-found">
+          <div class="row"><div><label for="microphone">麦克风</label><p>实际产品显示音量与断开状态</p></div><select id="microphone"><option>内置麦克风（演示）</option><option>外接耳机（演示）</option></select></div>
+          <div class="row"><div><label for="speech-language">识别语言</label><p>已验证中英混说</p></div><select id="speech-language"><option>中文 / English 混说</option><option>中文</option><option>English</option></select></div>
+          <div class="row"><div><label for="cleanup">启用整理与润色</label><p>关闭后浮窗只提供原话与翻译</p></div><select id="cleanup"><option value="on">开启</option><option value="off">关闭</option></select></div>
+          <div class="row"><div><label for="default-polish">默认润色方式</label><p>没有应用记忆时的起点；出厂为「口语整理」</p></div><select id="default-polish"></select></div>
+          <div class="row"><div><label for="direction-setting">翻译方向</label><p>中文与英文互译</p></div><select id="direction-setting"><option value="zh-en">中文 → English</option><option value="en-zh">English → 中文</option></select></div>
+          <div class="row"><div><label for="keep-audio">保留录音</label><p>默认关闭；开启后保存到用户目录，不上传</p></div><input id="keep-audio" type="checkbox" role="switch"></div>
+
+          <div class="presets-box" id="presets-section">
+            <div class="endpoints-head">
+              <div>
+                <h2 id="presets-title">润色方式预设</h2>
+                <p>内置 5 种高频场景，可按需微调或在浮窗菜单中隐藏；也可添加团队专属格式（如 Bug 缺陷单、Commit 说明）</p>
+              </div>
+              <button type="button" id="add-preset" class="btn">添加润色方式</button>
+            </div>
+            <ul id="presets-list" class="item-list" role="list" aria-labelledby="presets-title"></ul>
+          </div>
+
+          <div class="terms">
+            <h2 id="terms-title">术语表</h2>
+            <form id="term-form" class="term-form"><label>原词<input id="term-source" placeholder="缓存穿透" required></label><label>译法<input id="term-target" placeholder="cache penetration" required></label><button type="submit" class="btn">添加</button></form>
+            <ul id="terms-list" class="item-list" role="list" aria-labelledby="terms-title"></ul>
+          </div>
+        </div>
+        <div id="panel-privacy" role="tabpanel" aria-labelledby="tab-privacy" data-panel="privacy" hidden="until-found">
+          <div class="row"><div><label for="cloud-translation">云端翻译</label><p>默认关闭。开启需单独同意</p></div><input id="cloud-translation" type="checkbox" role="switch"></div>
+          <div class="row"><div><label for="cloud-cleanup">云端整理与润色</label><p>与翻译分别授权</p></div><input id="cloud-cleanup" type="checkbox" role="switch"></div>
+          <div class="endpoints">
+            <div class="endpoints-head"><div><h2 id="endpoints-title">云端端点</h2><p id="endpoints-sub"></p></div><button type="button" id="add-endpoint" class="btn">添加端点</button></div>
+            <ul id="endpoints-list" class="item-list" role="list" aria-labelledby="endpoints-title"></ul>
+          </div>
+          <div class="row"><div><b>最近草稿</b><p>原型内存保留最近 5 份，刷新清空</p></div><button type="button" id="clear-history" class="btn">清除</button></div>
+        </div>
+        <div id="panel-models" role="tabpanel" aria-labelledby="tab-models" data-panel="models" hidden="until-found">
+          <div class="chips-row"><span class="chip">识别 · X-ASR + Qwen3-ASR</span><span class="chip" id="cleaner-chip">整理与润色 · Qwen3.5 4B</span><span class="chip">翻译 · Hy-MT2</span></div>
+          <div class="row"><div><label for="cleaner-model">润色与整理模型</label><p>结构化指令提炼与废案剪枝对模型推理能力敏感（M2+ / 16GB+ 基线）</p></div>
+            <select id="cleaner-model">
+              <option value="Qwen3.5 9B">Qwen3.5-9B · 深度重组旗舰（推荐重度 AI 结对）</option>
+              <option value="Qwen3.5 4B" selected>Qwen3.5-4B · 均衡主力（16GB 默认）</option>
+              <option value="Qwen3.5 2B">Qwen3.5-2B · 轻量顺句</option>
+            </select>
+          </div>
+          <p id="cleaner-quality-hint" class="quality-hint" role="status" hidden>质量提示：2B 轻量模型仅建议用于「口语顺句」；使用「AI 任务指令 / 待办与派单 / 汇报与纪要」时，建议切换至 Qwen3.5-4B / 9B 或开启云端润色以保障跨句重组与改口剪枝质量。</p>
+          <div class="row"><div><label for="translation-model">翻译模型</label><p>质量优先或速度优先；不会静默切到云端</p></div><select id="translation-model"><option>Hy-MT2-7B · 质量优先</option><option>Hy-MT2-1.8B · 速度优先</option></select></div>
+          <div class="row"><div><b>本次状态</b><p>不含正文，便于排查</p></div><button type="button" id="show-diagnostics" class="btn">查看</button></div>
+          <div class="row"><div><b>版本</b><p>原型 v5 · 无网络请求</p></div><span class="chip">仅设计演示</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="page-notes" class="page" hidden>
+    <h1>设计说明</h1>
+    <p class="lead">面向 AI 结对与 AI 办公重构润色体系：以「高信噪比、零幻觉、零八股套话」的润色质量为第一目标，保持浮窗零新增常驻控件。</p>
+    <div class="notes-grid">
+      <article class="card"><h2>AI 任务指令优先</h2><p>倒叙目标自动置顶、中途改口废案彻底剪枝、正负硬性护栏独立成列；短句纠偏自适应直出，绝不硬套空标题。</p></article>
+      <article class="card"><h2>全局单窗防撕裂</h2><p>结构化模式不再逢换行或 800 字硬切拼接，≤2400 字整篇一次推理统合，彻底消除重复标题与上下文割裂。</p></article>
+      <article class="card"><h2>协同门禁 + 定向自愈</h2><p>双层门禁新增「自我改口数字豁免」与「防越界写代码 / 防角色套话拦截」，失败时带具体原因单次同模式自愈，不静默退回散文。</p></article>
+      <article class="card"><h2>宿主感知 + 零损切换</h2><p>Cursor 默认落位 AI 任务指令、Linear 落位待办、飞书文档落位汇报；原话常驻，5 种模式可随时无损来回切换对比。</p></article>
+    </div>
+
+    <article class="card wide-card"><h2>以润色质量为第一目标：五层工程改造对照</h2>
+      <table>
+        <thead><tr><th>质量维度</th><th>传统单提示词润色（旧方案）</th><th>质量优先多场景润色（v5 定稿）</th></tr></thead>
+        <tbody>
+          <tr><td>口语思维撤回与倒叙</td><td>按原话顺序顺句，保留被推翻线索，核心诉求仍埋在段尾</td><td><b>目标倒装归位 + 废案彻底剪枝</b>（如剔除被改口的“重试 3 次”，只留生效的 <code>401</code> 与 <code>30 秒</code>）</td></tr>
+          <tr><td>长短输入格式适配</td><td>无论长短硬套 4 个 Markdown 标题，脑补“你是一位资深专家”等废话</td><td><b>自适应颗粒度</b>：≤2 句短纠偏紧凑直出；复杂委派按实际要素输出目标 / 上下文 / 硬性约束，缺项绝不硬凑</td></tr>
+          <tr><td>文档切分与推理窗口</td><td><code>DocumentWork.Split</code> 遇 <code>\n</code> 或 800 字即切块拼接，产生重复标题头</td><td>顺句走分段窗口；结构化模式走 <b>2400 字全局单窗统合</b>（超长走 Map 抽事实 → Reduce 单次成篇）</td></tr>
+          <tr><td>安全门禁与重试策略</td><td>字符级 LCS 误杀所有结构提炼，且删掉改口旧数字会误报 <code>NumberLost</code>；失败直接退回默认口语</td><td><code>FactAnchorGate</code> 支持<b>改口数字豁免</b>、拦截越界写代码与角色套话；失败执行<b>单次同模式定向修复</b></td></tr>
+          <tr><td>模型档位与思考卫生</td><td>未区分 2B/4B/9B 能力边界，未剥离推理模型 <code>&lt;think&gt;</code> 块</td><td>显式关闭/剥离思考块，按模式分档采样，推荐 <code>Qwen3.5 4B / 9B</code> 并在 2B 下给出诚实质量提示</td></tr>
+        </tbody>
+      </table>
+    </article>
+
+    <article class="card wide-card"><h2>内置 5 种正交场景规格</h2>
+      <details class="spec-details">
+        <summary>展开查看 5 种内置模式与 3 个扩展模板的质量红线</summary>
+        <ul>
+          <li><b>AI 任务指令（⌘1 · AI 结对核心）</b>：面向 Cursor / Claude Code / Copilot / ChatGPT。倒叙目标置顶、正负护栏分离、短纠偏免套壳、严禁模型替用户回答或偷写业务代码。</li>
+          <li><b>口语顺句（⌘2 · 即时沟通）</b>：面向微信 / Slack / 飞书消息。接碎句、去口头语与改口残片，保留真人说话口吻，零标题列表。</li>
+          <li><b>得体书面（⌘3 · 邮件与评审）</b>：面向正式邮件、PR Review 与客户沟通。克制专业的书面段落，显式封杀“赋能/抓手/闭环/综上所述”等公文黑话。</li>
+          <li><b>待办与派单（⌘4 · 任务拆解）</b>：面向 Linear / Jira / 飞书任务。过滤寒暄与已否决提议，提取动词开头的 <code>- [ ]</code> 清单，绝不编造截止日期或负责人。</li>
+          <li><b>汇报与纪要（⌘5 · 决策同步）</b>：面向周报 / 站会 / 评审文档。强制结论先行（BLUF），锁死全部业务指标数值与正反对比。</li>
+          <li><b>一键扩展模板</b>：内置 <code>Bug 缺陷与复现</code>、<code>需求规格（Spec/AC）</code>、<code>Commit 说明</code> 三个起步芯片，支持团队自定义沉淀。</li>
+        </ul>
+      </details>
+    </article>
+  </section>
+</main>
+
+<input id="file" type="file" accept="audio/*" hidden>
+<dialog id="dlg" aria-labelledby="dlg-title"><header><h1 id="dlg-title" class="dlg-heading"></h1><button type="button" id="dlg-close" class="icon-btn" aria-label="关闭"><svg class="ic" aria-hidden="true"><use href="#i-close"/></svg></button></header><div id="dlg-body"></div></dialog>
+</body>
+</html>

@@ -16,9 +16,13 @@ public static class ComposerShortcuts
     public static IReadOnlyList<Shortcut> All { get; } =
     [
         new("dictate", "KeyD", "D", false),
-        new("clean", "Digit1", "1", false),
-        new("translate", "Digit2", "2", false),
-        new("original", "Digit3", "3", false),
+        new("polish:ai-task", "Digit1", "1", false),
+        new("polish:natural", "Digit2", "2", false),
+        new("polish:formal", "Digit3", "3", false),
+        new("polish:todo", "Digit4", "4", false),
+        new("polish:report", "Digit5", "5", false),
+        new("translate", "KeyT", "T", false),
+        new("original", "Digit0", "0", false),
         new("swap", "KeyL", "L", false),
         new("copy", "KeyC", "C", true),
         new("new", "KeyN", "N", false),
@@ -28,6 +32,8 @@ public static class ComposerShortcuts
         new("zoom", "KeyE", "E", false),
         new("settings", "Comma", ",", false)
     ];
+
+    public static Shortcut? TryOf(string id) => All.FirstOrDefault(shortcut => shortcut.Id == id);
 
     public static Shortcut Of(string id) => All.Single(shortcut => shortcut.Id == id);
 

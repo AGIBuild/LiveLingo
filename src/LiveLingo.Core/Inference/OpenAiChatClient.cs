@@ -86,6 +86,7 @@ public sealed class OpenAiChatClient(
                 text.Append(chunk);
                 if (!string.IsNullOrWhiteSpace(chunk))
                     firstVisibleMs ??= clock.Elapsed.TotalMilliseconds;
+                request.OnDelta?.Invoke(chunk);
             }
         }
 
@@ -93,6 +94,43 @@ public sealed class OpenAiChatClient(
             throw new InvalidDataException($"Incomplete completion stream: done={done}, finish={finish ?? "missing"}.");
 
         return new ChatCompletion(text.ToString().Trim(), firstVisibleMs.Value, clock.Elapsed.TotalMilliseconds, outputTokens, reportedModel);
+    }
+
+    public async Task WarmPromptAsync(
+        string systemPrompt,
+        IReadOnlyDictionary<string, object>? extra = null,
+        CancellationToken ct = default,
+        string userPrefix = "目标：")
+    {
+        if (!sendProviderExtras || string.IsNullOrWhiteSpace(systemPrompt))
+            return;
+
+        var payload = new Dictionary<string, object>(extra ?? new Dictionary<string, object>())
+        {
+            ["messages"] = new[]
+            {
+                new { role = "system", content = systemPrompt },
+                new { role = "user", content = userPrefix }
+            },
+            ["stream"] = false,
+            ["temperature"] = 0,
+            ["max_tokens"] = 1,
+            ["cache_prompt"] = true
+        };
+        if (model is not null)
+            payload["model"] = model;
+
+        using var message = new HttpRequestMessage(HttpMethod.Post, endpoint)
+        {
+            Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json")
+        };
+        message.Headers.ConnectionClose = true;
+        if (bearerToken is not null)
+            message.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", bearerToken);
+
+        using var response = await http.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+        response.EnsureSuccessStatusCode();
+        _ = await response.Content.ReadAsByteArrayAsync(ct).ConfigureAwait(false);
     }
 
     private static JsonDocument ParseEvent(string data)

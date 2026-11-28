@@ -76,7 +76,11 @@
   // What a shortcut does is what the button or menu item of the same id does; an action that is not available
   // (nothing to copy, an output the settings do not offer) is simply not run.
   function runShortcut(id, c) {
-    const offered = (output) => c.output.menu.some((item) => item.id === output);
+    const offered = (output) => c.output.menu.some((item) => item.id === output && item.enabled !== false);
+    if (id.startsWith('polish:')) {
+      if (offered(id)) LL.send('polishMode', { id: id.slice(7) });
+      return;
+    }
     switch (id) {
       case 'dictate': LL.send('micToggle'); break;
       case 'clean':

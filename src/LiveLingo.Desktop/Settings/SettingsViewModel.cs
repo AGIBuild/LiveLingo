@@ -50,6 +50,18 @@ public enum EndpointError
 /// <summary>The form that adds an endpoint (<paramref name="Id"/> null) or edits one, and why its last submission was refused.</summary>
 public sealed record EndpointForm(string? Id, EndpointError? Error);
 
+/// <summary>Why the polish preset add or edit form was refused.</summary>
+public enum PresetFormError
+{
+    NameMissing,
+    NameTaken,
+    DescriptionInvalid,
+    InstructionsInvalid
+}
+
+/// <summary>The open modal form for adding a custom polish preset (<paramref name="Id"/> null) or editing an existing preset.</summary>
+public sealed record PresetForm(string? Id, PresetFormError? Error);
+
 /// <summary>A stage routing request to a cloud endpoint waiting for the user's explicit privacy consent.</summary>
 public sealed record PendingCloudConsent(CloudStep Step, string EndpointId, string? PreviousEndpointId);
 
@@ -109,7 +121,10 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
         _preloadSpeech = current.Composer.PreloadSpeech;
         _builtInGlossary = current.Composer.BuiltInGlossary;
         _rememberChoices = current.Composer.RememberChoices;
-        _polishPrompt = PolishStyle.IsUsable(current.Composer.PolishPrompt) ? current.Composer.PolishPrompt : "";
+        _defaultPolishMode = current.Composer.ResolvedDefaultPolishMode();
+        _smartHostPolish = current.Composer.SmartHostPolish;
+        var naturalPreset = current.Composer.EffectivePolishPresets().First(p => p.Id == PolishPresets.NaturalId);
+        _polishPrompt = naturalPreset.IsCustomized ? naturalPreset.CustomInstructions : "";
         _microphoneNames = [""];
         _microphoneIndex = 0;
         _speechEndpointId = current.Cloud.SpeechEndpointId;
@@ -160,9 +175,23 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
     /// <summary>Whether the output and direction last chosen for an application are used the next time it is the target.</summary>
     [ObservableProperty] private bool _rememberChoices;
 
+    [ObservableProperty] private string _defaultPolishMode = PolishPresets.NaturalId;
+
+    [ObservableProperty] private bool _smartHostPolish = true;
+
+    [ObservableProperty] private PresetForm? _activePresetForm;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PendingDeletePreset))]
+    private string? _pendingDeletePresetId;
+
+    public IReadOnlyList<PolishPreset> Presets => _settings.Current.Composer.EffectivePolishPresets();
+
+    public PolishPreset? PendingDeletePreset =>
+        PendingDeletePresetId is null ? null : Presets.FirstOrDefault(p => p.Id == PendingDeletePresetId && !p.BuiltIn);
+
     /// <summary>
-    /// The polish requirements as the user wrote them, "" for the built-in ones. Saved when set; a text that is not usable
-    /// (<see cref="PolishStyle.IsUsable"/>) is flagged and not stored.
+    /// The polish requirements as the user wrote them for the default <c>natural</c> mode, "" for the built-in ones.
     /// </summary>
     [ObservableProperty] private string _polishPrompt = "";
 
@@ -183,9 +212,232 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(Apps));
     }
 
+    public void SetAppPreference(string appId, string appName, string encodedChoice)
+    {
+        if (string.IsNullOrWhiteSpace(appId))
+            return;
+
+        if (string.Equals(encodedChoice, "default", StringComparison.Ordinal))
+        {
+            _preferences.Forget(appId);
+            OnPropertyChanged(nameof(Apps));
+            return;
+        }
+
+        if (encodedChoice.StartsWith("translate:", StringComparison.Ordinal))
+        {
+            var langPart = encodedChoice["translate:".Length..];
+            if (Enum.TryParse<TargetLanguage>(langPart, ignoreCase: true, out var target))
+            {
+                _preferences.SetAppChoice(appId, appName, ComposerOutput.Translate, target, DefaultPolishMode);
+                OnPropertyChanged(nameof(Apps));
+            }
+            return;
+        }
+
+        if (encodedChoice.StartsWith("clean:", StringComparison.Ordinal))
+        {
+            var modeId = encodedChoice["clean:".Length..];
+            if (Presets.Any(p => p.Enabled && string.Equals(p.Id, modeId, StringComparison.Ordinal)))
+            {
+                var defaultTarget = Enum.Parse<TargetLanguage>(_settings.Current.Composer.TargetLanguage);
+                _preferences.SetAppChoice(appId, appName, ComposerOutput.Clean, defaultTarget, modeId);
+                OnPropertyChanged(nameof(Apps));
+            }
+        }
+    }
+
     public void ClearApps()
     {
         _preferences.Clear();
+        OnPropertyChanged(nameof(Apps));
+    }
+
+    // ---- scenario polish presets -----------------------------------------------------------
+
+    public void OpenPresetForm(string? id)
+    {
+        if (id is null || Presets.Any(p => string.Equals(p.Id, id, StringComparison.Ordinal)))
+            ActivePresetForm = new PresetForm(id, null);
+    }
+
+    public void ClosePresetForm() => ActivePresetForm = null;
+
+    public bool SavePreset(string name, string description, string gate, string instructions)
+    {
+        if (ActivePresetForm is not { } form)
+            return false;
+
+        var current = Presets;
+        var existing = form.Id is null ? null : current.FirstOrDefault(p => string.Equals(p.Id, form.Id, StringComparison.Ordinal));
+        if (form.Id is not null && existing is null)
+        {
+            ActivePresetForm = null;
+            return false;
+        }
+
+        var builtIn = existing?.BuiltIn == true;
+        var trimmedName = (name ?? "").Trim();
+        var trimmedDesc = (description ?? "").Trim();
+        var storedInstructions = PolishStyle.ToStored(instructions ?? "");
+
+        if (!builtIn && !PolishPresets.IsValidName(trimmedName))
+        {
+            ActivePresetForm = form with { Error = PresetFormError.NameMissing };
+            return false;
+        }
+        if (!builtIn && current.Any(p => p.Id != existing?.Id && string.Equals(p.Name, trimmedName, StringComparison.OrdinalIgnoreCase)))
+        {
+            ActivePresetForm = form with { Error = PresetFormError.NameTaken };
+            return false;
+        }
+        if (!builtIn && !PolishPresets.IsValidDescription(trimmedDesc))
+        {
+            ActivePresetForm = form with { Error = PresetFormError.DescriptionInvalid };
+            return false;
+        }
+        if (storedInstructions is null || (!builtIn && storedInstructions.Length == 0))
+        {
+            ActivePresetForm = form with { Error = PresetFormError.InstructionsInvalid };
+            return false;
+        }
+
+        var model = _settings.CloneCurrent();
+        if (builtIn)
+        {
+            var builtInId = existing!.Id;
+            var normalized = PolishStyle.NormalizeText(instructions ?? "");
+            var isBuiltInDefault = string.IsNullOrWhiteSpace(instructions)
+                || normalized == PolishStyle.NormalizeText(existing.DefaultInstructions);
+            var entry = model.Composer.PolishPresets.FirstOrDefault(e => e.Id == builtInId);
+            if (entry is null && !isBuiltInDefault)
+            {
+                model.Composer.PolishPresets.Add(new PolishPresetEntry
+                {
+                    Id = builtInId,
+                    Enabled = existing.Enabled,
+                    Gate = existing.Gate.ToString(),
+                    Instructions = normalized
+                });
+            }
+            else if (entry is not null)
+            {
+                entry.Instructions = isBuiltInDefault ? "" : normalized;
+            }
+            if (builtInId == PolishPresets.NaturalId)
+            {
+                model.Composer.PolishPrompt = isBuiltInDefault ? "" : normalized;
+                _loading = true;
+                PolishPrompt = isBuiltInDefault ? "" : normalized;
+                PolishPromptInvalid = false;
+                _loading = false;
+            }
+        }
+        else if (existing is not null)
+        {
+            var entry = model.Composer.PolishPresets.First(e => e.Id == existing.Id);
+            entry.Name = trimmedName;
+            entry.Description = trimmedDesc;
+            entry.Gate = Enum.TryParse<PolishGateKind>(gate, ignoreCase: true, out var g) ? g.ToString() : nameof(PolishGateKind.FactAnchor);
+            entry.Instructions = PolishStyle.NormalizeText(instructions!);
+        }
+        else
+        {
+            var parsedGate = Enum.TryParse<PolishGateKind>(gate, ignoreCase: true, out var g) ? g : PolishGateKind.FactAnchor;
+            model.Composer.PolishPresets.Add(new PolishPresetEntry
+            {
+                Id = "custom-" + Guid.NewGuid().ToString("N")[..12],
+                Name = trimmedName,
+                Description = trimmedDesc,
+                Gate = parsedGate.ToString(),
+                Enabled = true,
+                Instructions = PolishStyle.NormalizeText(instructions!)
+            });
+        }
+
+        _settings.Replace(model);
+        ActivePresetForm = null;
+        OnPropertyChanged(nameof(Presets));
+        return true;
+    }
+
+    public void ResetBuiltInPreset(string id)
+    {
+        if (!PolishPresets.IsBuiltInId(id))
+            return;
+
+        var model = _settings.CloneCurrent();
+        var entry = model.Composer.PolishPresets.FirstOrDefault(e => e.Id == id);
+        if (entry is not null)
+            entry.Instructions = "";
+        if (id == PolishPresets.NaturalId)
+        {
+            model.Composer.PolishPrompt = "";
+            _loading = true;
+            PolishPrompt = "";
+            PolishPromptInvalid = false;
+            _loading = false;
+        }
+        _settings.Replace(model);
+        OnPropertyChanged(nameof(Presets));
+    }
+
+    public void SetPresetEnabled(string id, bool enabled)
+    {
+        if (string.Equals(id, DefaultPolishMode, StringComparison.Ordinal) && !enabled)
+            return;
+
+        var existing = Presets.FirstOrDefault(p => string.Equals(p.Id, id, StringComparison.Ordinal));
+        if (existing is null)
+            return;
+
+        var model = _settings.CloneCurrent();
+        var entry = model.Composer.PolishPresets.FirstOrDefault(e => e.Id == id);
+        if (entry is null && existing.BuiltIn)
+        {
+            model.Composer.PolishPresets.Add(new PolishPresetEntry
+            {
+                Id = id,
+                Enabled = enabled,
+                Gate = existing.Gate.ToString(),
+                Instructions = existing.IsCustomized ? existing.CustomInstructions : ""
+            });
+        }
+        else if (entry is not null)
+        {
+            entry.Enabled = enabled;
+        }
+        _settings.Replace(model);
+        OnPropertyChanged(nameof(Presets));
+    }
+
+    public void DeletePreset(string id)
+    {
+        if (Presets.Any(p => string.Equals(p.Id, id, StringComparison.Ordinal) && !p.BuiltIn))
+            PendingDeletePresetId = id;
+    }
+
+    public void AnswerDeletePreset(bool allow)
+    {
+        var id = PendingDeletePresetId;
+        PendingDeletePresetId = null;
+        if (!allow || id is null)
+            return;
+
+        var model = _settings.CloneCurrent();
+        if (model.Composer.PolishPresets.RemoveAll(e => string.Equals(e.Id, id, StringComparison.Ordinal)) == 0)
+            return;
+
+        if (string.Equals(model.Composer.DefaultPolishMode, id, StringComparison.Ordinal))
+        {
+            model.Composer.DefaultPolishMode = PolishPresets.NaturalId;
+            _loading = true;
+            DefaultPolishMode = PolishPresets.NaturalId;
+            _loading = false;
+        }
+        _settings.Replace(model);
+        _preferences.ForgetPolishMode(id);
+        OnPropertyChanged(nameof(Presets));
         OnPropertyChanged(nameof(Apps));
     }
 
@@ -305,6 +557,8 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
     partial void OnPreloadSpeechChanged(bool value) => Apply();
     partial void OnBuiltInGlossaryChanged(bool value) => Apply();
     partial void OnRememberChoicesChanged(bool value) => Apply();
+    partial void OnDefaultPolishModeChanged(string value) => Apply();
+    partial void OnSmartHostPolishChanged(bool value) => Apply();
     partial void OnPolishPromptChanged(string value) => Apply();
 
     /// <summary>A combo box reports -1 while its items are being replaced; that is not a choice.</summary>
@@ -342,9 +596,32 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
         model.Composer.PreloadSpeech = PreloadSpeech;
         model.Composer.BuiltInGlossary = BuiltInGlossary;
         model.Composer.RememberChoices = RememberChoices;
+        if (model.Composer.EffectivePolishPresets().Any(p => string.Equals(p.Id, DefaultPolishMode, StringComparison.Ordinal)))
+        {
+            model.Composer.DefaultPolishMode = DefaultPolishMode;
+            var defEntry = model.Composer.PolishPresets.FirstOrDefault(e => e.Id == DefaultPolishMode);
+            if (defEntry is not null)
+                defEntry.Enabled = true;
+        }
+        model.Composer.SmartHostPolish = SmartHostPolish;
         if (PolishStyle.ToStored(PolishPrompt) is { } polish)
         {
             model.Composer.PolishPrompt = polish;
+            var naturalEntry = model.Composer.PolishPresets.FirstOrDefault(e => e.Id == PolishPresets.NaturalId);
+            if (naturalEntry is null && polish.Length > 0)
+            {
+                model.Composer.PolishPresets.Add(new PolishPresetEntry
+                {
+                    Id = PolishPresets.NaturalId,
+                    Enabled = true,
+                    Gate = nameof(PolishGateKind.Verbatim),
+                    Instructions = polish
+                });
+            }
+            else if (naturalEntry is not null)
+            {
+                naturalEntry.Instructions = polish;
+            }
             PolishPromptInvalid = false;
         }
         else

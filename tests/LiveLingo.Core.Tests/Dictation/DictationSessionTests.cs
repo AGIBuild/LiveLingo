@@ -821,6 +821,14 @@ public class DictationSessionTests
         Assert.Equal([longLive], collapsed.Raws);
         Assert.True(collapsed.Session.Segments[0].SecondPassFailed);
 
+        // Mid-utterance loop truncation (~46% of live speech units kept after GenerateText:1099 truncated at 93 tokens)
+        // must also fall back to the complete X-ASR live transcript so the second half of the sentence is never lost.
+        await using var halfTruncated = new Harness(script, secondPass: new ScriptedSegmentRecognizer(() => "如果说你还需要更强的润色"));
+        halfTruncated.Push(6_800);
+        await halfTruncated.Session.StopAsync();
+        Assert.Equal([longLive], halfTruncated.Raws);
+        Assert.True(halfTruncated.Session.Segments[0].SecondPassFailed);
+
         // Legitimate bilingual + numeric normalization ("百分之五十" -> "50%", phonetic CJK -> "Agent"/"Skill"/"configuration") is accepted.
         var bilingual = "如果说你还需要更强的 Agent configuration 或者 50% 的 Skill 机制也可以澄清。";
         await using var validBilingual = new Harness(script, secondPass: new ScriptedSegmentRecognizer(() => bilingual));
@@ -846,5 +854,40 @@ public class DictationSessionTests
 
         Assert.Equal(["短句。"], draft.Read(d => d.Units.Select(u => u.Raw).ToList()));
         Assert.False(nonAutoregressive.Segments[0].SecondPassFailed);
+    }
+
+    [Fact]
+    public async Task SecondPassPromptEchoAndCodeFenceHallucination_FallsBackToCleanLiveText()
+    {
+        var liveSentence = "从头到尾干完了，就是我们这个很重要的功能。";
+        var script = new[] { new ScriptedSegment(200, 5_200, liveSentence) };
+
+        await using var echoed = new Harness(
+            script,
+            secondPass: new ScriptedSegmentRecognizer(() =>
+                "就是我们这个Agent Skill Prompt Token API SDK CLI UI PR Git GitHub Copilot Claude Cursor VS Code LiveLingo MCP。"));
+        echoed.Push(5_800);
+        await echoed.Session.StopAsync();
+        Assert.Equal([liveSentence], echoed.Raws);
+        Assert.True(echoed.Session.Segments[0].SecondPassFailed);
+
+        await using var fenced = new Harness(
+            script,
+            secondPass: new ScriptedSegmentRecognizer(() =>
+                "从头到尾干完了```tableular data``` ```text\nlanguage Chinese啊。"));
+        fenced.Push(5_800);
+        await fenced.Session.StopAsync();
+        Assert.Equal([liveSentence], fenced.Raws);
+        Assert.True(fenced.Session.Segments[0].SecondPassFailed);
+
+        // Standalone 3+ word English BGM hallucination ("Like any power.") on pure CJK acoustic stream falls back to X-ASR.
+        var rushScript = new[] { new ScriptedSegment(200, 3_200, "没有别的意外了，直接打呀。快打！快打！") };
+        await using var bgmEnglish = new Harness(
+            rushScript,
+            secondPass: new ScriptedSegmentRecognizer(() => "没有别的意外了，直接打呀。Like any power.快打！快打！"));
+        bgmEnglish.Push(3_800);
+        await bgmEnglish.Session.StopAsync();
+        Assert.Equal("没有别的意外了，直接打呀。快打！快打！", string.Concat(bgmEnglish.Raws));
+        Assert.True(bgmEnglish.Session.Segments[0].SecondPassFailed);
     }
 }

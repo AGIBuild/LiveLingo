@@ -291,4 +291,27 @@ public class ComposerTextsTests
         Assert.Equal(local + " · hello", ComposerTexts.RecentItem(new RecentDraft(at, "\n  hello  \nsecond", false)));
         Assert.Equal(local + " · " + new string('a', 28) + "…", ComposerTexts.RecentItem(new RecentDraft(at, new string('a', 40), true)));
     }
+
+    [Fact]
+    public void ScenarioPolishTexts_FormatBuiltInAndCustomPresetsAndGateBadges()
+    {
+        var texts = Create();
+        var aiTask = LiveLingo.Core.Cleanup.PolishPresets.FindBuiltIn("ai-task");
+        var natural = LiveLingo.Core.Cleanup.PolishPresets.FindBuiltIn("natural");
+        var custom = new LiveLingo.Core.Cleanup.PolishPreset(
+            "custom-bug", "Bug 单", "复现与预期",
+            LiveLingo.Core.Cleanup.PolishGateKind.FactAnchor,
+            LiveLingo.Core.Cleanup.PolishRouteKind.Holistic,
+            BuiltIn: false, Enabled: true,
+            DefaultInstructions: "提炼复现步骤与报错", CustomInstructions: "提炼复现步骤与报错");
+
+        Assert.Equal("[composer.polish.ai-task.pill]", texts.OutputPill(ComposerOutput.Clean, TargetLanguage.English, aiTask));
+        Assert.Equal("[composer.polish.natural.pill]", texts.OutputPill(ComposerOutput.Clean, TargetLanguage.English, natural));
+        Assert.Equal("[composer.polish.custom.pill:Bug 单]", texts.OutputPill(ComposerOutput.Clean, TargetLanguage.English, custom));
+        Assert.Equal("[composer.res.labelMode:[composer.polish.ai-task.name]]", texts.ResultLabel(ComposerOutput.Clean, TargetLanguage.English, aiTask));
+        Assert.Equal("[composer.res.label]", texts.ResultLabel(ComposerOutput.Clean, TargetLanguage.English, natural));
+        Assert.Equal("[composer.document.gate.factOk]", texts.DocumentGateBadge(DocumentState.Ready, owned: false, LiveLingo.Core.Cleanup.PolishGateKind.FactAnchor));
+        Assert.Equal("[composer.document.gate.verbatimOk]", texts.DocumentGateBadge(DocumentState.Ready, owned: false, LiveLingo.Core.Cleanup.PolishGateKind.Verbatim));
+        Assert.Equal("[composer.document.gate.intercepted]", texts.DocumentGateBadge(DocumentState.Failed, owned: false, LiveLingo.Core.Cleanup.PolishGateKind.FactAnchor));
+    }
 }

@@ -19,6 +19,8 @@
 
   const pickOutput = (item) => {
     if (item.id === 'swap') LL.send('swapLanguage');
+    else if (item.id === 'managePolish') LL.send('openSettings', { section: 'voice' });
+    else if (item.id.startsWith('polish:')) LL.send('polishMode', { id: item.id.slice(7) });
     else LL.send('output', { value: item.id });
     LL.closeMenu();
   };
@@ -52,7 +54,11 @@
     const cloud = c.privacy.cloud;
     const privacyText = c.privacy.text;
     const privacyAria = c.privacy.aria;
-    const output = [...c.output.menu, { id: 'swap', label: c.output.swap, sepBefore: true }];
+    const output = [
+      ...c.output.menu,
+      { id: 'swap', label: c.output.swap, sepBefore: true },
+      ...(c.output.manageLabel ? [{ id: 'managePolish', label: c.output.manageLabel }] : [])
+    ];
     const more = c.menus.more.map((item) => (item.id === 'wide' || item.id === 'settings' ? { ...item, sepBefore: true } : item));
     return html`<header class="c-head">
       <div class="anchor">
@@ -70,8 +76,8 @@
       </div>
       <div class="anchor">
         <button type="button" id="out-pill" class="pill" aria-label=${LL.t('outputAria')} aria-haspopup="menu" aria-expanded=${open === 'output'}
-          onClick=${toggle('output')}>${c.output.globe && html`<${Icon} name="globe"/>`}${c.output.pill}<${Icon} name="chevron"/></button>
-        <${LL.Menu} id="output" align="right" label=${LL.t('outputAria')} items=${output} note=${c.output.note} onPick=${pickOutput}/>
+          onClick=${toggle('output')}>${c.output.globe && html`<${Icon} name="globe"/>`}${c.output.sparkle && html`<${Icon} name="sparkle"/>`}${c.output.pill}<${Icon} name="chevron"/></button>
+        <${LL.Menu} id="output" align="right" label=${LL.t('outputAria')} items=${output} polishGroup=${c.output.polishGroup} note=${c.output.note} onPick=${pickOutput}/>
       </div>
       <div class="anchor">
         <button type="button" id="more" class="icon-btn" aria-label=${LL.t('moreAria')} title=${LL.t('moreAria')} aria-haspopup="menu"
@@ -99,6 +105,28 @@
   // The key cap of a shortcut (snapshot options), for menus and tooltips; "" when the shortcut does not exist.
   LL.cap = (id) => LL.state.composer?.options.shortcuts.find((s) => s.id === id)?.cap ?? '';
 
+  class CopyButton extends preact.Component {
+    state = { copied: false };
+
+    componentWillUnmount() {
+      clearTimeout(this.timer);
+    }
+
+    copy = () => {
+      LL.send('copy');
+      clearTimeout(this.timer);
+      this.setState({ copied: true });
+      this.timer = setTimeout(() => this.setState({ copied: false }), 1400);
+    };
+
+    render({ enabled }) {
+      const { copied } = this.state;
+      return html`<button type="button" id="copy" class=${'icon-btn' + (copied ? ' copied' : '')}
+        aria-label=${LL.t('copyAria')} title=${LL.t('copyAria') + ' (' + LL.cap('copy') + ')'}
+        disabled=${!enabled} onClick=${this.copy}><${Icon} name=${copied ? 'check' : 'copy'}/></button>`;
+    }
+  }
+
   LL.Footer = ({ c }) => {
     const f = c.footer;
     const cm = f.commit;
@@ -115,8 +143,7 @@
       </div>
       ${f.download && html`<span id="download" class="dl" role="status" title=${f.download.text}>
         <progress max="100" value=${f.download.percent} aria-label=${LL.t('progressAria')}></progress>${f.download.text}</span>`}
-      <button type="button" id="copy" class="icon-btn" aria-label=${LL.t('copyAria')} title=${LL.t('copyAria') + ' (' + LL.cap('copy') + ')'} disabled=${!f.copyEnabled}
-        onClick=${() => LL.send('copy')}><${Icon} name="copy"/></button>
+      <${CopyButton} enabled=${f.copyEnabled}/>
       <button type="button" id="commit" class="btn primary" disabled=${!cm.enabled} aria-label=${cm.aria}
         onClick=${() => LL.send('commit', { fromKey: false })}>${cm.armed
           ? html`<span class="spinner" aria-hidden="true"></span>${cm.label}`

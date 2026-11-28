@@ -165,4 +165,30 @@ public class ComposerChoiceTests
 
         Assert.Equal("Slack", h.Vm.RememberFor?.Name);
     }
+
+    [Fact]
+    public async Task ChoosingAPolishMode_SwitchesToCleanAndAnnouncesTheMode_AndRestoreDefaultsResetsIt()
+    {
+        await using var h = new Harness(output: ComposerOutput.Translate);
+        var choices = new List<ComposerChoice>();
+        h.Vm.ChoiceMade += choices.Add;
+        h.Vm.Begin(new ComposerStart(
+            ComposerOutput.Clean, TargetLanguage.English,
+            ComposerOutput.Clean, TargetLanguage.English,
+            new RememberContext("com.todesktop.cursor", "Cursor", true),
+            PolishMode: "ai-task", DefaultPolishMode: "natural"));
+
+        Assert.Equal("ai-task", h.Vm.PolishMode);
+        Assert.Empty(choices);
+
+        h.Vm.ChoosePolishMode("todo");
+        Assert.Equal(ComposerOutput.Clean, h.Vm.Output);
+        Assert.Equal("todo", h.Vm.PolishMode);
+        Assert.Equal([new ComposerChoice(ComposerOutput.Clean, TargetLanguage.English, "todo")], choices);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => h.Vm.ChoosePolishMode("nonexistent"));
+
+        h.Vm.RestoreDefaultsCommand.Execute(null);
+        Assert.Equal("natural", h.Vm.PolishMode);
+    }
 }

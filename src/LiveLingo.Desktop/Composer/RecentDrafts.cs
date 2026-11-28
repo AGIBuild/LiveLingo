@@ -7,7 +7,8 @@ namespace LiveLingo.Desktop.Composer;
 /// <param name="Written">The result was written or copied; a draft that was not is offered again on the next summon.</param>
 public sealed record RecentDraft(
     DateTimeOffset At, string Text, bool Written, DraftState? State = null,
-    ComposerOutput Output = ComposerOutput.Clean, TargetLanguage Target = TargetLanguage.English);
+    ComposerOutput Output = ComposerOutput.Clean, TargetLanguage Target = TargetLanguage.English,
+    string PolishMode = Core.Cleanup.PolishPresets.NaturalId);
 
 /// <summary>
 /// The last few source texts, newest first, so a closed composer can be continued. Memory only: nothing is persisted,

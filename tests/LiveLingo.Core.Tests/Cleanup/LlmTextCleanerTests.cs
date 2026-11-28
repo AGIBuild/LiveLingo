@@ -65,9 +65,11 @@ public class LlmTextCleanerTests
     [InlineData("好的。", "好的。")]
     [InlineData("  \n好的。\n", "好的。")]
     [InlineData("目标：好的。", "好的。")]
+    [InlineData("润色结果：好的。", "好的。")]
+    [InlineData("<think>\n先分析一下语境\n</think>\n输出：好的。", "好的。")]
     [InlineData("“好的。”", "好的。")]
     [InlineData("\"好的。\"", "好的。")]
-    public async Task CleanAsync_RemovesLabelsQuotesAndOuterWhitespace(string output, string expected)
+    public async Task CleanAsync_RemovesLabelsQuotesThinkBlocksAndOuterWhitespace(string output, string expected)
     {
         var (cleaner, _) = Create(output);
 

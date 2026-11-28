@@ -85,6 +85,7 @@ internal sealed class ComposerIntents : IIntentHandler
                 break;
             case MicToggleIntent: Run(() => _vm.ToggleListeningCommand.ExecuteAsync(null)); break;
             case OutputIntent output: _vm.ChooseOutput(output.Value); break;
+            case PolishModeIntent polishMode: _vm.ChoosePolishMode(polishMode.Id); break;
             case RestoreDefaultsIntent: _vm.RestoreDefaultsCommand.Execute(null); break;
             case SwapLanguageIntent: _vm.SwapLanguageCommand.Execute(null); break;
             case CommitIntent commit: Run(() => _vm.CommitAsync(commit.FromKey)); break;

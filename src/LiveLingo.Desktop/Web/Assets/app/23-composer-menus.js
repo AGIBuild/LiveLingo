@@ -7,23 +7,60 @@
 
   const RADIO = new Set(['target', 'copyOnly', 'clean', 'translate', 'original']);
   const CHECKBOX = new Set(['wide', 'whole']);
+  const isRadio = (id) => RADIO.has(id) || id.startsWith('polish:');
 
-  const role = (id) => (RADIO.has(id) ? 'menuitemradio' : CHECKBOX.has(id) ? 'menuitemcheckbox' : 'menuitem');
-  const checkable = (id) => RADIO.has(id) || CHECKBOX.has(id);
+  const role = (id) => (isRadio(id) ? 'menuitemradio' : CHECKBOX.has(id) ? 'menuitemcheckbox' : 'menuitem');
+  const checkable = (id) => isRadio(id) || CHECKBOX.has(id);
+
+  const MenuItem = ({ item, onPick, onFocusItem }) => {
+    const cap = LL.cap(item.id);
+    return html`${item.sepBefore && html`<hr/>`}<button type="button" key=${item.id}
+      title=${item.sub || undefined}
+      role=${role(item.id)} aria-checked=${checkable(item.id) ? item.checked : undefined}
+      disabled=${item.enabled === false}
+      onFocus=${onFocusItem ? () => onFocusItem(item) : undefined}
+      onMouseEnter=${onFocusItem ? () => onFocusItem(item) : undefined}
+      onClick=${() => onPick(item)}>
+      <span class="lbl">${item.label}</span>
+      ${cap && html`<kbd aria-hidden="true">${cap}</kbd>`}
+    </button>`;
+  };
+
+  const defaultSubOf = (items) =>
+    (items.find((item) => item.checked && item.sub) || items.find((item) => item.sub))?.sub ?? '';
 
   class MenuList extends preact.Component {
+    constructor(props) {
+      super(props);
+      this.state = { activeSub: defaultSubOf(props.items) };
+    }
+
     setList = (el) => {
       this.list = el;
     };
 
     componentDidMount() {
       const buttons = this.buttons();
-      (this.list.querySelector('[aria-checked="true"]:not(:disabled)') || buttons[0])?.focus();
+      (this.list.querySelector('[aria-checked="true"]:not(:disabled)') || buttons[0])?.focus({ preventScroll: true });
+      LL.measure?.();
+    }
+
+    componentDidUpdate(prevProps) {
+      if (prevProps.items !== this.props.items && !this.state.activeSub) {
+        const fallback = defaultSubOf(this.props.items);
+        if (fallback) this.setState({ activeSub: fallback });
+      }
+      LL.measure?.();
     }
 
     buttons() {
       return [...this.list.querySelectorAll('button:not(:disabled)')];
     }
+
+    onFocusItem = (item) => {
+      const next = item.sub || defaultSubOf(this.props.items);
+      if (this.state.activeSub !== next) this.setState({ activeSub: next });
+    };
 
     onKeyDown = (e) => {
       const keys = ['ArrowDown', 'ArrowUp', 'Home', 'End'];
@@ -39,17 +76,23 @@
       buttons[next].focus();
     };
 
-    render({ align, label, items, note, onPick }) {
-      return html`<div class=${'menu ' + align} role="menu" aria-label=${label} ref=${this.setList} onKeyDown=${this.onKeyDown}>
-        ${items.map((item) => html`${item.sepBefore && html`<hr/>`}<button type="button" key=${item.id} role=${role(item.id)} aria-checked=${checkable(item.id) ? item.checked : undefined}
-          disabled=${item.enabled === false} onClick=${() => onPick(item)}><span class="lbl">${item.label}</span>${LL.cap(item.id) && html`<kbd>${LL.cap(item.id)}</kbd>`}</button>`)}
+    render({ align, label, items, polishGroup, note, onPick }, { activeSub }) {
+      const polishItems = polishGroup ? items.filter((item) => item.group === 'polish') : [];
+      const restItems = polishGroup ? items.filter((item) => item.group !== 'polish') : items;
+      return html`<div class=${'menu ' + align + (polishItems.length ? ' output-menu' : '')} role="menu" aria-label=${label} ref=${this.setList} onKeyDown=${this.onKeyDown}>
+        ${polishItems.length > 0 && html`<div class="menu-group" role="group" aria-label=${polishGroup}>
+          <p class="menu-group-head" aria-hidden="true">${polishGroup}</p>
+          ${polishItems.map((item) => html`<${MenuItem} key=${item.id} item=${item} onFocusItem=${this.onFocusItem} onPick=${onPick}/>`)}
+        </div><hr/>`}
+        ${restItems.map((item) => html`<${MenuItem} key=${item.id} item=${item} onFocusItem=${polishItems.length ? this.onFocusItem : null} onPick=${onPick}/>`)}
+        ${activeSub && html`<p class="menu-sub-preview" aria-hidden="true">${activeSub}</p>`}
         ${note && html`<p class="menu-note">${note}</p>`}
       </div>`;
     }
   }
 
-  LL.Menu = ({ id, align, label, items, note, onPick }) =>
-    LL.state.menu === id ? html`<${MenuList} align=${align} label=${label} items=${items} note=${note} onPick=${onPick}/>` : null;
+  LL.Menu = ({ id, align, label, items, polishGroup, note, onPick }) =>
+    LL.state.menu === id ? html`<${MenuList} align=${align} label=${label} items=${items} polishGroup=${polishGroup} note=${note} onPick=${onPick}/>` : null;
 
   // What the privacy chip opens: the model of each stage as this window actually used it. Nothing to pick, so it is a
   // card under the chip, not a menu; like a menu it closes on Escape and when the pointer goes anywhere else.

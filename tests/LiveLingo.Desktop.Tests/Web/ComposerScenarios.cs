@@ -55,6 +55,14 @@ internal static class ComposerScenarios
         }),
         ["translate-ready"] = () => Ready(Chat, ComposerOutput.Translate),
         ["document-ready"] = () => Document(),
+        ["document-ai-task"] = () => StructuredDocument(
+            "ai-task",
+            "把 AuthMiddleware 的重试关掉，但千万不要改动 login.ts。",
+            "### 目标\n把 `AuthMiddleware` 的重试关掉。\n\n### 限制与护栏\n- 不要改动 `login.ts`"),
+        ["document-todo"] = () => StructuredDocument(
+            "todo",
+            "先记一下，小王排查 Redis 缓存穿透，老李在 18:00 前补回归测试。",
+            "- [ ] 小王排查 `Redis` 缓存穿透\n- [ ] 老李在 18:00 前补回归测试"),
         ["document-editing"] = () => Document(editing: true),
         ["document-failed"] = () => Document(failed: true),
         ["model-local"] = () => Ready(Chat, ComposerOutput.Translate, models: Models(Speech(), Cleaner(), Translator("Hy-MT2-1.8B", confirmed: true))),
@@ -147,6 +155,16 @@ internal static class ComposerScenarios
 
     public static ComposerViewState State(Harness h, RecentDrafts? recent = null, ModelReport? models = null) =>
         Normalize(ComposerViewState.From(h.Vm, Texts.Chinese(), recent ?? new RecentDrafts(), sourceRev: 1, models));
+
+    private static async Task<ComposerViewState> StructuredDocument(string modeId, string sourceText, string outputText)
+    {
+        await using var h = new Harness(output: ComposerOutput.Clean, documentMode: true);
+        h.Polisher.Handler = (_, _) => Task.FromResult(outputText);
+        h.Vm.ChoosePolishMode(modeId);
+        h.Vm.SourceText = sourceText;
+        await Wait.Until(() => h.Vm.Status == ComposerStatus.Ready && h.Vm.FinalState == DocumentState.Ready);
+        return State(h);
+    }
 
     private static async Task<ComposerViewState> Document(bool editing = false, bool failed = false)
     {

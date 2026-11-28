@@ -246,6 +246,8 @@ public partial class App : Application
     /// <summary>How much of the text before a passage the cleaner reads as context.</summary>
     private const int CleanupContextChars = 300;
 
+    private PolishScheduler? _activePolish;
+
     private async Task SummonAsync(IPlatformServices platform)
     {
         var window = _composer!;
@@ -265,8 +267,9 @@ public partial class App : Application
         var glossary = settings.Composer.EffectiveGlossary();
         var session = new DraftSession(hasTarget: target is not null, notifyOn: context);
         session.Mutate(d => d.DocumentMode = true);
-        var polishStyle = PolishStyle.Resolve(settings.Composer.PolishPrompt);
-        var customPolishPrompt = polishStyle != PolishStyle.Default;
+        var presets = settings.Composer.EffectivePolishPresets();
+        var defaultPolishMode = settings.Composer.ResolvedDefaultPolishMode();
+        var customPolishPrompt = presets.First(p => p.Id == PolishPresets.NaturalId).IsCustomized;
         var speechNativeClean = settings.Composer.CleanupEnabled
             && !customPolishPrompt
             && SpeechCloudRoute.SupportsNativePolishForModel(settings.Cloud.SpeechEndpoint?.Model);
@@ -275,7 +278,9 @@ public partial class App : Application
             Enum.Parse<CommitKey>(settings.Composer.CommitKey), settings.Appearance.Animations, settings.Appearance.Theme,
             settings.Composer.CleanupEnabled,
             CloudSpeech: settings.Cloud.Speech,
-            CustomPolishPrompt: customPolishPrompt);
+            CustomPolishPrompt: customPolishPrompt,
+            Presets: presets,
+            DefaultPolishMode: defaultPolishMode);
         var preferences = services.GetRequiredService<ComposerPreferences>();
         var start = preferences.Resolve(target, options.Outputs) with { LastExport = preferences.LastExportFormat };
         var scheduler = new TranslationScheduler(
@@ -289,10 +294,11 @@ public partial class App : Application
         var polish = settings.Composer.CleanupEnabled
             ? new PolishScheduler(
                 session, services.GetRequiredService<IDictationPolisher>(), glossary.Terms,
-                polishStyle, CleanupContextChars,
+                presets, CleanupContextChars,
                 services.GetRequiredService<ILogger<PolishScheduler>>(),
                 corrections: glossary.Corrections)
             : null;
+        _activePolish = polish;
         platform.Microphone.PreferredDevice = settings.Composer.Microphone;
         // Before the voice input is made: the models that are not in memory start loading now, and the composer shows that.
         var warmup = services.GetRequiredService<ModelWarmup>();
@@ -313,7 +319,7 @@ public partial class App : Application
             platform,
             voice,
             services.GetRequiredService<IAudioFileTranscriber>(),
-            glossary.SpeechHotwords(),
+            glossary.UserSpeechHotwords(),
             options,
             target,
             context)
@@ -325,10 +331,10 @@ public partial class App : Application
         vm.Begin(start);
         vm.PropertyChanged += (_, e) =>
         {
-            if (e.PropertyName == nameof(ComposerViewModel.Output))
+            if (e.PropertyName is nameof(ComposerViewModel.Output) or nameof(ComposerViewModel.PolishMode))
                 warmup.OnOutputChanged(vm.Output);
         };
-        vm.ChoiceMade += choice => preferences.Remember(target, choice.Output, choice.Target);
+        vm.ChoiceMade += choice => preferences.Remember(target, choice.Output, choice.Target, choice.PolishMode);
         vm.DefaultsRestored += () => preferences.Forget(start.Remember!.AppId);
         vm.Exported += preferences.RememberExportFormat;
 
@@ -346,6 +352,7 @@ public partial class App : Application
         await vm.DisposeAsync();
         if (cleanup is not null)
             await cleanup.DisposeAsync();
+        _activePolish = null;
         if (polish is not null)
             await polish.DisposeAsync();
         await scheduler.DisposeAsync();
@@ -412,10 +419,13 @@ public partial class App : Application
         var previousModels = core.Models;
         ApplyCoreOptions(settings, core, hardware);
         core.Models = settings.Composer.ResolveSelection(hardware, modelManager);
-        var polishStyle = PolishStyle.Resolve(settings.Composer.PolishPrompt);
+        var presets = settings.Composer.EffectivePolishPresets();
+        var customNatural = presets.First(p => p.Id == PolishPresets.NaturalId).IsCustomized;
         var speechNativeClean = settings.Composer.CleanupEnabled
-            && polishStyle == PolishStyle.Default
+            && !customNatural
             && SpeechCloudRoute.SupportsNativePolishForModel(settings.Cloud.SpeechEndpoint?.Model);
+        _activePolish?.UpdatePresets(presets);
+        _composer?.UpdatePresets(presets);
         _composer?.UpdateModelPlan(ComposerModelPlan.Create(
             core.Models,
             cleanInCloud: settings.Cloud.Clean && settings.Composer.CleanupEnabled,

@@ -28,6 +28,7 @@
         "Clean",
         "Mutate",
         "Pack",
+        "ProbePolish",
         "ProbeTranslation",
         "ProbeVoice",
         "Publish",

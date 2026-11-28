@@ -84,7 +84,10 @@ public sealed class SherpaSileroVad : IVoiceActivityDetector
     {
         if (_windowCount > 0)
         {
-            _vad.AcceptWaveform(_window.AsSpan(0, _windowCount).ToArray());
+            // Silero VAD's native circular buffer requires WindowSamples-aligned (512-sample) frames; feeding a
+            // partial tail causes sherpa-onnx Flush() to pop a negative count (e.g. 256 - 512 = -256).
+            _window.AsSpan(_windowCount).Clear();
+            _vad.AcceptWaveform(_window);
             _windowCount = 0;
         }
         _vad.Flush();

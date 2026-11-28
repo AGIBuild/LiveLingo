@@ -30,15 +30,24 @@ public sealed class ComposerDocumentTests(BrowserFixture browsers)
     [InlineData("chromium")]
     public async Task FinalDocument_IsContinuousAndOriginalCanBeExpanded(string engine)
     {
-        await using var page = await browsers.OpenAsync(engine, "document-ready");
+        await using var page = await browsers.OpenAsync(engine, "document-ready", BrowserFixture.WideWidth);
 
+        Assert.Contains("wide", await page.Page.Locator("#composer").GetAttributeAsync("class"));
         Assert.Equal(0, await page.Page.Locator("#res .unit").CountAsync());
         Assert.Equal("T:先检查缓存。然后更新索引。", await page.Page.Locator("#final-text").InnerTextAsync());
-        Assert.False(await page.Page.Locator("#src").IsVisibleAsync());
-        await page.Page.Locator(".source-toggle").ClickAsync();
         Assert.True(await page.Page.Locator("#src").IsVisibleAsync());
         await page.Page.Locator("#edit-full").ClickAsync();
         Assert.Equal(1, await page.CountAsync<EditDocumentIntent>());
+
+        // When switched to narrow stacked mode, the finished document collapses the original pane until expanded.
+        await page.PushAsync("document-ready", state =>
+        {
+            state["layout"]!["wide"] = false;
+            state["source"]!["collapsible"] = true;
+        });
+        Assert.False(await page.Page.Locator("#src").IsVisibleAsync());
+        await page.Page.Locator(".source-toggle").ClickAsync();
+        Assert.True(await page.Page.Locator("#src").IsVisibleAsync());
         Assert.Empty(page.ConsoleErrors);
     }
 
@@ -107,5 +116,57 @@ public sealed class ComposerDocumentTests(BrowserFixture browsers)
         Assert.Equal(0, await page.CountAsync<SaveEditIntent>());
         Assert.Equal(0, await page.CountAsync<CommitIntent>());
         Assert.Equal("中文候选", (await page.LastIntentAsync<EditTextIntent>()).Text);
+    }
+
+    [Theory]
+    [InlineData("webkit")]
+    [InlineData("chromium")]
+    public async Task ScenarioPolishModes_RenderNonDestructiveStructuredHighlightsGateBadgeAndGroupedMenu(string engine)
+    {
+        await using var page = await browsers.OpenAsync(engine, "document-ai-task");
+
+        Assert.Contains("AI 任务指令", await page.Page.Locator("#out-pill").InnerTextAsync());
+        Assert.Contains("事实锚点已校验", await page.Page.Locator("#gate-badge").InnerTextAsync());
+        var expectedText = "### 目标\n把 `AuthMiddleware` 的重试关掉。\n\n### 限制与护栏\n- 不要改动 `login.ts`";
+        Assert.Equal(expectedText, await page.Page.Locator("#final-text").TextContentAsync());
+        Assert.Equal(2, await page.Page.Locator("#final-text .md-h").CountAsync());
+        Assert.Equal(2, await page.Page.Locator("#final-text .md-code").CountAsync());
+
+        await page.Page.Locator("#out-pill").ClickAsync();
+        Assert.Equal(1, await page.Page.Locator(".menu-group[role=group]").CountAsync());
+        await page.Page.Locator(".menu button", new() { HasText = "待办与派单" }).ClickAsync();
+        Assert.Equal("todo", (await page.LastIntentAsync<PolishModeIntent>()).Id);
+
+        // Immediately upon switching modes while the LLM works, the result pane shows the generating badge & shimmer.
+        await page.PushAsync("document-ai-task", state =>
+        {
+            state["result"]!["label"] = "将写入 · 待办与派单";
+            state["result"]!["document"]!["state"] = "pending";
+            state["result"]!["document"]!["gateBadge"] = "正在生成…";
+            state["result"]!["document"]!["gateTone"] = "info";
+            state["result"]!["document"]!["notice"] = "正在按「待办与派单」生成全文…";
+        });
+        Assert.Equal("正在生成…", (await page.Page.Locator("#gate-badge").InnerTextAsync()).Trim());
+        Assert.Equal(1, await page.Page.Locator(".doc-generating").CountAsync());
+        Assert.Contains("previewing", await page.Page.Locator("#final-text").GetAttributeAsync("class"));
+
+        // Once SSE tokens start streaming, shimmer bars yield to crisp live-highlighted text + caret while keeping edit gated.
+        await page.PushAsync("document-ai-task", state =>
+        {
+            state["result"]!["label"] = "将写入 · 待办与派单";
+            state["result"]!["document"]!["state"] = "pending";
+            state["result"]!["document"]!["streaming"] = true;
+            state["result"]!["document"]!["text"] = "- [ ] 先排查 `AuthMiddleware`";
+            state["result"]!["document"]!["gateBadge"] = "正在生成…";
+            state["result"]!["document"]!["gateTone"] = "info";
+            state["result"]!["document"]!["notice"] = "正在按「待办与派单」生成全文…";
+        });
+        Assert.Equal(0, await page.Page.Locator(".doc-generating").CountAsync());
+        Assert.Contains("streaming", await page.Page.Locator("#final-text").GetAttributeAsync("class"));
+        Assert.Equal(1, await page.Page.Locator("#final-text .stream-caret").CountAsync());
+        Assert.Equal("- [ ] 先排查 `AuthMiddleware`", await page.Page.Locator("#final-text").TextContentAsync());
+        Assert.Equal(1, await page.Page.Locator("#final-text .md-cb").CountAsync());
+        Assert.Equal(1, await page.Page.Locator("#final-text .md-code").CountAsync());
+        Assert.True(await page.Page.Locator("#edit-full").IsDisabledAsync());
     }
 }

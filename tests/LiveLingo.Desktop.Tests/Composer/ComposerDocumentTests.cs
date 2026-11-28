@@ -128,4 +128,82 @@ public class ComposerDocumentTests
         Assert.Contains("Preview:", h.Vm.FinalText);
         Assert.Empty(h.Events);
     }
+
+    [Fact]
+    public async Task SwitchingPolishModes_CachesEachFinishedResult_AndRecentDraftRestoresTheMode()
+    {
+        await using var h = new Harness(output: ComposerOutput.Clean, documentMode: true);
+        h.Polisher.Handler = (req, _) => Task.FromResult(
+            req.Gate == LiveLingo.Core.Cleanup.PolishGateKind.FactAnchor
+                ? "- [ ] 先检查缓存"
+                : "先检查缓存。");
+        h.Vm.SourceText = "先检查缓存。";
+        await Wait.Until(() => h.Vm.CanWrite);
+        Assert.Equal("先检查缓存。", h.Vm.FinalText);
+
+        h.Vm.ChoosePolishMode("todo");
+        await Wait.Until(() => h.Vm.CanWrite && h.Vm.FinalText == "- [ ] 先检查缓存");
+        var callsAfterFirstSwitch = h.Polisher.Requests.Count;
+
+        // Switching back to natural hits the per-mode cache with zero extra LLM calls.
+        h.Vm.ChoosePolishMode("natural");
+        Assert.Equal("先检查缓存。", h.Vm.FinalText);
+        Assert.Equal(callsAfterFirstSwitch, h.Polisher.Requests.Count);
+
+        // RecentDraft preserves the active scenario polish mode.
+        h.Vm.ChoosePolishMode("todo");
+        var recent = h.Vm.CaptureRecentDraft(written: false);
+
+        await using var restored = new Harness(output: ComposerOutput.Clean, documentMode: true);
+        restored.Vm.RestoreRecentDraft(recent);
+        Assert.Equal("todo", restored.Vm.PolishMode);
+        Assert.Equal("- [ ] 先检查缓存", restored.Vm.FinalText);
+    }
+
+    [Fact]
+    public async Task LiveDictationInDocumentCleanMode_StaysSinglePaneWithZeroLiveCleanerCalls_ThenStreamsOnStopAndHonorsQueuedWrite()
+    {
+        await using var h = new Harness(output: ComposerOutput.Clean, documentMode: true);
+        var finishPolish = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        h.Polisher.Handler = async (req, ct) =>
+        {
+            req.OnPartial?.Invoke("### 目标\n排查 `CacheService`");
+            await finishPolish.Task.WaitAsync(ct);
+            return "### 目标\n排查 `CacheService` 的重试逻辑。";
+        };
+        h.Vm.ChoosePolishMode("ai-task");
+
+        await h.Vm.StartListeningAsync();
+        h.Voice.Say("帮我排查一下 CacheService 的重试逻辑。");
+        h.Voice.Hear("先别改单测");
+
+        var duringSpeech = LiveLingo.Desktop.Tests.Web.ComposerScenarios.State(h);
+        Assert.False(duringSpeech.Result.Visible);
+        Assert.Contains("停止后生成「AI 任务指令」", duringSpeech.Source.Label);
+        Assert.Empty(h.Cleaner.Requests);
+
+        await h.Vm.StopListeningAsync();
+        await Wait.Until(() => h.Vm.IsStreamingDocument);
+
+        var whileStreaming = LiveLingo.Desktop.Tests.Web.ComposerScenarios.State(h);
+        Assert.True(whileStreaming.Result.Visible);
+        Assert.NotNull(whileStreaming.Result.Document);
+        Assert.True(whileStreaming.Result.Document!.Streaming);
+        Assert.Equal("### 目标\n排查 `CacheService`", h.Vm.FinalText);
+        Assert.False(h.Vm.CanWrite);
+
+        // Pressing Enter while tokens are still streaming arms commit and injects only the gate-verified final text.
+        await h.Vm.CommitAsync(fromKey: true);
+        Assert.True(h.Vm.IsWriteQueued);
+        await h.Injector.DidNotReceiveWithAnyArgs().InjectAsync(default!, default!, default, TestContext.Current.CancellationToken);
+
+        finishPolish.SetResult();
+        await Wait.Until(() => h.Events.Contains("completed"));
+        await h.Injector.Received(1).InjectAsync(
+            Harness.Target,
+            "### 目标\n排查 `CacheService` 的重试逻辑。",
+            false,
+            Arg.Any<CancellationToken>());
+        Assert.Empty(h.Cleaner.Requests);
+    }
 }

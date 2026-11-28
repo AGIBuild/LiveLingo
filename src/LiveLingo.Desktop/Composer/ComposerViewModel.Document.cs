@@ -11,10 +11,18 @@ public sealed partial class ComposerViewModel
     public bool IsEditing => EditingIndex != -1;
     public bool IsEditingDocument => _documentEdit is not null;
     public DocumentState FinalState => _session.Read(d => d.Final(SelectedKind).State);
+    public bool IsStreamingDocument => _session.Read(d =>
+        d.Final(SelectedKind) is { State: DocumentState.Pending, StreamingText.Length: > 0 });
     public bool FinalIsOwned => _session.Read(d => d.Final(SelectedKind).IsOwned);
     public string FinalError => _session.Read(d => d.Final(SelectedKind).Error);
+    public GateRejection? FinalWarning => _session.Read(d => d.Final(SelectedKind).Warning);
     public string FinalText => _session.Read(d =>
-        d.Final(SelectedKind).Text ?? d.PreviewText(SelectedKind));
+    {
+        var final = d.Final(SelectedKind);
+        return final.State == DocumentState.Pending && !string.IsNullOrEmpty(final.StreamingText)
+            ? final.StreamingText
+            : final.Text ?? d.PreviewText(SelectedKind);
+    });
     public bool CanEditDocument =>
         DocumentMode && Output != ComposerOutput.Original && _committed is null &&
         !IsClearing && !IsListening && !IsStartingListening && !IsTranscribing &&
@@ -69,7 +77,7 @@ public sealed partial class ComposerViewModel
         if (IsEditing)
             SaveEdit();
         return new RecentDraft(_time.GetUtcNow(), SourceText, written,
-            _session.Read(d => d.CaptureState()), Output, TargetLanguage);
+            _session.Read(d => d.CaptureState()), Output, TargetLanguage, PolishMode);
     }
 
     public void RestoreRecentDraft(RecentDraft recent)
@@ -83,12 +91,19 @@ public sealed partial class ComposerViewModel
             return;
         }
 
+        PolishMode = _presets.Any(p => p.Enabled && string.Equals(p.Id, recent.PolishMode, StringComparison.Ordinal))
+            ? recent.PolishMode
+            : DefaultPolishMode;
         Output = Outputs.Contains(recent.Output) ? recent.Output : ComposerOutput.Original;
         TargetLanguage = recent.Target;
         _applyingDraftText = true;
         try
         {
-            _session.Mutate(d => d.RestoreState(recent.State));
+            _session.Mutate(d =>
+            {
+                d.RestoreState(recent.State);
+                d.SetPolishMode(PolishMode);
+            });
             SourceText = _session.Read(d => d.SourceText());
         }
         finally

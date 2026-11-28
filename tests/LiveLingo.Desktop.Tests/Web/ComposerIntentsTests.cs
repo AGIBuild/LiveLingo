@@ -147,6 +147,8 @@ public sealed class ComposerIntentsTests
 
         rig.Do(new OutputIntent(ComposerOutput.Original) { V = 1 });
         rig.Do(new SwapLanguageIntent { V = 1 });
+        rig.Do(new WideIntent(false) { V = 1 });
+        Assert.False(rig.Vm.ForceWide);
         rig.Do(new WideIntent(true) { V = 1 });
         rig.Do(new WholeIntent(true) { V = 1 });
         rig.Do(new CopyOnlyIntent(true) { V = 1 });

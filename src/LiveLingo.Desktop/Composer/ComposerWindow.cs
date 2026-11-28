@@ -43,7 +43,7 @@ internal sealed class ComposerWindow : Window
         _geometryLog = new ComposerGeometryLog(logger);
         _mover = mover;
         _web = new WebSurface(WebPage.ComposerEntry, logger);
-        Width = ComposerFrame.NarrowWidth;
+        Width = ComposerFrame.WideWidth;
         Height = ComposerFrame.InitialHeight;
         CanResize = false;
         ShowInTaskbar = false;
@@ -145,6 +145,8 @@ internal sealed class ComposerWindow : Window
     public void RequestHide() => _session?.Vm.HideCommand.Execute(null);
 
     public void UpdateModelPlan(ComposerModelPlan plan) => _session?.Vm.UpdateModelPlan(plan);
+
+    public void UpdatePresets(IReadOnlyList<LiveLingo.Core.Cleanup.PolishPreset> presets) => _session?.Vm.UpdatePresets(presets);
 
     private void OnSize(SizeIntent size)
     {

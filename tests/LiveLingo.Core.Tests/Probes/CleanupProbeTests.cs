@@ -240,11 +240,11 @@ public class CleanupProbeTests(ITestOutputHelper output)
             if (!models.HasAllExpectedLocalAssets(descriptor))
                 continue;
 
-            var strategy = LiveLingo.Core.Speech.SpeechOptimizationStrategies.ForModel(descriptor.Id);
+            var strategy = LiveLingo.Core.Speech.SpeechOptimizationStrategies.ForLocal(descriptor.Id);
             var modelDir = models.GetModelDirectory(descriptor.Id);
             await using var resident = new ResidentModel<SherpaOnnx.OfflineRecognizer>(
                 $"probe-{descriptor.Id}",
-                hw => LiveLingo.Core.Speech.Native.SherpaQwen3Recognizer.Load(modelDir, hw, maxNewTokens: descriptor == ModelCatalog.SpeechQuality ? 224 : 192),
+                hw => strategy.Load(modelDir, hw, threads: 4),
                 TimeSpan.FromMinutes(1));
             using var recognizer = new LiveLingo.Core.Speech.Native.SherpaQwen3Recognizer(
                 await resident.AcquireAsync(hotwords, CancellationToken.None),

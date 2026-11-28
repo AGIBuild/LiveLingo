@@ -38,6 +38,8 @@ public sealed class DraftUnit
     public bool IsComplete { get; private set; } = true;
     public UnitResult Clean { get; } = new();
     public UnitResult Translation { get; } = new();
+    /// <summary>True when <see cref="Raw"/> came from speech recognition rather than user typing/pasting.</summary>
+    public bool IsDictated { get; internal set; }
     /// <summary>True when <see cref="Clean"/> was produced natively by generative speech recognition during decoding.</summary>
     public bool IsNativePolished { get; internal set; }
     internal int TranslationRevision { get; set; }

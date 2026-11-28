@@ -40,6 +40,16 @@ public sealed class DraftSession
             return 0;
         });
 
+    internal bool MutateIf(Func<Draft, bool> change)
+    {
+        bool changed;
+        lock (_gate)
+            changed = change(_draft);
+        if (changed)
+            NotifyChanged();
+        return changed;
+    }
+
     private void NotifyChanged()
     {
         if (_context is null)

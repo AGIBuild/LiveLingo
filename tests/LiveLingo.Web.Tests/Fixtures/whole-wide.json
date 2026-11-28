@@ -25,26 +25,68 @@
   },
   "output": {
     "value": "translate",
+    "polishMode": "natural",
     "pill": "→ English",
     "globe": true,
+    "sparkle": false,
+    "polishGroup": "整理与场景润色（保持原语言）",
+    "manageLabel": "管理润色方式…",
     "menu": [
       {
-        "id": "clean",
-        "label": "整理原话（保持原语言）",
+        "id": "polish:ai-task",
+        "label": "AI 任务指令",
         "checked": false,
-        "enabled": true
+        "enabled": true,
+        "sub": "倒叙归位、剪除改口废案、分离硬性护栏（短话免套壳）",
+        "group": "polish"
+      },
+      {
+        "id": "polish:natural",
+        "label": "口语顺句（默认）",
+        "checked": false,
+        "enabled": true,
+        "sub": "接碎句、去口头语与改口残片，保留真人语气",
+        "group": "polish"
+      },
+      {
+        "id": "polish:formal",
+        "label": "得体书面",
+        "checked": false,
+        "enabled": true,
+        "sub": "邮件、PR 评论、克制书面段落（零公文黑话）",
+        "group": "polish"
+      },
+      {
+        "id": "polish:todo",
+        "label": "待办与派单",
+        "checked": false,
+        "enabled": true,
+        "sub": "过滤闲聊废案，提取 - [ ] 行动项、负责人与条件",
+        "group": "polish"
+      },
+      {
+        "id": "polish:report",
+        "label": "汇报与纪要",
+        "checked": false,
+        "enabled": true,
+        "sub": "结论先行（BLUF），归纳关键决策与下一步",
+        "group": "polish"
       },
       {
         "id": "translate",
         "label": "翻译成 English",
         "checked": true,
-        "enabled": true
+        "enabled": true,
+        "sub": null,
+        "group": null
       },
       {
         "id": "original",
         "label": "原话（不整理）",
         "checked": false,
-        "enabled": true
+        "enabled": true,
+        "sub": null,
+        "group": null
       }
     ],
     "swap": "翻译目标改为 中文",
@@ -127,22 +169,46 @@
         "cap": "⌘D"
       },
       {
-        "id": "clean",
+        "id": "polish:ai-task",
         "code": "Digit1",
         "shift": false,
         "cap": "⌘1"
       },
       {
-        "id": "translate",
+        "id": "polish:natural",
         "code": "Digit2",
         "shift": false,
         "cap": "⌘2"
       },
       {
-        "id": "original",
+        "id": "polish:formal",
         "code": "Digit3",
         "shift": false,
         "cap": "⌘3"
+      },
+      {
+        "id": "polish:todo",
+        "code": "Digit4",
+        "shift": false,
+        "cap": "⌘4"
+      },
+      {
+        "id": "polish:report",
+        "code": "Digit5",
+        "shift": false,
+        "cap": "⌘5"
+      },
+      {
+        "id": "translate",
+        "code": "KeyT",
+        "shift": false,
+        "cap": "⌘T"
+      },
+      {
+        "id": "original",
+        "code": "Digit0",
+        "shift": false,
+        "cap": "⌘0"
       },
       {
         "id": "swap",
@@ -200,13 +266,17 @@
         "id": "target",
         "label": "Slack 输入框",
         "checked": true,
-        "enabled": true
+        "enabled": true,
+        "sub": null,
+        "group": null
       },
       {
         "id": "copyOnly",
         "label": "没有输入框 · 仅复制",
         "checked": false,
-        "enabled": true
+        "enabled": true,
+        "sub": null,
+        "group": null
       }
     ],
     "more": [
@@ -214,43 +284,57 @@
         "id": "new",
         "label": "新草稿",
         "checked": false,
-        "enabled": true
+        "enabled": true,
+        "sub": null,
+        "group": null
       },
       {
         "id": "recent",
         "label": "最近草稿",
         "checked": false,
-        "enabled": true
+        "enabled": true,
+        "sub": null,
+        "group": null
       },
       {
         "id": "import",
         "label": "导入录音…",
         "checked": false,
-        "enabled": false
+        "enabled": false,
+        "sub": null,
+        "group": null
       },
       {
         "id": "export",
         "label": "导出…",
         "checked": false,
-        "enabled": true
+        "enabled": true,
+        "sub": null,
+        "group": null
       },
       {
         "id": "wide",
         "label": "宽屏对照",
-        "checked": false,
-        "enabled": true
+        "checked": true,
+        "enabled": true,
+        "sub": null,
+        "group": null
       },
       {
         "id": "whole",
         "label": "整段处理（保留格式）",
         "checked": true,
-        "enabled": true
+        "enabled": true,
+        "sub": null,
+        "group": null
       },
       {
         "id": "settings",
         "label": "设置",
         "checked": false,
-        "enabled": true
+        "enabled": true,
+        "sub": null,
+        "group": null
       }
     ]
   },

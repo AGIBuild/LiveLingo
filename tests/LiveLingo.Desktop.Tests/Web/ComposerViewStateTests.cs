@@ -90,7 +90,9 @@ public sealed class ComposerViewStateTests
         Assert.Equal("target", state.Dest.Kind);
         Assert.Equal("translate", state.Output.Value);
         Assert.True(state.Output.Globe);
-        Assert.Equal(["clean", "translate", "original"], state.Output.Menu.Select(item => item.Id));
+        Assert.Equal(
+            ["polish:ai-task", "polish:natural", "polish:formal", "polish:todo", "polish:report", "translate", "original"],
+            state.Output.Menu.Select(item => item.Id));
         Assert.Equal(["translate"], state.Output.Menu.Where(item => item.Checked).Select(item => item.Id));
     }
 
@@ -238,7 +240,9 @@ public sealed class ComposerViewStateTests
         var all = await ComposerScenarios.All["original-ready"]();
         var none = await ComposerScenarios.All["no-cleanup"]();
 
-        Assert.Equal(["clean", "translate", "original"], all.Output.Menu.Select(m => m.Id));
+        Assert.Equal(
+            ["polish:ai-task", "polish:natural", "polish:formal", "polish:todo", "polish:report", "translate", "original"],
+            all.Output.Menu.Select(m => m.Id));
         Assert.Equal(["translate", "original"], none.Output.Menu.Select(m => m.Id));
         Assert.Equal("original", none.Output.Value);
     }

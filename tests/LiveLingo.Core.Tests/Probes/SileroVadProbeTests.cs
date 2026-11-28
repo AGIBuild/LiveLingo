@@ -93,4 +93,23 @@ public class SileroVadProbeTests(ITestOutputHelper output)
         output.WriteLine($"Processed {accepted / (double)AudioFormat.SampleRate:F1}s in {frameSamples}-sample frames; " +
             $"{spans.Count} spans, longest {spans.Max(s => s.EndSample - s.StartSample) / (double)AudioFormat.SampleRate:F3}s.");
     }
+
+    [Theory]
+    [InlineData(256)]
+    [InlineData(3584 + 256)]
+    [InlineData(511)]
+    public void PartialWindowTailFlush_AlignsWindowWithoutNativeErrors(int totalSamples)
+    {
+        if (!Enabled)
+            return;
+
+        using var vad = new SherpaSileroVad(ModelPath());
+        var samples = new float[totalSamples];
+        for (var i = 0; i < samples.Length; i++)
+            samples[i] = MathF.Sin(i * 0.1f) * 0.2f;
+        vad.Accept(samples);
+        vad.Flush();
+
+        Assert.False(vad.IsSpeechActive);
+    }
 }
