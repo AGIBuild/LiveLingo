@@ -1,0 +1,751 @@
+tests/LiveLingo.Web.Tests/Fixtures/model-missing.json
+  s_f5c90c34584bc5::t_ab606df93bdcc3 28,31-33,36-37,39-73,79-81,87-89,197,203,209,214-237,294-296,302-304,312-314,320-322,328-330,336-338,344-346,352-354,360-362
+  s_f5c90c34584bc5::t_653bfecc7da0b8 180,343
+tests/LiveLingo.Web.Tests/Fixtures/model-switching.json
+  s_f5c90c34584bc5::t_ab606df93bdcc3 28,31-33,36-37,39-73,79-81,87-89,190,196,202,207-230,287-289,295-297,305-307,313-315,321-323,329-331,337-339,345-347,353-355
+  s_f5c90c34584bc5::t_653bfecc7da0b8 173,336
+src/LiveLingo.Core/Cleanup/IDictationPolisher.cs
+  s_f5c90c34584bc5::t_08bc2e42640d35 19,38
+  s_f5c90c34584bc5::t_9e5aaa392d2b37 17-18
+  s_f5c90c34584bc5::t_00cf1f492d2d6b 20-21,39-44
+src/LiveLingo.Desktop/Web/Assets/styles/settings.css
+  s_f5c90c34584bc5::t_3ed5290d9c9029 143-160,184,199-200
+src/LiveLingo.Core/Cleanup/CleanupScheduler.cs
+  s_f5c90c34584bc5::t_edf775aae2ab5d 75,182,235,237
+  s_f5c90c34584bc5::t_9baa0fa741f989 73-74,76-78,80
+  s_f5c90c34584bc5::t_17889ef99ca5b0 240-245
+src/LiveLingo.Core/Drafting/Draft.Documents.cs
+  s_f5c90c34584bc5::t_2d7876245bc86b 1-2,7,14,19,21-54,56,62,64-73,75-78,92-94,108,110,115-116,129,146,148-153,162,166,168,177,184-189,195-199,201-204,220-231,236,238,260-261,265,295,306-307,312-315,317,326-329,331,339,367-383
+  s_f5c90c34584bc5::t_ca5d358ae6a6a0 96-99,175,237,239-240,291,301,325,330,361
+  s_f5c90c34584bc5::t_a10e5714a7b098 351
+  s_f5c90c34584bc5::t_8c62959e4dde3b 269,273-279
+  s_f5c90c34584bc5::t_d4030f627ae46e 15,55,57-60,63,142
+  s_f5c90c34584bc5::t_fd352830bf639e 61,74,109,111-112,114,171,200,233,280-289,292,294,296
+  s_f5c90c34584bc5::t_cd80235edfb2fc 290
+  s_f5c90c34584bc5::t_78f2e12d6e652c 293
+tests/LiveLingo.Web.Tests/Fixtures/gate-warning.json
+  s_f5c90c34584bc5::t_653bfecc7da0b8 169,332
+  s_f5c90c34584bc5::t_ab606df93bdcc3 28,31-33,36-45,47-73,79-81,87-89,186,192,198,203-226,283-285,291-293,301-303,309-311,317-319,325-327,333-335,341-343,349-351
+tests/LiveLingo.Web.Tests/Fixtures/settings-consent.json
+  s_f5c90c34584bc5::t_a54544de62bd2d 141-142
+  s_f5c90c34584bc5::t_ab606df93bdcc3 12-46,65-80,83-95,98-102,105-125,128-140,143-169
+  s_f5c90c34584bc5::t_2442a6388fbefd 81-82,103-104,126-127
+  s_f5c90c34584bc5::t_1be800453ae629 63,96-97
+src/LiveLingo.Desktop/Services/Warmup/ModelWarmup.cs
+  s_f5c90c34584bc5::t_3adc48d13ad432 99
+src/LiveLingo.Core/Translation/Glossary.cs
+  s_f5c90c34584bc5::t_af0a5609a6e2ae 21-28,103-111
+  s_f5c90c34584bc5::t_b637e6cf09b907 112
+docs/superpowers/specs/2026-11-27-multi-scenario-polish-design.md
+  s_f5c90c34584bc5::t_9fb3c3e38f2e80 3,234-270
+  s_f5c90c34584bc5::t_77b8d0344ff94f 210-212
+  s_f5c90c34584bc5::t_20aacc2be28438 1-2,4-181,195-209,213-233
+  s_f5c90c34584bc5::t_4029bdb7b045f4 182-194
+tests/LiveLingo.Web.Tests/Fixtures/mic-denied.json
+  s_f5c90c34584bc5::t_653bfecc7da0b8 155,318
+  s_f5c90c34584bc5::t_ab606df93bdcc3 28,31-33,36-37,39-73,79-81,87-89,172,178,184,189-212,269-271,277-279,287-289,295-297,303-305,311-313,319-321,327-329,335-337
+tests/LiveLingo.Core.Tests/Probes/SileroVadProbeTests.cs
+  s_f5c90c34584bc5::t_ada22f9882c489 96-114
+tests/LiveLingo.Core.Tests/Cleanup/LlmDictationPolisherTests.cs
+  s_f5c90c34584bc5::t_3f8bd96c938ee0 64-104
+  s_f5c90c34584bc5::t_4ee41cc2ae08bc 38-63
+src/LiveLingo.Core/Drafting/DraftSession.cs
+  s_f5c90c34584bc5::t_01dd3b6a1c9a3a 43-52
+docs/superpowers/prototypes/livelingo-ux-v5/index.html
+  s_f5c90c34584bc5::t_d23e4759f18790 121-128,130,132-133,137,145,197-202,204,211-212,214-215,231,235,237,239-240,245,248-249,262,307
+  s_f5c90c34584bc5::t_afd3863b58ef25 161-167,171,174-177,250-258,269,271-274,277,279,281-285,290,292,294-299
+  s_f5c90c34584bc5::t_3cc81f70af4e10 1-120,129,131,134-136,138-144,146-160,168-170,172-173,178-196,203,205-210,213,216-230,232-234,236,238,241-244,246-247,259-261,263-268,270,275-276,278,280,286-289,291,293,300-306,308-309
+src/LiveLingo.Desktop/Services/Preferences/PreferencesData.cs
+  s_f5c90c34584bc5::t_12d595e0a7b48a 9-16
+tests/LiveLingo.Desktop.Tests/Web/ComposerViewStateTests.cs
+  s_f5c90c34584bc5::t_64cb9d3ec87669 93-95,243-245
+tests/LiveLingo.Web.Tests/Fixtures/settings-speech-consent.json
+  s_f5c90c34584bc5::t_ab606df93bdcc3 12-46,65-80,83-95,98-102,105-125,128-140,143-169
+  s_f5c90c34584bc5::t_a54544de62bd2d 141-142
+  s_f5c90c34584bc5::t_1be800453ae629 63,96-97
+  s_f5c90c34584bc5::t_2442a6388fbefd 81-82,103-104,126-127
+tests/LiveLingo.Web.Tests/Fixtures/settings-update-latest.json
+  s_f5c90c34584bc5::t_1be800453ae629 63,96-97
+  s_f5c90c34584bc5::t_a54544de62bd2d 141-142
+  s_f5c90c34584bc5::t_ab606df93bdcc3 12-46,65-80,83-95,98-102,105-125,128-140,143-169
+  s_f5c90c34584bc5::t_2442a6388fbefd 81-82,103-104,126-127
+tests/LiveLingo.Web.Tests/Fixtures/settings-cloud-invalid.json
+  s_f5c90c34584bc5::t_a54544de62bd2d 141-142
+  s_f5c90c34584bc5::t_2442a6388fbefd 81-82,103-104,126-127
+  s_f5c90c34584bc5::t_ab606df93bdcc3 12-46,65-80,83-95,98-102,105-125,128-140,143-169
+  s_f5c90c34584bc5::t_1be800453ae629 63,96-97
+tests/LiveLingo.Web.Tests/Fixtures/settings-hotkey-invalid.json
+  s_f5c90c34584bc5::t_2442a6388fbefd 81-82,103-104,126-127
+  s_f5c90c34584bc5::t_1be800453ae629 63,96-97
+  s_f5c90c34584bc5::t_ab606df93bdcc3 12-46,65-80,83-95,98-102,105-125,128-140,143-169
+  s_f5c90c34584bc5::t_a54544de62bd2d 141-142
+tests/LiveLingo.Web.Tests/Fixtures/clean-ready.json
+  s_f5c90c34584bc5::t_ab606df93bdcc3 28,31-33,36-45,47-73,79-81,87-89,172,178,184,189-212,269-271,277-279,287-289,295-297,303-305,311-313,319-321,327-329,335-337
+  s_f5c90c34584bc5::t_653bfecc7da0b8 155,318
+tests/LiveLingo.Web.Tests/Fixtures/settings-update-downloading.json
+  s_f5c90c34584bc5::t_1be800453ae629 63,96-97
+  s_f5c90c34584bc5::t_ab606df93bdcc3 12-46,65-80,83-95,98-102,105-125,128-140,143-169
+  s_f5c90c34584bc5::t_2442a6388fbefd 81-82,103-104,126-127
+  s_f5c90c34584bc5::t_a54544de62bd2d 141-142
+src/LiveLingo.Core/Cleanup/PolishScheduler.cs
+  s_f5c90c34584bc5::t_bf110eb8f5013c 35,43,72-73,82-106,109-126,250-251,253-255,257-259,261,264-265,271-276,278,282-284,286-288,291-294,296-298,303,308,322-325,345,347,351-352,376-378,388-390,434,437-438,440,455-461
+  s_f5c90c34584bc5::t_596efd659553b3 210,266-270,277,280-281
+  s_f5c90c34584bc5::t_3e0ef05b3d8b99 252,256,262,285,295,299-302,315,320,326,330,332-333,335-336,338,340-341,343-344,346,349-350,370-375,379,385-387,392-393,395-404,433,435-436
+  s_f5c90c34584bc5::t_2ebe97925ea661 142,144-146,149,159,161,174-187
+  s_f5c90c34584bc5::t_9548c07e0b7f84 260,304-305,309-310,316-319,321,353-369,380-384
+  s_f5c90c34584bc5::t_af94b7aeae929a 415,417,428-429,431-432
+  s_f5c90c34584bc5::t_65b8284ca3a04f 46-47,107-108
+  s_f5c90c34584bc5::t_b2b6cc08f9eb6e 227-229
+  s_f5c90c34584bc5::t_ef05012cd14c16 48-51,76,127-134,143,147-148,150,160,162-173,188-209,211-226,230-241,246-249,263,279,289-290,348,780,785,791
+  s_f5c90c34584bc5::t_8fcef65ba764d5 306-307,311-314,327-329,331,334,337,339,342,391,394,405-414,416,418-427,430
+  s_f5c90c34584bc5::t_e909e124fee9e4 439,441-448,450-454
+  s_f5c90c34584bc5::t_6618ea95c05448 449
+tests/LiveLingo.Desktop.Tests/Composer/ComposerDocumentTests.cs
+  s_f5c90c34584bc5::t_5a90195d56a855 131-161
+  s_f5c90c34584bc5::t_e018471b8d5ba6 162-208
+tests/LiveLingo.Web.Tests/Fixtures/target-lost.json
+  s_f5c90c34584bc5::t_ab606df93bdcc3 28,31-33,36-37,39-73,79-81,87-89,201,207,213,218-241,298-300,306-308,316-318,324-326,332-334,340-342,348-350,356-358,364-366
+  s_f5c90c34584bc5::t_653bfecc7da0b8 184,347
+src/LiveLingo.Desktop/Settings/SettingsViewModel.cs
+  s_f5c90c34584bc5::t_a21ad71cd86ce4 329
+  s_f5c90c34584bc5::t_1dcf567c358d2d 53-64,124-127,178-192,194,215-249,256-328,330-443,560-561,599-606,610-624
+tests/LiveLingo.Core.Tests/Drafting/FinalDocumentTests.cs
+  s_f5c90c34584bc5::t_152ce3fd5d171d 572
+  s_f5c90c34584bc5::t_bf3962b2ffc2b1 654-656
+  s_f5c90c34584bc5::t_4e81d9b4ea1343 561-571,573-634
+  s_f5c90c34584bc5::t_f9c262c8e346b9 675-707
+  s_f5c90c34584bc5::t_c64122c6caffc0 635-653,657-674
+src/LiveLingo.Desktop/Web/ComposerViewState.cs
+  s_f5c90c34584bc5::t_206cc0bb3eeb5b 202-203,213
+  s_f5c90c34584bc5::t_0396e325a61ac7 18,21-31,131-133,150-151,153-156,173,181-182,189-191,193-199,201,258-283
+  s_f5c90c34584bc5::t_7b4320bce89700 192,200,204
+  s_f5c90c34584bc5::t_c7775c2671672f 62,123-125,127,165,205-206
+  s_f5c90c34584bc5::t_d20cf780cc2cec 284-285
+tests/LiveLingo.Web.Tests/Fixtures/export-last.json
+  s_f5c90c34584bc5::t_653bfecc7da0b8 169,332
+  s_f5c90c34584bc5::t_ab606df93bdcc3 28,31-33,36-45,47-73,79-81,87-89,186,192,198,203-226,283-285,291-293,301-303,309-311,317-319,325-327,333-335,341-343,349-351
+tests/LiveLingo.Web.Tests/Fixtures/model-local.json
+  s_f5c90c34584bc5::t_653bfecc7da0b8 173,336
+  s_f5c90c34584bc5::t_ab606df93bdcc3 28,31-33,36-37,39-73,79-81,87-89,190,196,202,207-230,287-289,295-297,305-307,313-315,321-323,329-331,337-339,345-347,353-355
+src/LiveLingo.Desktop/Composer/ComposerShortcuts.cs
+  s_f5c90c34584bc5::t_c53b5a4ee84dea 19-25,36
+  s_f5c90c34584bc5::t_f068b6099816e8 37
+tests/LiveLingo.Web.Tests/Fixtures/model-preparing.json
+  s_f5c90c34584bc5::t_ab606df93bdcc3 28,31-33,36-45,47-73,79-81,87-89,190,196,202,207-230,287-289,295-297,305-307,313-315,321-323,329-331,337-339,345-347,353-355
+  s_f5c90c34584bc5::t_653bfecc7da0b8 173,336
+src/LiveLingo.Core/Drafting/DocumentScheduler.cs
+  s_f5c90c34584bc5::t_a6b86f9537ae36 13,30,53,130-131
+  s_f5c90c34584bc5::t_824d356d026c8d 35-38,47-48,155,160
+  s_f5c90c34584bc5::t_f0291dc8c1030a 8-9,12,33-34,39-46,141-153
+  s_f5c90c34584bc5::t_f11aac9d12b97d 1-2,14,23,31-32,54,69-72,166-167,171
+  s_f5c90c34584bc5::t_1e6ba273a6891f 73
+tests/LiveLingo.Web.Tests/Fixtures/settings-dark.json
+  s_f5c90c34584bc5::t_1be800453ae629 63,96-97
+  s_f5c90c34584bc5::t_a54544de62bd2d 141-142
+  s_f5c90c34584bc5::t_ab606df93bdcc3 12-46,65-80,83-95,98-102,105-125,128-140,143-169
+  s_f5c90c34584bc5::t_2442a6388fbefd 81-82,103-104,126-127
+tests/LiveLingo.Web.Tests/Fixtures/settings-endpoint-error.json
+  s_f5c90c34584bc5::t_ab606df93bdcc3 12-46,65-80,83-95,98-102,105-125,128-140,143-169
+  s_f5c90c34584bc5::t_a54544de62bd2d 141-142
+  s_f5c90c34584bc5::t_1be800453ae629 63,96-97
+  s_f5c90c34584bc5::t_2442a6388fbefd 81-82,103-104,126-127
+tests/LiveLingo.Web.Tests/Fixtures/download-failed.json
+  s_f5c90c34584bc5::t_653bfecc7da0b8 151,314
+  s_f5c90c34584bc5::t_ab606df93bdcc3 28,31-33,36-37,39-73,79-81,87-89,168,174,180,185-208,265-267,273-275,283-285,291-293,299-301,307-309,315-317,323-325,331-333
+tests/LiveLingo.Web.Tests/Fixtures/slow.json
+  s_f5c90c34584bc5::t_ab606df93bdcc3 28,31-33,36-37,39-73,79-81,87-89,201,207,213,218-241,298-300,306-308,316-318,324-326,332-334,340-342,348-350,356-358,364-366
+  s_f5c90c34584bc5::t_653bfecc7da0b8 184,347
+tests/LiveLingo.Web.Tests/Fixtures/document-ai-task.json
+  s_f5c90c34584bc5::t_653bfecc7da0b8 108,169,332
+  s_f5c90c34584bc5::t_ddbfecb39c893e 143-144
+  s_f5c90c34584bc5::t_1fa646beb90b66 1-107,109-141,145-168,170-331,333-365
+  s_f5c90c34584bc5::t_60045faaedba4f 142
+tests/LiveLingo.Web.Tests/Fixtures/copy-only.json
+  s_f5c90c34584bc5::t_653bfecc7da0b8 169,332
+  s_f5c90c34584bc5::t_ab606df93bdcc3 28,31-33,36-37,39-73,79-81,87-89,186,192,198,203-226,283-285,291-293,301-303,309-311,317-319,325-327,333-335,341-343,349-351
+tests/LiveLingo.Web.Tests/Fixtures/timeline.json
+  s_f5c90c34584bc5::t_653bfecc7da0b8 362
+  s_f5c90c34584bc5::t_ab606df93bdcc3 28,31-33,36-37,39-73,79-81,87-89,216,222,228,233-256,313-315,321-323,331-333,339-341,347-349,355-357,363-365,371-373,379-381
+tests/LiveLingo.Web.Tests/Fixtures/document-ready.json
+  s_f5c90c34584bc5::t_60045faaedba4f 156
+  s_f5c90c34584bc5::t_ab606df93bdcc3 28,31-33,36-37,39-73,79-81,87-89,154-155,200,206,212,217-240,297-299,305-307,315-317,323-325,331-333,339-341,347-349,355-357,363-365
+  s_f5c90c34584bc5::t_653bfecc7da0b8 108,183,346
+  s_f5c90c34584bc5::t_ddbfecb39c893e 157-158
+tests/LiveLingo.Web.Tests/ComposerInteractionTests.cs
+  s_f5c90c34584bc5::t_dfcaed2b439aa2 723,744
+  s_f5c90c34584bc5::t_f92d04669cea30 681,685,697,699-700,705-722,724-743,745-746
+  s_f5c90c34584bc5::t_19be27eeade35c 600,619,621,623,625
+  s_f5c90c34584bc5::t_0c5940327ed059 315-321,349,357-359,362-365,378
+src/LiveLingo.Core/Drafting/DocumentResult.cs
+  s_f5c90c34584bc5::t_37bee180818e2f 17-18,21-22,32-34
+  s_f5c90c34584bc5::t_4183382d68ab33 8
+  s_f5c90c34584bc5::t_9e11b9ef3835c4 12,24,28-29
+  s_f5c90c34584bc5::t_7d2b2d9fcb6c14 23
+tests/LiveLingo.Web.Tests/Fixtures/remembered.json
+  s_f5c90c34584bc5::t_653bfecc7da0b8 143,306
+  s_f5c90c34584bc5::t_ab606df93bdcc3 28,31-33,36-37,39-73,79-81,87-89,160,166,172,177-200,257-259,265-267,275-277,283-285,291-293,299-301,307-309,315-317,323-325
+tests/LiveLingo.Web.Tests/Fixtures/settings-endpoint-delete.json
+  s_f5c90c34584bc5::t_2442a6388fbefd 81-82,103-104,126-127
+  s_f5c90c34584bc5::t_ab606df93bdcc3 12-46,65-80,83-95,98-102,105-125,128-140,143-169
+  s_f5c90c34584bc5::t_1be800453ae629 63,96-97
+  s_f5c90c34584bc5::t_a54544de62bd2d 141-142
+tests/LiveLingo.Web.Tests/Fixtures/settings-endpoint-edit.json
+  s_f5c90c34584bc5::t_2442a6388fbefd 81-82,103-104,126-127
+  s_f5c90c34584bc5::t_1be800453ae629 63,96-97
+  s_f5c90c34584bc5::t_a54544de62bd2d 141-142
+  s_f5c90c34584bc5::t_ab606df93bdcc3 12-46,65-80,83-95,98-102,105-125,128-140,143-169
+src/LiveLingo.Core/Dictation/FidelityGate.cs
+  s_f5c90c34584bc5::t_81af116325be60 50-56,83,126
+  s_f5c90c34584bc5::t_9737cce98343ea 189,193,198,220,405-438
+  s_f5c90c34584bc5::t_0bbcc9603f2813 161,163,393,440,582-599,603-609,612-616,624-625
+  s_f5c90c34584bc5::t_1d5b91f1383243 70-77,229,251,253-257,264-277,297-298,301,304,362,364
+  s_f5c90c34584bc5::t_aa8bf10188421e 84-85,94-101,106-107,124-125,132-133,150-152,160,162,168,170-179,181,187-188,197,218-219,359-360,365,368-369,377-392,439,466-468,736-760,774-779
+  s_f5c90c34584bc5::t_295b58707189da 394
+  s_f5c90c34584bc5::t_784498869c12e3 441
+  s_f5c90c34584bc5::t_14f82724ef0161 469
+  s_f5c90c34584bc5::t_9e581fd87abc21 626
+tests/LiveLingo.Web.Tests/Fixtures/no-speech.json
+  s_f5c90c34584bc5::t_653bfecc7da0b8 151,314
+  s_f5c90c34584bc5::t_ab606df93bdcc3 28,31-33,36-37,39-73,79-81,87-89,168,174,180,185-208,265-267,273-275,283-285,291-293,299-301,307-309,315-317,323-325,331-333
+src/LiveLingo.Desktop/Web/WebIntent.cs
+  s_f5c90c34584bc5::t_069ae129615498 442,445
+  s_f5c90c34584bc5::t_1527f377ee00e1 24,76-83,108-110,216-220,307-308,319,325-326,429-441,443-444,446-465
+tests/LiveLingo.Web.Tests/Fixtures/settings-polish-invalid.json
+  s_f5c90c34584bc5::t_2442a6388fbefd 81-82,103-104,126-127
+  s_f5c90c34584bc5::t_ab606df93bdcc3 12-46,65-80,83-95,98-102,105-125,128-140,143-169
+  s_f5c90c34584bc5::t_1be800453ae629 96-97
+  s_f5c90c34584bc5::t_a54544de62bd2d 141-142
+src/LiveLingo.Core/Inference/IChatCompletionClient.cs
+  s_f5c90c34584bc5::t_8233b2a4be907e 25-27,32-33
+  s_f5c90c34584bc5::t_f4b43a006a20e3 6,12-13,23-24,28-31
+src/LiveLingo.Core/Drafting/Draft.cs
+  s_f5c90c34584bc5::t_3c2f3fb8a0f07b 114
+tests/LiveLingo.Web.Tests/Fixtures/whole-wide.json
+  s_f5c90c34584bc5::t_653bfecc7da0b8 318
+  s_f5c90c34584bc5::t_ab606df93bdcc3 28,31-33,36-37,39-73,79-81,87-89,172,178,184,189-212,269-271,277-279,287-289,295-297,303-305,311-313,319-321,327-329,335-337
+src/LiveLingo.Desktop/Resources/i18n/zh-CN.json
+  s_f5c90c34584bc5::t_8e761a86ca5cef 162,165,167,169
+  s_f5c90c34584bc5::t_f158e1dab30c26 163,168
+  s_f5c90c34584bc5::t_0813611ae8ddde 87-88
+  s_f5c90c34584bc5::t_e93dbe6e854cf4 137-161,164,166,170,517-562
+tests/LiveLingo.Core.Tests/Probes/CleanupProbeTests.cs
+  s_f5c90c34584bc5::t_fca6fcbe69d2ba 243,247
+tests/LiveLingo.Web.Tests/Fixtures/original-ready.json
+  s_f5c90c34584bc5::t_653bfecc7da0b8 140,303
+  s_f5c90c34584bc5::t_ab606df93bdcc3 28,31-33,36-37,39-73,79-81,87-89,157,163,169,174-197,254-256,262-264,272-274,280-282,288-290,296-298,304-306,312-314,320-322
+tests/LiveLingo.Web.Tests/Fixtures/settings-cloud.json
+  s_f5c90c34584bc5::t_a54544de62bd2d 141-142
+  s_f5c90c34584bc5::t_ab606df93bdcc3 12-46,65-80,83-95,98-102,105-125,128-140,143-169
+  s_f5c90c34584bc5::t_2442a6388fbefd 81-82,103-104,126-127
+  s_f5c90c34584bc5::t_1be800453ae629 63,96-97
+tests/LiveLingo.Web.Tests/Fixtures/listening.json
+  s_f5c90c34584bc5::t_653bfecc7da0b8 166,329
+  s_f5c90c34584bc5::t_ab606df93bdcc3 28,31-33,36-37,39-73,79-81,87-89,183,189,195,200-223,280-282,288-290,298-300,306-308,314-316,322-324,330-332,338-340,346-348
+tests/LiveLingo.Web.Tests/Fixtures/settings-models.json
+  s_f5c90c34584bc5::t_1be800453ae629 63,96-97
+  s_f5c90c34584bc5::t_ab606df93bdcc3 12-46,65-80,83-95,98-102,105-125,128-140,143-169
+  s_f5c90c34584bc5::t_a54544de62bd2d 141-142
+  s_f5c90c34584bc5::t_2442a6388fbefd 81-82,103-104,126-127
+src/LiveLingo.Desktop/Composer/RecentDrafts.cs
+  s_f5c90c34584bc5::t_f69901dcd2b1ed 10-11
+src/LiveLingo.Desktop/App.axaml.cs
+  s_f5c90c34584bc5::t_41e60e5505aa3e 322
+  s_f5c90c34584bc5::t_0006df57d832fc 249-250,270-272,281-283,297,301,334,337,355,422-423,425,427-428
+tests/LiveLingo.Web.Tests/Fixtures/no-cleanup.json
+  s_f5c90c34584bc5::t_ab606df93bdcc3 28,31-33,39-41,47-49,117,123,129,134-157,214-216,222-224,232-234,240-242,248-250,256-258,264-266,272-274,280-282
+  s_f5c90c34584bc5::t_653bfecc7da0b8 100,263
+src/LiveLingo.Core/Cleanup/LlmTextCleaner.cs
+  s_f5c90c34584bc5::t_fb005eb0a126bb 109-118,120-141
+  s_f5c90c34584bc5::t_4b7b20e69b578b 2,15,92-93,98-105,108,142-143
+  s_f5c90c34584bc5::t_4d8207730772e0 96-97,119,144-146
+src/LiveLingo.Desktop/Resources/i18n/en-US.json
+  s_f5c90c34584bc5::t_01ebbe93fa5f2e 87-88
+  s_f5c90c34584bc5::t_5640efa2d11399 163,168
+  s_f5c90c34584bc5::t_55d9018bbc4ca5 162,165,167,169
+  s_f5c90c34584bc5::t_e94aae2a932f7e 137-161,164,166,170,517-562
+tests/LiveLingo.Web.Tests/Fixtures/write-failed.json
+  s_f5c90c34584bc5::t_653bfecc7da0b8 175,338
+  s_f5c90c34584bc5::t_ab606df93bdcc3 28,31-33,36-37,39-73,79-81,87-89,192,198,204,209-232,289-291,297-299,307-309,315-317,323-325,331-333,339-341,347-349,355-357
+tests/LiveLingo.Web.Tests/Fixtures/translate-pending.json
+  s_f5c90c34584bc5::t_653bfecc7da0b8 169,332
+  s_f5c90c34584bc5::t_ab606df93bdcc3 28,31-33,36-37,39-73,79-81,87-89,186,192,198,203-226,283-285,291-293,301-303,309-311,317-319,325-327,333-335,341-343,349-351
+tests/LiveLingo.Core.Tests/Cloud/RoutedChatClientTests.cs
+  s_f5c90c34584bc5::t_91cc56a8e952b1 152-156
+  s_f5c90c34584bc5::t_60ab3708ddbca6 140-151,157-158
+src/LiveLingo.Desktop/Web/SettingsIntents.cs
+  s_f5c90c34584bc5::t_30efd8c8d467d3 76-78,80-83,120-121
+  s_f5c90c34584bc5::t_5f2e4873a866c0 79
+tests/LiveLingo.Web.Tests/Fixtures/settings-preset-delete.json
+  s_f5c90c34584bc5::t_ab606df93bdcc3 1-34,36-66,68-84,87-99,102-106,109-129,132-144,147-148,150-188,190-541
+  s_f5c90c34584bc5::t_4dd9da1c360d4d 35,149,189
+  s_f5c90c34584bc5::t_a54544de62bd2d 145-146
+  s_f5c90c34584bc5::t_2442a6388fbefd 85-86,107-108,130-131
+  s_f5c90c34584bc5::t_1be800453ae629 67,100-101
+src/LiveLingo.Core/Drafting/DraftUnit.cs
+  s_f5c90c34584bc5::t_751f884f30d89b 41-42
+tests/LiveLingo.Web.Tests/Fixtures/cloud-ctrl-enter.json
+  s_f5c90c34584bc5::t_653bfecc7da0b8 169,332
+  s_f5c90c34584bc5::t_ab606df93bdcc3 28,31-33,36-37,39-73,79-81,87-89,186,192,198,203-226,283-285,291-293,301-303,309-311,317-319,325-327,333-335,341-343,349-351
+tests/LiveLingo.Desktop.Tests/Web/ComposerIntentsTests.cs
+  s_f5c90c34584bc5::t_82f79a5b2173aa 150-151
+tests/LiveLingo.Desktop.Tests/Composer/ComposerSessionTests.cs
+  s_f5c90c34584bc5::t_37ea198002a4ae 194-195,198-199
+tests/LiveLingo.Desktop.Tests/Settings/SettingsViewModelTests.cs
+  s_f5c90c34584bc5::t_47eab55419a6f5 941-1010
+src/LiveLingo.Desktop/Composer/ComposerWindow.cs
+  s_f5c90c34584bc5::t_78c25270f797aa 149-150
+  s_f5c90c34584bc5::t_45eddb506e49ca 46
+tests/LiveLingo.Core.Tests/Cleanup/PolishPresetTests.cs
+  s_f5c90c34584bc5::t_e35c7fefebe059 1-64
+src/LiveLingo.Core/Dictation/DictationSession.cs
+  s_f5c90c34584bc5::t_edb22020feb3a2 15,736-753,764-779
+  s_f5c90c34584bc5::t_c72682223b8d97 668-669,673,679
+  s_f5c90c34584bc5::t_0493032ffd385e 754-763
+  s_f5c90c34584bc5::t_2d3db3cff117bb 385-387,397,401,404-405,682-735
+  s_f5c90c34584bc5::t_257df442de6fa4 398-400
+  s_f5c90c34584bc5::t_7debb1947cfedf 780
+tests/LiveLingo.Core.Tests/Inference/OpenAiChatClientTests.cs
+  s_f5c90c34584bc5::t_2b275af6118dd7 222-257
+tests/LiveLingo.Web.Tests/Fixtures/settings-endpoint-add.json
+  s_f5c90c34584bc5::t_ab606df93bdcc3 12-46,65-80,83-95,98-102,105-125,128-140,143-169
+  s_f5c90c34584bc5::t_a54544de62bd2d 141-142
+  s_f5c90c34584bc5::t_2442a6388fbefd 81-82,103-104,126-127
+  s_f5c90c34584bc5::t_1be800453ae629 63,96-97
+src/LiveLingo.Desktop/Web/Assets/app/23-composer-menus.js
+  s_f5c90c34584bc5::t_08596223626e30 15,18,20-24,37,60,62-64,79,85,87-88
+  s_f5c90c34584bc5::t_5b767bf65eda9d 10,12-13,16-17,19,25-28,80-84,86,94-95
+  s_f5c90c34584bc5::t_964f3680955884 29-30,33-36,44-53,61
+  s_f5c90c34584bc5::t_064f075caee3c6 14
+build/BuildTask.cs
+  s_f5c90c34584bc5::t_d37f5b089884fd 233-253
+  s_f5c90c34584bc5::t_c9d1fb03bed5c3 183
+tests/LiveLingo.Web.Tests/Fixtures/settings-voice.json
+  s_f5c90c34584bc5::t_1be800453ae629 74,107-108
+  s_f5c90c34584bc5::t_2442a6388fbefd 92-93,114-115,137-138
+  s_f5c90c34584bc5::t_ab606df93bdcc3 12-46,76-91,94-106,109-113,116-136,139-151,154-180
+  s_f5c90c34584bc5::t_a54544de62bd2d 152-153
+tests/LiveLingo.Web.Tests/Fixtures/resume-draft.json
+  s_f5c90c34584bc5::t_ab606df93bdcc3 28,31-33,36-45,47-73,79-81,87-89,160,166,172,177-200,257-259,265-267,275-277,283-285,291-293,299-301,307-309,315-317,323-325
+  s_f5c90c34584bc5::t_653bfecc7da0b8 143,306
+tests/LiveLingo.Core.Tests/Probes/PolishQualityProbeTests.cs
+  s_f5c90c34584bc5::t_5a98a315e7dcf4 80,261-278
+  s_f5c90c34584bc5::t_1d4629f3fdea9b 18,46
+  s_f5c90c34584bc5::t_b819391b34ea7d 75-76
+  s_f5c90c34584bc5::t_7a902bdf7dfbe5 338-339
+  s_f5c90c34584bc5::t_bf3ed8b854384d 340,342-348,351,358-359
+  s_f5c90c34584bc5::t_7e38a9785d0d61 176-207
+  s_f5c90c34584bc5::t_884366d0285c45 294,296
+  s_f5c90c34584bc5::t_e9eb62d79b5e3f 1-3,5-13,53,55-56,59-74,83-175,297-307,309-337,341,349-350,352-353,355-357,360-363
+  s_f5c90c34584bc5::t_2bbd1a625eb2b0 354
+  s_f5c90c34584bc5::t_e884ef129d7f98 81-82,279-293,295
+  s_f5c90c34584bc5::t_e60265af225cfe 4
+  s_f5c90c34584bc5::t_66a62a9affe313 14-17,19-45,47-52,54,57-58,308
+  s_f5c90c34584bc5::t_373a63e5daa607 77-78,208-241
+  s_f5c90c34584bc5::t_5d7fb8c19704fe 79,242-260
+tests/LiveLingo.Web.Tests/Fixtures/clearing.json
+  s_f5c90c34584bc5::t_ab606df93bdcc3 28,31-33,36-45,47-73,79-81,87-89,172,178,184,189-212,269-271,277-279,287-289,295-297,303-305,311-313,319-321,327-329,335-337
+  s_f5c90c34584bc5::t_653bfecc7da0b8 155,318
+src/LiveLingo.Core/Cloud/RoutedChatClient.cs
+  s_f5c90c34584bc5::t_8342878227d200 45-48,51-54,56
+  s_f5c90c34584bc5::t_1c1b2609080686 49-50,55
+tests/LiveLingo.Desktop.Tests/Composer/ComposerChoiceTests.cs
+  s_f5c90c34584bc5::t_7131b7b5f97456 168-193
+docs/superpowers/prototypes/livelingo-ux-v5/style.css
+  s_f5c90c34584bc5::t_8f61952ab57631 8
+  s_f5c90c34584bc5::t_80f65859b85b2f 2,11,14-27,36,40-41,43-44,46,49-52,60,62,149-152,162,170,181-182,188,192-195,199-205,270-272,275,278-279,289-290,295-297,312-314,325-326,370-373,385-387
+  s_f5c90c34584bc5::t_aee752a76ce472 317-319
+  s_f5c90c34584bc5::t_d838699c34cd16 130,246,251
+  s_f5c90c34584bc5::t_422e5e7f8262a0 327
+  s_f5c90c34584bc5::t_eb5a1d2e28d9f0 315-316
+  s_f5c90c34584bc5::t_1aaeb5557a0c9d 1,3-7,9-10,12-13,28-35,37-39,42,45,47-48,53-59,61,63-129,131-148,153-161,163-169,171-180,183-187,189-191,196-198,206-245,247-250,252-269,273-274,276-277,280-288,291-294,298-311,320-324,328-369,374-384,388-390
+src/LiveLingo.Desktop/Web/Assets/app/24-composer.js
+  s_f5c90c34584bc5::t_26ce31707dad3e 79-83
+tests/LiveLingo.Web.Tests/Fixtures/translate-ready.json
+  s_f5c90c34584bc5::t_653bfecc7da0b8 169,332
+  s_f5c90c34584bc5::t_ab606df93bdcc3 28,31-33,36-37,39-73,79-81,87-89,186,192,198,203-226,283-285,291-293,301-303,309-311,317-319,325-327,333-335,341-343,349-351
+src/LiveLingo.Desktop/Web/Assets/page.html
+  s_f5c90c34584bc5::t_aecaeb42e59077 23-24
+src/LiveLingo.Desktop/Composer/ComposerViewModel.cs
+  s_f5c90c34584bc5::t_00d6946bee9aad 770
+  s_f5c90c34584bc5::t_5d23769fd46f2c 86,160,179-180
+  s_f5c90c34584bc5::t_20b6a5604e0697 3,46,78-81,115,158-159,161,174-175,181-182,187-190,422-433,565,581
+  s_f5c90c34584bc5::t_1e750e039abbde 774
+  s_f5c90c34584bc5::t_0181e5ebdb61bd 183-186
+  s_f5c90c34584bc5::t_1dd2260541599e 176-178
+src/LiveLingo.Desktop/Web/ComposerIntents.cs
+  s_f5c90c34584bc5::t_9fe103efa09fe1 88
+tests/LiveLingo.Core.Tests/Dictation/TextTests.cs
+  s_f5c90c34584bc5::t_14e7f25496d8b3 19
+  s_f5c90c34584bc5::t_2aa3353a90df36 20,23-24
+  s_f5c90c34584bc5::t_d00899ab076c2c 21-22
+src/LiveLingo.Desktop/Composer/ComposerTexts.cs
+  s_f5c90c34584bc5::t_1a96b2fe13c6bb 138-149
+  s_f5c90c34584bc5::t_2ab39e14a4e617 247-250,254,258-260,265-269,272-276,282-284,291-315,317-322,325
+  s_f5c90c34584bc5::t_1e9a400fe1a768 251-252,255,270-271,277-281
+  s_f5c90c34584bc5::t_012eff39188011 63,65-67,73,75-76,82-91,112-117,151-157,242-246,253,256-257,261-263
+  s_f5c90c34584bc5::t_d56202471297c5 150
+  s_f5c90c34584bc5::t_e962118953b149 264
+tests/LiveLingo.Web.Tests/ComposerDocumentTests.cs
+  s_f5c90c34584bc5::t_f9cb1384819bb4 152-170
+  s_f5c90c34584bc5::t_3f1c5427893d30 139-151
+  s_f5c90c34584bc5::t_9f4e171006c956 120-138,171
+  s_f5c90c34584bc5::t_e1add69b931e48 33,35,41-50
+src/LiveLingo.Desktop/Composer/ComposerViewModel.Choices.cs
+  s_f5c90c34584bc5::t_5f0b6f252b71bf 33-35,38,62-67,69-70,76-78,83,93-95
+  s_f5c90c34584bc5::t_5d80a6bce69499 68,71-75
+src/LiveLingo.Desktop/Web/Assets/styles/composer.css
+  s_f5c90c34584bc5::t_ae2b0144a09d46 108-113
+  s_f5c90c34584bc5::t_54cb677155a5af 155,171-173
+  s_f5c90c34584bc5::t_b7e79d333d32a3 170,176,179
+  s_f5c90c34584bc5::t_5b2d5c4e14dd23 20,106-107,114
+  s_f5c90c34584bc5::t_4a38837a598e35 115-119,175,180-181
+  s_f5c90c34584bc5::t_49a88d3759f042 163-169,177-178,182
+src/LiveLingo.Desktop/Composer/ComposerTypes.cs
+  s_f5c90c34584bc5::t_69e52704319297 230-232,239-243
+  s_f5c90c34584bc5::t_ee66f4338a9ebf 206-208,212
+  s_f5c90c34584bc5::t_e098ce3a6a5a50 213
+tests/LiveLingo.Web.Tests/Fixtures/model-cloud.json
+  s_f5c90c34584bc5::t_653bfecc7da0b8 173,336
+  s_f5c90c34584bc5::t_ab606df93bdcc3 28,31-33,36-37,39-73,79-81,87-89,190,196,202,207-230,287-289,295-297,305-307,313-315,321-323,329-331,337-339,345-347,353-355
+.fallout/build.schema.json
+  s_f5c90c34584bc5::t_80800508919e52 31
+tests/LiveLingo.Web.Tests/Fixtures/translate-armed.json
+  s_f5c90c34584bc5::t_ab606df93bdcc3 28,31-33,36-37,39-73,79-81,87-89,186,192,198,203-226,283-285,291-293,301-303,309-311,317-319,325-327,333-335,341-343,349-351
+  s_f5c90c34584bc5::t_653bfecc7da0b8 169,332
+tests/LiveLingo.Web.Tests/Fixtures/download-background.json
+  s_f5c90c34584bc5::t_ab606df93bdcc3 28,31-33,36-37,39-73,79-81,87-89,160,166,172,177-200,257-259,265-267,275-277,283-285,291-293,299-301,307-309,315-317,323-325
+  s_f5c90c34584bc5::t_653bfecc7da0b8 143,306
+tests/LiveLingo.Web.Tests/Fixtures/polishing.json
+  s_f5c90c34584bc5::t_ab606df93bdcc3 28,31-33,36-45,47-73,79-81,87-89,186,192,198,203-226,283-285,291-293,301-303,309-311,317-319,325-327,333-335,341-343,349-351
+  s_f5c90c34584bc5::t_653bfecc7da0b8 169,332
+src/LiveLingo.Core/Cleanup/PolishStyle.cs
+  s_f5c90c34584bc5::t_d430bffc31dac2 65
+  s_f5c90c34584bc5::t_ffbb7174407e5f 66-67
+  s_f5c90c34584bc5::t_76c5baa8ffc132 18-21,23,26-29
+docs/superpowers/plans/2026-11-27-multi-scenario-polish-implementation.md
+  s_f5c90c34584bc5::t_f6094bd752333d 1-16,23-46,51-58,62-69,72-79,83-90
+  s_f5c90c34584bc5::t_17ba725be9d8d9 17-22,47-50,59-61,70-71,80-82,91-92
+src/LiveLingo.Desktop/Composer/ComposerViewModel.Document.cs
+  s_f5c90c34584bc5::t_7ba503c3ccfc94 14-15,20-25
+  s_f5c90c34584bc5::t_60255bf2313e52 105
+  s_f5c90c34584bc5::t_d435034683ca5a 80,94-96,102-104,106
+  s_f5c90c34584bc5::t_59720fec149575 18
+tests/LiveLingo.Desktop.Tests/Composer/ComposerHarness.cs
+  s_f5c90c34584bc5::t_c1fccaba3fcd5f 224,229,255,258-259,272,282-283
+  s_f5c90c34584bc5::t_e574c997a89b5c 150-152
+  s_f5c90c34584bc5::t_e9101083df4dd2 137-149,153-154
+tests/LiveLingo.Core.Tests/Cleanup/FactAnchorGateTests.cs
+  s_f5c90c34584bc5::t_1d75e66394ff59 1-80,184
+  s_f5c90c34584bc5::t_75a478d52be71e 168-182
+  s_f5c90c34584bc5::t_2d5f7a4635ecf0 81-128
+  s_f5c90c34584bc5::t_03adab6c51da65 129-160,183
+  s_f5c90c34584bc5::t_8befe0ba95f083 161-167
+src/LiveLingo.Desktop/Services/Preferences/ComposerPreferences.cs
+  s_f5c90c34584bc5::t_8dfa20dccf0253 1,11-12,22-33,56,65-71,75-79,84-89,91-92,95-133,137-138,140-144,153-157,159-193,195
+tests/LiveLingo.Web.Tests/Fixtures/document-failed.json
+  s_f5c90c34584bc5::t_60045faaedba4f 156
+  s_f5c90c34584bc5::t_ddbfecb39c893e 157-158
+  s_f5c90c34584bc5::t_653bfecc7da0b8 183,346
+  s_f5c90c34584bc5::t_ab606df93bdcc3 28,31-33,36-37,39-73,79-81,87-89,154-155,200,206,212,217-240,297-299,305-307,315-317,323-325,331-333,339-341,347-349,355-357,363-365
+  s_f5c90c34584bc5::t_2442a6388fbefd 168
+tests/LiveLingo.Web.Tests/Fixtures/settings-speech-endpoint-add.json
+  s_f5c90c34584bc5::t_2442a6388fbefd 81-82,103-104,126-127
+  s_f5c90c34584bc5::t_1be800453ae629 63,96-97
+  s_f5c90c34584bc5::t_a54544de62bd2d 141-142
+  s_f5c90c34584bc5::t_ab606df93bdcc3 12-46,65-80,83-95,98-102,105-125,128-140,143-169
+tests/LiveLingo.Web.Tests/Fixtures/document-todo.json
+  s_f5c90c34584bc5::t_1fa646beb90b66 98
+  s_f5c90c34584bc5::t_ddbfecb39c893e 143-144
+  s_f5c90c34584bc5::t_653bfecc7da0b8 108,169,332
+  s_f5c90c34584bc5::t_ab606df93bdcc3 1-97,99-107,109-141,145-168,170-331,333-365
+  s_f5c90c34584bc5::t_60045faaedba4f 142
+src/LiveLingo.Desktop/Web/SettingsViewState.cs
+  s_f5c90c34584bc5::t_60c093bb86f6ce 10-19,30-31,37-72,81-86,260-313,325-344,358-369,375-387,508
+src/LiveLingo.Core/Cleanup/PolishPreset.cs
+  s_f5c90c34584bc5::t_fd828c58178bb9 125-126
+  s_f5c90c34584bc5::t_98c1d66b648d02 135-136
+  s_f5c90c34584bc5::t_dbe9834abd65ef 124
+  s_f5c90c34584bc5::t_7cc395772b6ba3 40
+  s_f5c90c34584bc5::t_646829d9bd9772 116,138-139,142,145
+  s_f5c90c34584bc5::t_fc709075ccb3e3 1-39,41-85,87-115,117-118,120-123,127-134,137,140-141,143-144,146-206
+  s_f5c90c34584bc5::t_53a4b43371c9c4 86,119
+tests/LiveLingo.Web.Tests/Fixtures/model-listening.json
+  s_f5c90c34584bc5::t_ab606df93bdcc3 28,31-33,36-45,47-73,79-81,87-89,161,167,173,178-201,258-260,266-268,276-278,284-286,292-294,300-302,308-310,316-318,324-326
+  s_f5c90c34584bc5::t_653bfecc7da0b8 144,307
+tests/LiveLingo.Desktop.Tests/Web/ComposerScenarios.cs
+  s_f5c90c34584bc5::t_a2e033270160b0 160-163,165-167
+  s_f5c90c34584bc5::t_5387de4ff85cda 58-65,159,164
+  s_f5c90c34584bc5::t_3d2b7a1d55b5d8 168
+tests/LiveLingo.Desktop.Tests/Composer/ComposerTextsTests.cs
+  s_f5c90c34584bc5::t_2a69169c3dff99 294-316
+tests/LiveLingo.Web.Tests/Fixtures/settings-endpoint-switch.json
+  s_f5c90c34584bc5::t_1be800453ae629 63,96-97
+  s_f5c90c34584bc5::t_a54544de62bd2d 141-142
+  s_f5c90c34584bc5::t_2442a6388fbefd 81-82,103-104,126-127
+  s_f5c90c34584bc5::t_ab606df93bdcc3 12-46,65-80,83-95,98-102,105-125,128-140,143-169
+tests/LiveLingo.Desktop.Tests/Services/Preferences/ComposerPreferencesTests.cs
+  s_f5c90c34584bc5::t_83ea4ff1901eba 292-342
+tests/LiveLingo.Web.Tests/Fixtures/settings-polish-custom.json
+  s_f5c90c34584bc5::t_ab606df93bdcc3 12-46,65-80,83-95,97-102,105-125,128-140,143-169
+  s_f5c90c34584bc5::t_2442a6388fbefd 81-82,103-104,126-127
+  s_f5c90c34584bc5::t_a54544de62bd2d 141-142
+  s_f5c90c34584bc5::t_1be800453ae629 96
+tests/LiveLingo.Web.Tests/Fixtures/settings-strings.json
+  s_f5c90c34584bc5::t_ab606df93bdcc3 49-82,94
+src/LiveLingo.Desktop/Web/Assets/app/22-composer-result.js
+  s_f5c90c34584bc5::t_245edee121963a 76-81,84-102,151-152,155-156,158
+  s_f5c90c34584bc5::t_330580aaff8b85 153,157
+  s_f5c90c34584bc5::t_9630051c47cea1 103-147
+  s_f5c90c34584bc5::t_9e9ebc035b223f 148
+tests/LiveLingo.Web.Tests/Fixtures/settings-update-checking.json
+  s_f5c90c34584bc5::t_ab606df93bdcc3 12-46,65-80,83-95,98-102,105-125,128-140,143-169
+  s_f5c90c34584bc5::t_1be800453ae629 63,96-97
+  s_f5c90c34584bc5::t_2442a6388fbefd 81-82,103-104,126-127
+  s_f5c90c34584bc5::t_a54544de62bd2d 141-142
+tests/LiveLingo.Web.Tests/Fixtures/empty.json
+  s_f5c90c34584bc5::t_ab606df93bdcc3 28,31-33,36-45,47-73,79-81,87-89,157,163,169,174-197,254-256,262-264,272-274,280-282,288-290,296-298,304-306,312-314,320-322
+  s_f5c90c34584bc5::t_653bfecc7da0b8 140,303
+tests/LiveLingo.Web.Tests/Fixtures/row-failed.json
+  s_f5c90c34584bc5::t_ab606df93bdcc3 28,31-33,36-37,39-73,79-81,87-89,186,192,198,203-226,283-285,291-293,301-303,309-311,317-319,325-327,333-335,341-343,349-351
+  s_f5c90c34584bc5::t_653bfecc7da0b8 169,332
+tests/LiveLingo.Web.Tests/Fixtures/written.json
+  s_f5c90c34584bc5::t_ab606df93bdcc3 28,31-33,36-37,39-73,79-81,87-89,186,192,198,203-226,283-285,291-293,301-303,309-311,317-319,325-327,333-335,341-343,349-351
+  s_f5c90c34584bc5::t_653bfecc7da0b8 169,332
+src/LiveLingo.Core/Inference/LocalChatClient.cs
+  s_f5c90c34584bc5::t_fcce5671088db3 21-22,28
+  s_f5c90c34584bc5::t_2764a333c0392c 17-20,23-27,29
+tests/LiveLingo.Web.Tests/Fixtures/settings-preset-add.json
+  s_f5c90c34584bc5::t_2442a6388fbefd 81-82,103-104,126-127
+  s_f5c90c34584bc5::t_a54544de62bd2d 141-142
+  s_f5c90c34584bc5::t_1be800453ae629 63,96-97
+  s_f5c90c34584bc5::t_ab606df93bdcc3 1-62,64-80,83-95,98-102,105-125,128-140,143-528
+tests/LiveLingo.Web.Tests/Fixtures/no-microphone.json
+  s_f5c90c34584bc5::t_ab606df93bdcc3 28,31-33,36-37,39-73,79-81,87-89,172,178,184,189-212,269-271,277-279,287-289,295-297,303-305,311-313,319-321,327-329,335-337
+  s_f5c90c34584bc5::t_653bfecc7da0b8 155,318
+src/LiveLingo.Core/Dictation/TextTidy.cs
+  s_f5c90c34584bc5::t_3476380f06ebdb 32,60-64,67-68
+  s_f5c90c34584bc5::t_e9853e45899c28 35-36,75-81
+  s_f5c90c34584bc5::t_6e8fdf6919798b 18-20,26-27
+  s_f5c90c34584bc5::t_cdf450183c32ff 33,65-66,69-70
+  s_f5c90c34584bc5::t_e36b14f48e44d0 29-31,40-46,51-59
+  s_f5c90c34584bc5::t_bdf88d4cccb984 28
+  s_f5c90c34584bc5::t_fffa34b30355c0 34
+  s_f5c90c34584bc5::t_e4b8d52fd77e5a 37-39
+  s_f5c90c34584bc5::t_5328704e1c9477 71
+  s_f5c90c34584bc5::t_6d4b8d488732e6 82
+src/LiveLingo.Core/Cleanup/LlmDictationPolisher.cs
+  s_f5c90c34584bc5::t_1561727710356d 36
+  s_f5c90c34584bc5::t_8c7708ff542baa 40
+  s_f5c90c34584bc5::t_af9ff8b71cc4c6 10,19,21,23-27,132,146-159
+  s_f5c90c34584bc5::t_cec48da489f4ee 15-16,30-35,37-39,41,85,142-143
+  s_f5c90c34584bc5::t_d0d287d2267304 79-83
+  s_f5c90c34584bc5::t_31f34b7e774fd9 84,86-104,106,117-119
+  s_f5c90c34584bc5::t_195a52a51e8082 111-116,121-129,140-141
+  s_f5c90c34584bc5::t_b4a143c0c947c8 28-29
+  s_f5c90c34584bc5::t_4da9253700c307 120
+tests/LiveLingo.Core.Tests/Dictation/DictationSessionTests.cs
+  s_f5c90c34584bc5::t_476f031a84490b 890
+  s_f5c90c34584bc5::t_99ae49b0d7479f 858-881,892
+  s_f5c90c34584bc5::t_91d6bc48d170b6 882-889,891
+  s_f5c90c34584bc5::t_6db6f2d849a865 824-831
+src/LiveLingo.Core/Drafting/DocumentWork.cs
+  s_f5c90c34584bc5::t_f949919807fa8f 64-67,69-72,81,84-99,101,110
+  s_f5c90c34584bc5::t_cfb9322ccbd2b1 11-12,18-20,32-35,61,118,120,171,173
+  s_f5c90c34584bc5::t_16ccdcbef72dba 14-16,168-170,172,174-199,203,206
+  s_f5c90c34584bc5::t_4b9a25be189359 200-202
+  s_f5c90c34584bc5::t_8af2e69881d96a 204-205
+  s_f5c90c34584bc5::t_9b8a1b1c2212e4 207-209
+  s_f5c90c34584bc5::t_26696ef05b1e19 210-212
+tests/LiveLingo.Desktop.Tests/Services/Preferences/JsonPreferencesStoreTests.cs
+  s_f5c90c34584bc5::t_5975a8b8d43f06 75
+src/LiveLingo.Desktop/Web/Assets/app/31-settings.js
+  s_f5c90c34584bc5::t_a9c565abcb2293 21,27-33,62,171-210,212-347,375
+  s_f5c90c34584bc5::t_da4885e5e937cf 211
+tests/LiveLingo.Web.Tests/Fixtures/downloading.json
+  s_f5c90c34584bc5::t_653bfecc7da0b8 151,314
+  s_f5c90c34584bc5::t_ab606df93bdcc3 28,31-33,36-37,39-73,79-81,87-89,168,174,180,185-208,265-267,273-275,283-285,291-293,299-301,307-309,315-317,323-325,331-333
+src/LiveLingo.Core/Speech/SpeechOptimizationStrategy.cs
+  s_f5c90c34584bc5::t_55bd6d1c382872 194-200
+  s_f5c90c34584bc5::t_3ed460359a1056 164-165,177,183-184,206,211-212,223,230,252
+  s_f5c90c34584bc5::t_976ec10786258f 240-246
+src/LiveLingo.Desktop/Composer/ComposerViewModel.Session.cs
+  s_f5c90c34584bc5::t_9485e226a4ab4c 25
+tests/LiveLingo.Desktop.Tests/Web/WebIntentTests.cs
+  s_f5c90c34584bc5::t_524487af1f63e3 79,144
+  s_f5c90c34584bc5::t_989f0d1fd50228 75-78,80-86,143
+tests/LiveLingo.Desktop.Tests/Services/Configuration/JsonSettingsServiceTests.cs
+  s_f5c90c34584bc5::t_3f769be9d151f4 441-454
+  s_f5c90c34584bc5::t_92a91bccd3fed1 440
+tests/LiveLingo.Web.Tests/Fixtures/settings-update-failed.json
+  s_f5c90c34584bc5::t_2442a6388fbefd 81-82,103-104,126-127
+  s_f5c90c34584bc5::t_ab606df93bdcc3 12-46,65-80,83-95,98-102,105-125,128-140,143-169
+  s_f5c90c34584bc5::t_1be800453ae629 63,96-97
+  s_f5c90c34584bc5::t_a54544de62bd2d 141-142
+src/LiveLingo.Desktop/Services/Configuration/SettingsModel.cs
+  s_f5c90c34584bc5::t_ffd6ebea711ba7 395-397,399,401-405
+  s_f5c90c34584bc5::t_3925ff142ed70e 186-206,265-266,270-342
+  s_f5c90c34584bc5::t_cc98bb8e0f9630 389,393-394,398,400,406-408,410,439-441
+  s_f5c90c34584bc5::t_432d1a3999890e 343
+src/LiveLingo.Core/Cleanup/FactAnchorGate.cs
+  s_f5c90c34584bc5::t_d8b1e3510995ad 201-218,408-413
+  s_f5c90c34584bc5::t_1941006bd0701d 31-32,34-47,49-50,52,79-82,89-90,92,192,194-195,200,219-252,414-422
+  s_f5c90c34584bc5::t_28ec32b150640d 2-9,14-17,25-29,33,48,51,53-57,59,62-64,66-78,114,135-138,141-147,346,392-394,399,424-425,429-438
+  s_f5c90c34584bc5::t_5dcbd446564d2c 1,10-13,18-24,30,65,112-113,115-134,139-140,148-191,193,196-199,253-345,347-361,400-407,423,426-428
+  s_f5c90c34584bc5::t_46f03c1af3c775 58,60-61,101-102,362-391,396-397
+  s_f5c90c34584bc5::t_e10efde23fac38 83-88,91,93-95
+  s_f5c90c34584bc5::t_223254b5a5b34c 96-100,103-111,395,398
+src/LiveLingo.Desktop/Settings/SettingsTexts.cs
+  s_f5c90c34584bc5::t_812d8ce26c7ddc 31-38,40,213-219,222-223,228-242
+  s_f5c90c34584bc5::t_bdfe82aa8347c3 362-365
+  s_f5c90c34584bc5::t_71bf7cfcade167 243
+tests/LiveLingo.Web.Tests/SettingsPageTests.cs
+  s_f5c90c34584bc5::t_a975b14c298c45 435-456,458-459,461-466
+  s_f5c90c34584bc5::t_1318e526f49781 457,460
+tests/LiveLingo.Web.Tests/Fixtures/editing.json
+  s_f5c90c34584bc5::t_ab606df93bdcc3 28,31-33,36-45,47-73,79-81,87-89,186,192,198,203-226,283-285,291-293,301-303,309-311,317-319,325-327,333-335,341-343,349-351
+  s_f5c90c34584bc5::t_653bfecc7da0b8 169,332
+tests/LiveLingo.Web.Tests/Fixtures/reduced-motion.json
+  s_f5c90c34584bc5::t_ab606df93bdcc3 28,31-33,36-37,39-73,79-81,87-89,186,192,198,203-226,283-285,291-293,301-303,309-311,317-319,325-327,333-335,341-343,349-351
+  s_f5c90c34584bc5::t_653bfecc7da0b8 169,332
+tests/LiveLingo.Web.Tests/Fixtures/settings-update-off.json
+  s_f5c90c34584bc5::t_2442a6388fbefd 81-82,103-104,126-127
+  s_f5c90c34584bc5::t_a54544de62bd2d 141-142
+  s_f5c90c34584bc5::t_ab606df93bdcc3 12-46,65-80,83-95,98-102,105-125,128-140,143-169
+  s_f5c90c34584bc5::t_1be800453ae629 63,96-97
+tests/LiveLingo.Web.Tests/Fixtures/settings-update-ready.json
+  s_f5c90c34584bc5::t_2442a6388fbefd 81-82,103-104,126-127
+  s_f5c90c34584bc5::t_a54544de62bd2d 141-142
+  s_f5c90c34584bc5::t_ab606df93bdcc3 12-46,65-80,83-95,98-102,105-125,128-140,143-169
+  s_f5c90c34584bc5::t_1be800453ae629 63,96-97
+tests/LiveLingo.Core.Tests/Cleanup/LlmTextCleanerTests.cs
+  s_f5c90c34584bc5::t_89cb2edb3d9a3c 68-69,72
+src/LiveLingo.Core/Drafting/GateRejection.cs
+  s_f5c90c34584bc5::t_f3b25e3d9b4dec 19-25
+tests/LiveLingo.Web.Tests/Fixtures/settings-diagnostics.json
+  s_f5c90c34584bc5::t_ab606df93bdcc3 12-46,76-91,94-106,109-113,116-136,139-151,154-180
+  s_f5c90c34584bc5::t_2442a6388fbefd 92-93,114-115,137-138
+  s_f5c90c34584bc5::t_1be800453ae629 74,107-108
+  s_f5c90c34584bc5::t_a54544de62bd2d 152-153
+tests/LiveLingo.Web.Tests/Fixtures/speech-preparing.json
+  s_f5c90c34584bc5::t_ab606df93bdcc3 28,31-33,36-45,47-73,79-81,87-89,157,163,169,174-197,254-256,262-264,272-274,280-282,288-290,296-298,304-306,312-314,320-322
+  s_f5c90c34584bc5::t_653bfecc7da0b8 140,303
+docs/superpowers/prototypes/livelingo-ux-v5/draft.test.cjs
+  s_f5c90c34584bc5::t_47552c32355c5e 1-266,279
+  s_f5c90c34584bc5::t_e949235d3efe96 267-278
+docs/superpowers/prototypes/livelingo-ux-v5/browser.test.cjs
+  s_f5c90c34584bc5::t_952f9fa461bf14 166-174,176-178,187-188,250,256,258,262,270-275,285,289-290
+  s_f5c90c34584bc5::t_5bc8a4b25a88ba 1-43,45-76,78-80,82-86,88,96-98,109,114-115,121,125-126,128-129,131-132,134-151,153-158,160-165,179-186,191-193,195-196,198-203,205,212-219,222-228,231,233-234,237,239,241-243,245-249,251,253-255,259-261,276-281,284,286-288,291-293,295-455,458-459,461-491,494-496,498-516,518-583,585-596,598-629
+  s_f5c90c34584bc5::t_a347877d172c5c 77,81,87,89-95,99-108,116-120,133,152,159,194,197,204,206-211,220-221,229-230,232,235-236,238,240,244,252,257,263-269,282-283,294,460,517
+  s_f5c90c34584bc5::t_7b022019fd959b 584,597
+  s_f5c90c34584bc5::t_3167fad3aaff2f 44
+  s_f5c90c34584bc5::t_eceecd472fd3ee 110-113,122-124,127,130
+  s_f5c90c34584bc5::t_16e3a938988f44 456-457,492-493
+  s_f5c90c34584bc5::t_f44779b9faba98 497
+  s_f5c90c34584bc5::t_9298b8357c2807 175
+  s_f5c90c34584bc5::t_930e041c9a3352 189-190
+src/LiveLingo.Core/Speech/Native/SherpaSileroVad.cs
+  s_f5c90c34584bc5::t_f51926f0972cbf 87-90
+tests/LiveLingo.Core.Tests/Cleanup/CleanupSchedulerTests.cs
+  s_f5c90c34584bc5::t_9d063837f03afb 436,444-446,448-451
+  s_f5c90c34584bc5::t_0c42cae4379174 437-443,447,452-456
+  s_f5c90c34584bc5::t_c7cf033574e433 435
+tests/LiveLingo.Web.Tests/Fixtures/settings-apps.json
+  s_f5c90c34584bc5::t_1be800453ae629 91,124-125
+  s_f5c90c34584bc5::t_2442a6388fbefd 109-110,131-132,154-155
+  s_f5c90c34584bc5::t_a54544de62bd2d 169-170
+  s_f5c90c34584bc5::t_ab606df93bdcc3 15,18-19,24,27-28,33,36-37,40-73,93-108,111-123,126-130,133-153,156-168,171-197
+tests/LiveLingo.Core.Tests/Speech/QwenAudioSpeechTests.cs
+  s_f5c90c34584bc5::t_6f31af46773c34 258-259
+  s_f5c90c34584bc5::t_41a6e321e8fb01 250,256
+src/LiveLingo.Core/Inference/OpenAiChatClient.cs
+  s_f5c90c34584bc5::t_7f8f2e73563289 89,99-101,104-112,114-133
+  s_f5c90c34584bc5::t_d07d6092478b34 102-103,113
+  s_f5c90c34584bc5::t_ee11e4cca21aa5 134-135
+docs/superpowers/prototypes/livelingo-ux-v5/draft.js
+  s_f5c90c34584bc5::t_7be1b20d3b4234 23,25,28-38,47,55,58-61,65-69
+  s_f5c90c34584bc5::t_8eb11b68aa56d0 1-22,24,26-27,39-46,48-54,56-57,62-64,70-377
+tests/LiveLingo.Desktop.Tests/Web/SettingsScenarios.cs
+  s_f5c90c34584bc5::t_f121717f8795c6 39-40,42
+  s_f5c90c34584bc5::t_3d445f01a798ca 41,43-49
+src/LiveLingo.Core/Drafting/TextUnits.cs
+  s_f5c90c34584bc5::t_9a6e189318bb9a 24-27,160-161
+  s_f5c90c34584bc5::t_68e45db7d3595d 162
+tests/LiveLingo.Desktop.Tests/Web/ComposerWebSessionTests.cs
+  s_f5c90c34584bc5::t_4e9680ff1cb6f8 209,211-212,215
+tests/LiveLingo.Core.Tests/Dictation/FidelityGateTests.cs
+  s_f5c90c34584bc5::t_4389b13772d3ab 352-367
+  s_f5c90c34584bc5::t_6523f0c111d666 333-351
+  s_f5c90c34584bc5::t_36b86e964019b7 368-416
+tests/LiveLingo.Web.Tests/Fixtures/settings-models-downloading.json
+  s_f5c90c34584bc5::t_2442a6388fbefd 81-82,103-104,126-127
+  s_f5c90c34584bc5::t_a54544de62bd2d 141-142
+  s_f5c90c34584bc5::t_1be800453ae629 63,96-97
+  s_f5c90c34584bc5::t_ab606df93bdcc3 12-46,65-80,83-95,98-102,105-125,128-140,143-169
+tests/LiveLingo.Web.Tests/Fixtures/settings-preset-edit.json
+  s_f5c90c34584bc5::t_a54544de62bd2d 141-142
+  s_f5c90c34584bc5::t_ab606df93bdcc3 1-62,64-80,83-95,98-102,105-125,128-140,143-174,176-528
+  s_f5c90c34584bc5::t_1be800453ae629 63,96-97
+  s_f5c90c34584bc5::t_2442a6388fbefd 81-82,103-104,126-127,175
+docs/superpowers/prototypes/livelingo-ux-v5/app.js
+  s_f5c90c34584bc5::t_92701b79d7091f 1330,1334,1342-1343,1346-1347,1351,1355,1382-1388
+  s_f5c90c34584bc5::t_e30fb2523322bd 2103
+  s_f5c90c34584bc5::t_4bf69e1954940c 1-14,18-23,25,27-32,34,36-41,43-50,54-56,61-62,66-70,73-74,78-80,85-87,90-94,97-99,102-106,109-111,133-188,237,239-255,257-258,261-297,299-300,316-364,367-372,374-376,378-381,384,386-388,393-396,400-401,403-412,421-436,440-451,462,465,479,494-501,508-511,513-518,520-523,525-599,602,604-706,708-928,930-931,942-943,945-950,952-968,970-971,980-1067,1069-1081,1083-1112,1118-1120,1122-1135,1142-1183,1185-1196,1198-1206,1208-1209,1222,1224-1250,1252-1329,1331-1333,1335-1341,1344-1345,1348-1350,1352-1354,1356-1381,1389-1446,1448-1463,1465-1468,1492,1503-1507,1513-1520,1522-1529,1541-1589,1591-1610,1612-1617,1619-1621,1623-1625,1627-1638,1640-1649,1651-1655,1666-1688,1691-1692,1694-1701,1713-1764,1767,1773-1838,1856,1861-1876,1878-1938,1977-1996,2003-2015,2017-2054,2056-2073,2075-2077,2080-2085,2087-2097,2099-2102,2104-2128,2130-2151,2153-2172,2174-2180
+  s_f5c90c34584bc5::t_573ecb85d013cd 1184,1251
+  s_f5c90c34584bc5::t_54f4ac623d77bc 112-113,116-119,122,124-125,128,130-132,259-260,298,301-315
+  s_f5c90c34584bc5::t_d0b8914fbfe578 1068,1082,1197,1207,1210-1221,1223
+  s_f5c90c34584bc5::t_58017aff24b5fd 1650,1997-2002,2173
+  s_f5c90c34584bc5::t_d358506fc362cc 929,932-941,944,951
+  s_f5c90c34584bc5::t_7ea61b7b05bc18 15-17,24,26,33,35,42,51-53,57-60,63-65,71-72,75-77,81-84,88-89,95-96,100-101,107-108,114-115,120-121,123,126-127,129,189-236,238
+  s_f5c90c34584bc5::t_0c90ce86ca2178 256,365-366,373,377,382-383,385
+  s_f5c90c34584bc5::t_7bfd8cf3a0f53e 603,1540
+  s_f5c90c34584bc5::t_234f3a414774d8 969,972-979
+  s_f5c90c34584bc5::t_3154df97016786 1447,1464,1469-1491,1493-1502,1508-1512,1521,1530-1539,1590
+  s_f5c90c34584bc5::t_4ec321240509fe 389-392,397-399,402,413-420,600-601,707
+  s_f5c90c34584bc5::t_2bba8f64f11bd1 1765-1766,1768-1772
+  s_f5c90c34584bc5::t_f6bb22e8060bc8 1839-1855,1857-1860,1877,1939-1976,2016
+  s_f5c90c34584bc5::t_f9977ffd92c206 1656-1665,1689-1690,1693,1702-1712
+  s_f5c90c34584bc5::t_cdd13af4ffccd7 2055,2074,2078-2079,2086,2098,2129,2152
+  s_f5c90c34584bc5::t_a2eaf1065e0e2d 437-439,452-461,463-464,466-478,480-493,502-507,512,519,524,1113-1117,1121,1136-1141
+  s_f5c90c34584bc5::t_27cbfae2d832b2 1611,1618,1622,1626,1639
+tests/LiveLingo.Web.Tests/Fixtures/document-editing.json
+  s_f5c90c34584bc5::t_60045faaedba4f 156
+  s_f5c90c34584bc5::t_ddbfecb39c893e 157-158
+  s_f5c90c34584bc5::t_ab606df93bdcc3 28,31-33,36-37,39-73,79-81,87-89,154-155,200,206,212,217-240,297-299,305-307,315-317,323-325,331-333,339-341,347-349,355-357,363-365
+  s_f5c90c34584bc5::t_653bfecc7da0b8 108,183,346
+tests/LiveLingo.Core.Tests/Cleanup/PolishSchedulerTests.cs
+  s_f5c90c34584bc5::t_f394d24030d92f 584-633
+  s_f5c90c34584bc5::t_5a5535873114ee 478-482
+  s_f5c90c34584bc5::t_5ed867f13c25e6 471-477,483-583
+docs/superpowers/prototypes/livelingo-ux-v5/README.md
+  s_f5c90c34584bc5::t_71ba29a0022429 1,3,7,9-15,17,19,21,27-37,39-41,43-49,51,53-55,57,59,61,65-67
+  s_f5c90c34584bc5::t_3c813e153d0b32 68-69
+  s_f5c90c34584bc5::t_c07b6159ffc9b1 2,4-6,8,16,18,20,22-26,38,42,50,52,56,58,60,62-64,70-91
+tests/LiveLingo.Web.Tests/Fixtures/settings-general.json
+  s_f5c90c34584bc5::t_ab606df93bdcc3 12-46,65-80,83-95,98-102,105-125,128-140,143-169
+  s_f5c90c34584bc5::t_a54544de62bd2d 141-142
+  s_f5c90c34584bc5::t_1be800453ae629 63,96-97
+  s_f5c90c34584bc5::t_2442a6388fbefd 81-82,103-104,126-127
+tests/LiveLingo.Web.Tests/Fixtures/settings-update-unsupported.json
+  s_f5c90c34584bc5::t_2442a6388fbefd 81-82,103-104,126-127
+  s_f5c90c34584bc5::t_ab606df93bdcc3 12-46,65-80,83-95,98-102,105-125,128-140,143-169
+  s_f5c90c34584bc5::t_a54544de62bd2d 141-142
+  s_f5c90c34584bc5::t_1be800453ae629 63,96-97
+src/LiveLingo.Desktop/Web/Assets/app/20-composer-parts.js
+  s_f5c90c34584bc5::t_9f1e0a03871992 22-23,57-61,79-80,108-129,146
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "2d65d16d6f2039166993188c90eeb0638de26451",
+  "prompts": {},
+  "sessions": {
+    "s_f5c90c34584bc5": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "35fb8fcf-8997-4a1b-89fa-dc45fbb2b57f",
+        "model": "unknown"
+      },
+      "human_author": "Hongwei Xi <hongwei.xi@myob.com>"
+    }
+  }
+}
