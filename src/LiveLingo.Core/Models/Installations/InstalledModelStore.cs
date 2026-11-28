@@ -67,11 +67,12 @@ internal sealed class InstalledModelStore
 
     public bool HasAllExpectedLocalAssets(ModelDescriptor descriptor)
     {
-        var modelDir = GetModelDirectory(descriptor.Id);
+        var artifact = descriptor.ResolveArtifact();
+        var modelDir = GetModelDirectory(artifact.Id);
         if (!Directory.Exists(modelDir))
             return false;
 
-        foreach (var rel in ModelStoragePaths.GetExpectedInstalledFiles(descriptor))
+        foreach (var rel in ModelStoragePaths.GetExpectedInstalledFiles(artifact))
         {
             var path = Path.Combine(modelDir, rel);
             if (!File.Exists(path))

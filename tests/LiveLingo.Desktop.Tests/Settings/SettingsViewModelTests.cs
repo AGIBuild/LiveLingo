@@ -43,7 +43,7 @@ public class SettingsViewModelTests
             Downloads.GetState(Arg.Any<string>())
                 .Returns(call => new ModelDownloadState(call.Arg<string>(), ModelDownloadStatus.Idle, 0, null));
             var probe = Substitute.For<IHardwareProbe>();
-            probe.Detect().Returns(hardware ?? HardwareProfile.Baseline16GbAppleMetal);
+            probe.Detect().Returns(hardware ?? HardwareProfile.Baseline32GbAppleMetal);
             Coordinator = new ModelSelectionCoordinator(service, Models, Downloads, probe);
             Vm = new SettingsViewModel(service, Secrets, Models, Recent, Microphone, new ComposerPreferences(PreferenceStore, service), Coordinator);
         }
@@ -819,10 +819,12 @@ public class SettingsViewModelTests
     [Fact]
     public void UnsupportedModel_CannotBeSelectedOrDownloaded()
     {
-        var f = new Fixture(); // 16 GB Apple Silicon: 9B cleaner is Unsupported
+        var f = new Fixture(hardware: HardwareProfile.Baseline16GbAppleMetal); // 16 GB Apple Silicon: 9B & 35B cleaners are Unsupported
 
         Assert.False(f.Vm.SelectModel(ModelCatalog.CleanerQuality.Id));
         Assert.False(f.Vm.DownloadModel(ModelCatalog.CleanerQuality.Id));
+        Assert.False(f.Vm.SelectModel(ModelCatalog.CleanerUnified.Id));
+        Assert.False(f.Vm.DownloadModel(ModelCatalog.CleanerUnified.Id));
         Assert.Empty(f.Saved);
     }
 
@@ -872,17 +874,65 @@ public class SettingsViewModelTests
     {
         var f = new Fixture();
         f.Models.ListInstalled().Returns([
-            Installed(ModelCatalog.TranslatorFast.Id, ModelCatalog.TranslatorFast.SizeBytes),
-            Installed(ModelCatalog.TranslatorQuality.Id, ModelCatalog.TranslatorQuality.SizeBytes)]);
+            Installed(ModelCatalog.TranslatorIndexQuality.Id, ModelCatalog.TranslatorIndexQuality.SizeBytes),
+            Installed(ModelCatalog.TranslatorFast.Id, ModelCatalog.TranslatorFast.SizeBytes)]);
         await f.Vm.InitializeAsync();
 
-        Assert.False(await f.Vm.DeleteModelAsync(ModelCatalog.TranslatorFast.Id));
-        Assert.True(await f.Vm.DeleteModelAsync(ModelCatalog.TranslatorQuality.Id));
+        Assert.False(await f.Vm.DeleteModelAsync(ModelCatalog.TranslatorIndexQuality.Id));
+        Assert.True(await f.Vm.DeleteModelAsync(ModelCatalog.TranslatorFast.Id));
 
         await f.Models.Received(1).CleanObsoleteModelsAsync(
-            Arg.Is<IEnumerable<string>>(ids => ids.SequenceEqual(new[] { ModelCatalog.TranslatorQuality.Id })),
+            Arg.Is<IEnumerable<string>>(ids => ids.SequenceEqual(new[] { ModelCatalog.TranslatorFast.Id })),
             Arg.Any<CancellationToken>());
-        f.Downloads.Received(1).NotifyDeleted(ModelCatalog.TranslatorQuality.Id);
+        f.Downloads.Received(1).NotifyDeleted(ModelCatalog.TranslatorFast.Id);
+    }
+
+    [Fact]
+    public async Task SharedUnifiedModel_DownloadsSingleArtifact_ActivatesBothStages_AndBlocksDeleteWhileEitherStageUsesIt()
+    {
+        var f = new Fixture();
+        f.Models.ListInstalled().Returns([
+            Installed(ModelCatalog.LlamaRuntime.Id, ModelCatalog.LlamaRuntime.SizeBytes),
+            Installed(ModelCatalog.CleanerQuality.Id, ModelCatalog.CleanerQuality.SizeBytes),
+            Installed(ModelCatalog.TranslatorIndexQuality.Id, ModelCatalog.TranslatorIndexQuality.SizeBytes)]);
+        await f.Vm.InitializeAsync();
+
+        var inFlight = new TaskCompletionSource();
+        var downloading = false;
+        f.Downloads.GetState(ModelCatalog.UnifiedQwen36MoE.Id).Returns(_ => downloading
+            ? new ModelDownloadState(ModelCatalog.UnifiedQwen36MoE.Id, ModelDownloadStatus.Downloading, 25, null, 1_000_000, ModelCatalog.UnifiedQwen36MoE.SizeBytes)
+            : new ModelDownloadState(ModelCatalog.UnifiedQwen36MoE.Id, ModelDownloadStatus.Idle, 0, null));
+        f.Downloads.StartAsync(ModelCatalog.UnifiedQwen36MoE).Returns(_ =>
+        {
+            downloading = true;
+            return inFlight.Task;
+        });
+
+        Assert.True(f.Vm.DownloadModel(ModelCatalog.CleanerUnified.Id));
+        Assert.True(f.Vm.DownloadModel(ModelCatalog.TranslatorUnified.Id));
+        await f.Downloads.Received(1).StartAsync(ModelCatalog.UnifiedQwen36MoE);
+
+        downloading = false;
+        inFlight.SetResult();
+        f.Downloads.StateChanged += Raise.Event<Action<ModelDownloadState>>(
+            new ModelDownloadState(ModelCatalog.UnifiedQwen36MoE.Id, ModelDownloadStatus.Installed, 100, null));
+
+        Assert.Equal(ModelCatalog.CleanerUnified.Id, f.Vm.ActiveModels.CleanerModelId);
+        Assert.Equal(ModelCatalog.TranslatorUnified.Id, f.Vm.ActiveModels.TranslatorModelId);
+        Assert.False(await f.Vm.DeleteModelAsync(ModelCatalog.CleanerUnified.Id));
+        Assert.False(await f.Vm.DeleteModelAsync(ModelCatalog.UnifiedQwen36MoE.Id));
+
+        // Switch Cleaner back to 9B while Translator still uses Unified -> shared weights MUST remain protected!
+        Assert.True(f.Vm.SelectModel(ModelCatalog.CleanerQuality.Id));
+        Assert.False(await f.Vm.DeleteModelAsync(ModelCatalog.CleanerUnified.Id));
+        Assert.False(await f.Vm.DeleteModelAsync(ModelCatalog.UnifiedQwen36MoE.Id));
+
+        // Switch Translator back to Index-Translate 9B -> shared weights become idle and can be deleted once.
+        Assert.True(f.Vm.SelectModel(ModelCatalog.TranslatorIndexQuality.Id));
+        Assert.True(await f.Vm.DeleteModelAsync(ModelCatalog.UnifiedQwen36MoE.Id));
+        await f.Models.Received(1).CleanObsoleteModelsAsync(
+            Arg.Is<IEnumerable<string>>(ids => ids.SequenceEqual(new[] { ModelCatalog.UnifiedQwen36MoE.Id })),
+            Arg.Any<CancellationToken>());
     }
 
     [Fact]
@@ -896,9 +946,10 @@ public class SettingsViewModelTests
         var workstation = new HardwareProfile("Apple M3 Pro", ComputeBackend.AppleMetal, 36L * 1024 * 1024 * 1024, 12);
         var f = new Fixture(initial, hardware: workstation);
         f.Models.ListInstalled().Returns([
+            Installed(ModelCatalog.LlamaRuntime.Id, ModelCatalog.LlamaRuntime.SizeBytes),
             Installed(ModelCatalog.SpeechSecondPass.Id, ModelCatalog.SpeechSecondPass.SizeBytes),
             Installed(ModelCatalog.Cleaner.Id, ModelCatalog.Cleaner.SizeBytes),
-            Installed(ModelCatalog.TranslatorQuality.Id, ModelCatalog.TranslatorQuality.SizeBytes)]);
+            Installed(ModelCatalog.TranslatorIndexQuality.Id, ModelCatalog.TranslatorIndexQuality.SizeBytes)]);
         await f.Vm.InitializeAsync();
 
         Assert.False(f.Coordinator.IsRecommendedActive);
@@ -906,8 +957,8 @@ public class SettingsViewModelTests
 
         f.Vm.ApplyRecommendedModels();
 
-        // Already-installed recommended 7B translator switches immediately; uninstalled 9B cleaner downloads in background.
-        Assert.Equal(ModelCatalog.TranslatorQuality.Id, f.Vm.ActiveModels.TranslatorModelId);
+        // Already-installed recommended Index-Translate 9B switches immediately; uninstalled 9B cleaner downloads in background.
+        Assert.Equal(ModelCatalog.TranslatorIndexQuality.Id, f.Vm.ActiveModels.TranslatorModelId);
         Assert.Equal(ModelCatalog.Cleaner.Id, f.Vm.ActiveModels.CleanerModelId);
         Assert.Equal(ModelCatalog.CleanerQuality.Id, f.Coordinator.PendingModelId(LiveLingo.Core.Inference.ModelStage.Cleaner));
         await f.Downloads.Received(1).StartAsync(ModelCatalog.CleanerQuality);

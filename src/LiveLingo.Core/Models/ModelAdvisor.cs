@@ -29,7 +29,8 @@ public sealed record ModelEvaluation(
     ModelDescriptor Model,
     ModelFit Fit,
     ModelUnsupportedReason? UnsupportedReason = null,
-    int? RequiredMemoryGb = null)
+    int? RequiredMemoryGb = null,
+    bool SharesActivePeerServer = false)
 {
     public bool IsSelectable => Fit != ModelFit.Unsupported;
 }
@@ -42,7 +43,8 @@ public sealed record ResidencyAssessment(
     long ActiveCoResidentBytes,
     long SafeBudgetBytes,
     bool CanCoResideBothLlms,
-    bool ExceedsSafeBudget);
+    bool ExceedsSafeBudget,
+    bool SharesSingleLlm = false);
 
 /// <summary>
 /// Evaluates catalog models against a <see cref="HardwareProfile"/> using composable compatibility specifications
@@ -209,11 +211,10 @@ public static class ModelAdvisor
         var speechBytes = speechInCloud ? 0 : selection.Speech.Profile!.ResidentBytes;
         var cleanerLocal = cleanupEnabled && !cleanInCloud;
         var translatorLocal = !translateInCloud;
-        var cleanerBytes = cleanerLocal ? selection.Cleaner.Profile!.ResidentBytes : 0;
-        var translatorBytes = translatorLocal ? selection.Translator.Profile!.ResidentBytes : 0;
+        var sharesSingleLlm = cleanerLocal && translatorLocal && selection.SharesLlmArtifact;
+        var llmBytes = CombinedLlmResidentBytes(selection.Cleaner, selection.Translator, cleanerLocal, translatorLocal);
 
-        var combinedBytes = speechBytes + cleanerBytes + translatorBytes;
-        var llmBytes = cleanerBytes + translatorBytes;
+        var combinedBytes = speechBytes + llmBytes;
 
         var fitsSystemRam = combinedBytes <= hardware.CoResidentBudgetBytes;
         var fitsVram = hardware.VramCoResidentBudgetBytes is not { } vramBudget || llmBytes <= vramBudget;
@@ -223,13 +224,60 @@ public static class ModelAdvisor
             || selection.Translator.SizeBytes <= hardware.CpuInteractiveWeightCeilingBytes;
 
         var withinSafeBudget = fitsSystemRam && fitsVram;
-        var canCoResideBoth = withinSafeBudget && cleanerFastOnCpu && translatorFastOnCpu;
+        var canCoResideBoth = (withinSafeBudget || sharesSingleLlm) && cleanerFastOnCpu && translatorFastOnCpu;
 
         return new ResidencyAssessment(
             combinedBytes,
             hardware.CoResidentBudgetBytes,
             canCoResideBoth,
-            ExceedsSafeBudget: !withinSafeBudget);
+            ExceedsSafeBudget: !withinSafeBudget,
+            SharesSingleLlm: sharesSingleLlm);
+    }
+
+    /// <summary>
+    /// True when two local LLM models may stay resident concurrently alongside <paramref name="speech"/> without
+    /// exceeding the host's system memory or dedicated VRAM co-residency budget. Models backed by the same physical
+    /// <see cref="ModelDescriptor.ArtifactId"/> run inside a single server process and always co-reside.
+    /// </summary>
+    public static bool CanCoResideLlmModels(
+        ModelDescriptor first,
+        ModelDescriptor second,
+        ModelDescriptor? speech,
+        HardwareProfile hardware,
+        bool speechInCloud = false)
+    {
+        if (string.Equals(first.ArtifactId, second.ArtifactId, StringComparison.Ordinal))
+            return true;
+
+        var firstBytes = first.Profile?.ResidentBytes ?? first.SizeBytes;
+        var secondBytes = second.Profile?.ResidentBytes ?? second.SizeBytes;
+        var speechBytes = speechInCloud ? 0 : speech?.Profile?.ResidentBytes ?? 0;
+        var llmBytes = firstBytes + secondBytes;
+
+        if (speechBytes + llmBytes > hardware.CoResidentBudgetBytes)
+            return false;
+        if (hardware.VramCoResidentBudgetBytes is { } vramBudget && llmBytes > vramBudget)
+            return false;
+
+        return true;
+    }
+
+    internal static long CombinedLlmResidentBytes(
+        ModelDescriptor cleaner,
+        ModelDescriptor translator,
+        bool cleanerLocal,
+        bool translatorLocal)
+    {
+        if (!cleanerLocal && !translatorLocal)
+            return 0;
+        if (cleanerLocal && !translatorLocal)
+            return cleaner.Profile!.ResidentBytes;
+        if (!cleanerLocal && translatorLocal)
+            return translator.Profile!.ResidentBytes;
+
+        return string.Equals(cleaner.ArtifactId, translator.ArtifactId, StringComparison.Ordinal)
+            ? Math.Max(cleaner.Profile!.ResidentBytes, translator.Profile!.ResidentBytes)
+            : cleaner.Profile!.ResidentBytes + translator.Profile!.ResidentBytes;
     }
 
     private static string ResolveStage(ModelStage stage, string? requestedId, string recommendedId, HardwareProfile hardware)
@@ -279,10 +327,17 @@ public static class ModelAdvisor
                 isHeavy = true;
         }
 
-        if (string.Equals(option.Id, recommendedId, StringComparison.Ordinal))
-            return new ModelEvaluation(option, ModelFit.Recommended);
+        var sharesPeerServer = option.Profile?.Stage switch
+        {
+            ModelStage.Cleaner => !translateInCloud && string.Equals(option.ArtifactId, peers.Translator.ArtifactId, StringComparison.Ordinal),
+            ModelStage.Translator => !cleanInCloud && string.Equals(option.ArtifactId, peers.Cleaner.ArtifactId, StringComparison.Ordinal),
+            _ => false
+        };
 
-        return new ModelEvaluation(option, isHeavy ? ModelFit.Heavy : ModelFit.Supported);
+        if (string.Equals(option.Id, recommendedId, StringComparison.Ordinal))
+            return new ModelEvaluation(option, ModelFit.Recommended, SharesActivePeerServer: sharesPeerServer);
+
+        return new ModelEvaluation(option, isHeavy ? ModelFit.Heavy : ModelFit.Supported, SharesActivePeerServer: sharesPeerServer);
     }
 
     private static long BudgetOvershoot(
@@ -295,12 +350,11 @@ public static class ModelAdvisor
         bool speechInCloud)
     {
         var speechBytes = speechInCloud ? 0 : speech.Profile!.ResidentBytes;
-        var cleanerBytes = cleanInCloud ? 0 : cleaner.Profile!.ResidentBytes;
-        var translatorBytes = translateInCloud ? 0 : translator.Profile!.ResidentBytes;
-        var systemTotal = speechBytes + cleanerBytes + translatorBytes;
+        var llmBytes = CombinedLlmResidentBytes(cleaner, translator, !cleanInCloud, !translateInCloud);
+        var systemTotal = speechBytes + llmBytes;
         var systemOvershoot = Math.Max(0, systemTotal - hardware.CoResidentBudgetBytes);
         var vramOvershoot = hardware.VramCoResidentBudgetBytes is { } vramBudget
-            ? Math.Max(0, cleanerBytes + translatorBytes - vramBudget)
+            ? Math.Max(0, llmBytes - vramBudget)
             : 0;
         return systemOvershoot + vramOvershoot;
     }
@@ -408,10 +462,20 @@ public static class ModelAdvisor
             if (singleSessionBytes <= context.Hardware.SingleRoleCeilingBytes)
                 return RuleOutcome.Supported;
 
-            var requiredRamBytes = (long)Math.Ceiling(singleSessionBytes / HardwareProfile.SingleRoleCeilingRatio);
             return RuleOutcome.Unsupported(
                 ModelUnsupportedReason.InsufficientMemory,
-                SnapTierGb(requiredRamBytes, StandardRamTiersGb));
+                SnapRequiredSystemRamTierGb(singleSessionBytes));
+        }
+
+        private static int SnapRequiredSystemRamTierGb(long singleSessionBytes)
+        {
+            foreach (var tierGb in StandardRamTiersGb)
+            {
+                if (singleSessionBytes <= HardwareProfile.ComputeSingleRoleCeilingBytes(tierGb * HardwareProfile.GiB))
+                    return tierGb;
+            }
+
+            return (int)Math.Ceiling(singleSessionBytes / HardwareProfile.HighMemorySingleRoleCeilingRatio / HardwareProfile.GiB);
         }
     }
 
@@ -421,14 +485,17 @@ public static class ModelAdvisor
         {
             var candidate = context.Peers.With(context.Model.Profile!.Stage, context.Model.Id);
             var speechBytes = context.SpeechInCloud ? 0 : candidate.Speech.Profile!.ResidentBytes;
-            var cleanerBytes = context.CleanInCloud ? 0 : candidate.Cleaner.Profile!.ResidentBytes;
-            var translatorBytes = context.TranslateInCloud ? 0 : candidate.Translator.Profile!.ResidentBytes;
+            var llmBytes = CombinedLlmResidentBytes(
+                candidate.Cleaner,
+                candidate.Translator,
+                !context.CleanInCloud,
+                !context.TranslateInCloud);
 
-            if (speechBytes + cleanerBytes + translatorBytes > context.Hardware.CoResidentBudgetBytes)
+            if (speechBytes + llmBytes > context.Hardware.CoResidentBudgetBytes)
                 return RuleOutcome.Heavy;
 
             if (context.Hardware.VramCoResidentBudgetBytes is { } vramBudget
-                && cleanerBytes + translatorBytes > vramBudget)
+                && llmBytes > vramBudget)
             {
                 return RuleOutcome.Heavy;
             }

@@ -226,20 +226,22 @@ public sealed class SettingsPageTests(BrowserFixture browsers)
         Assert.Contains("Qwen-Audio-3.1-ASR", await page.Page.Locator("#stage-cloud-empty-speech").InnerTextAsync());
         Assert.Equal(["#1", "#2", "#3"], await page.Page.Locator("#stage-speech .mcard:not(.cloud) .mrank").AllInnerTextsAsync());
         Assert.Contains("Qwen3-ASR 1.7B", await page.Page.Locator("#model-card-qwen3-asr-1\\.7b-int8").InnerTextAsync());
-        Assert.Equal(1, await page.Page.Locator("#model-download-qwen3-asr-1\\.7b-int8").CountAsync());
+        Assert.True(await page.Page.Locator("#model-radio-qwen3-asr-1\\.7b-int8").IsCheckedAsync());
+        Assert.Equal(1, await page.Page.Locator("#model-download-qwen3-asr-0\\.6b-int8").CountAsync());
         Assert.Equal(0, await page.Page.Locator("#stage-cleaner").CountAsync());
         Assert.Equal(0, await page.Page.Locator("#stage-translator").CountAsync());
 
-        // Switch across purpose categories and verify ranked options, inline cloud onboarding & hardware gating.
+        // Switch across purpose categories and verify ranked options, inline cloud onboarding & 32 GB baseline defaults + unified MoE option.
         await page.Page.Locator("#model-tab-cleaner").ClickAsync();
         Assert.Equal(1, await page.Page.Locator("#stage-cloud-empty-cleaner").CountAsync());
-        Assert.Equal(["#1", "#2", "#3"], await page.Page.Locator("#stage-cleaner .mcard:not(.cloud) .mrank").AllInnerTextsAsync());
-        Assert.True(await page.Page.Locator("#model-radio-qwen3\\.5-9b-q4km").IsDisabledAsync());
-        Assert.True(await page.Page.Locator("#model-radio-qwen3\\.5-4b-q4km").IsCheckedAsync());
+        Assert.Equal(["#1", "#2", "#3", "#4"], await page.Page.Locator("#stage-cleaner .mcard:not(.cloud) .mrank").AllInnerTextsAsync());
+        Assert.Equal(1, await page.Page.Locator("#model-download-qwen3\\.6-35b-a3b-cleaner").CountAsync());
+        Assert.True(await page.Page.Locator("#model-radio-qwen3\\.5-9b-q4km").IsCheckedAsync());
 
         await page.Page.Locator("#model-tab-cleaner").PressAsync("ArrowRight");
-        Assert.Equal(["#1", "#2"], await page.Page.Locator("#stage-translator .mcard:not(.cloud) .mrank").AllInnerTextsAsync());
-        Assert.True(await page.Page.Locator("#model-radio-hy-mt2-1\\.8b-q4km").IsCheckedAsync());
+        Assert.Equal(["#1", "#2", "#3", "#4", "#5"], await page.Page.Locator("#stage-translator .mcard:not(.cloud) .mrank").AllInnerTextsAsync());
+        Assert.Equal(1, await page.Page.Locator("#model-download-qwen3\\.6-35b-a3b-translator").CountAsync());
+        Assert.True(await page.Page.Locator("#model-radio-index-translate-9b-q4km").IsCheckedAsync());
 
         // Clicking the disk usage summary jumps directly to Local Storage with full inventory and sizes.
         await page.Page.Locator("#models-disk-link").ClickAsync();

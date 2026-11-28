@@ -11,10 +11,12 @@ This is an engineering inventory, not legal advice.
 
 | Model | Role | Source of the pinned file | License |
 |---|---|---|---|
+| Qwen3.6 35B-A3B MoE, IQ4_XS | Unified cleanup & translation | `unsloth/Qwen3.6-35B-A3B-GGUF`, derived from `Qwen/Qwen3.6-35B-A3B` | Apache-2.0 (model card) |
+| Index-Translate 2B / 9B, Q4_K_M | Translation | `IndexTeam/Index-Translate-2B-GGUF`, `IndexTeam/Index-Translate-9B-GGUF` (Hugging Face) | Apache-2.0 (model card) |
 | Hy-MT2 1.8B / 7B, Q4_K_M | Translation | `tencent/Hy-MT2-1.8B-GGUF`, `tencent/Hy-MT2-7B-GGUF` (Hugging Face) | Apache-2.0 (model card and `LICENSE.txt`) |
-| Qwen3.5 4B, Q4_K_M | Text cleanup | `unsloth/Qwen3.5-4B-GGUF`, derived from `Qwen/Qwen3.5-4B` | Apache-2.0 (model card links the Qwen license) |
-| X-ASR 480 ms streaming zh-en, int8 | Live recognition | sherpa-onnx `asr-models` release; upstream `Gilgamesh-J/X-ASR` | Apache-2.0 (upstream `LICENSE`) |
-| Qwen3-ASR 0.6B, int8 | Second pass and recording import | sherpa-onnx `asr-models` release; upstream `Qwen/Qwen3-ASR-0.6B` | Apache-2.0 (model card) |
+| Qwen3.5 2B / 4B / 9B, Q4_K_M | Text cleanup & polish | `unsloth/Qwen3.5-2B-GGUF`, `unsloth/Qwen3.5-4B-GGUF`, `unsloth/Qwen3.5-9B-GGUF`, derived from `Qwen/Qwen3.5-*` | Apache-2.0 (model card links the Qwen license) |
+| X-ASR 480 ms streaming / Offline zh-en, int8 | Live & lightweight recognition | sherpa-onnx `asr-models` release; upstream `Gilgamesh-J/X-ASR` | Apache-2.0 (upstream `LICENSE`) |
+| Qwen3-ASR 0.6B / 1.7B, int8 | Second pass and recording import | sherpa-onnx `asr-models` release & `thieunv-asilla/sherpa-onnx-qwen3-asr-1.7B-int8`; upstream `Qwen/Qwen3-ASR-*` | Apache-2.0 (model card) |
 | Silero VAD | Speech boundaries | sherpa-onnx `asr-models` release; upstream `snakers4/silero-vad` | MIT (upstream `LICENSE`) |
 
 Every download is verified against a pinned SHA256 before it is used.

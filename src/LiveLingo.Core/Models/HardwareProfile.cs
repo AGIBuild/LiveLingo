@@ -31,23 +31,32 @@ public sealed record HardwareProfile(
 
     /// <summary>
     /// Maximum combined resident footprint (Speech + Cleaner + Translator) that may stay warm concurrently
-    /// (45% of physical RAM, leaving ≥55% for OS wired pages and foreground applications).
+    /// on sub-32 GB hosts (45% of physical RAM) vs 32 GB+ hosts (48% of physical RAM, leaving ≥16.6 GiB on 32 GB).
     /// </summary>
     public const double CoResidentMemoryRatio = 0.45;
+    public const double HighMemoryCoResidentRatio = 0.48;
 
     /// <summary>
     /// Maximum single-session resident footprint (minimum companion + one active stage model) before memory
-    /// pressure degrades foreground interactivity (41.5% of physical RAM).
+    /// pressure degrades foreground interactivity (41.5% on sub-32 GB hosts; 62% on 32 GB+ hosts, reserving ≥12.2 GiB
+    /// for OS and foreground apps while permitting on-demand ~19 GiB MoE models).
     /// </summary>
     public const double SingleRoleCeilingRatio = 0.415;
+    public const double HighMemorySingleRoleCeilingRatio = 0.62;
 
     /// <summary>VRAM headroom reserved for the desktop compositor and foreground GPU clients (1.2 GiB hard / 1.5 GiB co-resident).</summary>
     internal const long VramSingleReserveBytes = 1_228 * MiB;
     internal const long VramCoResidentReserveBytes = 1_536 * MiB;
 
-    public long CoResidentBudgetBytes => (long)(TotalMemoryBytes * CoResidentMemoryRatio);
+    public long CoResidentBudgetBytes => ComputeCoResidentBudgetBytes(TotalMemoryBytes);
 
-    public long SingleRoleCeilingBytes => (long)(TotalMemoryBytes * SingleRoleCeilingRatio);
+    public long SingleRoleCeilingBytes => ComputeSingleRoleCeilingBytes(TotalMemoryBytes);
+
+    internal static long ComputeCoResidentBudgetBytes(long totalMemoryBytes) =>
+        (long)(totalMemoryBytes * (totalMemoryBytes >= 32 * GiB ? HighMemoryCoResidentRatio : CoResidentMemoryRatio));
+
+    internal static long ComputeSingleRoleCeilingBytes(long totalMemoryBytes) =>
+        (long)(totalMemoryBytes * (totalMemoryBytes >= 32 * GiB ? HighMemorySingleRoleCeilingRatio : SingleRoleCeilingRatio));
 
     public long? VramCoResidentBudgetBytes =>
         Backend == ComputeBackend.DiscreteGpu && DedicatedVideoMemoryBytes is { } vram
@@ -73,7 +82,11 @@ public sealed record HardwareProfile(
             ? Math.Max(1, (int)Math.Round(vram / (double)GiB))
             : null;
 
-    /// <summary>Product validation baseline (Apple M2+ / 16 GB unified memory), used as deterministic fallback in headless tests.</summary>
+    /// <summary>Product validation baseline (Apple M2+ / 32 GB unified memory), used as deterministic fallback in headless hosts.</summary>
+    public static HardwareProfile Baseline32GbAppleMetal { get; } =
+        new("Apple Silicon", ComputeBackend.AppleMetal, 32 * GiB, 10);
+
+    /// <summary>Legacy 16 GB Apple Silicon profile retained for downgrade compatibility coverage.</summary>
     public static HardwareProfile Baseline16GbAppleMetal { get; } =
         new("Apple Silicon", ComputeBackend.AppleMetal, 16 * GiB, 8);
 }
@@ -90,7 +103,7 @@ public sealed class SystemHardwareProbe : IHardwareProbe
     {
         var memory = GC.GetGCMemoryInfo().TotalAvailableMemoryBytes;
         if (memory <= 0)
-            memory = 16 * HardwareProfile.GiB;
+            memory = 32 * HardwareProfile.GiB;
         var cores = Math.Max(1, Environment.ProcessorCount);
         var brand = OperatingSystem.IsMacOS() ? ReadMacSysctlString("machdep.cpu.brand_string") : null;
         return FromFacts(RuntimeInformation.RuntimeIdentifier, brand, memory, cores);

@@ -18,11 +18,12 @@ public sealed class ModelAdvisorTests
 
     [Theory]
     [InlineData(8, "x-asr-offline-int8", "qwen3.5-2b-q4km", "hy-mt2-1.8b-q4km")]
-    [InlineData(16, "qwen3-asr-0.6b-int8", "qwen3.5-4b-q4km", "hy-mt2-1.8b-q4km")]
-    [InlineData(24, "qwen3-asr-0.6b-int8", "qwen3.5-4b-q4km", "hy-mt2-7b-q4km")]
-    [InlineData(32, "qwen3-asr-1.7b-int8", "qwen3.5-9b-q4km", "hy-mt2-7b-q4km")]
-    [InlineData(36, "qwen3-asr-1.7b-int8", "qwen3.5-9b-q4km", "hy-mt2-7b-q4km")]
-    [InlineData(64, "qwen3-asr-1.7b-int8", "qwen3.5-9b-q4km", "hy-mt2-7b-q4km")]
+    [InlineData(16, "qwen3-asr-0.6b-int8", "qwen3.5-4b-q4km", "index-translate-2b-q4km")]
+    [InlineData(24, "qwen3-asr-0.6b-int8", "qwen3.5-4b-q4km", "index-translate-9b-q4km")]
+    [InlineData(32, "qwen3-asr-1.7b-int8", "qwen3.5-9b-q4km", "index-translate-9b-q4km")]
+    [InlineData(36, "qwen3-asr-1.7b-int8", "qwen3.5-9b-q4km", "index-translate-9b-q4km")]
+    [InlineData(48, "qwen3-asr-1.7b-int8", "qwen3.6-35b-a3b-cleaner", "qwen3.6-35b-a3b-translator")]
+    [InlineData(64, "qwen3-asr-1.7b-int8", "qwen3.6-35b-a3b-cleaner", "qwen3.6-35b-a3b-translator")]
     public void AppleSiliconMatrix_SelectsBestMatchGroundedInResidencyBudget(
         int ramGb, string expectedSpeech, string expectedCleaner, string expectedTranslator)
     {
@@ -32,7 +33,51 @@ public sealed class ModelAdvisorTests
     }
 
     [Fact]
-    public void Apple16GbBaseline_MarksBestMatches_Allows17BSpeechAnd7BTranslatorAsHeavy_AndBlocks9BCleaner()
+    public void Apple32GbBaseline_Recommends9BSpecialists_OffersUnified35BMoEOnDemand_AndKeepsDowngradesSupported()
+    {
+        var hw = HardwareProfile.Baseline32GbAppleMetal;
+        Assert.Equal(ModelSelection.Baseline, ModelAdvisor.Recommend(hw));
+
+        var cleaners = ModelAdvisor.EvaluateStage(ModelStage.Cleaner, hw);
+        Assert.Equal(
+            [
+                (ModelCatalog.CleanerUnified.Id, ModelFit.Heavy),
+                (ModelCatalog.CleanerQuality.Id, ModelFit.Recommended),
+                (ModelCatalog.Cleaner.Id, ModelFit.Supported),
+                (ModelCatalog.CleanerFast.Id, ModelFit.Supported)
+            ],
+            cleaners.Select(e => (e.Model.Id, e.Fit)));
+
+        var translators = ModelAdvisor.EvaluateStage(ModelStage.Translator, hw);
+        Assert.Equal(
+            [
+                (ModelCatalog.TranslatorUnified.Id, ModelFit.Heavy),
+                (ModelCatalog.TranslatorIndexQuality.Id, ModelFit.Recommended),
+                (ModelCatalog.TranslatorQuality.Id, ModelFit.Supported),
+                (ModelCatalog.TranslatorIndexFast.Id, ModelFit.Supported),
+                (ModelCatalog.TranslatorFast.Id, ModelFit.Supported)
+            ],
+            translators.Select(e => (e.Model.Id, e.Fit)));
+
+        // When both Cleaner and Translator select the unified 35B-A3B MoE, memory is counted ONCE and SharesSingleLlm is true.
+        var unifiedPlan = new ModelSelection(
+            ModelCatalog.SpeechQuality.Id,
+            ModelCatalog.CleanerUnified.Id,
+            ModelCatalog.TranslatorUnified.Id);
+        var unifiedAssessment = ModelAdvisor.AssessPlan(unifiedPlan, hw);
+        Assert.True(unifiedAssessment.SharesSingleLlm);
+        Assert.True(unifiedAssessment.CanCoResideBothLlms);
+        Assert.True(unifiedAssessment.ExceedsSafeBudget);
+        Assert.Equal(
+            ModelCatalog.SpeechQuality.Profile!.ResidentBytes + ModelCatalog.CleanerUnified.Profile!.ResidentBytes,
+            unifiedAssessment.ActiveCoResidentBytes);
+
+        var translatorEvalUnderUnified = ModelAdvisor.Evaluate(ModelCatalog.TranslatorUnified, hw, unifiedPlan);
+        Assert.True(translatorEvalUnderUnified.SharesActivePeerServer);
+    }
+
+    [Fact]
+    public void Apple16GbDowngradeProfile_MarksBestMatches_Allows17BSpeechAnd7BTranslatorAsHeavy_AndBlocks9BAnd35B()
     {
         var hw = AppleMetal(16);
 
@@ -48,19 +93,23 @@ public sealed class ModelAdvisorTests
         var cleaners = ModelAdvisor.EvaluateStage(ModelStage.Cleaner, hw);
         Assert.Equal(
             [
+                (ModelCatalog.CleanerUnified.Id, ModelFit.Unsupported),
                 (ModelCatalog.CleanerQuality.Id, ModelFit.Unsupported),
                 (ModelCatalog.Cleaner.Id, ModelFit.Recommended),
                 (ModelCatalog.CleanerFast.Id, ModelFit.Supported)
             ],
             cleaners.Select(e => (e.Model.Id, e.Fit)));
-        Assert.Equal(ModelUnsupportedReason.InsufficientMemory, cleaners[0].UnsupportedReason);
-        Assert.Equal(24, cleaners[0].RequiredMemoryGb);
+        Assert.Equal((ModelUnsupportedReason.InsufficientMemory, 32), (cleaners[0].UnsupportedReason, cleaners[0].RequiredMemoryGb));
+        Assert.Equal((ModelUnsupportedReason.InsufficientMemory, 24), (cleaners[1].UnsupportedReason, cleaners[1].RequiredMemoryGb));
 
         var translators = ModelAdvisor.EvaluateStage(ModelStage.Translator, hw);
         Assert.Equal(
             [
+                (ModelCatalog.TranslatorUnified.Id, ModelFit.Unsupported),
+                (ModelCatalog.TranslatorIndexQuality.Id, ModelFit.Unsupported),
                 (ModelCatalog.TranslatorQuality.Id, ModelFit.Heavy),
-                (ModelCatalog.TranslatorFast.Id, ModelFit.Recommended)
+                (ModelCatalog.TranslatorIndexFast.Id, ModelFit.Recommended),
+                (ModelCatalog.TranslatorFast.Id, ModelFit.Supported)
             ],
             translators.Select(e => (e.Model.Id, e.Fit)));
 
@@ -75,16 +124,20 @@ public sealed class ModelAdvisorTests
     }
 
     [Fact]
-    public void Apple24Gb_Prioritizes7BTranslator_AndOffers9BCleanerAsHeavy()
+    public void Apple24Gb_PrioritizesIndexTranslate9B_Offers9BCleanerAsHeavy_AndBlocks35BUnified()
     {
         var hw = AppleMetal(24);
 
         var cleaners = ModelAdvisor.EvaluateStage(ModelStage.Cleaner, hw);
+        Assert.Equal(ModelFit.Unsupported, cleaners.Single(e => e.Model == ModelCatalog.CleanerUnified).Fit);
+        Assert.Equal(32, cleaners.Single(e => e.Model == ModelCatalog.CleanerUnified).RequiredMemoryGb);
         Assert.Equal(ModelFit.Heavy, cleaners.Single(e => e.Model == ModelCatalog.CleanerQuality).Fit);
         Assert.Equal(ModelFit.Recommended, cleaners.Single(e => e.Model == ModelCatalog.Cleaner).Fit);
 
         var translators = ModelAdvisor.EvaluateStage(ModelStage.Translator, hw);
-        Assert.Equal(ModelFit.Recommended, translators.Single(e => e.Model == ModelCatalog.TranslatorQuality).Fit);
+        Assert.Equal(ModelFit.Unsupported, translators.Single(e => e.Model == ModelCatalog.TranslatorUnified).Fit);
+        Assert.Equal(ModelFit.Recommended, translators.Single(e => e.Model == ModelCatalog.TranslatorIndexQuality).Fit);
+        Assert.Equal(ModelFit.Supported, translators.Single(e => e.Model == ModelCatalog.TranslatorQuality).Fit);
         Assert.Equal(ModelFit.Supported, translators.Single(e => e.Model == ModelCatalog.TranslatorFast).Fit);
     }
 
@@ -94,31 +147,39 @@ public sealed class ModelAdvisorTests
         var standardCpu = CpuHost(16, cores: 8);
         var stdRec = ModelAdvisor.Recommend(standardCpu);
         Assert.Equal(
-            new ModelSelection(ModelCatalog.SpeechSecondPass.Id, ModelCatalog.CleanerFast.Id, ModelCatalog.TranslatorFast.Id),
+            new ModelSelection(ModelCatalog.SpeechSecondPass.Id, ModelCatalog.CleanerFast.Id, ModelCatalog.TranslatorIndexFast.Id),
             stdRec);
 
         var cleanersOn8Core = ModelAdvisor.EvaluateStage(ModelStage.Cleaner, standardCpu);
         Assert.Equal(ModelFit.Unsupported, cleanersOn8Core[0].Fit);
         Assert.Equal(ModelUnsupportedReason.RequiresGpuAcceleration, cleanersOn8Core[0].UnsupportedReason);
-        Assert.Equal(ModelFit.Heavy, cleanersOn8Core[1].Fit);
-        Assert.Equal(ModelFit.Recommended, cleanersOn8Core[2].Fit);
+        Assert.Equal(ModelFit.Unsupported, cleanersOn8Core[1].Fit);
+        Assert.Equal(ModelUnsupportedReason.RequiresGpuAcceleration, cleanersOn8Core[1].UnsupportedReason);
+        Assert.Equal(ModelFit.Heavy, cleanersOn8Core[2].Fit);
+        Assert.Equal(ModelFit.Recommended, cleanersOn8Core[3].Fit);
 
         var translatorsOn8Core = ModelAdvisor.EvaluateStage(ModelStage.Translator, standardCpu);
-        Assert.Equal(ModelFit.Unsupported, translatorsOn8Core[0].Fit);
-        Assert.Equal(ModelUnsupportedReason.RequiresGpuAcceleration, translatorsOn8Core[0].UnsupportedReason);
-        Assert.Equal(ModelFit.Recommended, translatorsOn8Core[1].Fit);
+        Assert.All(translatorsOn8Core.Take(3), eval =>
+        {
+            Assert.Equal(ModelFit.Unsupported, eval.Fit);
+            Assert.Equal(ModelUnsupportedReason.RequiresGpuAcceleration, eval.UnsupportedReason);
+        });
+        Assert.Equal(ModelFit.Recommended, translatorsOn8Core[3].Fit);
+        Assert.Equal(ModelFit.Supported, translatorsOn8Core[4].Fit);
 
         var workstationCpu = CpuHost(32, cores: 16);
         var wsRec = ModelAdvisor.Recommend(workstationCpu);
         Assert.Equal(ModelCatalog.SpeechQuality.Id, wsRec.SpeechModelId);
         Assert.Equal(ModelCatalog.Cleaner.Id, wsRec.CleanerModelId);
+        Assert.Equal(ModelCatalog.TranslatorIndexFast.Id, wsRec.TranslatorModelId);
     }
 
     [Theory]
     [InlineData(16, 6, "qwen3-asr-0.6b-int8", "qwen3.5-4b-q4km", "hy-mt2-1.8b-q4km")]
-    [InlineData(16, 8, "qwen3-asr-0.6b-int8", "qwen3.5-4b-q4km", "hy-mt2-1.8b-q4km")]
-    [InlineData(32, 12, "qwen3-asr-1.7b-int8", "qwen3.5-4b-q4km", "hy-mt2-7b-q4km")]
-    [InlineData(32, 16, "qwen3-asr-1.7b-int8", "qwen3.5-9b-q4km", "hy-mt2-7b-q4km")]
+    [InlineData(16, 8, "qwen3-asr-0.6b-int8", "qwen3.5-4b-q4km", "index-translate-2b-q4km")]
+    [InlineData(32, 12, "qwen3-asr-1.7b-int8", "qwen3.5-4b-q4km", "index-translate-9b-q4km")]
+    [InlineData(32, 16, "qwen3-asr-1.7b-int8", "qwen3.5-9b-q4km", "index-translate-9b-q4km")]
+    [InlineData(48, 24, "qwen3-asr-1.7b-int8", "qwen3.6-35b-a3b-cleaner", "qwen3.6-35b-a3b-translator")]
     public void DiscreteGpuHosts_RespectDedicatedVideoMemoryCeilings(
         int ramGb, int vramGb, string speech, string cleaner, string translator)
     {
@@ -131,6 +192,14 @@ public sealed class ModelAdvisorTests
             Assert.Equal(ModelFit.Unsupported, eval7B.Fit);
             Assert.Equal(ModelUnsupportedReason.InsufficientVideoMemory, eval7B.UnsupportedReason);
             Assert.Equal(8, eval7B.RequiredMemoryGb);
+        }
+
+        if (vramGb == 16)
+        {
+            var eval35B = ModelAdvisor.Evaluate(ModelCatalog.TranslatorUnified, hw);
+            Assert.Equal(ModelFit.Unsupported, eval35B.Fit);
+            Assert.Equal(ModelUnsupportedReason.InsufficientVideoMemory, eval35B.UnsupportedReason);
+            Assert.Equal(24, eval35B.RequiredMemoryGb);
         }
     }
 
@@ -169,9 +238,9 @@ public sealed class ModelAdvisorTests
 
         // When cleanup is offloaded to cloud on 16 GB, Hy-MT2 7B fits within the 7.2 GiB co-resident budget alongside speech
         // and upgrades from Heavy to Recommended Best Match.
-        Assert.Equal(ModelFit.Heavy, ModelAdvisor.EvaluateStage(ModelStage.Translator, hw)[0].Fit);
+        Assert.Equal(ModelFit.Heavy, ModelAdvisor.Evaluate(ModelCatalog.TranslatorQuality, hw).Fit);
         var cloudCleanEvaluations = ModelAdvisor.EvaluateStage(ModelStage.Translator, hw, cleanInCloud: true);
-        Assert.Equal(ModelFit.Recommended, cloudCleanEvaluations[0].Fit);
+        Assert.Equal(ModelFit.Recommended, cloudCleanEvaluations.Single(e => e.Model == ModelCatalog.TranslatorQuality).Fit);
         Assert.Equal(ModelCatalog.TranslatorQuality.Id, ModelAdvisor.Recommend(hw, cleanInCloud: true).TranslatorModelId);
 
         // When both Cleaner and Translator run in cloud on 16 GB, Qwen3-ASR 1.7B upgrades to Recommended Best Match.
@@ -223,16 +292,17 @@ public sealed class ModelAdvisorTests
             new ModelSelection(ModelCatalog.SpeechFast.Id, ModelCatalog.CleanerFast.Id, ModelCatalog.TranslatorFast.Id),
             ModelAdvisor.Recommend(ram4Gb));
 
-        // Peer selection changes co-residency evaluation: on 24 GB Apple Metal, Hy-MT2 1.8B is Supported alongside 4B cleaner,
-        // and becomes Heavy if the user explicitly switched cleaner to 9B (1350 + 6170 + 5056 > 11059 MiB for 7B).
+        // Peer selection changes co-residency evaluation: on 24 GB Apple Metal, Index-Translate 9B & Hy-MT2 7B become Heavy
+        // when the user explicitly switched cleaner to 9B (1350 + 6170 + 5056 > 11059 MiB), while 2B/1.8B stay Supported.
         var ram24Gb = AppleMetal(24);
         var with9BCleaner = new ModelSelection(
             ModelCatalog.SpeechSecondPass.Id,
             ModelCatalog.CleanerQuality.Id,
             ModelCatalog.TranslatorFast.Id);
         var translatorsWith9B = ModelAdvisor.EvaluateStage(ModelStage.Translator, ram24Gb, with9BCleaner);
-        Assert.Equal(ModelFit.Recommended, translatorsWith9B[0].Fit);
-        Assert.Equal(ModelFit.Supported, translatorsWith9B[1].Fit);
+        Assert.Equal(ModelFit.Recommended, translatorsWith9B.Single(e => e.Model == ModelCatalog.TranslatorIndexQuality).Fit);
+        Assert.Equal(ModelFit.Heavy, translatorsWith9B.Single(e => e.Model == ModelCatalog.TranslatorQuality).Fit);
+        Assert.Equal(ModelFit.Supported, translatorsWith9B.Single(e => e.Model == ModelCatalog.TranslatorFast).Fit);
 
         // On 8 GB VRAM + 32 GB RAM discrete GPU, 4B cleaner + 7B translator (8075 MiB) exceeds 6656 MiB co-resident VRAM -> 4B is Heavy alongside 7B.
         var dgpu8Vram = DiscreteGpuHost(ramGb: 32, vramGb: 8);
@@ -243,20 +313,20 @@ public sealed class ModelAdvisorTests
         var cleanersOn8Vram = ModelAdvisor.EvaluateStage(ModelStage.Cleaner, dgpu8Vram, with7BTranslator);
         Assert.Equal(ModelFit.Heavy, cleanersOn8Vram.Single(c => c.Model == ModelCatalog.Cleaner).Fit);
         Assert.False(ModelAdvisor.AssessPlan(with7BTranslator, dgpu8Vram).CanCoResideBothLlms);
-        Assert.True(ModelAdvisor.AssessPlan(ModelSelection.Baseline, dgpu8Vram).CanCoResideBothLlms);
+        Assert.True(ModelAdvisor.AssessPlan(ModelSelection.Fallback16Gb, dgpu8Vram).CanCoResideBothLlms);
 
-        // On CPU-only 8-core host, AssessPlan allows co-residing 2B + 1.8B, and disables co-residency when 4B cleaner or 7B translator is selected.
+        // On CPU-only 8-core host, AssessPlan allows co-residing 2B + 2B, and disables co-residency when 4B cleaner or 7B translator is selected.
         var cpu8 = CpuHost(16, cores: 8);
         var cpuRecPlan = ModelAdvisor.AssessPlan(ModelAdvisor.Recommend(cpu8), cpu8);
         Assert.True(cpuRecPlan.CanCoResideBothLlms);
         Assert.Equal(
             ModelCatalog.SpeechSecondPass.Profile!.ResidentBytes
             + ModelCatalog.CleanerFast.Profile!.ResidentBytes
-            + ModelCatalog.TranslatorFast.Profile!.ResidentBytes,
+            + ModelCatalog.TranslatorIndexFast.Profile!.ResidentBytes,
             cpuRecPlan.ActiveCoResidentBytes);
         Assert.Equal(cpu8.CoResidentBudgetBytes, cpuRecPlan.SafeBudgetBytes);
-        Assert.False(ModelAdvisor.AssessPlan(ModelSelection.Baseline, cpu8).CanCoResideBothLlms);
-        Assert.True(ModelAdvisor.AssessPlan(ModelSelection.Baseline, cpu8, cleanInCloud: true).CanCoResideBothLlms);
+        Assert.False(ModelAdvisor.AssessPlan(ModelSelection.Fallback16Gb, cpu8).CanCoResideBothLlms);
+        Assert.True(ModelAdvisor.AssessPlan(ModelSelection.Fallback16Gb, cpu8, cleanInCloud: true).CanCoResideBothLlms);
 
         var cpuWith7B = new ModelSelection(
             ModelCatalog.SpeechSecondPass.Id,
@@ -266,13 +336,13 @@ public sealed class ModelAdvisorTests
         Assert.True(ModelAdvisor.AssessPlan(cpuWith7B, cpu8, translateInCloud: true).CanCoResideBothLlms);
 
         // Exact inclusive memory/VRAM ceilings (<= rather than <).
-        var exactCoResidentBytes = ModelSelection.Baseline.Speech.Profile!.ResidentBytes
-                                 + ModelSelection.Baseline.Cleaner.Profile!.ResidentBytes
-                                 + ModelSelection.Baseline.Translator.Profile!.ResidentBytes;
+        var exactCoResidentBytes = ModelSelection.Fallback16Gb.Speech.Profile!.ResidentBytes
+                                 + ModelSelection.Fallback16Gb.Cleaner.Profile!.ResidentBytes
+                                 + ModelSelection.Fallback16Gb.Translator.Profile!.ResidentBytes;
         var exactRamBytes = (long)Math.Ceiling(exactCoResidentBytes / HardwareProfile.CoResidentMemoryRatio);
         var exactHost = new HardwareProfile("Exact", ComputeBackend.AppleMetal, exactRamBytes, 8);
-        Assert.True(ModelAdvisor.AssessPlan(ModelSelection.Baseline, exactHost).CanCoResideBothLlms);
-        Assert.Equal(ModelFit.Supported, ModelAdvisor.Evaluate(ModelCatalog.SpeechFast, exactHost, ModelSelection.Baseline).Fit);
+        Assert.True(ModelAdvisor.AssessPlan(ModelSelection.Fallback16Gb, exactHost).CanCoResideBothLlms);
+        Assert.Equal(ModelFit.Supported, ModelAdvisor.Evaluate(ModelCatalog.SpeechFast, exactHost, ModelSelection.Fallback16Gb).Fit);
 
         var exactLlmBytes = ModelSelection.Baseline.Cleaner.Profile!.ResidentBytes
                           + ModelSelection.Baseline.Translator.Profile!.ResidentBytes;

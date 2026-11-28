@@ -7,12 +7,31 @@ public class ModelCatalogTests
     [Fact]
     public void TheModelsThatAreReportedAsUsed_HaveAShortNameWithoutTheDescription()
     {
+        Assert.Equal("Qwen3.6 35B-A3B", ModelCatalog.UnifiedQwen36MoE.ShortName);
+        Assert.Equal("Qwen3.6 35B-A3B", ModelCatalog.CleanerUnified.ShortName);
+        Assert.Equal("Qwen3.6 35B-A3B", ModelCatalog.TranslatorUnified.ShortName);
+        Assert.Equal("Index-Translate 9B", ModelCatalog.TranslatorIndexQuality.ShortName);
+        Assert.Equal("Index-Translate 2B", ModelCatalog.TranslatorIndexFast.ShortName);
         Assert.Equal("Hy-MT2-1.8B", ModelCatalog.TranslatorFast.ShortName);
         Assert.Equal("Hy-MT2-7B", ModelCatalog.TranslatorQuality.ShortName);
         Assert.Equal("Qwen3.5 4B", ModelCatalog.Cleaner.ShortName);
         Assert.Equal("X-ASR", ModelCatalog.SpeechLive.ShortName);
         Assert.Equal("Qwen3-ASR 1.7B", ModelCatalog.SpeechQuality.ShortName);
         Assert.Equal("Qwen3-ASR", ModelCatalog.SpeechSecondPass.ShortName);
+    }
+
+    [Fact]
+    public void UnifiedMoEOptions_ShareASinglePhysicalCatalogArtifactAndBundle()
+    {
+        Assert.Same(ModelCatalog.UnifiedQwen36MoE, ModelCatalog.CleanerUnified.ResolveArtifact());
+        Assert.Same(ModelCatalog.UnifiedQwen36MoE, ModelCatalog.TranslatorUnified.ResolveArtifact());
+        Assert.Equal(ModelCatalog.UnifiedQwen36MoE.Id, ModelCatalog.CleanerUnified.ArtifactId);
+        Assert.Equal(ModelCatalog.UnifiedQwen36MoE.Id, ModelCatalog.TranslatorUnified.ArtifactId);
+        Assert.Single(ModelCatalog.All, m => m.Id == ModelCatalog.UnifiedQwen36MoE.Id);
+
+        var runtime = ModelCatalog.LlamaRuntimeFor("osx-arm64");
+        Assert.Equal([runtime, ModelCatalog.UnifiedQwen36MoE], ModelCatalog.BundleFor(ModelCatalog.CleanerUnified, runtime));
+        Assert.Equal([runtime, ModelCatalog.UnifiedQwen36MoE], ModelCatalog.BundleFor(ModelCatalog.TranslatorUnified, runtime));
     }
 
     [Fact]

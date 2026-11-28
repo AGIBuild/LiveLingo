@@ -26,6 +26,55 @@ public static class ModelCatalog
 
     private const string LlamaRelease = "https://github.com/ggml-org/llama.cpp/releases/download/b11980/";
 
+    /// <summary>
+    /// Shared GGUF package for Qwen3.6 35B-A3B MoE (~3B active parameters per token). Stored once on disk and served by
+    /// a single shared <c>llama-server</c> process when selected for both cleanup/polish and translation.
+    /// </summary>
+    public static readonly ModelDescriptor UnifiedQwen36MoE = new(
+        "qwen3.6-35b-a3b-iq4xs",
+        "Qwen3.6 35B-A3B MoE (unified polish & translation)",
+        ModelType.PostProcessing,
+        "Apache-2.0",
+        [
+            new ModelAsset(
+                "Qwen3.6-35B-A3B-UD-IQ4_XS.gguf",
+                "https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF/resolve/a483e9e6cbd595906af30beda3187c2663a1118c/Qwen3.6-35B-A3B-UD-IQ4_XS.gguf",
+                17_730_509_792,
+                "649d7508507b84638732c4f52c24c8b15843c6dca2f3ff793ae07c14a67ebbb3")
+        ])
+    {
+        ShortName = "Qwen3.6 35B-A3B"
+    };
+
+    public static readonly ModelDescriptor TranslatorUnified = new(
+        "qwen3.6-35b-a3b-translator",
+        "Qwen3.6 35B-A3B MoE (unified flagship translation)",
+        ModelType.Translation,
+        "Apache-2.0",
+        UnifiedQwen36MoE.Assets)
+    {
+        ShortName = "Qwen3.6 35B-A3B",
+        SharedArtifact = UnifiedQwen36MoE,
+        Profile = new ModelProfile(ModelStage.Translator, Rank: 1, QualityStars: 3, SpeedStars: 2, ResidentBytes: 18_800 * MiB, RequiresGpu: true, UtilityScore: 54)
+    };
+
+    public static readonly ModelDescriptor TranslatorIndexQuality = new(
+        "index-translate-9b-q4km",
+        "Index-Translate 9B (flagship translation)",
+        ModelType.Translation,
+        "Apache-2.0",
+        [
+            new ModelAsset(
+                "Index-Translate-9B.Q4_K_M.gguf",
+                "https://huggingface.co/IndexTeam/Index-Translate-9B-GGUF/resolve/645939fbab839a656f1bc39975a872bc8ad749f8/Index-Translate-9B.Q4_K_M.gguf",
+                5_780_090_304,
+                "9cc6758b0007f4cbf42ea3400768cbff91ae74ef8d640e467158348426d33713")
+        ])
+    {
+        ShortName = "Index-Translate 9B",
+        Profile = new ModelProfile(ModelStage.Translator, Rank: 2, QualityStars: 3, SpeedStars: 2, ResidentBytes: 6_270 * MiB, RequiresGpu: true, UtilityScore: 49)
+    };
+
     public static readonly ModelDescriptor TranslatorQuality = new(
         "hy-mt2-7b-q4km",
         "Hy-MT2 7B (quality translation)",
@@ -40,7 +89,24 @@ public static class ModelCatalog
         ])
     {
         ShortName = "Hy-MT2-7B",
-        Profile = new ModelProfile(ModelStage.Translator, Rank: 1, QualityStars: 3, SpeedStars: 2, ResidentBytes: 5_056 * MiB, RequiresGpu: true, UtilityScore: 45)
+        Profile = new ModelProfile(ModelStage.Translator, Rank: 3, QualityStars: 3, SpeedStars: 2, ResidentBytes: 5_056 * MiB, RequiresGpu: true, UtilityScore: 45)
+    };
+
+    public static readonly ModelDescriptor TranslatorIndexFast = new(
+        "index-translate-2b-q4km",
+        "Index-Translate 2B (fast translation)",
+        ModelType.Translation,
+        "Apache-2.0",
+        [
+            new ModelAsset(
+                "Index-Translate-2B.Q4_K_M.gguf",
+                "https://huggingface.co/IndexTeam/Index-Translate-2B-GGUF/resolve/3a0eca6ce931d88d00614d427ab3ed8ff0743902/Index-Translate-2B.Q4_K_M.gguf",
+                1_312_164_352,
+                "044b313d29342bd3b2c77cbb64023ca0d209bd9b3247763f9d162767ef2d746a")
+        ])
+    {
+        ShortName = "Index-Translate 2B",
+        Profile = new ModelProfile(ModelStage.Translator, Rank: 4, QualityStars: 2, SpeedStars: 3, ResidentBytes: 1_630 * MiB, RequiresGpu: false, UtilityScore: 28)
     };
 
     public static readonly ModelDescriptor TranslatorFast = new(
@@ -57,7 +123,19 @@ public static class ModelCatalog
         ])
     {
         ShortName = "Hy-MT2-1.8B",
-        Profile = new ModelProfile(ModelStage.Translator, Rank: 2, QualityStars: 2, SpeedStars: 3, ResidentBytes: 1_448 * MiB, RequiresGpu: false, UtilityScore: 25)
+        Profile = new ModelProfile(ModelStage.Translator, Rank: 5, QualityStars: 2, SpeedStars: 3, ResidentBytes: 1_448 * MiB, RequiresGpu: false, UtilityScore: 25)
+    };
+
+    public static readonly ModelDescriptor CleanerUnified = new(
+        "qwen3.6-35b-a3b-cleaner",
+        "Qwen3.6 35B-A3B MoE (unified flagship polish)",
+        ModelType.PostProcessing,
+        "Apache-2.0",
+        UnifiedQwen36MoE.Assets)
+    {
+        ShortName = "Qwen3.6 35B-A3B",
+        SharedArtifact = UnifiedQwen36MoE,
+        Profile = new ModelProfile(ModelStage.Cleaner, Rank: 1, QualityStars: 3, SpeedStars: 2, ResidentBytes: 18_800 * MiB, RequiresGpu: true, UtilityScore: 54)
     };
 
     public static readonly ModelDescriptor CleanerQuality = new(
@@ -74,7 +152,7 @@ public static class ModelCatalog
         ])
     {
         ShortName = "Qwen3.5 9B",
-        Profile = new ModelProfile(ModelStage.Cleaner, Rank: 1, QualityStars: 3, SpeedStars: 1, ResidentBytes: 6_170 * MiB, RequiresGpu: true, UtilityScore: 42)
+        Profile = new ModelProfile(ModelStage.Cleaner, Rank: 2, QualityStars: 3, SpeedStars: 1, ResidentBytes: 6_170 * MiB, RequiresGpu: true, UtilityScore: 42)
     };
 
     public static readonly ModelDescriptor Cleaner = new(
@@ -91,7 +169,7 @@ public static class ModelCatalog
         ])
     {
         ShortName = "Qwen3.5 4B",
-        Profile = new ModelProfile(ModelStage.Cleaner, Rank: 2, QualityStars: 2, SpeedStars: 2, ResidentBytes: 3_019 * MiB, RequiresGpu: false, UtilityScore: 30)
+        Profile = new ModelProfile(ModelStage.Cleaner, Rank: 3, QualityStars: 2, SpeedStars: 2, ResidentBytes: 3_019 * MiB, RequiresGpu: false, UtilityScore: 30)
     };
 
     public static readonly ModelDescriptor CleanerFast = new(
@@ -108,7 +186,7 @@ public static class ModelCatalog
         ])
     {
         ShortName = "Qwen3.5 2B",
-        Profile = new ModelProfile(ModelStage.Cleaner, Rank: 3, QualityStars: 1, SpeedStars: 3, ResidentBytes: 1_600 * MiB, RequiresGpu: false, UtilityScore: 15)
+        Profile = new ModelProfile(ModelStage.Cleaner, Rank: 4, QualityStars: 1, SpeedStars: 3, ResidentBytes: 1_600 * MiB, RequiresGpu: false, UtilityScore: 15)
     };
 
     /// <summary>Streaming X-ASR (480 ms chunks) that produces the live text while the user speaks.</summary>
@@ -238,10 +316,11 @@ public static class ModelCatalog
     public static IReadOnlyList<ModelDescriptor> SpeechModels { get; } = [SpeechQuality, SpeechSecondPass, SpeechFast];
 
     /// <summary>Selectable cleanup and polish models, ordered strictly from highest quality (#1) to lightest.</summary>
-    public static IReadOnlyList<ModelDescriptor> CleanerModels { get; } = [CleanerQuality, Cleaner, CleanerFast];
+    public static IReadOnlyList<ModelDescriptor> CleanerModels { get; } = [CleanerUnified, CleanerQuality, Cleaner, CleanerFast];
 
     /// <summary>Selectable translation models, ordered strictly from highest quality (#1) to lightest.</summary>
-    public static IReadOnlyList<ModelDescriptor> TranslatorModels { get; } = [TranslatorQuality, TranslatorFast];
+    public static IReadOnlyList<ModelDescriptor> TranslatorModels { get; } =
+        [TranslatorUnified, TranslatorIndexQuality, TranslatorQuality, TranslatorIndexFast, TranslatorFast];
 
     /// <summary>Every user-selectable stage option, ordered by stage and then from best quality (#1) to lightest.</summary>
     public static IReadOnlyList<ModelDescriptor> Selectable { get; } = [.. SpeechModels, .. CleanerModels, .. TranslatorModels];
@@ -264,6 +343,16 @@ public static class ModelCatalog
             ? null
             : Selectable.FirstOrDefault(model => string.Equals(model.Id, modelId, StringComparison.Ordinal));
 
+    /// <summary>Finds either a selectable stage option or a physical catalog artifact by ID.</summary>
+    public static ModelDescriptor? FindAny(string? modelId) =>
+        FindSelectable(modelId) ?? (string.IsNullOrWhiteSpace(modelId)
+            ? null
+            : All.FirstOrDefault(model => string.Equals(model.Id, modelId, StringComparison.Ordinal)));
+
+    /// <summary>True when <paramref name="modelId"/> is a shared multi-stage LLM package that the user may manage/delete in Storage.</summary>
+    public static bool IsSharedStageArtifact(string? modelId) =>
+        string.Equals(modelId, UnifiedQwen36MoE.Id, StringComparison.Ordinal);
+
     /// <summary>Everything voice dictation needs for the default speech recognizer besides the cleaner and the translator.</summary>
     public static IReadOnlyList<ModelDescriptor> Speech { get; } = SpeechFor(SpeechSecondPass);
 
@@ -282,8 +371,9 @@ public static class ModelCatalog
         option.Profile?.Stage switch
         {
             ModelStage.Speech => SpeechFor(option),
-            ModelStage.Cleaner or ModelStage.Translator => (llamaRuntime ?? LlamaRuntimeOrNull) is { } runtime ? [runtime, option] : [option],
-            _ => [option]
+            ModelStage.Cleaner or ModelStage.Translator =>
+                (llamaRuntime ?? LlamaRuntimeOrNull) is { } runtime ? [runtime, option.ResolveArtifact()] : [option.ResolveArtifact()],
+            _ => [option.ResolveArtifact()]
         };
 
     private static readonly ModelDescriptor LlamaMacArm64 = new(
@@ -349,7 +439,8 @@ public static class ModelCatalog
 
     public static IReadOnlyList<ModelDescriptor> All { get; } =
     [
-        TranslatorQuality, TranslatorFast,
+        UnifiedQwen36MoE,
+        TranslatorIndexQuality, TranslatorQuality, TranslatorIndexFast, TranslatorFast,
         CleanerQuality, Cleaner, CleanerFast,
         SpeechLive, SpeechQuality, SpeechSecondPass, SpeechFast, SpeechVad,
         LlamaMacArm64, LlamaWinX64

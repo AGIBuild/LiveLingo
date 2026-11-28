@@ -16,6 +16,10 @@ public class CoreOptionsTests
     {
         var opts = new CoreOptions();
         Assert.Equal(LiveLingo.Core.Models.ModelSelection.Baseline, opts.Models);
+        Assert.Equal(LiveLingo.Core.Models.TranslatorTier.Quality, opts.TranslatorTier);
+
+        opts.TranslatorTier = LiveLingo.Core.Models.TranslatorTier.Fast;
+        Assert.Equal(LiveLingo.Core.Models.ModelCatalog.TranslatorFast.Id, opts.Models.TranslatorModelId);
         Assert.Equal(LiveLingo.Core.Models.TranslatorTier.Fast, opts.TranslatorTier);
 
         opts.TranslatorTier = LiveLingo.Core.Models.TranslatorTier.Quality;

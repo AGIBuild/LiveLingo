@@ -70,7 +70,8 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<CoreOptions>(),
             sp.GetRequiredService<LlamaServerHostOptions>(),
             TimeProvider.System,
-            sp.GetRequiredService<ILogger<LlamaServerHost>>()));
+            sp.GetRequiredService<ILogger<LlamaServerHost>>(),
+            sp.GetRequiredService<IHardwareProbe>().Detect()));
         services.AddSingleton<IQwenWebSocketTransport>(ClientWebSocketTransport.Shared);
         services.AddSingleton<SherpaSpeechEngine>();
         services.AddSingleton<RoutedSpeechEngine>(sp => new RoutedSpeechEngine(

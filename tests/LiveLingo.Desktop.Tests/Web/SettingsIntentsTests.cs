@@ -285,7 +285,7 @@ public sealed class SettingsIntentsTests
         Assert.Equal(ModelCatalog.SpeechFast.Id, rig.Vm.ActiveModels.SpeechModelId);
 
         rig.Do(new ApplyRecommendedModelsIntent { V = 1 });
-        Assert.Equal(ModelCatalog.SpeechSecondPass.Id, rig.Vm.ActiveModels.SpeechModelId);
+        Assert.Equal(ModelCatalog.SpeechQuality.Id, rig.Vm.ActiveModels.SpeechModelId);
 
         rig.Do(new DeleteModelIntent(ModelCatalog.CleanerFast.Id) { V = 1 });
         await Wait.Until(() => rig.F.Models.ReceivedCalls().Any(c => c.GetMethodInfo().Name == nameof(IModelManager.CleanObsoleteModelsAsync)));

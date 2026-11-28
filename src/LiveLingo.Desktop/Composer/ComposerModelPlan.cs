@@ -31,13 +31,13 @@ public sealed record ComposerModelPlan(
     {
         ArgumentNullException.ThrowIfNull(selection);
         return new ComposerModelPlan(
-            cleanInCloud ? [] : [ModelCatalog.LlamaRuntime, selection.Cleaner],
-            translateInCloud ? [] : [ModelCatalog.LlamaRuntime, selection.Translator],
+            cleanInCloud ? [] : [ModelCatalog.LlamaRuntime, selection.Cleaner.ResolveArtifact()],
+            translateInCloud ? [] : [ModelCatalog.LlamaRuntime, selection.Translator.ResolveArtifact()],
             speechInCloud ? [] : ModelCatalog.SpeechFor(selection.Speech),
             speechInCloud ? [] : ModelCatalog.TranscriptionFor(selection.Speech),
             SpeechNativeClean: speechInCloud && speechNativeClean && !cleanInCloud);
     }
 
     public static ComposerModelPlan Create(TranslatorTier tier, bool cleanInCloud, bool translateInCloud, bool speechInCloud = false) =>
-        Create(ModelSelection.Baseline with { TranslatorModelId = ModelCatalog.Translator(tier).Id }, cleanInCloud, translateInCloud, speechInCloud);
+        Create(ModelSelection.Fallback16Gb with { TranslatorModelId = ModelCatalog.Translator(tier).Id }, cleanInCloud, translateInCloud, speechInCloud);
 }

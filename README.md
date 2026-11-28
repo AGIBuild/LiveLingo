@@ -72,8 +72,10 @@ until that processing ends. Customize the final polish requirements in **Setting
 Invalid requirements fall back to the built-in ones; a rejected final result keeps the passage preview with a notice.
 
 Model names appear briefly when recording starts or the active processing model changes. Click the **Local / Cloud**
-chip to inspect what this window actually used. Speech uses X-ASR 480 ms plus Qwen3-ASR 0.6B; cleanup uses Qwen3.5 4B.
-The fast/quality translation choice selects Hy-MT2 1.8B/7B and does not change the speech recognizer.
+chip to inspect what this window actually used. On the 32 GB baseline, speech defaults to X-ASR 480 ms plus
+Qwen3-ASR 1.7B, cleanup defaults to Qwen3.5 9B, and translation defaults to Index-Translate 9B. Cleanup and
+translation can also share a single unified Qwen3.6 35B-A3B MoE server on demand, or step down to lighter models
+(Qwen3-ASR 0.6B / X-ASR Offline, Qwen3.5 4B / 2B, Index-Translate 2B / Hy-MT2 1.8B) under **Settings → Models**.
 
 Imported recordings become a read-only timeline that goes through the same cleanup and translation, and can be
 exported as SRT.
@@ -109,17 +111,18 @@ exported as SRT.
 | Role | Model | Size |
 |---|---|---|
 | Live recognition | X-ASR 480 ms streaming (zh-en) | ~130 MB |
-| Settled recognition and recording import | Qwen3-ASR 0.6B | ~880 MB |
+| Settled recognition & recording import (default / light) | Qwen3-ASR 1.7B / 0.6B / X-ASR Offline | ~2.4 GB / ~880 MB / ~136 MB |
 | Speech boundaries | Silero VAD | <1 MB |
-| Cleanup | Qwen3.5 4B Q4_K_M | ~2.7 GB |
-| Translation (balanced) / (quality) | Hy-MT2 1.8B / 7B Q4_K_M | ~1.1 GB / ~4.6 GB |
+| Unified cleanup & translation (shared MoE server) | Qwen3.6 35B-A3B IQ4_XS (3B active) | ~17.7 GB |
+| Cleanup (32 GB default / light fallbacks) | Qwen3.5 9B / 4B / 2B Q4_K_M | ~5.7 GB / ~2.7 GB / ~1.3 GB |
+| Translation (32 GB default / light fallbacks) | Index-Translate 9B / Hy-MT2 7B / Index-Translate 2B / Hy-MT2 1.8B Q4_K_M | ~5.8 GB / ~4.6 GB / ~1.3 GB / ~1.1 GB |
 | Runtime | llama.cpp b11980 | ~16–24 MB |
 
 Licenses are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ## Requirements and status
 
-- Target hardware: Apple M2 or newer with 16 GB, or an equivalent Windows 11 PC. macOS 12+ and Windows 10/11.
+- Target hardware: Apple M2 or newer with at least 32 GB unified memory, or an equivalent 32 GB Windows 11 PC. macOS 12+ and Windows 10/11 (lighter fallback models remain selectable in Settings when running heavy background workloads or smaller GPUs).
 - macOS needs Accessibility (to type into other apps) and Microphone permission.
 - The interface is drawn by the system web view: WKWebView on macOS, WebView2 on Windows (Windows 11 includes it; how the
   runtime reaches Windows 10 is not decided yet).

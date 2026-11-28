@@ -64,4 +64,17 @@ public class ComposerModelPlanTests
         Assert.Equal(ModelCatalog.SpeechFor(ModelCatalog.SpeechFast), plan.Voice);
         Assert.Equal(ModelCatalog.TranscriptionFor(ModelCatalog.SpeechFast), plan.Transcription);
     }
+
+    [Fact]
+    public void UnifiedSelection_MapsBothStagesToTheSharedPhysicalArtifact()
+    {
+        var selection = new ModelSelection(
+            ModelCatalog.SpeechQuality.Id,
+            ModelCatalog.CleanerUnified.Id,
+            ModelCatalog.TranslatorUnified.Id);
+        var plan = ComposerModelPlan.Create(selection, cleanInCloud: false, translateInCloud: false);
+
+        Assert.Equal([ModelCatalog.LlamaRuntime, ModelCatalog.UnifiedQwen36MoE], plan.For(ComposerOutput.Clean));
+        Assert.Equal([ModelCatalog.LlamaRuntime, ModelCatalog.UnifiedQwen36MoE], plan.For(ComposerOutput.Translate));
+    }
 }

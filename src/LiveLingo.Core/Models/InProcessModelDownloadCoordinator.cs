@@ -33,10 +33,11 @@ public sealed class InProcessModelDownloadCoordinator : IModelDownloadCoordinato
     {
         if (string.IsNullOrEmpty(modelId)) throw new ArgumentException("Model id required.", nameof(modelId));
 
-        if (_sessions.TryGetValue(modelId, out var session))
-            return session.State;
+        var resolvedId = ModelCatalog.FindSelectable(modelId)?.ArtifactId ?? modelId;
+        if (_sessions.TryGetValue(resolvedId, out var session))
+            return session.State with { ModelId = modelId };
 
-        var installed = _modelManager.ListInstalled().FirstOrDefault(m => string.Equals(m.Id, modelId, StringComparison.Ordinal));
+        var installed = _modelManager.ListInstalled().FirstOrDefault(m => string.Equals(m.Id, resolvedId, StringComparison.Ordinal));
         return installed is not null
             ? new ModelDownloadState(modelId, ModelDownloadStatus.Installed, 100, null, installed.SizeBytes, installed.SizeBytes)
             : new ModelDownloadState(modelId, ModelDownloadStatus.Idle, 0, null);
@@ -45,6 +46,7 @@ public sealed class InProcessModelDownloadCoordinator : IModelDownloadCoordinato
     public Task StartAsync(ModelDescriptor descriptor)
     {
         if (descriptor is null) throw new ArgumentNullException(nameof(descriptor));
+        descriptor = descriptor.ResolveArtifact();
 
         lock (_startLock)
         {

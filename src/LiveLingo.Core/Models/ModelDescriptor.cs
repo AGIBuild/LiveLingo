@@ -72,8 +72,20 @@ public record ModelDescriptor(
     /// <summary>The name without its description ("Hy-MT2-1.8B"), for one line of status text; <see cref="DisplayName"/> is the full one.</summary>
     public string ShortName { get; init; } = DisplayName;
 
+    /// <summary>
+    /// Underlying shared catalog artifact when multiple stage options (for example unified Cleaner and Translator roles)
+    /// execute the exact same GGUF weights on disk and share a single <c>llama-server</c> instance.
+    /// </summary>
+    public ModelDescriptor? SharedArtifact { get; init; }
+
+    /// <summary>Returns the physical installable artifact on disk (<see cref="SharedArtifact"/> when shared, otherwise <c>this</c>).</summary>
+    public ModelDescriptor ResolveArtifact() => SharedArtifact ?? this;
+
+    /// <summary>On-disk directory and shared server identity.</summary>
+    public string ArtifactId => (SharedArtifact ?? this).Id;
+
     /// <summary>Total download size in bytes.</summary>
-    public long SizeBytes => Assets.Sum(asset => asset.SizeBytes);
+    public long SizeBytes => (SharedArtifact ?? this).Assets.Sum(asset => asset.SizeBytes);
 
     /// <summary>
     /// Files that must be present after extraction for an archive-based model to count as installed.

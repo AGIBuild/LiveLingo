@@ -437,7 +437,7 @@ internal sealed record SettingsViewState(
 
             return new DownloadItemState(
                 task.Model.Id,
-                texts.CategoryBadge(task.Stage),
+                texts.CategoryBadge(task.Model, task.Stage),
                 texts.CatalogArtifactName(task.Model),
                 statusText,
                 percent,
@@ -528,8 +528,8 @@ internal sealed record SettingsViewState(
                 var isIndeterminate = isDownloading && (isQueued || (download.BytesDownloaded <= 0 && download.Percentage < 0.5));
                 var canSelectImmediate = eval.IsSelectable && !isActive && (isInstalled || !hasWorkingCurrent);
                 var canDownload = eval.IsSelectable && !isInstalled && !isDownloading;
-                var canDelete = isInstalled && !isActive && !isDownloading;
-                var installedSize = inventory.FirstOrDefault(i => i.Model.Id == model.Id)?.SizeBytes ?? model.SizeBytes;
+                var canDelete = isInstalled && coordinator.CanDeleteModel(model.Id);
+                var installedSize = inventory.FirstOrDefault(i => i.Model.Id == model.ArtifactId)?.SizeBytes ?? model.SizeBytes;
 
                 return new ModelOptionState(
                     model.Id,
@@ -586,7 +586,7 @@ internal sealed record SettingsViewState(
         var storageItems = inventory.Select(item => new InstalledModelItemState(
             item.Model.Id,
             texts.CatalogArtifactName(item.Model),
-            texts.CategoryBadge(item.Stage),
+            texts.CategoryBadge(item.Model, item.Stage),
             texts.FormatSize(item.SizeBytes),
             item.InUse,
             texts.StorageStatusBadge(item.InUse),

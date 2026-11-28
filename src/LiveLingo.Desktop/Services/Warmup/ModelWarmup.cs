@@ -47,7 +47,7 @@ public sealed class ModelWarmup : IDisposable
         _inference = inference;
         _settings = settings;
         _downloads = downloads;
-        _hardware = hardware?.Detect() ?? HardwareProfile.Baseline16GbAppleMetal;
+        _hardware = hardware?.Detect() ?? HardwareProfile.Baseline32GbAppleMetal;
         _logger = logger;
         _time = time ?? TimeProvider.System;
         _downloads.StateChanged += OnDownloadChanged;
@@ -107,6 +107,9 @@ public sealed class ModelWarmup : IDisposable
     {
         var current = _settings.Current;
         var selection = current.Composer.ResolveSelection(_hardware);
+        if (!current.Cloud.Clean && !current.Cloud.Translate && selection.SharesLlmArtifact)
+            return null;
+
         var canCoReside = ModelAdvisor.AssessPlan(
             selection,
             _hardware,

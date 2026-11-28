@@ -41,21 +41,25 @@ public sealed class ServerLease : IDisposable
 }
 
 /// <summary>
-/// Runs the pinned llama-server, one process per <see cref="InferenceRole"/>, bound to a random loopback port.
-/// A server is started on first use, reused while the same model is requested, restarted on the next request
-/// after it exits, and unloaded after <see cref="LlamaServerHostOptions.IdleTimeout"/> without leases.
+/// Runs the pinned llama-server, sharing one process when multiple <see cref="InferenceRole"/>s resolve to the same
+/// physical <see cref="ModelDescriptor.ArtifactId"/>, and keeping distinct role models side-by-side only when they fit
+/// within the host's co-residency budget (otherwise evicting idle peer servers before loading the requested model).
+/// A server is started on first use, reused while active, restarted on the next request after it exits, and unloaded
+/// after <see cref="LlamaServerHostOptions.IdleTimeout"/> without leases.
 /// A failed start is an explicit error; nothing is retried behind the caller's back.
 /// </summary>
 public sealed class LlamaServerHost : IAsyncDisposable
 {
     private sealed class Instance(
-        ModelDescriptor model,
+        ModelDescriptor artifact,
+        ModelDescriptor representativeModel,
         ILlamaProcess process,
         HttpClient http,
         IChatCompletionClient client,
         ITimer idleTimer)
     {
-        public ModelDescriptor Model { get; } = model;
+        public ModelDescriptor Artifact { get; } = artifact;
+        public ModelDescriptor RepresentativeModel { get; set; } = representativeModel;
         public ILlamaProcess Process { get; } = process;
         public HttpClient Http { get; } = http;
         public IChatCompletionClient Client { get; } = client;
@@ -74,8 +78,10 @@ public sealed class LlamaServerHost : IAsyncDisposable
     private readonly LlamaServerHostOptions _options;
     private readonly TimeProvider _time;
     private readonly ILogger<LlamaServerHost> _logger;
-    private readonly Dictionary<InferenceRole, Instance> _instances = [];
-    private readonly Dictionary<InferenceRole, SemaphoreSlim> _locks = [];
+    private readonly HardwareProfile _hardware;
+    private readonly Dictionary<string, Instance> _instances = new(StringComparer.Ordinal);
+    private readonly Dictionary<InferenceRole, string> _roleBindings = [];
+    private readonly SemaphoreSlim _hostLock = new(1, 1);
     private readonly object _gate = new();
     private bool _disposed;
 
@@ -88,7 +94,8 @@ public sealed class LlamaServerHost : IAsyncDisposable
         CoreOptions core,
         LlamaServerHostOptions options,
         TimeProvider time,
-        ILogger<LlamaServerHost> logger)
+        ILogger<LlamaServerHost> logger,
+        HardwareProfile? hardware = null)
     {
         _models = models;
         _runtime = runtime;
@@ -99,51 +106,84 @@ public sealed class LlamaServerHost : IAsyncDisposable
         _options = options;
         _time = time;
         _logger = logger;
+        _hardware = hardware ?? HardwareProfile.Baseline32GbAppleMetal;
     }
 
     /// <exception cref="ModelNotReadyException">The runtime or the model is not installed.</exception>
     /// <exception cref="LlamaServerStartException">The server exited or did not become ready in time.</exception>
     public async Task<ServerLease> AcquireAsync(InferenceRole role, ModelDescriptor model, CancellationToken ct)
     {
-        var roleLock = LockFor(role);
-        await roleLock.WaitAsync(ct).ConfigureAwait(false);
+        await _hostLock.WaitAsync(ct).ConfigureAwait(false);
         try
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
 
-            Instance? current;
-            lock (_gate)
-                _instances.TryGetValue(role, out current);
+            var artifact = model.ResolveArtifact();
+            Instance? target;
+            List<Instance> toStop = [];
 
-            if (current is not null && (current.Process.HasExited || current.Model.Id != model.Id))
+            lock (_gate)
             {
-                if (!current.Process.HasExited)
+                _instances.TryGetValue(artifact.Id, out target);
+                if (target is not null && target.Process.HasExited)
+                {
+                    toStop.Add(target);
+                    target = null;
+                }
+
+                var previousArtifactId = _roleBindings.TryGetValue(role, out var boundId) ? boundId : null;
+                foreach (var candidate in _instances.Values)
+                {
+                    if (string.Equals(candidate.Artifact.Id, artifact.Id, StringComparison.Ordinal))
+                        continue;
+
+                    var ownedOnlyByThisRole = string.Equals(candidate.Artifact.Id, previousArtifactId, StringComparison.Ordinal)
+                        && !HasOtherRoleBoundUnsafe(candidate.Artifact.Id, role);
+                    var exceedsCoResidency = target is null && !CanCoResideWith(candidate.RepresentativeModel, model);
+
+                    if (candidate.Process.HasExited || ownedOnlyByThisRole || exceedsCoResidency)
+                        toStop.Add(candidate);
+                }
+            }
+
+            if (target is null)
+            {
+                RequireInstalled(_runtime);
+                RequireInstalled(model);
+            }
+
+            foreach (var retiring in toStop)
+            {
+                if (!retiring.Process.HasExited)
                 {
                     Task drained;
                     lock (_gate)
-                        drained = current.Leases == 0 ? Task.CompletedTask : current.Drained.Task;
+                        drained = retiring.Leases == 0 ? Task.CompletedTask : retiring.Drained.Task;
                     await drained.WaitAsync(ct).ConfigureAwait(false);
                 }
-                await StopAsync(role, current).ConfigureAwait(false);
-                current = null;
             }
 
-            current ??= await StartAsync(role, model, ct).ConfigureAwait(false);
+            foreach (var retiring in toStop)
+                await StopAsync(retiring).ConfigureAwait(false);
+
+            target ??= await StartAsync(role, model, ct).ConfigureAwait(false);
 
             lock (_gate)
             {
-                if (current.Leases == 0)
-                    current.Drained = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-                current.Leases++;
-                current.IdleTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+                _roleBindings[role] = artifact.Id;
+                target.RepresentativeModel = model;
+                if (target.Leases == 0)
+                    target.Drained = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                target.Leases++;
+                target.IdleTimer.Change(Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
             }
 
-            var instance = current;
-            return new ServerLease(instance.Model, instance.Client, () => Release(instance));
+            var instance = target;
+            return new ServerLease(model, instance.Client, () => Release(instance));
         }
         finally
         {
-            roleLock.Release();
+            _hostLock.Release();
         }
     }
 
@@ -158,55 +198,49 @@ public sealed class LlamaServerHost : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        List<InferenceRole> roles;
-        lock (_gate)
+        await _hostLock.WaitAsync().ConfigureAwait(false);
+        try
         {
-            if (_disposed)
-                return;
-            _disposed = true;
-            roles = _locks.Keys.ToList();
-        }
+            List<Instance> running;
+            lock (_gate)
+            {
+                if (_disposed)
+                    return;
+                _disposed = true;
+                running = _instances.Values.ToList();
+            }
 
-        foreach (var role in roles)
+            foreach (var instance in running)
+                await StopAsync(instance).ConfigureAwait(false);
+        }
+        finally
         {
-            var roleLock = LockFor(role);
-            await roleLock.WaitAsync().ConfigureAwait(false);
-            try
-            {
-                Instance? instance;
-                lock (_gate)
-                    _instances.TryGetValue(role, out instance);
-                if (instance is not null)
-                    await StopAsync(role, instance).ConfigureAwait(false);
-            }
-            finally
-            {
-                roleLock.Release();
-            }
+            _hostLock.Release();
         }
     }
 
-    private SemaphoreSlim LockFor(InferenceRole role)
+    private bool HasOtherRoleBoundUnsafe(string artifactId, InferenceRole excludingRole)
     {
-        lock (_gate)
+        foreach (var (boundRole, boundArtifactId) in _roleBindings)
         {
-            if (!_locks.TryGetValue(role, out var roleLock))
-                _locks[role] = roleLock = new SemaphoreSlim(1, 1);
-            return roleLock;
+            if (boundRole != excludingRole && string.Equals(boundArtifactId, artifactId, StringComparison.Ordinal))
+                return true;
         }
+        return false;
     }
+
+    private bool CanCoResideWith(ModelDescriptor existingModel, ModelDescriptor incomingModel) =>
+        ModelAdvisor.CanCoResideLlmModels(existingModel, incomingModel, _core.Models.Speech, _hardware);
 
     private async Task<Instance> StartAsync(InferenceRole role, ModelDescriptor model, CancellationToken ct)
     {
-        RequireInstalled(_runtime);
-        RequireInstalled(model);
-
+        var artifact = model.ResolveArtifact();
         var executable = Path.Combine(_models.GetModelDirectory(_runtime.Id), _runtime.ExtractedFiles[0]);
-        var modelPath = Path.Combine(_models.GetModelDirectory(model.Id), model.Assets[0].RelativePath);
+        var modelPath = Path.Combine(_models.GetModelDirectory(artifact.Id), artifact.Assets[0].RelativePath);
         var endpoint = new Uri($"http://127.0.0.1:{_ports.NextLoopbackPort()}/");
         var launch = new LlamaServerLaunch(executable, BuildArguments(modelPath, endpoint), endpoint);
 
-        _logger.LogInformation("Starting llama-server for {Role} with {Model} at {Endpoint}", role, model.Id, endpoint);
+        _logger.LogInformation("Starting llama-server for {Role} with {Model} ({Artifact}) at {Endpoint}", role, model.Id, artifact.Id, endpoint);
         var process = _launcher.Start(launch);
         try
         {
@@ -219,17 +253,17 @@ public sealed class LlamaServerHost : IAsyncDisposable
         }
 
         var http = new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
-        var idleTimer = _time.CreateTimer(_ => OnIdle(role), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+        var idleTimer = _time.CreateTimer(_ => OnIdle(artifact.Id), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
         var instance = new Instance(
-            model, process, http, new OpenAiChatClient(http, new Uri(endpoint, "v1/chat/completions")), idleTimer);
+            artifact, model, process, http, new OpenAiChatClient(http, new Uri(endpoint, "v1/chat/completions")), idleTimer);
         lock (_gate)
-            _instances[role] = instance;
+            _instances[artifact.Id] = instance;
         return instance;
     }
 
     private void RequireInstalled(ModelDescriptor descriptor)
     {
-        if (_models.HasAllExpectedLocalAssets(descriptor))
+        if (_models.HasAllExpectedLocalAssets(descriptor.ResolveArtifact()))
             return;
 
         throw new ModelNotReadyException(
@@ -287,37 +321,40 @@ public sealed class LlamaServerHost : IAsyncDisposable
         }
     }
 
-    private void OnIdle(InferenceRole role) => _ = UnloadIfIdleAsync(role);
+    private void OnIdle(string artifactId) => _ = UnloadIfIdleAsync(artifactId);
 
-    private async Task UnloadIfIdleAsync(InferenceRole role)
+    private async Task UnloadIfIdleAsync(string artifactId)
     {
-        var roleLock = LockFor(role);
-        await roleLock.WaitAsync().ConfigureAwait(false);
+        await _hostLock.WaitAsync().ConfigureAwait(false);
         try
         {
             Instance? idle;
             lock (_gate)
-                idle = _instances.TryGetValue(role, out var found) && found.Leases == 0 ? found : null;
+                idle = _instances.TryGetValue(artifactId, out var found) && found.Leases == 0 ? found : null;
 
             if (idle is not null)
             {
-                _logger.LogInformation("Unloading idle llama-server for {Role}", role);
-                await StopAsync(role, idle).ConfigureAwait(false);
+                _logger.LogInformation("Unloading idle llama-server for artifact {Artifact}", artifactId);
+                await StopAsync(idle).ConfigureAwait(false);
             }
         }
         finally
         {
-            roleLock.Release();
+            _hostLock.Release();
         }
     }
 
-    private async Task StopAsync(InferenceRole role, Instance instance)
+    private async Task StopAsync(Instance instance)
     {
         lock (_gate)
         {
             instance.Stopped = true;
-            if (_instances.TryGetValue(role, out var registered) && ReferenceEquals(registered, instance))
-                _instances.Remove(role);
+            if (_instances.TryGetValue(instance.Artifact.Id, out var registered) && ReferenceEquals(registered, instance))
+            {
+                _instances.Remove(instance.Artifact.Id);
+                foreach (var role in _roleBindings.Where(kv => string.Equals(kv.Value, instance.Artifact.Id, StringComparison.Ordinal)).Select(kv => kv.Key).ToList())
+                    _roleBindings.Remove(role);
+            }
         }
 
         await instance.IdleTimer.DisposeAsync().ConfigureAwait(false);

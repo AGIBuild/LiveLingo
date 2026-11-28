@@ -26,7 +26,7 @@ public class CoreOptions
     /// <summary>Which translation model tier is selected; maps onto <see cref="Models"/>.</summary>
     public TranslatorTier TranslatorTier
     {
-        get => _models.Translator.Id == ModelCatalog.TranslatorQuality.Id ? TranslatorTier.Quality : TranslatorTier.Fast;
+        get => _models.Translator.Profile?.RequiresGpu == true ? TranslatorTier.Quality : TranslatorTier.Fast;
         set => _models = _models with { TranslatorModelId = ModelCatalog.Translator(value).Id };
     }
 

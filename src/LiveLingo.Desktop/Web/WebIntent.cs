@@ -111,7 +111,7 @@ internal abstract record WebIntent
     protected static bool IsSelectableModelId(string value) => ModelCatalog.FindSelectable(value) is not null;
 
     protected static bool IsCatalogModelId(string value) =>
-        value.Length is >= 1 and <= 64 && ModelCatalog.All.Any(m => string.Equals(m.Id, value, StringComparison.Ordinal));
+        value.Length is >= 1 and <= 64 && ModelCatalog.FindAny(value) is not null;
 
     /// <summary>
     /// Returns the intent, or null with a <paramref name="reason"/> that is safe to log: it names the kind of failure
@@ -403,7 +403,7 @@ internal sealed record CancelModelDownloadIntent(string ModelId) : WebIntent
 
 internal sealed record DeleteModelIntent(string ModelId) : WebIntent
 {
-    protected override bool IsValid => IsSelectableModelId(ModelId);
+    protected override bool IsValid => IsSelectableModelId(ModelId) || ModelCatalog.IsSharedStageArtifact(ModelId);
 }
 
 internal sealed record ApplyRecommendedModelsIntent : WebIntent;

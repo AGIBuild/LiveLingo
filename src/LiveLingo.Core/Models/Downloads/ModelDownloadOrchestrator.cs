@@ -36,6 +36,7 @@ internal sealed class ModelDownloadOrchestrator
         IProgress<ModelDownloadProgress>? progress,
         CancellationToken ct)
     {
+        descriptor = descriptor.ResolveArtifact();
         var modelDir = ModelStoragePaths.GetModelDirectory(_options.ModelStoragePath, descriptor.Id);
         var manifestPath = ModelStoragePaths.GetManifestPath(modelDir);
 

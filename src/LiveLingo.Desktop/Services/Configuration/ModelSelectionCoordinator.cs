@@ -44,7 +44,7 @@ public sealed class ModelSelectionCoordinator : IDisposable
         _settings = settings;
         _models = models;
         _downloads = downloads;
-        Hardware = hardwareProbe?.Detect() ?? HardwareProfile.Baseline16GbAppleMetal;
+        Hardware = hardwareProbe?.Detect() ?? HardwareProfile.Baseline32GbAppleMetal;
         _downloads.StateChanged += OnDownloadStateChanged;
     }
 
@@ -196,13 +196,7 @@ public sealed class ModelSelectionCoordinator : IDisposable
     {
         var active = ActiveSelection;
         var cloud = _settings.Current.Cloud;
-        var activeLocalStageIds = new HashSet<string>(StringComparer.Ordinal);
-        if (!cloud.Speech)
-            activeLocalStageIds.Add(active.SpeechModelId);
-        if (!cloud.Clean)
-            activeLocalStageIds.Add(active.CleanerModelId);
-        if (!cloud.Translate)
-            activeLocalStageIds.Add(active.TranslatorModelId);
+        var activeLocalArtifactIds = ActiveLocalArtifactIds(active, cloud);
 
         var items = new List<InstalledCatalogItem>();
         lock (_gate)
@@ -218,24 +212,25 @@ public sealed class ModelSelectionCoordinator : IDisposable
                     continue;
 
                 var stage = model.Profile?.Stage;
+                var isSharedStageArtifact = ModelCatalog.IsSharedStageArtifact(model.Id);
                 var downloading = _downloads.GetState(model.Id).IsDownloading;
-                var inUse = stage is not null
-                    ? activeLocalStageIds.Contains(model.Id)
+                var inUse = stage is not null || isSharedStageArtifact
+                    ? activeLocalArtifactIds.Contains(model.Id)
                     : ModelCatalog.IsSpeechAsset(model.Id)
                         ? !cloud.Speech
                         : !cloud.Clean || !cloud.Translate;
                 var canActivate = stage is not null && !inUse && ModelAdvisor.Evaluate(model, Hardware, active, cloud.Clean, cloud.Translate, cloud.Speech).IsSelectable;
-                var canDelete = stage is not null && !inUse && !downloading;
+                var canDelete = (stage is not null || isSharedStageArtifact) && !inUse && !downloading && !IsQueuedUnsafe(model.Id);
 
                 items.Add(new InstalledCatalogItem(model, stage, sizeBytes, inUse, canActivate, canDelete));
             }
         }
 
-        // Selectable stage models first (largest first so disk hogs stand out), then shared foundational components.
+        // Selectable/shared stage models first (largest first so disk hogs stand out), then foundational runtime components.
         return
         [
             .. items
-                .OrderBy(item => item.Stage is null ? 1 : 0)
+                .OrderBy(item => item.Stage is null && !ModelCatalog.IsSharedStageArtifact(item.Model.Id) ? 1 : 0)
                 .ThenByDescending(item => item.SizeBytes)
         ];
     }
@@ -244,11 +239,13 @@ public sealed class ModelSelectionCoordinator : IDisposable
     public IReadOnlyList<DownloadTaskSnapshot> GetActiveDownloads()
     {
         HashSet<string> queuedIds;
-        HashSet<string> pendingIds;
+        HashSet<string> pendingArtifactIds;
         lock (_gate)
         {
             queuedIds = _downloadQueue.Select(d => d.Id).ToHashSet(StringComparer.Ordinal);
-            pendingIds = _pendingByStage.Values.ToHashSet(StringComparer.Ordinal);
+            pendingArtifactIds = _pendingByStage.Values
+                .Select(id => ModelCatalog.FindSelectable(id)?.ArtifactId ?? id)
+                .ToHashSet(StringComparer.Ordinal);
         }
 
         var list = new List<DownloadTaskSnapshot>();
@@ -270,7 +267,7 @@ public sealed class ModelSelectionCoordinator : IDisposable
                 model.Profile?.Stage,
                 effectiveState,
                 Queued: isQueued,
-                PendingActivation: pendingIds.Contains(model.Id)));
+                PendingActivation: pendingArtifactIds.Contains(model.Id)));
         }
 
         return
@@ -288,9 +285,13 @@ public sealed class ModelSelectionCoordinator : IDisposable
 
     public bool IsQueued(string modelId)
     {
+        var artifactId = ModelCatalog.FindSelectable(modelId)?.ArtifactId ?? modelId;
         lock (_gate)
-            return _downloadQueue.Any(d => d.Id == modelId) && !_downloads.GetState(modelId).IsDownloading;
+            return IsQueuedUnsafe(artifactId);
     }
+
+    private bool IsQueuedUnsafe(string artifactId) =>
+        _downloadQueue.Any(d => d.Id == artifactId) && !_downloads.GetState(artifactId).IsDownloading;
 
     public bool IsInstalled(ModelDescriptor descriptor)
     {
@@ -298,27 +299,54 @@ public sealed class ModelSelectionCoordinator : IDisposable
             return IsArtifactInstalledUnsafe(descriptor);
     }
 
+    public bool CanDeleteModel(string modelId)
+    {
+        if (ModelCatalog.FindAny(modelId) is not { } descriptor)
+            return false;
+        if (descriptor.Profile is null && !ModelCatalog.IsSharedStageArtifact(descriptor.Id))
+            return false;
+
+        var artifactId = descriptor.ArtifactId;
+        if (_downloads.GetState(artifactId).IsDownloading || IsQueued(artifactId))
+            return false;
+
+        return !ActiveLocalArtifactIds(ActiveSelection, _settings.Current.Cloud).Contains(artifactId);
+    }
+
+    private static HashSet<string> ActiveLocalArtifactIds(ModelSelection active, CloudSettings cloud)
+    {
+        var ids = new HashSet<string>(StringComparer.Ordinal);
+        if (!cloud.Speech)
+            ids.Add(active.Speech.ArtifactId);
+        if (!cloud.Clean)
+            ids.Add(active.Cleaner.ArtifactId);
+        if (!cloud.Translate)
+            ids.Add(active.Translator.ArtifactId);
+        return ids;
+    }
+
     public ModelDownloadState GetOptionDownloadState(ModelDescriptor option)
     {
-        var primary = _downloads.GetState(option.Id);
+        var artifact = option.ResolveArtifact();
+        var primary = _downloads.GetState(artifact.Id);
         if (primary.IsDownloading || primary.IsFailed || primary.Status == ModelDownloadStatus.Cancelled)
-            return primary.TotalBytes > 0 ? primary : primary with { TotalBytes = option.SizeBytes };
+            return primary with { ModelId = option.Id, TotalBytes = primary.TotalBytes > 0 ? primary.TotalBytes : option.SizeBytes };
 
-        if (IsQueued(option.Id))
+        if (IsQueued(artifact.Id))
             return new ModelDownloadState(option.Id, ModelDownloadStatus.Downloading, 0, null, 0, option.SizeBytes);
 
         foreach (var companion in ModelCatalog.BundleFor(option))
         {
-            if (companion.Id == option.Id)
+            if (companion.Id == artifact.Id)
                 continue;
             var state = _downloads.GetState(companion.Id);
             if (state.IsDownloading || state.IsFailed)
                 return new ModelDownloadState(option.Id, state.Status, state.Percentage, state.ErrorMessage, state.BytesDownloaded, state.TotalBytes);
         }
 
-        return IsInstalled(option)
+        return IsInstalled(artifact)
             ? new ModelDownloadState(option.Id, ModelDownloadStatus.Installed, 100, null, option.SizeBytes, option.SizeBytes)
-            : primary;
+            : primary with { ModelId = option.Id };
     }
 
     public void ClearPendingActivation(ModelStage stage)
@@ -449,46 +477,46 @@ public sealed class ModelSelectionCoordinator : IDisposable
 
     public void CancelDownload(string modelId)
     {
-        var descriptor = ModelCatalog.All.FirstOrDefault(m => m.Id == modelId);
+        var descriptor = ModelCatalog.FindAny(modelId);
         if (descriptor is null)
             return;
 
+        var artifactId = descriptor.ArtifactId;
         lock (_gate)
         {
-            _downloadQueue.RemoveAll(d => d.Id == modelId);
-            if (descriptor.Profile is { } profile
-                && _pendingByStage.TryGetValue(profile.Stage, out var pending)
-                && pending == modelId)
+            _downloadQueue.RemoveAll(d => d.Id == artifactId);
+            foreach (var (stage, pendingId) in _pendingByStage.ToList())
             {
-                _pendingByStage.Remove(profile.Stage);
+                var pendingArtifactId = ModelCatalog.FindOption(stage, pendingId)?.ArtifactId ?? pendingId;
+                if (string.Equals(pendingArtifactId, artifactId, StringComparison.Ordinal))
+                    _pendingByStage.Remove(stage);
             }
         }
 
-        _downloads.Cancel(modelId);
+        _downloads.Cancel(artifactId);
         Changed?.Invoke();
     }
 
     public async Task<bool> DeleteModelAsync(string modelId)
     {
-        if (ModelCatalog.FindSelectable(modelId) is not { Profile: { } profile } option)
+        if (!CanDeleteModel(modelId) || ModelCatalog.FindAny(modelId) is not { } descriptor)
             return false;
 
-        if (!IsStageInCloud(profile.Stage) && ActiveSelection.ModelIdFor(profile.Stage) == option.Id)
-            return false;
-
-        if (_downloads.GetState(option.Id).IsDownloading || IsQueued(option.Id))
-            return false;
-
+        var artifactId = descriptor.ArtifactId;
         lock (_gate)
         {
-            if (_pendingByStage.TryGetValue(profile.Stage, out var pending) && pending == option.Id)
-                _pendingByStage.Remove(profile.Stage);
-            _downloadQueue.RemoveAll(d => d.Id == option.Id);
-            _installedSizes.Remove(option.Id);
+            foreach (var (stage, pendingId) in _pendingByStage.ToList())
+            {
+                var pendingArtifactId = ModelCatalog.FindOption(stage, pendingId)?.ArtifactId ?? pendingId;
+                if (string.Equals(pendingArtifactId, artifactId, StringComparison.Ordinal))
+                    _pendingByStage.Remove(stage);
+            }
+            _downloadQueue.RemoveAll(d => d.Id == artifactId);
+            _installedSizes.Remove(artifactId);
         }
 
-        await _models.CleanObsoleteModelsAsync([option.Id]).ConfigureAwait(false);
-        _downloads.NotifyDeleted(option.Id);
+        await _models.CleanObsoleteModelsAsync([artifactId]).ConfigureAwait(false);
+        _downloads.NotifyDeleted(artifactId);
         Changed?.Invoke();
         return true;
     }
@@ -543,8 +571,11 @@ public sealed class ModelSelectionCoordinator : IDisposable
 
     public void Dispose() => _downloads.StateChanged -= OnDownloadStateChanged;
 
-    private bool IsWorkingToward(ModelDescriptor descriptor) =>
-        _downloads.GetState(descriptor.Id).IsDownloading || IsQueued(descriptor.Id);
+    private bool IsWorkingToward(ModelDescriptor descriptor)
+    {
+        var artifactId = descriptor.ArtifactId;
+        return _downloads.GetState(artifactId).IsDownloading || IsQueued(artifactId);
+    }
 
     private void EnsureQueueDraining()
     {
@@ -585,10 +616,13 @@ public sealed class ModelSelectionCoordinator : IDisposable
         }
     }
 
-    private bool IsArtifactInstalledUnsafe(ModelDescriptor descriptor) =>
-        _installedSizes.ContainsKey(descriptor.Id)
-        || _models.HasAllExpectedLocalAssets(descriptor)
-        || _downloads.GetState(descriptor.Id).IsInstalled;
+    private bool IsArtifactInstalledUnsafe(ModelDescriptor descriptor)
+    {
+        var artifact = descriptor.ResolveArtifact();
+        return _installedSizes.ContainsKey(artifact.Id)
+            || _models.HasAllExpectedLocalAssets(artifact)
+            || _downloads.GetState(artifact.Id).IsInstalled;
+    }
 
     private void OnDownloadStateChanged(ModelDownloadState state)
     {
@@ -611,7 +645,7 @@ public sealed class ModelSelectionCoordinator : IDisposable
                 var bundleReady = bundle.All(d =>
                     d.Id == state.ModelId
                         ? state.IsInstalled
-                        : d.Id == pendingOption.Id
+                        : d.Id == pendingOption.ArtifactId
                             ? IsArtifactInstalledUnsafe(d)
                             : IsCompanionDoneUnsafe(d));
 

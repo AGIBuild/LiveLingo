@@ -84,12 +84,12 @@ internal static class SettingsScenarios
         }, key: "sk-stored"),
         ["settings-models"] = () => Open("models", before: f => f.Models.ListInstalled().Returns([
             Legacy(ModelCatalog.SpeechLive.Id, ModelCatalog.SpeechLive.SizeBytes),
-            Legacy(ModelCatalog.SpeechSecondPass.Id, ModelCatalog.SpeechSecondPass.SizeBytes),
+            Legacy(ModelCatalog.SpeechQuality.Id, ModelCatalog.SpeechQuality.SizeBytes),
             Legacy(ModelCatalog.SpeechVad.Id, ModelCatalog.SpeechVad.SizeBytes),
             Legacy(ModelCatalog.LlamaRuntimeFor("osx-arm64").Id, ModelCatalog.LlamaRuntimeFor("osx-arm64").SizeBytes),
-            Legacy(ModelCatalog.Cleaner.Id, ModelCatalog.Cleaner.SizeBytes),
+            Legacy(ModelCatalog.CleanerQuality.Id, ModelCatalog.CleanerQuality.SizeBytes),
             Legacy(ModelCatalog.CleanerFast.Id, ModelCatalog.CleanerFast.SizeBytes),
-            Legacy(ModelCatalog.TranslatorFast.Id, ModelCatalog.TranslatorFast.SizeBytes),
+            Legacy(ModelCatalog.TranslatorIndexQuality.Id, ModelCatalog.TranslatorIndexQuality.SizeBytes),
             Legacy("old-a", 5_500_000_000),
             Legacy("old-b", 3_000_000_000)])),
         ["settings-models-downloading"] = () => Open(

@@ -116,7 +116,9 @@ public sealed class SettingsTexts(ILocalizationService loc)
         loc.T("settings.models.hw.residency", FormatGib(assessment.ActiveCoResidentBytes), FormatGib(assessment.SafeBudgetBytes));
 
     public string ResidencyMode(ResidencyAssessment assessment) =>
-        loc.T(assessment.CanCoResideBothLlms ? "settings.models.hw.mode.dual" : "settings.models.hw.mode.swap");
+        assessment.SharesSingleLlm
+            ? loc.T("settings.models.hw.mode.shared")
+            : loc.T(assessment.CanCoResideBothLlms ? "settings.models.hw.mode.dual" : "settings.models.hw.mode.swap");
 
     public string DiskUsedSummary(long bytes) =>
         bytes > 0 ? loc.T("settings.models.hw.disk.some", FormatSize(bytes)) : loc.T("settings.models.hw.disk.none");
@@ -131,6 +133,11 @@ public sealed class SettingsTexts(ILocalizationService loc)
     public string CategoryBadge(ModelStage? stage) => stage is { } s
         ? StageTabTitle(s)
         : loc.T("settings.models.tab.shared");
+
+    public string CategoryBadge(ModelDescriptor model, ModelStage? stage) =>
+        ModelCatalog.IsSharedStageArtifact(model.Id)
+            ? loc.T("settings.models.tab.unified")
+            : CategoryBadge(stage);
 
     public string StageTabSummary(
         ModelStage stage,
@@ -308,14 +315,16 @@ public sealed class SettingsTexts(ILocalizationService loc)
     {
         ModelFit.Unsupported => evaluation.UnsupportedReason switch
         {
-            ModelUnsupportedReason.InsufficientMemory => loc.T("settings.models.reason.ram", evaluation.RequiredMemoryGb ?? 16, hardware.TotalMemoryGb),
+            ModelUnsupportedReason.InsufficientMemory => loc.T("settings.models.reason.ram", evaluation.RequiredMemoryGb ?? 32, hardware.TotalMemoryGb),
             ModelUnsupportedReason.InsufficientVideoMemory => loc.T("settings.models.reason.vram", evaluation.RequiredMemoryGb ?? 8),
             ModelUnsupportedReason.RequiresGpuAcceleration => loc.T("settings.models.reason.gpu"),
             _ => null
         },
         ModelFit.Heavy => hardware.Backend == ComputeBackend.CpuOnly
             ? loc.T("settings.models.heavy.cpu")
-            : loc.T("settings.models.heavy.swap"),
+            : evaluation.SharesActivePeerServer
+                ? loc.T("settings.models.heavy.shared")
+                : loc.T("settings.models.heavy.swap"),
         _ => null
     };
 

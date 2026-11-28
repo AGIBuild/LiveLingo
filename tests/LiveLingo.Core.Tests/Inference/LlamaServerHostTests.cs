@@ -65,7 +65,7 @@ public class LlamaServerHostTests
         public ModelDescriptor Runtime { get; } = ModelCatalog.LlamaRuntimeFor("osx-arm64");
         public LlamaServerHost Host { get; }
 
-        public Harness(LlamaServerHostOptions? options = null)
+        public Harness(LlamaServerHostOptions? options = null, HardwareProfile? hardware = null)
         {
             Models.HasAllExpectedLocalAssets(Arg.Any<ModelDescriptor>()).Returns(true);
             Models.GetModelDirectory(Arg.Any<string>()).Returns(call => Path.Combine("/models", call.Arg<string>()));
@@ -78,7 +78,8 @@ public class LlamaServerHostTests
                 Core,
                 options ?? new LlamaServerHostOptions(TimeSpan.FromMinutes(10), TimeSpan.FromSeconds(5), TimeSpan.FromMilliseconds(1)),
                 Time,
-                NullLogger<LlamaServerHost>.Instance);
+                NullLogger<LlamaServerHost>.Instance,
+                hardware);
         }
 
         public ValueTask DisposeAsync() => Host.DisposeAsync();
@@ -413,6 +414,57 @@ public class LlamaServerHostTests
 
         using var lease = await acquire;
         Assert.True(h.Launcher.Started[0].Process.Disposed);
+    }
+
+    [Fact]
+    public async Task SharedArtifact_CleanerAndTranslatorShareOneProcessAndRefCountLeases()
+    {
+        await using var h = new Harness();
+
+        var cleanerLease = await h.Host.AcquireAsync(InferenceRole.Cleaner, ModelCatalog.CleanerUnified, CancellationToken.None);
+        var translatorLease = await h.Host.AcquireAsync(InferenceRole.Translator, ModelCatalog.TranslatorUnified, CancellationToken.None);
+
+        var (launch, _) = Assert.Single(h.Launcher.Started);
+        Assert.Contains(ModelCatalog.UnifiedQwen36MoE.Id, launch.Arguments[1]);
+        Assert.Same(cleanerLease.Client, translatorLease.Client);
+        Assert.Equal(ModelCatalog.CleanerUnified, cleanerLease.Model);
+        Assert.Equal(ModelCatalog.TranslatorUnified, translatorLease.Model);
+
+        cleanerLease.Dispose();
+        Assert.Equal(Timeout.InfiniteTimeSpan, h.Time.Timer.Due);
+        Assert.False(h.Launcher.Started[0].Process.Disposed);
+
+        translatorLease.Dispose();
+        Assert.Equal(TimeSpan.FromMinutes(10), h.Time.Timer.Due);
+    }
+
+    [Fact]
+    public async Task DistinctModelsExceedingBudget_EvictIdleOppositeRoleBeforeStarting()
+    {
+        await using var h = new Harness(hardware: HardwareProfile.Baseline32GbAppleMetal);
+
+        (await h.Host.AcquireAsync(InferenceRole.Cleaner, ModelCatalog.CleanerQuality, CancellationToken.None)).Dispose();
+        Assert.False(h.Launcher.Started[0].Process.Disposed);
+
+        // Qwen3.5 9B (6.0 GiB) + Qwen3.6 35B-A3B (18.4 GiB) + 1.7B speech exceeds 32 GB co-residency budget -> evicts 9B first.
+        using var heavyLease = await h.Host.AcquireAsync(InferenceRole.Translator, ModelCatalog.TranslatorUnified, CancellationToken.None);
+
+        Assert.Equal(2, h.Launcher.Started.Count);
+        Assert.True(h.Launcher.Started[0].Process.Disposed);
+        Assert.False(h.Launcher.Started[1].Process.Disposed);
+    }
+
+    [Fact]
+    public async Task DistinctModelsWithin32GbBudget_StayWarmSideBySide()
+    {
+        await using var h = new Harness(hardware: HardwareProfile.Baseline32GbAppleMetal);
+
+        (await h.Host.AcquireAsync(InferenceRole.Cleaner, ModelCatalog.CleanerQuality, CancellationToken.None)).Dispose();
+        using var translateLease = await h.Host.AcquireAsync(InferenceRole.Translator, ModelCatalog.TranslatorIndexQuality, CancellationToken.None);
+
+        Assert.Equal(2, h.Launcher.Started.Count);
+        Assert.False(h.Launcher.Started[0].Process.Disposed);
+        Assert.False(h.Launcher.Started[1].Process.Disposed);
     }
 
     private static async Task WaitUntil(Func<bool> condition)

@@ -24,7 +24,7 @@ internal static class ModelStoragePaths
         relativePath.Replace('\\', Path.DirectorySeparatorChar);
 
     /// <summary>The assets to materialise for the given descriptor.</summary>
-    public static IReadOnlyList<ModelAsset> GetExpectedAssets(ModelDescriptor descriptor) => descriptor.Assets;
+    public static IReadOnlyList<ModelAsset> GetExpectedAssets(ModelDescriptor descriptor) => descriptor.ResolveArtifact().Assets;
 
     /// <summary>
     /// Files that must be present inside <paramref name="modelDir"/> for the model to be
@@ -33,10 +33,11 @@ internal static class ModelStoragePaths
     /// </summary>
     public static IReadOnlyList<string> GetExpectedInstalledFiles(ModelDescriptor descriptor)
     {
-        if (descriptor.ArchiveType != ModelArchiveType.None && descriptor.ExtractedFiles.Count > 0)
-            return descriptor.ExtractedFiles;
+        var artifact = descriptor.ResolveArtifact();
+        if (artifact.ArchiveType != ModelArchiveType.None && artifact.ExtractedFiles.Count > 0)
+            return artifact.ExtractedFiles;
 
-        return GetExpectedAssets(descriptor)
+        return GetExpectedAssets(artifact)
             .Select(asset => NormalizeRelativePath(asset.RelativePath))
             .ToArray();
     }

@@ -99,11 +99,41 @@ public sealed class ModelWarmupTests : IDisposable
     }
 
     [Fact]
-    public async Task OnSummon_Heavy7BTranslatorOn16Gb_DoesNotSpeculativelyLoadSecondaryLargeModel()
+    public async Task OnSummon_HeavyUnifiedTranslatorPairedWithDifferentCleanerOn32Gb_DoesNotSpeculativelyLoadSecondaryLargeModel()
     {
-        _settings.Composer.TranslatorModel = ModelCatalog.TranslatorQuality.Id;
+        _settings.Composer.TranslatorModel = ModelCatalog.TranslatorUnified.Id;
 
         _sut.OnSummon(ComposerOutput.Clean);
+
+        await Wait.Until(() => SpeechWarms == 1 && InferenceWarms.Any());
+        await Task.Delay(50, TestContext.Current.CancellationToken);
+        Assert.Equal([InferenceRole.Cleaner], InferenceWarms);
+    }
+
+    [Fact]
+    public async Task OnSummon_UnifiedSharedModelAcrossBothRoles_WarmsSharedServerOnce()
+    {
+        _settings.Composer.CleanerModel = ModelCatalog.CleanerUnified.Id;
+        _settings.Composer.TranslatorModel = ModelCatalog.TranslatorUnified.Id;
+
+        _sut.OnSummon(ComposerOutput.Clean);
+
+        await Wait.Until(() => SpeechWarms == 1 && InferenceWarms.Any());
+        await Task.Delay(50, TestContext.Current.CancellationToken);
+        Assert.Equal([InferenceRole.Cleaner], InferenceWarms);
+    }
+
+    [Fact]
+    public async Task OnSummon_Heavy7BTranslatorOn16GbDowngradeProfile_DoesNotSpeculativelyLoadSecondaryLargeModel()
+    {
+        _settings.Composer.TranslatorModel = ModelCatalog.TranslatorQuality.Id;
+        var settings = Substitute.For<ISettingsService>();
+        settings.Current.Returns(_settings);
+        var probe = Substitute.For<IHardwareProbe>();
+        probe.Detect().Returns(HardwareProfile.Baseline16GbAppleMetal);
+        using var constrained = new ModelWarmup(_speech, _inference, settings, _downloads, NullLogger<ModelWarmup>.Instance, _time, probe);
+
+        constrained.OnSummon(ComposerOutput.Clean);
 
         await Wait.Until(() => SpeechWarms == 1 && InferenceWarms.Any());
         await Task.Delay(50, TestContext.Current.CancellationToken);
