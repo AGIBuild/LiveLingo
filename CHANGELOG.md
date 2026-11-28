@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.0] - 2026-11-29
+
+Adds shared local model host integration (Bionic, LM Studio, Ollama, Llama.app, and loopback OpenAI-compatible
+servers), multi-scenario streaming polish, a 32 GB flagship model lineup, and a redesigned 6-section Settings window.
+
+### Added
+- **Shared local model host integration**: automatically discovers and reuses locally running Bionic (`:1235`), LM
+  Studio (`:1234`), Ollama (`:11434`), Llama.app (`:9931`), and loopback OpenAI-compatible servers (`:8080`, `:1337`,
+  `:8000`, or custom ports) with zero extra memory or duplicate downloads, native reasoning-off control, delegated host
+  downloads, and strict loopback-only routing.
+- **Multi-scenario streaming polish**: introduces built-in and custom `PolishPreset` modes (`natural`, work/chat/email
+  presets) with `FactAnchorGate` verification, targeted self-repair, KV-cache pre-warming during recording, and live
+  token streaming into the Composer document view.
+- **32 GB flagship model lineup**: adds `Index-Translate` (`9B` / `2B`) and shared `Qwen3.6 35B-A3B` MoE models while
+  retaining lighter models as manual downgrade options.
+- **6-section Settings redesign**: reorganizes Settings into General, Voice, Polish, Glossary, Models (split by
+  Built-in / Local Host / Cloud per stage), and About with sidebar search and a `1090×768` default window layout so
+  stage tabs and action buttons stay on a single row.
+
+### Fixed
+- **Speech recognition error surfacing**: propagates mid-session HTTP/WebSocket dictation failures and
+  `LocalHostUnavailableException` to the Composer banner instead of silently dropping utterances, and filters out local
+  hosts whose HTTP API does not expose audio endpoints on the Speech stage.
+- **Parked composer click-through**: keeps the parked composer window click-through so it never intercepts clicks while
+  hidden.
+
+### Changed
+- **Documentation**: added macOS (`installer` CLI for unsigned `.pkg`) and Windows installation instructions to
+  `README.md`.
+
 ## [2.5.0] - 2026-11-22
 
 Adds `Qwen-Audio-3.1-ASR` cloud speech and local `Qwen3-ASR 1.7B` support with per-model optimization strategies,
