@@ -4,6 +4,7 @@ using LiveLingo.Core.Cleanup;
 using LiveLingo.Core.Cloud;
 using LiveLingo.Core.Dictation;
 using LiveLingo.Core.Drafting;
+using LiveLingo.Core.LocalHost;
 using LiveLingo.Core.Models;
 using LiveLingo.Core.Translation;
 using LiveLingo.Core.Transcription;
@@ -90,6 +91,7 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
         _downloads.StateChanged += OnDownloadStateChanged;
         _voice.NoSignalChanged += OnNoSignalChanged;
         _voice.PreparingChanged += OnPreparingChanged;
+        _voice.RecognitionFailed += OnRecognitionFailed;
         _speechPreparing = _voice.IsPreparing;
         Refresh();
     }
@@ -102,6 +104,14 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
         {
             _speechPreparing = preparing;
             Refresh();
+        });
+
+    private void OnRecognitionFailed(string message) =>
+        OnUiThread(() =>
+        {
+            if (_disposed || _committed is not null || string.IsNullOrWhiteSpace(message))
+                return;
+            Banner = new BannerState(BannerKind.SpeechFailed, message);
         });
 
     /// <summary>Raised after the result was written (or copied when there is no target); the window should close.</summary>
@@ -276,7 +286,7 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
         {
             Banner = new BannerState(BannerKind.ModelMissing, MissingSizeLabel());
         }
-        catch (Exception ex) when (ex is CloudNotConfiguredException or CloudSpeechException
+        catch (Exception ex) when (ex is CloudNotConfiguredException or CloudSpeechException or LocalHostUnavailableException
                                    or HttpRequestException or System.Net.WebSockets.WebSocketException)
         {
             Banner = new BannerState(BannerKind.SpeechFailed, ex.Message);
@@ -551,6 +561,7 @@ public sealed partial class ComposerViewModel : ObservableObject, IAsyncDisposab
         _downloads.StateChanged -= OnDownloadStateChanged;
         _voice.NoSignalChanged -= OnNoSignalChanged;
         _voice.PreparingChanged -= OnPreparingChanged;
+        _voice.RecognitionFailed -= OnRecognitionFailed;
         DisposeTimers();
         IsListening = false;
         await _voice.DisposeAsync().ConfigureAwait(false);

@@ -1,6 +1,7 @@
 using System.Globalization;
 using LiveLingo.Core.Cloud;
 using LiveLingo.Core.Inference;
+using LiveLingo.Core.LocalHost;
 using LiveLingo.Core.Models;
 using LiveLingo.Core.Translation;
 using LiveLingo.Desktop.Composer;
@@ -17,7 +18,18 @@ public sealed class SettingsTexts(ILocalizationService loc)
     /// <summary>The static labels of the page, by their key without the "settings." prefix.</summary>
     private static readonly string[] Keys =
     [
-        "title", "nav.aria", "nav.general", "nav.voice", "nav.models", "nav.about",
+        "title", "nav.aria", "nav.general", "nav.voice", "nav.polish", "nav.glossary", "nav.models", "nav.about",
+        "nav.group.basic", "nav.group.quality", "nav.group.system",
+        "search.placeholder", "search.empty",
+        "section.general.desc", "section.voice.desc", "section.polish.desc", "section.glossary.desc", "section.models.desc", "section.about.desc",
+        "group.keys", "group.look", "group.apps", "group.data",
+        "group.input", "group.output", "group.polishRouting", "group.builtinTerms",
+        "group.hw", "group.privacy", "group.update",
+        "output.clean.desc", "output.translate.desc", "output.original.desc",
+        "polish.advanced", "polish.advanced.default", "polish.advanced.custom",
+        "glossary.tab.corrections", "glossary.tab.terms", "glossary.keepSame", "glossary.translated",
+        "models.source.local", "models.source.host", "models.source.cloud", "models.source.aria",
+        "models.unsupported.toggle", "models.active.label",
         "hotkey", "hotkey.desc", "hotkey.invalid", "hotkey.prompt",
         "commit", "commit.desc", "commit.enter", "commit.ctrlEnter",
         "language", "language.desc",
@@ -67,6 +79,15 @@ public sealed class SettingsTexts(ILocalizationService loc)
         "models.metric.quality", "models.metric.speed",
         "models.state.activeInstalled", "models.state.selected", "models.state.activating", "models.state.installed",
         "models.action.enable", "models.action.cancel", "models.action.delete", "models.action.retry",
+        "models.group.localHost.title", "models.localHost.refresh", "models.localHost.refreshing", "models.localHost.addCustom",
+        "models.localHost.empty", "models.localHost.speechEmpty", "models.localHost.hotBanner.apply", "models.localHost.hotBanner.badge",
+        "models.localHost.openApp", "models.localHost.startServer", "models.localHost.configure", "models.localHost.remove",
+        "models.localHost.authPrompt", "models.localHost.tokenPlaceholder", "models.localHost.saveToken",
+        "models.localHost.notServingHint", "models.localHost.missingTitle", "models.localHost.missingDesc",
+        "models.localHost.downloadInHost", "models.localHost.copyCmd", "models.localHost.copied",
+        "models.localHost.customName", "models.localHost.customUrl", "models.localHost.customUrlHint", "models.localHost.customAdd",
+        "models.localHost.badge.loaded", "models.localHost.badge.onDemand", "models.localHost.badge.host",
+        "models.localHost.showMore", "models.localHost.showLess",
         "about.subtitle",
         "legacy", "legacy.remove",
         "version", "version.desc",
@@ -116,9 +137,11 @@ public sealed class SettingsTexts(ILocalizationService loc)
         loc.T("settings.models.hw.residency", FormatGib(assessment.ActiveCoResidentBytes), FormatGib(assessment.SafeBudgetBytes));
 
     public string ResidencyMode(ResidencyAssessment assessment) =>
-        assessment.SharesSingleLlm
-            ? loc.T("settings.models.hw.mode.shared")
-            : loc.T(assessment.CanCoResideBothLlms ? "settings.models.hw.mode.dual" : "settings.models.hw.mode.swap");
+        assessment.UsesSharedLocalHost
+            ? loc.T("settings.models.hw.mode.localHost")
+            : assessment.SharesSingleLlm
+                ? loc.T("settings.models.hw.mode.shared")
+                : loc.T(assessment.CanCoResideBothLlms ? "settings.models.hw.mode.dual" : "settings.models.hw.mode.swap");
 
     public string DiskUsedSummary(long bytes) =>
         bytes > 0 ? loc.T("settings.models.hw.disk.some", FormatSize(bytes)) : loc.T("settings.models.hw.disk.none");
@@ -147,7 +170,9 @@ public sealed class SettingsTexts(ILocalizationService loc)
         bool queued,
         bool cleanupEnabled,
         bool cloudRouted,
-        string? endpointName)
+        string? endpointName,
+        bool localHostRouted = false,
+        string? localHostLabel = null)
     {
         if (activeStageDownload is { IsDownloading: true } dl)
         {
@@ -160,6 +185,8 @@ public sealed class SettingsTexts(ILocalizationService loc)
             return loc.T("settings.models.tab.summary.off");
         if (cloudRouted && !string.IsNullOrEmpty(endpointName))
             return loc.T("settings.models.tab.summary.cloud", endpointName);
+        if (localHostRouted && !string.IsNullOrEmpty(localHostLabel))
+            return loc.T("settings.models.tab.summary.localHost", localHostLabel);
 
         return installed
             ? activeModel.ShortName
@@ -269,13 +296,68 @@ public sealed class SettingsTexts(ILocalizationService loc)
         return loc.T(activeHere ? "settings.cloud.alsoUsedBy" : "settings.cloud.usedBy", joined);
     }
 
-    public string ModelsPrivacyStatus(bool cloudClean, bool cloudTranslate, bool cloudSpeech = false)
+    public string ModelsPrivacyStatus(bool cloudClean, bool cloudTranslate, bool cloudSpeech = false, bool anyLocalHost = false)
     {
         var steps = AffectedCloudSteps(cloudClean, cloudTranslate, cloudSpeech);
         return steps is null
-            ? loc.T("settings.models.privacy.allLocal")
+            ? loc.T(anyLocalHost ? "settings.models.privacy.allLocalWithHost" : "settings.models.privacy.allLocal")
             : loc.T(cloudSpeech ? "settings.models.privacy.cloudSpeech" : "settings.models.privacy.cloud", steps);
     }
+
+    public string LocalHostStatusBadge(LocalHostStatus status) => status switch
+    {
+        LocalHostStatus.Running => loc.T("settings.models.localHost.status.running"),
+        LocalHostStatus.AuthRequired => loc.T("settings.models.localHost.status.auth"),
+        LocalHostStatus.InstalledNotServing => loc.T("settings.models.localHost.status.stopped"),
+        _ => loc.T("settings.models.localHost.status.missing")
+    };
+
+    public string LocalHostSuitabilityBadge(HostModelSuitability suitability) => suitability switch
+    {
+        HostModelSuitability.CatalogVerified => loc.T("settings.models.localHost.fit.verified"),
+        HostModelSuitability.FlagshipBilingual => loc.T("settings.models.localHost.fit.flagship"),
+        HostModelSuitability.Compatible => loc.T("settings.models.localHost.fit.compatible"),
+        _ => loc.T("settings.models.localHost.fit.warning")
+    };
+
+    public string? LocalHostWarningText(string? warningReason) => warningReason switch
+    {
+        "experimentalArch" => loc.T("settings.models.localHost.warn.experimentalArch"),
+        "forcedReasoning" => loc.T("settings.models.localHost.warn.forcedReasoning"),
+        "contextTooSmall" => loc.T("settings.models.localHost.warn.contextTooSmall"),
+        "tooSmall" => loc.T("settings.models.localHost.warn.tooSmall"),
+        "speechApiUnsupported" => loc.T("settings.models.localHost.warn.speechApiUnsupported"),
+        _ => null
+    };
+
+    public string LocalHostHotBannerSummary(string hostName, LocalHostModelInfo model)
+    {
+        var size = model.SizeBytes > 0 ? FormatSize(model.SizeBytes) : "";
+        var fmt = string.IsNullOrWhiteSpace(model.Format) ? "" : model.Format.ToUpperInvariant();
+        var details = string.Join(" · ", new[] { size, fmt }.Where(s => s.Length > 0));
+        return details.Length > 0
+            ? loc.T("settings.models.localHost.hotBanner.summaryDetail", hostName, model.DisplayName, details)
+            : loc.T("settings.models.localHost.hotBanner.summary", hostName, model.DisplayName);
+    }
+
+    public string LocalHostModelMeta(LocalHostModelInfo model)
+    {
+        var parts = new List<string>(5);
+        if (!string.IsNullOrWhiteSpace(model.Format))
+            parts.Add(model.Format.ToUpperInvariant());
+        if (!string.IsNullOrWhiteSpace(model.Quantization))
+            parts.Add(model.Quantization);
+        if (model.SizeBytes > 0)
+            parts.Add(FormatSize(model.SizeBytes));
+        if (model.EffectiveContextLength is { } ctx and > 0)
+            parts.Add(ctx >= 1024 ? $"{ctx / 1024}K ctx" : $"{ctx} ctx");
+        if (!string.IsNullOrWhiteSpace(model.LoadedEngine))
+            parts.Add(model.LoadedEngine);
+        return string.Join(" · ", parts);
+    }
+
+    public string? LocalHostParallelBadge(int? parallelSlots) =>
+        parallelSlots is >= 2 ? loc.T("settings.models.localHost.badge.parallel", parallelSlots.Value) : null;
 
     public string? AffectedCloudSteps(bool usedForClean, bool usedForTranslate, bool usedForSpeech = false)
     {

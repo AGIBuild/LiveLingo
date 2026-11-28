@@ -94,7 +94,7 @@ public sealed class ModelWarmup : IDisposable
     }
 
     private Task WarmSpeechAsync() =>
-        _settings.Current.Cloud.Speech
+        _settings.Current.Cloud.Speech || _settings.Current.LocalHost.HasSpeech
             ? Task.CompletedTask
             : Warm("speech models", () => _speech.WarmAsync(_settings.Current.Composer.EffectiveGlossary().UserSpeechHotwords()));
 
@@ -106,8 +106,10 @@ public sealed class ModelWarmup : IDisposable
     private ComposerOutput? SecondaryOutputToWarm(ComposerOutput primary)
     {
         var current = _settings.Current;
+        var cleanExternal = current.Cloud.Clean || current.LocalHost.Clean;
+        var translateExternal = current.Cloud.Translate || current.LocalHost.Translate;
         var selection = current.Composer.ResolveSelection(_hardware);
-        if (!current.Cloud.Clean && !current.Cloud.Translate && selection.SharesLlmArtifact)
+        if (!cleanExternal && !translateExternal && selection.SharesLlmArtifact)
             return null;
 
         var canCoReside = ModelAdvisor.AssessPlan(
@@ -116,12 +118,14 @@ public sealed class ModelWarmup : IDisposable
             cleanInCloud: current.Cloud.Clean,
             translateInCloud: current.Cloud.Translate,
             cleanupEnabled: current.Composer.CleanupEnabled,
-            speechInCloud: current.Cloud.Speech).CanCoResideBothLlms;
+            speechInCloud: current.Cloud.Speech,
+            cleanOnLocalHost: current.LocalHost.Clean,
+            translateOnLocalHost: current.LocalHost.Translate).CanCoResideBothLlms;
 
         return primary switch
         {
-            ComposerOutput.Clean when current.Composer.CleanupEnabled && !current.Cloud.Translate && canCoReside => ComposerOutput.Translate,
-            ComposerOutput.Translate when current.Composer.CleanupEnabled && !current.Cloud.Clean && canCoReside => ComposerOutput.Clean,
+            ComposerOutput.Clean when current.Composer.CleanupEnabled && !translateExternal && canCoReside => ComposerOutput.Translate,
+            ComposerOutput.Translate when current.Composer.CleanupEnabled && !cleanExternal && canCoReside => ComposerOutput.Clean,
             _ => null
         };
     }

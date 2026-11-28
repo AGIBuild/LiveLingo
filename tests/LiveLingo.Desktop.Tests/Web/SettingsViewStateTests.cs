@@ -276,7 +276,7 @@ public sealed class SettingsViewStateTests
             ["about", "general", "models", "options", "rev", "section", "voice"],
             document.RootElement.EnumerateObject().Select(p => p.Name).Order(StringComparer.Ordinal));
         Assert.Equal(
-            ["consent", "deleteConfirm", "downloads", "form", "hardware", "navBadge", "stages", "storage", "tab"],
+            ["consent", "deleteConfirm", "downloads", "form", "hardware", "hotHost", "localHostRefreshing", "navBadge", "stages", "storage", "tab"],
             document.RootElement.GetProperty("models").EnumerateObject().Select(p => p.Name).Order(StringComparer.Ordinal));
     }
 

@@ -44,7 +44,8 @@ public sealed record ResidencyAssessment(
     long SafeBudgetBytes,
     bool CanCoResideBothLlms,
     bool ExceedsSafeBudget,
-    bool SharesSingleLlm = false);
+    bool SharesSingleLlm = false,
+    bool UsesSharedLocalHost = false);
 
 /// <summary>
 /// Evaluates catalog models against a <see cref="HardwareProfile"/> using composable compatibility specifications
@@ -206,12 +207,15 @@ public static class ModelAdvisor
         bool cleanInCloud = false,
         bool translateInCloud = false,
         bool cleanupEnabled = true,
-        bool speechInCloud = false)
+        bool speechInCloud = false,
+        bool cleanOnLocalHost = false,
+        bool translateOnLocalHost = false)
     {
         var speechBytes = speechInCloud ? 0 : selection.Speech.Profile!.ResidentBytes;
-        var cleanerLocal = cleanupEnabled && !cleanInCloud;
-        var translatorLocal = !translateInCloud;
+        var cleanerLocal = cleanupEnabled && !cleanInCloud && !cleanOnLocalHost;
+        var translatorLocal = !translateInCloud && !translateOnLocalHost;
         var sharesSingleLlm = cleanerLocal && translatorLocal && selection.SharesLlmArtifact;
+        var usesSharedLocalHost = (cleanupEnabled && cleanOnLocalHost) || translateOnLocalHost;
         var llmBytes = CombinedLlmResidentBytes(selection.Cleaner, selection.Translator, cleanerLocal, translatorLocal);
 
         var combinedBytes = speechBytes + llmBytes;
@@ -231,7 +235,8 @@ public static class ModelAdvisor
             hardware.CoResidentBudgetBytes,
             canCoResideBoth,
             ExceedsSafeBudget: !withinSafeBudget,
-            SharesSingleLlm: sharesSingleLlm);
+            SharesSingleLlm: sharesSingleLlm,
+            UsesSharedLocalHost: usesSharedLocalHost);
     }
 
     /// <summary>

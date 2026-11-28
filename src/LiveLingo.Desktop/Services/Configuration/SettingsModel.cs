@@ -12,6 +12,7 @@ public partial class SettingsModel : ObservableObject
     [ObservableProperty] private AppearanceSettings _appearance = new();
     [ObservableProperty] private ComposerSettings _composer = new();
     [ObservableProperty] private CloudSettings _cloud = new();
+    [ObservableProperty] private LocalHostSettings _localHost = new();
     [ObservableProperty] private UpdateSettings _update = new();
     [ObservableProperty] private AdvancedSettings _advanced = new();
 
@@ -24,6 +25,7 @@ public partial class SettingsModel : ObservableObject
         Appearance = Appearance.DeepClone(),
         Composer = Composer.DeepClone(),
         Cloud = Cloud.DeepClone(),
+        LocalHost = LocalHost.DeepClone(),
         Update = Update.DeepClone(),
         Advanced = Advanced.DeepClone()
     };
@@ -174,6 +176,91 @@ public sealed class CloudEndpoint
     public static string NewId() => Guid.NewGuid().ToString("N");
 
     public CloudEndpoint DeepClone() => new() { Id = Id, Name = Name, BaseUrl = BaseUrl, Model = Model, SecretId = SecretId };
+}
+
+/// <summary>One stage's explicit binding to a discovered or custom loopback local model host (Bionic, LM Studio, Ollama, etc.).</summary>
+public sealed class LocalHostStageBinding
+{
+    public string HostId { get; set; } = "";
+    public string BaseUrl { get; set; } = "";
+    public string ModelKey { get; set; } = "";
+
+    [JsonIgnore]
+    public bool IsBound => !string.IsNullOrWhiteSpace(HostId) && !string.IsNullOrWhiteSpace(ModelKey);
+
+    public void Clear()
+    {
+        HostId = "";
+        BaseUrl = "";
+        ModelKey = "";
+    }
+
+    public LocalHostStageBinding DeepClone() => new()
+    {
+        HostId = HostId,
+        BaseUrl = BaseUrl,
+        ModelKey = ModelKey
+    };
+}
+
+/// <summary>User-added custom loopback OpenAI-compatible local server (for example llama-server or mlx_lm.server on a custom port).</summary>
+public sealed class CustomLocalHostEntry
+{
+    public string Id { get; set; } = "";
+    public string Name { get; set; } = "";
+    public string BaseUrl { get; set; } = "";
+
+    public static string NewId() => "custom-" + Guid.NewGuid().ToString("N")[..10];
+
+    public CustomLocalHostEntry DeepClone() => new() { Id = Id, Name = Name, BaseUrl = BaseUrl };
+}
+
+/// <summary>
+/// Configuration for reusing models hosted by local model runners on loopback (Bionic, LM Studio, Ollama, and
+/// OpenAI-compatible local servers). Strictly loopback-only: preserves LiveLingo's 100% on-device privacy contract
+/// while avoiding duplicate multi-gigabyte downloads and redundant model residency.
+/// </summary>
+public partial class LocalHostSettings : ObservableObject
+{
+    public static string TokenSecretIdFor(string hostId) => $"local-host-token:{hostId}";
+
+    [ObservableProperty] private bool _autoDetect = true;
+
+    /// <summary>Optional loopback base URL overrides keyed by well-known host ID ("bionic", "lmstudio", "ollama").</summary>
+    [ObservableProperty] private Dictionary<string, string> _portOverrides = new(StringComparer.Ordinal);
+
+    [ObservableProperty] private List<CustomLocalHostEntry> _customHosts = [];
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSpeech))]
+    private LocalHostStageBinding _speech = new();
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Clean))]
+    private LocalHostStageBinding _cleaner = new();
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Translate))]
+    private LocalHostStageBinding _translator = new();
+
+    [JsonIgnore]
+    public bool HasSpeech => Speech.IsBound;
+
+    [JsonIgnore]
+    public bool Clean => Cleaner.IsBound;
+
+    [JsonIgnore]
+    public bool Translate => Translator.IsBound;
+
+    public LocalHostSettings DeepClone() => new()
+    {
+        AutoDetect = AutoDetect,
+        PortOverrides = new Dictionary<string, string>(PortOverrides, StringComparer.Ordinal),
+        CustomHosts = [.. CustomHosts.Select(entry => entry.DeepClone())],
+        Speech = Speech.DeepClone(),
+        Cleaner = Cleaner.DeepClone(),
+        Translator = Translator.DeepClone()
+    };
 }
 
 public partial class HotkeySettings : ObservableObject

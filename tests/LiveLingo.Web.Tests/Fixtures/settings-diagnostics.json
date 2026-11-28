@@ -306,7 +306,10 @@
             "canDelete": false,
             "deleteActionLabel": null
           }
-        ]
+        ],
+        "localHostSupported": true,
+        "localHostRouted": false,
+        "localHosts": []
       },
       {
         "stage": "cleaner",
@@ -441,7 +444,10 @@
             "canDelete": false,
             "deleteActionLabel": null
           }
-        ]
+        ],
+        "localHostSupported": true,
+        "localHostRouted": false,
+        "localHosts": []
       },
       {
         "stage": "translator",
@@ -600,7 +606,10 @@
             "canDelete": false,
             "deleteActionLabel": null
           }
-        ]
+        ],
+        "localHostSupported": true,
+        "localHostRouted": false,
+        "localHosts": []
       }
     ],
     "storage": {
@@ -617,7 +626,9 @@
     },
     "form": null,
     "deleteConfirm": null,
-    "consent": null
+    "consent": null,
+    "hotHost": null,
+    "localHostRefreshing": false
   },
   "about": {
     "version": "2.0.0",

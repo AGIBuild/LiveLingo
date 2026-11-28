@@ -161,6 +161,8 @@ internal sealed class FakeVoiceInput : IVoiceInput
 
     public event Action<bool>? PreparingChanged;
 
+    public event Action<string>? RecognitionFailed;
+
     public bool IsPreparing { get; private set; }
 
     public void SetPreparing(bool preparing)
@@ -170,6 +172,8 @@ internal sealed class FakeVoiceInput : IVoiceInput
     }
 
     public void RaiseNoSignal(bool silent) => NoSignalChanged?.Invoke(silent);
+
+    public void RaiseRecognitionFailed(string message) => RecognitionFailed?.Invoke(message);
 
     public int Starts { get; private set; }
     public int Stops { get; private set; }

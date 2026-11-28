@@ -2,6 +2,8 @@ using LiveLingo.Core.Cleanup;
 using LiveLingo.Core.Cloud;
 using LiveLingo.Core.Dictation;
 using LiveLingo.Core.Inference;
+using LiveLingo.Core.LocalHost;
+using LiveLingo.Core.LocalHost.Providers;
 using LiveLingo.Core.Models;
 using LiveLingo.Core.Speech;
 using LiveLingo.Core.Speech.Cloud;
@@ -80,17 +82,28 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<IQwenWebSocketTransport>(),
             CloudHttp,
             sp.GetRequiredService<ILogger<RoutedSpeechEngine>>(),
-            sp.GetRequiredService<ModelUsage>()));
+            sp.GetRequiredService<ModelUsage>(),
+            sp.GetRequiredService<ILocalHostRoutes>()));
         services.AddSingleton<IDictationSessionFactory>(sp => sp.GetRequiredService<RoutedSpeechEngine>());
         services.AddSingleton<ISpeechWarmup>(sp => sp.GetRequiredService<RoutedSpeechEngine>());
         services.AddSingleton<IAudioFileTranscriber>(sp => sp.GetRequiredService<RoutedSpeechEngine>());
 
         // Everything stays on the machine unless the host registers routes (after this call) that send a role to the cloud.
         services.AddSingleton<ICloudRoutes, LocalOnlyRoutes>();
+        services.AddSingleton<ILocalHostRoutes, NoLocalHostRoutes>();
+        services.AddSingleton<ILocalHostProvider>(_ => new LmStudioFamilyProvider(LocalHostHttp));
+        services.AddSingleton<ILocalHostProvider>(_ => new OllamaHostProvider(LocalHostHttp));
+        services.AddSingleton<ILocalHostProvider>(_ => new GenericOpenAiLocalProvider(LocalHostHttp));
+        services.AddSingleton(sp => new LocalHostRegistry(sp.GetServices<ILocalHostProvider>()));
         services.AddSingleton<ModelUsage>();
-        services.AddSingleton<IInferenceWarmup, LlamaWarmup>();
+        services.AddSingleton<IInferenceWarmup>(sp => new LlamaWarmup(
+            sp.GetRequiredService<LlamaServerHost>(),
+            sp.GetRequiredService<ICloudRoutes>(),
+            sp.GetRequiredService<CoreOptions>(),
+            sp.GetRequiredService<ILocalHostRoutes>(),
+            sp.GetRequiredService<LocalHostRegistry>()));
         // The cleanup of a passage and the polish of a whole dictation are one role: one client, so they are routed
-        // (local or cloud) by the same setting.
+        // (local, shared local host, or cloud) by the same setting.
         services.AddKeyedSingleton<IChatCompletionClient>(InferenceRole.Cleaner, (sp, _) => new RoutedChatClient(
             InferenceRole.Cleaner,
             sp.GetRequiredService<ICloudRoutes>(),
@@ -99,7 +112,10 @@ public static class ServiceCollectionExtensions
                 InferenceRole.Cleaner,
                 () => InferenceModels.For(InferenceRole.Cleaner, sp.GetRequiredService<CoreOptions>().Models),
                 sp.GetRequiredService<ModelUsage>()),
-            CloudHttp, sp.GetRequiredService<ModelUsage>()));
+            CloudHttp,
+            sp.GetRequiredService<ModelUsage>(),
+            sp.GetRequiredService<ILocalHostRoutes>(),
+            sp.GetRequiredService<LocalHostRegistry>()));
         services.AddSingleton<ITextCleaner>(sp =>
             new LlmTextCleaner(sp.GetRequiredKeyedService<IChatCompletionClient>(InferenceRole.Cleaner)));
         services.AddSingleton<IDictationPolisher>(sp =>
@@ -112,10 +128,14 @@ public static class ServiceCollectionExtensions
                 InferenceRole.Translator,
                 () => InferenceModels.For(InferenceRole.Translator, sp.GetRequiredService<CoreOptions>().Models),
                 sp.GetRequiredService<ModelUsage>()),
-            CloudHttp, sp.GetRequiredService<ModelUsage>())));
+            CloudHttp,
+            sp.GetRequiredService<ModelUsage>(),
+            sp.GetRequiredService<ILocalHostRoutes>(),
+            sp.GetRequiredService<LocalHostRegistry>())));
 
         return services;
     }
 
     private static readonly HttpClient CloudHttp = new() { Timeout = TimeSpan.FromSeconds(120) };
+    private static readonly HttpClient LocalHostHttp = new() { Timeout = TimeSpan.FromSeconds(120) };
 }

@@ -283,6 +283,75 @@ public class QwenAudioSpeechTests
         Assert.False(vllm17B.Strategy.Profile.SupportsNativePolish);
     }
 
+    [Fact]
+    public async Task CloudHttpSession_RaisesRecognitionFailed_WhenServerRejectsAudioRequest()
+    {
+        using var http = new HttpClient(new StubHttpHandler(_ => Task.FromResult(
+            new HttpResponseMessage(HttpStatusCode.BadRequest)
+            {
+                Content = new StringContent(
+                    """{"error":"Invalid 'content': 'content' objects must have a 'type' field that is either 'text' or 'image_url'."}""",
+                    Encoding.UTF8,
+                    "application/json")
+            })));
+        var localRoute = LiveLingo.Core.LocalHost.LocalHostRoute.Create(
+            "custom-asr", "Local ASR", LiveLingo.Core.LocalHost.LocalHostKind.OpenAiLocal,
+            "http://127.0.0.1:8000", "qwen3-asr-1.7b", LiveLingo.Core.LocalHost.LocalHostApiTier.OpenAiCompat);
+        var route = SpeechCloudRoute.CreateForLocalHost(localRoute);
+        var draft = new DraftSession(hasTarget: true);
+        var failures = new List<string>();
+
+        await using var session = new CloudHttpDictationSession(
+            http, route, SpeechSessionRequest.FromHotwords([]), draft, logger: NullLogger.Instance);
+        session.RecognitionFailed += failures.Add;
+        session.Start();
+
+        // Push ~240ms of audible audio (> MinSpeechMs=160ms) so StopAsync flushes one utterance to HTTP.
+        var speech = Enumerable.Repeat(0.25f, 3840).ToArray();
+        session.Push(speech);
+        await session.StopAsync();
+
+        var failure = Assert.Single(failures);
+        Assert.Contains("HTTP 400", failure, StringComparison.Ordinal);
+        Assert.Contains("text", failure, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task WebSocketSession_RaisesRecognitionFailed_OnMidSessionTaskFailed()
+    {
+        var ws = new FakeWebSocket();
+        var transport = new FakeTransport(ws);
+        var route = SpeechCloudRoute.Create("https://dashscope.aliyuncs.com/api/v1", "qwen-audio-3.1-asr-flash-message", "sk-key");
+        var draft = new DraftSession(hasTarget: true);
+        var failures = new List<string>();
+        var failureReceived = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        _ = Task.Run(async () =>
+        {
+            var runTask = JsonDocument.Parse(await ws.ClientTexts.Reader.ReadAsync());
+            var taskId = runTask.RootElement.GetProperty("header").GetProperty("task_id").GetString()!;
+            ws.EnqueueServerEvent("""{"header":{"task_id":"__TASK__","event":"task-started"},"payload":{}}""".Replace("__TASK__", taskId));
+            await ws.ClientBinaries.Reader.ReadAsync();
+            ws.EnqueueServerEvent("""{"header":{"task_id":"__TASK__","event":"task-failed","error_code":"QuotaExceeded","error_message":"ASR quota exceeded."},"payload":{}}""".Replace("__TASK__", taskId));
+        });
+
+        await using var session = await QwenWebSocketDictationSession.ConnectAndStartTaskAsync(
+            transport, route, draft, SpeechSessionRequest.FromHotwords([]), null, NullLogger.Instance, CancellationToken.None);
+        session.RecognitionFailed += msg =>
+        {
+            failures.Add(msg);
+            failureReceived.TrySetResult(msg);
+        };
+        session.Start();
+        session.Push(new float[1600]);
+
+        var reported = await failureReceived.Task.WaitAsync(TimeSpan.FromSeconds(5), CancellationToken.None);
+        await session.StopAsync();
+
+        Assert.Equal("ASR quota exceeded.", reported);
+        Assert.Single(failures);
+    }
+
     private sealed class FakeTransport(FakeWebSocket socket) : IQwenWebSocketTransport
     {
         public string? LastApiKey { get; private set; }

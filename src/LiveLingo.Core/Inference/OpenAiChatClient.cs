@@ -16,7 +16,8 @@ public sealed class OpenAiChatClient(
     Uri endpoint,
     string? model = null,
     string? bearerToken = null,
-    bool sendProviderExtras = true) : IChatCompletionClient
+    bool sendProviderExtras = true,
+    bool connectionClose = true) : IChatCompletionClient
 {
     public async Task<ChatCompletion> CompleteAsync(ChatRequest request, CancellationToken ct)
     {
@@ -38,8 +39,9 @@ public sealed class OpenAiChatClient(
         {
             Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json")
         };
-        // llama-server drops idle keep-alive sockets; reusing one fails the next request with a connection error.
-        message.Headers.ConnectionClose = true;
+        // Local llama-server drops idle keep-alive sockets; Node.js/Express hosts (Bionic/LM Studio) need keep-alive.
+        if (connectionClose)
+            message.Headers.ConnectionClose = true;
         if (bearerToken is not null)
             message.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", bearerToken);
         using var response = await http.SendAsync(message, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
@@ -124,7 +126,8 @@ public sealed class OpenAiChatClient(
         {
             Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json")
         };
-        message.Headers.ConnectionClose = true;
+        if (connectionClose)
+            message.Headers.ConnectionClose = true;
         if (bearerToken is not null)
             message.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", bearerToken);
 

@@ -143,4 +143,25 @@ public class MicrophoneVoiceInputTests
         Assert.Equal([true, false], changes);
         await input.StopAsync();
     }
+
+    [Fact]
+    public async Task SessionRecognitionFailures_AreForwarded_UntilStopped()
+    {
+        var draft = new DraftSession(hasTarget: true);
+        var session = Substitute.For<IDictationSession>();
+        var factory = Substitute.For<IDictationSessionFactory>();
+        factory.CreateAsync(draft, Arg.Any<SpeechSessionRequest>(), Arg.Any<CancellationToken>()).Returns(session);
+        var mic = Substitute.For<IMicrophone>();
+        await using var input = new MicrophoneVoiceInput(factory, mic, Substitute.For<ISpeechWarmup>());
+        var failures = new List<string>();
+        input.RecognitionFailed += failures.Add;
+
+        await input.StartAsync(draft, SpeechSessionRequest.FromHotwords([]), CancellationToken.None);
+        session.RecognitionFailed += Raise.Event<Action<string>>("HTTP 400: audio unsupported");
+        Assert.Equal(["HTTP 400: audio unsupported"], failures);
+
+        await input.StopAsync();
+        session.RecognitionFailed += Raise.Event<Action<string>>("after stop");
+        Assert.Equal(["HTTP 400: audio unsupported"], failures);
+    }
 }

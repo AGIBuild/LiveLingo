@@ -212,6 +212,8 @@ public sealed class ComposerTexts(ILocalizationService loc, bool? mac = null)
         {
             { Cloud: true, Confirmed: false } => loc.T("composer.model.requested", use.Name),
             { Cloud: true } => loc.T("composer.model.cloud", use.Name),
+            { LocalHost: true, Confirmed: true, Endpoint: { } host } => loc.T("composer.model.localHost", use.Name, host),
+            { LocalHost: true, Endpoint: { } host } => loc.T("composer.model.localHostPreparing", use.Name, host),
             { Confirmed: true } => loc.T("composer.model.local", use.Name),
             _ when previous is not null => loc.T("composer.model.switching", use.Name, previous.Name),
             _ => loc.T("composer.model.preparing", use.Name)
@@ -229,6 +231,7 @@ public sealed class ComposerTexts(ILocalizationService loc, bool? mac = null)
         {
             { Cloud: true, Endpoint: { } endpoint } => loc.T("composer.modelLine.cloud", stage, use.Label, endpoint),
             { Cloud: true } => loc.T("composer.modelLine.cloudUnnamed", stage, use.Label),
+            { LocalHost: true, Endpoint: { } host } => loc.T("composer.modelLine.localHost", stage, use.Label, host),
             { Confirmed: true } => loc.T("composer.modelLine.local", stage, use.Label),
             _ when previous is not null => loc.T("composer.modelLine.switching", stage, use.Label, previous.Label),
             _ => loc.T("composer.modelLine.preparing", stage, use.Label)
@@ -293,8 +296,13 @@ public sealed class ComposerTexts(ILocalizationService loc, bool? mac = null)
         if (translating && state == DocumentState.Failed)
             return baseText + " " + loc.T("composer.document.translateHint");
 
-        if (!translating && state == DocumentState.Failed && TryFormatRefusalReason(error) is { } reasonText)
-            return baseText + " " + loc.T("composer.document.failedReason", reasonText);
+        if (!translating && state == DocumentState.Failed)
+        {
+            if (TryFormatRefusalReason(error) is { } reasonText)
+                return baseText + " " + loc.T("composer.document.failedReason", reasonText);
+            if (!string.IsNullOrWhiteSpace(error))
+                return baseText + " " + loc.T("composer.document.failedReason", error.Length > 180 ? error[..180] + "…" : error);
+        }
 
         return baseText;
     }

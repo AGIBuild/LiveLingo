@@ -20,6 +20,9 @@ public interface IVoiceInput : IAsyncDisposable
     /// <summary>Raised when <see cref="IsPreparing"/> changed, on whichever thread caused it.</summary>
     event Action<bool>? PreparingChanged;
 
+    /// <summary>Raised when an active speech recognition session reports a runtime failure (for example an HTTP 400/500 from a cloud or local-host ASR server).</summary>
+    event Action<string>? RecognitionFailed;
+
     /// <exception cref="LiveLingo.Core.Models.ModelNotReadyException">A speech model is not installed.</exception>
     /// <exception cref="InvalidOperationException">There is no input device or it could not be opened.</exception>
     Task StartAsync(DraftSession draft, IReadOnlyList<string> glossary, CancellationToken ct);
@@ -57,9 +60,13 @@ public sealed class MicrophoneVoiceInput : IVoiceInput
 
     public event Action<bool>? PreparingChanged;
 
+    public event Action<string>? RecognitionFailed;
+
     public bool IsPreparing => _warmup.State == ModelResidency.Loading;
 
     private void OnResidencyChanged(ModelResidency state) => PreparingChanged?.Invoke(state == ModelResidency.Loading);
+
+    private void OnSessionRecognitionFailed(string message) => RecognitionFailed?.Invoke(message);
 
     public async Task StartAsync(DraftSession draft, IReadOnlyList<string> glossary, CancellationToken ct)
     {
@@ -81,6 +88,7 @@ public sealed class MicrophoneVoiceInput : IVoiceInput
 
     private async Task OpenMicrophoneForAsync(IDictationSession session)
     {
+        session.RecognitionFailed += OnSessionRecognitionFailed;
         session.Start();
         var monitor = new SignalMonitor(IdleTimeout);
         _monitor = monitor;
@@ -95,6 +103,7 @@ public sealed class MicrophoneVoiceInput : IVoiceInput
         }
         catch
         {
+            session.RecognitionFailed -= OnSessionRecognitionFailed;
             await session.DisposeAsync().ConfigureAwait(false);
             throw;
         }
@@ -110,7 +119,14 @@ public sealed class MicrophoneVoiceInput : IVoiceInput
         _session = null;
         // The microphone stops first: a frame pushed after the session stopped is an error.
         _microphone.Stop();
-        await session.DisposeAsync().ConfigureAwait(false);
+        try
+        {
+            await session.DisposeAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            session.RecognitionFailed -= OnSessionRecognitionFailed;
+        }
     }
 
     public async ValueTask DisposeAsync()

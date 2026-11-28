@@ -86,7 +86,12 @@ public sealed class ModelSelectionCoordinator : IDisposable
         get
         {
             var cloud = _settings.Current.Cloud;
-            return ModelAdvisor.Recommend(Hardware, cloud.Clean, cloud.Translate, cloud.Speech);
+            var localHost = _settings.Current.LocalHost;
+            return ModelAdvisor.Recommend(
+                Hardware,
+                cleanInCloud: cloud.Clean || localHost.Clean,
+                translateInCloud: cloud.Translate || localHost.Translate,
+                speechInCloud: cloud.Speech || localHost.HasSpeech);
         }
     }
 
@@ -98,7 +103,17 @@ public sealed class ModelSelectionCoordinator : IDisposable
         _ => false
     };
 
-    private IEnumerable<ModelStage> LocalStages => Stages.Where(stage => !IsStageInCloud(stage));
+    public bool IsStageOnLocalHost(ModelStage stage) => stage switch
+    {
+        ModelStage.Speech => _settings.Current.LocalHost.HasSpeech,
+        ModelStage.Cleaner => _settings.Current.LocalHost.Clean,
+        ModelStage.Translator => _settings.Current.LocalHost.Translate,
+        _ => false
+    };
+
+    private bool IsStageExternallyHosted(ModelStage stage) => IsStageInCloud(stage) || IsStageOnLocalHost(stage);
+
+    private IEnumerable<ModelStage> LocalStages => Stages.Where(stage => !IsStageExternallyHosted(stage));
 
     /// <summary>True when all locally routed stages match <see cref="RecommendedSelection"/> and are installed on disk.</summary>
     public bool IsRecommendedActive
@@ -196,7 +211,11 @@ public sealed class ModelSelectionCoordinator : IDisposable
     {
         var active = ActiveSelection;
         var cloud = _settings.Current.Cloud;
-        var activeLocalArtifactIds = ActiveLocalArtifactIds(active, cloud);
+        var localHost = _settings.Current.LocalHost;
+        var activeLocalArtifactIds = ActiveLocalArtifactIds(active, cloud, localHost);
+        var speechExternal = cloud.Speech || localHost.HasSpeech;
+        var cleanExternal = cloud.Clean || localHost.Clean;
+        var translateExternal = cloud.Translate || localHost.Translate;
 
         var items = new List<InstalledCatalogItem>();
         lock (_gate)
@@ -217,9 +236,9 @@ public sealed class ModelSelectionCoordinator : IDisposable
                 var inUse = stage is not null || isSharedStageArtifact
                     ? activeLocalArtifactIds.Contains(model.Id)
                     : ModelCatalog.IsSpeechAsset(model.Id)
-                        ? !cloud.Speech
-                        : !cloud.Clean || !cloud.Translate;
-                var canActivate = stage is not null && !inUse && ModelAdvisor.Evaluate(model, Hardware, active, cloud.Clean, cloud.Translate, cloud.Speech).IsSelectable;
+                        ? !speechExternal
+                        : !cleanExternal || !translateExternal;
+                var canActivate = stage is not null && !inUse && ModelAdvisor.Evaluate(model, Hardware, active, cleanExternal, translateExternal, speechExternal).IsSelectable;
                 var canDelete = (stage is not null || isSharedStageArtifact) && !inUse && !downloading && !IsQueuedUnsafe(model.Id);
 
                 items.Add(new InstalledCatalogItem(model, stage, sizeBytes, inUse, canActivate, canDelete));
@@ -310,17 +329,17 @@ public sealed class ModelSelectionCoordinator : IDisposable
         if (_downloads.GetState(artifactId).IsDownloading || IsQueued(artifactId))
             return false;
 
-        return !ActiveLocalArtifactIds(ActiveSelection, _settings.Current.Cloud).Contains(artifactId);
+        return !ActiveLocalArtifactIds(ActiveSelection, _settings.Current.Cloud, _settings.Current.LocalHost).Contains(artifactId);
     }
 
-    private static HashSet<string> ActiveLocalArtifactIds(ModelSelection active, CloudSettings cloud)
+    private static HashSet<string> ActiveLocalArtifactIds(ModelSelection active, CloudSettings cloud, LocalHostSettings localHost)
     {
         var ids = new HashSet<string>(StringComparer.Ordinal);
-        if (!cloud.Speech)
+        if (!cloud.Speech && !localHost.HasSpeech)
             ids.Add(active.Speech.ArtifactId);
-        if (!cloud.Clean)
+        if (!cloud.Clean && !localHost.Clean)
             ids.Add(active.Cleaner.ArtifactId);
-        if (!cloud.Translate)
+        if (!cloud.Translate && !localHost.Translate)
             ids.Add(active.Translator.ArtifactId);
         return ids;
     }
@@ -393,11 +412,12 @@ public sealed class ModelSelectionCoordinator : IDisposable
 
         var active = ActiveSelection;
         var cloud = _settings.Current.Cloud;
-        if (!ModelAdvisor.Evaluate(option, Hardware, active, cloud.Clean, cloud.Translate, cloud.Speech).IsSelectable)
+        var localHost = _settings.Current.LocalHost;
+        if (!ModelAdvisor.Evaluate(option, Hardware, active, cloud.Clean || localHost.Clean, cloud.Translate || localHost.Translate, cloud.Speech || localHost.HasSpeech).IsSelectable)
             return false;
 
         var currentOption = active.DescriptorFor(profile.Stage);
-        var hasWorkingCurrent = IsStageInCloud(profile.Stage) || IsInstalled(currentOption);
+        var hasWorkingCurrent = IsStageExternallyHosted(profile.Stage) || IsInstalled(currentOption);
         if (!IsInstalled(option) && hasWorkingCurrent)
             return false;
 
@@ -420,7 +440,8 @@ public sealed class ModelSelectionCoordinator : IDisposable
 
         var active = ActiveSelection;
         var cloud = _settings.Current.Cloud;
-        if (!ModelAdvisor.Evaluate(option, Hardware, active, cloud.Clean, cloud.Translate, cloud.Speech).IsSelectable)
+        var localHost = _settings.Current.LocalHost;
+        if (!ModelAdvisor.Evaluate(option, Hardware, active, cloud.Clean || localHost.Clean, cloud.Translate || localHost.Translate, cloud.Speech || localHost.HasSpeech).IsSelectable)
             return false;
 
         var missing = ModelCatalog.BundleFor(option).Where(artifact => !IsInstalled(artifact)).ToList();
@@ -428,13 +449,14 @@ public sealed class ModelSelectionCoordinator : IDisposable
         {
             lock (_gate)
                 _pendingByStage.Remove(profile.Stage);
+
             PersistStage(profile.Stage, option.Id);
             Changed?.Invoke();
             return true;
         }
 
         var currentOption = active.DescriptorFor(profile.Stage);
-        var hasWorkingCurrent = IsStageInCloud(profile.Stage) || IsInstalled(currentOption);
+        var hasWorkingCurrent = IsStageExternallyHosted(profile.Stage) || IsInstalled(currentOption);
         if (!hasWorkingCurrent || IsInstalled(option))
             PersistStage(profile.Stage, option.Id);
 
@@ -686,7 +708,18 @@ public sealed class ModelSelectionCoordinator : IDisposable
         model.Composer.TranslatorModel = active.TranslatorModelId;
         SetStageOnComposer(model.Composer, stage, modelId);
         ClearCloudOnStage(model.Cloud, stage);
+        ClearLocalHostOnStage(model.LocalHost, stage);
         _settings.Replace(model);
+    }
+
+    private static void ClearLocalHostOnStage(LocalHostSettings localHost, ModelStage stage)
+    {
+        switch (stage)
+        {
+            case ModelStage.Speech: localHost.Speech.Clear(); break;
+            case ModelStage.Cleaner: localHost.Cleaner.Clear(); break;
+            case ModelStage.Translator: localHost.Translator.Clear(); break;
+        }
     }
 
     private static void ClearCloudOnStage(CloudSettings cloud, ModelStage stage)

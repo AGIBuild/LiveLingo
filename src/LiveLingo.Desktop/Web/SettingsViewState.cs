@@ -1,6 +1,8 @@
 using System.Globalization;
 using LiveLingo.Core.Inference;
+using LiveLingo.Core.LocalHost;
 using LiveLingo.Core.Models;
+using LiveLingo.Desktop.Services.Configuration;
 using LiveLingo.Desktop.Settings;
 using LiveLingo.Desktop.Services.Update;
 
@@ -163,6 +165,53 @@ internal sealed record StageCloudOptionState(
     bool Active,
     string? PeerBadge);
 
+internal sealed record HotHostBannerState(
+    string HostId,
+    string HostName,
+    string ModelKey,
+    string ModelName,
+    string Summary);
+
+internal sealed record LocalHostModelItemState(
+    string Key,
+    string Name,
+    string Meta,
+    string Suitability,
+    string SuitabilityBadge,
+    bool IsLoaded,
+    string LoadedBadge,
+    string? ParallelBadge,
+    string? WarningText,
+    bool Active,
+    bool CanSelect,
+    string? PeerBadge);
+
+internal sealed record LocalHostRecommendationState(
+    string CatalogModelId,
+    string Name,
+    string SizeText,
+    string CopyCommand,
+    bool CanDownload,
+    bool Downloading,
+    int? Percent,
+    string? StatusText,
+    string? Error);
+
+internal sealed record LocalHostGroupState(
+    string HostId,
+    string Kind,
+    string Name,
+    string Address,
+    string Status,
+    string StatusBadge,
+    bool SupportsDownload,
+    bool SupportsStartServer,
+    bool SupportsOpenApp,
+    bool IsCustom,
+    bool HasSuitableModels,
+    IReadOnlyList<LocalHostModelItemState> Models,
+    IReadOnlyList<LocalHostRecommendationState> Recommendations);
+
 internal sealed record ModelStageGroupState(
     string Stage,
     string TabTitle,
@@ -176,7 +225,10 @@ internal sealed record ModelStageGroupState(
     bool CloudRouted,
     bool CloudInvalid,
     IReadOnlyList<StageCloudOptionState> CloudOptions,
-    IReadOnlyList<ModelOptionState> Options);
+    IReadOnlyList<ModelOptionState> Options,
+    bool LocalHostSupported = false,
+    bool LocalHostRouted = false,
+    IReadOnlyList<LocalHostGroupState>? LocalHosts = null);
 
 internal sealed record InstalledModelItemState(
     string Id,
@@ -207,7 +259,9 @@ internal sealed record ModelsSettingsState(
     ModelStorageState Storage,
     EndpointForm? Form,
     DeleteEndpointModalState? DeleteConfirm,
-    ConsentModalState? Consent);
+    ConsentModalState? Consent,
+    HotHostBannerState? HotHost = null,
+    bool LocalHostRefreshing = false);
 
 internal sealed record AboutSettingsState(
     string Version,
@@ -399,7 +453,9 @@ internal sealed record SettingsViewState(
             cleanInCloud: vm.CloudClean,
             translateInCloud: vm.CloudTranslate,
             cleanupEnabled: vm.CleanupEnabled,
-            speechInCloud: vm.CloudSpeech);
+            speechInCloud: vm.CloudSpeech || vm.LocalHostSpeech,
+            cleanOnLocalHost: vm.LocalHostClean,
+            translateOnLocalHost: vm.LocalHostTranslate);
         var budgetPercent = assessment.SafeBudgetBytes > 0
             ? Math.Clamp((int)Math.Round(assessment.ActiveCoResidentBytes * 100d / assessment.SafeBudgetBytes), 0, 100)
             : 100;
@@ -419,7 +475,7 @@ internal sealed record SettingsViewState(
             texts.ResidencyMode(assessment),
             texts.DiskUsedSummary(totalDiskBytes),
             anyCloud,
-            texts.ModelsPrivacyStatus(vm.CloudClean, vm.CloudTranslate, vm.CloudSpeech),
+            texts.ModelsPrivacyStatus(vm.CloudClean, vm.CloudTranslate, vm.CloudSpeech, vm.AnyLocalHost),
             isRecommended,
             isRecommendedDownloading,
             isRecommended || isRecommendedDownloading ? null : texts.RecommendActionLabel(coordinator.MissingBytesForRecommended()));
@@ -452,15 +508,17 @@ internal sealed record SettingsViewState(
         var navBadge = texts.NavDownloadBadge(primaryRunning?.Percent, anyBusyDownload);
 
         ModelStage[] stages = [ModelStage.Speech, ModelStage.Cleaner, ModelStage.Translator];
+        var discoveredHosts = vm.DiscoveredLocalHosts;
+        var hostDownloads = vm.LocalHostDownloads;
         var groups = stages.Select(stage =>
         {
             var evaluations = ModelAdvisor.EvaluateStage(
                 stage,
                 hardware,
                 active,
-                cleanInCloud: vm.CloudClean,
-                translateInCloud: vm.CloudTranslate,
-                speechInCloud: vm.CloudSpeech);
+                cleanInCloud: vm.CloudClean || vm.LocalHostClean,
+                translateInCloud: vm.CloudTranslate || vm.LocalHostTranslate,
+                speechInCloud: vm.CloudSpeech || vm.LocalHostSpeech);
             var activeDescriptor = active.DescriptorFor(stage);
             var activeId = activeDescriptor.Id;
             var pendingId = coordinator.PendingModelId(stage);
@@ -487,6 +545,18 @@ internal sealed record SettingsViewState(
                 ModelStage.Translator => vm.CloudTranslate,
                 _ => false
             };
+            var localHostSupported = stage is ModelStage.Speech or ModelStage.Cleaner or ModelStage.Translator;
+            var stageHostBinding = stage switch
+            {
+                ModelStage.Speech => vm.SpeechLocalHost,
+                ModelStage.Cleaner => vm.CleanerLocalHost,
+                ModelStage.Translator => vm.TranslatorLocalHost,
+                _ => null
+            };
+            var localHostRouted = !cloudRouted && stageHostBinding is { IsBound: true };
+            var localHostGroups = localHostSupported
+                ? BuildLocalHostGroups(stage, vm, discoveredHosts, hostDownloads, hardware, texts)
+                : [];
             var cloudOptions = cloudStep is null
                 ? []
                 : vm.Endpoints.Select(endpoint =>
@@ -505,8 +575,8 @@ internal sealed record SettingsViewState(
                         texts.PeerStageBadge(stage, activeHere, endpoint.UsedForClean, endpoint.UsedForTranslate, endpoint.UsedForSpeech));
                 }).ToArray();
 
-            var notice = texts.StageNotice(stage, vm.CleanupEnabled, vm.CloudSpeech, vm.SpeechEndpoint?.Model, activeId, cloudRouted);
-            var hasWorkingCurrent = cloudRouted || currentStageInstalled;
+            var notice = texts.StageNotice(stage, vm.CleanupEnabled, vm.CloudSpeech, vm.SpeechEndpoint?.Model, activeId, cloudRouted || localHostRouted);
+            var hasWorkingCurrent = cloudRouted || localHostRouted || currentStageInstalled;
 
             ModelDownloadState? stageRunningDownload = null;
             var stageQueued = false;
@@ -516,7 +586,7 @@ internal sealed record SettingsViewState(
                 var profile = model.Profile!;
                 var download = coordinator.GetOptionDownloadState(model);
                 var isQueued = coordinator.IsQueued(model.Id);
-                var isActive = !cloudRouted && model.Id == activeId;
+                var isActive = !cloudRouted && !localHostRouted && model.Id == activeId;
                 var isInstalled = download.IsInstalled;
                 var isDownloading = download.IsDownloading;
                 if (isDownloading && stageRunningDownload is null)
@@ -556,6 +626,11 @@ internal sealed record SettingsViewState(
                     canDelete ? texts.DeleteWithSizeLabel(installedSize) : null);
             }).ToArray();
 
+            var localHostLabel = localHostRouted && stageHostBinding is not null
+                ? discoveredHosts.FirstOrDefault(h => string.Equals(h.HostId, stageHostBinding.HostId, StringComparison.OrdinalIgnoreCase))?.DisplayName
+                  ?? stageHostBinding.HostId
+                : null;
+
             return new ModelStageGroupState(
                 stage.ToString().ToLowerInvariant(),
                 texts.StageTabTitle(stage),
@@ -567,7 +642,9 @@ internal sealed record SettingsViewState(
                     stageQueued,
                     vm.CleanupEnabled,
                     cloudRouted,
-                    stageEndpoint?.Name),
+                    stageEndpoint?.Name,
+                    localHostRouted,
+                    localHostLabel),
                 Busy: stageRunningDownload is not null,
                 texts.StageTitle(stage),
                 texts.StageDescription(stage),
@@ -577,7 +654,10 @@ internal sealed record SettingsViewState(
                 cloudRouted,
                 CloudInvalid: cloudStep is not null && vm.CloudInvalid,
                 cloudOptions,
-                options);
+                options,
+                localHostSupported,
+                localHostRouted,
+                localHostGroups);
         }).ToArray();
 
         var inUseBytes = inventory.Where(i => i.InUse).Sum(i => i.SizeBytes);
@@ -627,6 +707,8 @@ internal sealed record SettingsViewState(
                 texts.AffectedCloudSteps(deleting.UsedForClean, deleting.UsedForTranslate, deleting.UsedForSpeech));
         }
 
+        var hotBanner = BuildHotHostBanner(vm, discoveredHosts, texts);
+
         return new ModelsSettingsState(
             modelsTab,
             navBadge,
@@ -636,7 +718,157 @@ internal sealed record SettingsViewState(
             storageView,
             vm.Form,
             deleteModal,
-            consentModal);
+            consentModal,
+            hotBanner,
+            vm.IsRefreshingLocalHosts);
+    }
+
+    private static HotHostBannerState? BuildHotHostBanner(
+        SettingsViewModel vm,
+        IReadOnlyList<LocalHostInstance> hosts,
+        SettingsTexts texts)
+    {
+        if (vm.LocalHostClean && vm.LocalHostTranslate)
+            return null;
+
+        foreach (var host in hosts)
+        {
+            if (host.Status != LocalHostStatus.Running)
+                continue;
+            var bestHot = LocalHostModelMatcher.PickBestHotModel(ModelStage.Cleaner, host.Models);
+            if (bestHot is not null)
+            {
+                return new HotHostBannerState(
+                    host.HostId,
+                    host.DisplayName,
+                    bestHot.Model.Key,
+                    bestHot.Model.DisplayName,
+                    texts.LocalHostHotBannerSummary(host.DisplayName, bestHot.Model));
+            }
+        }
+
+        return null;
+    }
+
+    private static IReadOnlyList<LocalHostGroupState> BuildLocalHostGroups(
+        ModelStage stage,
+        SettingsViewModel vm,
+        IReadOnlyList<LocalHostInstance> hosts,
+        IReadOnlyList<LocalHostDownloadJob> downloads,
+        HardwareProfile hardware,
+        SettingsTexts texts)
+    {
+        var activeBinding = stage switch
+        {
+            ModelStage.Speech => vm.SpeechLocalHost,
+            ModelStage.Cleaner => vm.CleanerLocalHost,
+            _ => vm.TranslatorLocalHost
+        };
+        var peerBinding = stage switch
+        {
+            ModelStage.Cleaner => vm.TranslatorLocalHost,
+            ModelStage.Translator => vm.CleanerLocalHost,
+            _ => new LocalHostStageBinding()
+        };
+        var stageCloud = stage switch
+        {
+            ModelStage.Speech => vm.CloudSpeech,
+            ModelStage.Cleaner => vm.CloudClean,
+            _ => vm.CloudTranslate
+        };
+        var recommendations = LocalHostModelMatcher.RecommendForMissing(stage, hardware);
+
+        // On Speech, only show hosts whose HTTP API supports audio endpoints (OpenAI-compatible / custom ports),
+        // plus any existing stale binding so the user can see the incompatibility warning and switch away.
+        return hosts
+            .Where(host => stage != ModelStage.Speech
+                || host.SupportsSpeech
+                || (activeBinding.IsBound && string.Equals(activeBinding.HostId, host.HostId, StringComparison.OrdinalIgnoreCase)))
+            .Select(host =>
+        {
+            var speechUnsupported = stage == ModelStage.Speech && !host.SupportsSpeech;
+            var activeKey = !stageCloud && activeBinding.IsBound
+                && string.Equals(activeBinding.HostId, host.HostId, StringComparison.OrdinalIgnoreCase)
+                ? activeBinding.ModelKey
+                : null;
+            var evaluated = LocalHostModelMatcher.Evaluate(stage, host.Models, activeKey);
+            if (speechUnsupported)
+            {
+                evaluated = evaluated
+                    .Select(e => new EvaluatedHostModel(e.Model, HostModelSuitability.SuboptimalWarning, "speechApiUnsupported"))
+                    .ToArray();
+            }
+            var hasSuitable = evaluated.Any(e => e.IsSuitable);
+
+            var modelStates = evaluated.Select(eval =>
+            {
+                var m = eval.Model;
+                var isActive = activeKey is not null && string.Equals(m.Key, activeKey, StringComparison.OrdinalIgnoreCase);
+                var usedByPeer = stage != ModelStage.Speech
+                    && peerBinding.IsBound
+                    && string.Equals(peerBinding.HostId, host.HostId, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(peerBinding.ModelKey, m.Key, StringComparison.OrdinalIgnoreCase);
+                var peerBadge = usedByPeer
+                    ? texts.PeerStageBadge(
+                        stage,
+                        isActive,
+                        usedForClean: stage == ModelStage.Translator,
+                        usedForTranslate: stage == ModelStage.Cleaner)
+                    : null;
+
+                return new LocalHostModelItemState(
+                    m.Key,
+                    m.DisplayName,
+                    texts.LocalHostModelMeta(m),
+                    eval.Suitability.ToString().ToLowerInvariant(),
+                    texts.LocalHostSuitabilityBadge(eval.Suitability),
+                    m.IsLoaded,
+                    texts.Label(m.IsLoaded ? "models.localHost.badge.loaded" : "models.localHost.badge.onDemand"),
+                    texts.LocalHostParallelBadge(m.ParallelSlots),
+                    texts.LocalHostWarningText(eval.WarningReason),
+                    isActive,
+                    CanSelect: !isActive && !speechUnsupported && host.Status == LocalHostStatus.Running,
+                    peerBadge);
+            }).ToArray();
+
+            var recStates = host.Status == LocalHostStatus.Running && !hasSuitable
+                ? recommendations.Select(rec =>
+                {
+                    var job = downloads.FirstOrDefault(d =>
+                        string.Equals(d.HostId, host.HostId, StringComparison.OrdinalIgnoreCase)
+                        && string.Equals(d.ModelId, rec.CatalogModel.Id, StringComparison.Ordinal));
+                    var copyCmd = host.Kind == LocalHostKind.Ollama ? $"ollama pull {rec.OllamaTag}" : rec.LmsGetCommand;
+                    int? pct = job?.Percentage is { } p ? (int)Math.Round(p) : null;
+                    return new LocalHostRecommendationState(
+                        rec.CatalogModel.Id,
+                        texts.OptionName(rec.CatalogModel),
+                        texts.FormatSize(rec.CatalogModel.SizeBytes),
+                        copyCmd,
+                        CanDownload: host.SupportsDownload && job is not { IsRunning: true },
+                        Downloading: job is { IsRunning: true },
+                        pct,
+                        job is { IsRunning: true }
+                            ? (pct is not null ? $"{pct}%" : texts.Label("models.localHost.refreshing"))
+                            : null,
+                        job is { IsFailed: true } ? job.Error : null);
+                }).ToArray()
+                : [];
+
+            return new LocalHostGroupState(
+                host.HostId,
+                host.Kind.ToString().ToLowerInvariant(),
+                host.DisplayName,
+                host.BaseUri?.Authority ?? "",
+                host.Status.ToString().ToLowerInvariant(),
+                texts.LocalHostStatusBadge(host.Status),
+                host.SupportsDownload,
+                host.SupportsStartServer,
+                host.SupportsOpenApp,
+                IsCustom: host.HostId.StartsWith("custom-", StringComparison.OrdinalIgnoreCase),
+                hasSuitable,
+                modelStates,
+                recStates);
+        }).ToArray();
     }
 
     private static string HostOf(string url) => Uri.TryCreate(url, UriKind.Absolute, out var uri) ? uri.Authority : url;

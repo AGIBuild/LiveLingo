@@ -314,4 +314,18 @@ public class ComposerTextsTests
         Assert.Equal("[composer.document.gate.verbatimOk]", texts.DocumentGateBadge(DocumentState.Ready, owned: false, LiveLingo.Core.Cleanup.PolishGateKind.Verbatim));
         Assert.Equal("[composer.document.gate.intercepted]", texts.DocumentGateBadge(DocumentState.Failed, owned: false, LiveLingo.Core.Cleanup.PolishGateKind.FactAnchor));
     }
+
+    [Fact]
+    public void DocumentNotice_SurfacesHostAndBackendFailureReason()
+    {
+        var texts = Create();
+        var notice = texts.DocumentNotice(
+            DocumentState.Failed,
+            owned: false,
+            translating: false,
+            error: "Model 'qwen3.8-flash-next' failed to load on Bionic (13%).");
+
+        Assert.Contains("[composer.document.failed]", notice);
+        Assert.Contains("failed to load on Bionic (13%)", notice);
+    }
 }

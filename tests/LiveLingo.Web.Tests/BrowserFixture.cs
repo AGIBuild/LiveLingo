@@ -70,12 +70,12 @@ public sealed class BrowserFixture : IAsyncLifetime
 
     /// <summary>The settings page without any snapshot.</summary>
     public Task<ComposerPage> OpenBareSettingsAsync(string engine) =>
-        OpenBareAsync(engine, WebPage.SettingsEntry, 920, 660, ColorScheme.Light);
+        OpenBareAsync(engine, WebPage.SettingsEntry, 1090, 768, ColorScheme.Light);
 
-    /// <summary>The settings window: 920 x 660, opened like the composer with the strings and a golden snapshot.</summary>
+    /// <summary>The settings window: 1090 x 768, opened like the composer with the strings and a golden snapshot.</summary>
     public async Task<ComposerPage> OpenSettingsAsync(string engine, string fixture = "settings-general", ColorScheme scheme = ColorScheme.Light)
     {
-        var session = await OpenBareAsync(engine, WebPage.SettingsEntry, 920, 660, scheme);
+        var session = await OpenBareAsync(engine, WebPage.SettingsEntry, 1090, 768, scheme);
         await session.PushStringsAsync("settings-strings");
         await session.PushAsync(fixture);
         return session;

@@ -295,7 +295,10 @@
             "canDelete": false,
             "deleteActionLabel": null
           }
-        ]
+        ],
+        "localHostSupported": true,
+        "localHostRouted": false,
+        "localHosts": []
       },
       {
         "stage": "cleaner",
@@ -430,7 +433,10 @@
             "canDelete": false,
             "deleteActionLabel": null
           }
-        ]
+        ],
+        "localHostSupported": true,
+        "localHostRouted": false,
+        "localHosts": []
       },
       {
         "stage": "translator",
@@ -589,7 +595,10 @@
             "canDelete": true,
             "deleteActionLabel": "删除（释放 1.13 GB）"
           }
-        ]
+        ],
+        "localHostSupported": true,
+        "localHostRouted": false,
+        "localHosts": []
       }
     ],
     "storage": {
@@ -624,7 +633,9 @@
       "endpointName": "Other",
       "host": "other.example.com",
       "previousEndpointName": "Main"
-    }
+    },
+    "hotHost": null,
+    "localHostRefreshing": false
   },
   "about": {
     "version": "2.0.0",

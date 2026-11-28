@@ -29,13 +29,13 @@ public static class QwenAudioFileTranscriber
         if (samples.Length == 0)
             return [];
 
-        usage?.Report(new ModelUse(ModelStage.Speech, route.Model, Cloud: true, Confirmed: false, route.DisplayModel, route.Name));
+        usage?.Report(new ModelUse(ModelStage.Speech, route.Model, Cloud: !route.IsLocalHost, Confirmed: false, route.DisplayModel, route.Name, LocalHost: route.IsLocalHost));
 
         IReadOnlyList<TimedSegment> segments = route.Protocol == SpeechCloudProtocol.QwenAudioWebSocket
             ? await TranscribeViaWebSocketAsync(samples, route, request, wsTransport, progress, ct).ConfigureAwait(false)
             : await TranscribeViaHttpAsync(samples, route, request, http, progress, ct).ConfigureAwait(false);
 
-        usage?.Report(new ModelUse(ModelStage.Speech, route.Model, Cloud: true, Confirmed: true, route.DisplayModel, route.Name));
+        usage?.Report(new ModelUse(ModelStage.Speech, route.Model, Cloud: !route.IsLocalHost, Confirmed: true, route.DisplayModel, route.Name, LocalHost: route.IsLocalHost));
         progress?.Report(1.0);
         return segments;
     }

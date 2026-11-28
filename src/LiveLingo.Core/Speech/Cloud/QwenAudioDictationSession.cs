@@ -46,6 +46,8 @@ public sealed class QwenWebSocketDictationSession : IDictationSession
     private Task _receiveTask = Task.CompletedTask;
     private Task? _stopTask;
 
+    public event Action<string>? RecognitionFailed;
+
     private QwenWebSocketDictationSession(
         IQwenWebSocketConnection socket,
         string taskId,
@@ -207,6 +209,7 @@ public sealed class QwenWebSocketDictationSession : IDictationSession
         catch (Exception ex)
         {
             _logger?.LogWarning(ex, "Cloud speech audio sender stopped early");
+            RecognitionFailed?.Invoke(ex.Message);
             _taskFinishedTcs.TrySetResult();
         }
     }
@@ -237,6 +240,10 @@ public sealed class QwenWebSocketDictationSession : IDictationSession
                             "Cloud speech task failed mid-session ({Code}): {Message}",
                             ev.ErrorCode,
                             ev.ErrorMessage);
+                        var detail = string.IsNullOrWhiteSpace(ev.ErrorMessage)
+                            ? ev.ErrorCode ?? "Speech recognition task failed."
+                            : ev.ErrorMessage;
+                        RecognitionFailed?.Invoke(detail);
                         _taskFinishedTcs.TrySetResult();
                         return;
                 }
@@ -248,6 +255,7 @@ public sealed class QwenWebSocketDictationSession : IDictationSession
         catch (Exception ex)
         {
             _logger?.LogWarning(ex, "Cloud speech receiver terminated unexpectedly");
+            RecognitionFailed?.Invoke(ex.Message);
         }
         finally
         {
@@ -451,6 +459,8 @@ public sealed class CloudHttpDictationSession : IDictationSession
     private Task _recognizeTask = Task.CompletedTask;
     private Task? _stopTask;
 
+    public event Action<string>? RecognitionFailed;
+
     public CloudHttpDictationSession(
         HttpClient http,
         SpeechCloudRoute route,
@@ -474,7 +484,15 @@ public sealed class CloudHttpDictationSession : IDictationSession
 
     public void Start()
     {
-        _usage?.Report(new ModelUse(ModelStage.Speech, _route.Model, Cloud: true, Confirmed: false, _route.DisplayModel, _route.Name));
+        var use = new ModelUse(
+            ModelStage.Speech,
+            _route.Model,
+            Cloud: !_route.IsLocalHost,
+            Confirmed: false,
+            _route.DisplayModel,
+            _route.Name,
+            LocalHost: _route.IsLocalHost);
+        _usage?.Report(use);
         _draft.Mutate(d =>
         {
             if (d.Epoch == _draftEpoch && d.Snapshot is null)
@@ -574,10 +592,24 @@ public sealed class CloudHttpDictationSession : IDictationSession
             {
                 var results = await QwenAudioProtocol.TranscribeChunkHttpAsync(
                     _http, _route, audio, _request, _historyTurns, CancellationToken.None).ConfigureAwait(false);
-                _usage?.Report(new ModelUse(ModelStage.Speech, _route.Model, Cloud: true, Confirmed: true, _route.DisplayModel, _route.Name));
+                _usage?.Report(new ModelUse(
+                    ModelStage.Speech,
+                    _route.Model,
+                    Cloud: !_route.IsLocalHost,
+                    Confirmed: true,
+                    _route.DisplayModel,
+                    _route.Name,
+                    LocalHost: _route.IsLocalHost));
                 if (_request.NativePolishSatisfiesClean && _route.SupportsNativePolish)
                 {
-                    _usage?.Report(new ModelUse(ModelStage.Cleaner, _route.Model, Cloud: true, Confirmed: true, _route.DisplayModel, _route.Name));
+                    _usage?.Report(new ModelUse(
+                        ModelStage.Cleaner,
+                        _route.Model,
+                        Cloud: !_route.IsLocalHost,
+                        Confirmed: true,
+                        _route.DisplayModel,
+                        _route.Name,
+                        LocalHost: _route.IsLocalHost));
                 }
 
                 foreach (var item in results)
@@ -600,6 +632,7 @@ public sealed class CloudHttpDictationSession : IDictationSession
             catch (Exception ex)
             {
                 _logger?.LogWarning(ex, "Cloud HTTP speech recognition failed for an utterance");
+                RecognitionFailed?.Invoke(ex.Message);
             }
         }
     }

@@ -520,7 +520,8 @@ internal static class QwenAudioProtocol
         {
             Content = new StringContent(payload.ToJsonString(), Encoding.UTF8, "application/json")
         };
-        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", route.ApiKey);
+        if (!string.IsNullOrEmpty(route.ApiKey))
+            req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", route.ApiKey);
 
         using var resp = await http.SendAsync(req, ct).ConfigureAwait(false);
         var body = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
@@ -568,7 +569,8 @@ internal static class QwenAudioProtocol
         }
 
         using var req = new HttpRequestMessage(HttpMethod.Post, route.Endpoint) { Content = form };
-        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", route.ApiKey);
+        if (!string.IsNullOrEmpty(route.ApiKey))
+            req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", route.ApiKey);
 
         using var resp = await http.SendAsync(req, ct).ConfigureAwait(false);
         var body = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);

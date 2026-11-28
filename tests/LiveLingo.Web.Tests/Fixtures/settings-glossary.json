@@ -1,0 +1,637 @@
+{
+  "rev": 1,
+  "section": "glossary",
+  "general": {
+    "hotkey": "Ctrl+Alt+T",
+    "hotkeyInvalid": false,
+    "commitKey": "Enter",
+    "language": "en-US",
+    "theme": "Auto",
+    "reduceMotion": false,
+    "rememberChoices": true,
+    "apps": [],
+    "appChoices": [
+      {
+        "value": "clean:ai-task",
+        "label": "AI 任务指令"
+      },
+      {
+        "value": "clean:natural",
+        "label": "口语顺句"
+      },
+      {
+        "value": "clean:formal",
+        "label": "得体书面"
+      },
+      {
+        "value": "clean:todo",
+        "label": "待办与派单"
+      },
+      {
+        "value": "clean:report",
+        "label": "汇报与纪要"
+      },
+      {
+        "value": "translate:English",
+        "label": "翻译成 English"
+      },
+      {
+        "value": "translate:Chinese",
+        "label": "翻译成 中文"
+      },
+      {
+        "value": "default",
+        "label": "跟随默认"
+      }
+    ]
+  },
+  "voice": {
+    "microphones": [
+      "",
+      "USB Mic",
+      "Built-in"
+    ],
+    "microphone": "",
+    "direction": "English",
+    "cleanup": true,
+    "defaultOutput": "Clean",
+    "autoDictate": false,
+    "preloadSpeech": true,
+    "builtInGlossary": true,
+    "terms": [
+      {
+        "i": 0,
+        "source": "Redis",
+        "target": "Redis"
+      },
+      {
+        "i": 1,
+        "source": "缓存穿透",
+        "target": "cache penetration"
+      }
+    ],
+    "corrections": [],
+    "polishPrompt": "润色要求：\n1. 把被停顿切碎的半句话接成通顺完整的句子（删去打断主谓宾或动补关系的错误句号，修正“的/地/得”及多字漏字病句，例如“打的还不错，的可以点点”改为“打得还不错，可以点点”），按语义重新断句；句首用于反驳前文的“不是”后面补上逗号，避免误读成反义。\n2. 彻底删去所有口头语、语气赘词（呃、嗯、啊、呀、呢、吧、嘛、那个、这个、就是、然后呢、对吧、你看）、单字结巴（如“我我”→“我”）、重复句以及说到一半卡壳重来的残片（同一个意思或提问重复多遍时，只保留最通顺完整的那一遍；自我改口时只保留纠正后的内容），并剔除背景音拟声词连读（如“噔噔噔噔…”）与明显的识别乱码残片。\n3. 根据全文主题和上下文修正明显的同音/近音误识别（如“在/再”、专有名词或高频词汇误听）并补全快读漏字；词表里的写法优先；确实无法从上下文判断原意的词保留原样，不要凭空编造。\n4. 保持说话人自然流畅的真实口吻，写成干净利索、可直接发送的文字，不要改成生硬公文腔，也不要添加标题或列表符号。\n\n示例 1：\n原文：呃，我觉得这个，就是那个接口的超时。设成十秒。不对，设成三十秒吧。嗯，对，就这样。\n润色：我觉得这个接口的超时设成三十秒吧。\n\n示例 2：\n原文：噔噔噔噔噔。打的还不错，的可以点点关注呀，点关注呀！我我刚才看了一下，哥，能不能给打给给龙拿了？哥，能不能把龙拿了？没有别的意外了，快打！快打！\n润色：打得还不错，可以点点关注！我刚才看了一下，哥，能不能把龙拿了？没有别的意外了，快打！",
+    "polishPromptIsDefault": true,
+    "polishPromptInvalid": false,
+    "defaultPolishMode": "natural",
+    "smartHostPolish": true,
+    "presets": [
+      {
+        "id": "ai-task",
+        "name": "AI 任务指令",
+        "description": "倒叙归位、剪除改口废案、分离硬性护栏（短话免套壳）",
+        "gate": "FactAnchor",
+        "gateBadge": "事实锚点校验",
+        "builtIn": true,
+        "enabled": true,
+        "isDefault": false,
+        "customized": false,
+        "canToggle": true,
+        "toggleAria": "在浮窗菜单显示 AI 任务指令",
+        "defaultInstructions": "润色要求（AI 任务指令）：\n1. 思维撤回彻底剪枝：说话人中途自我否定或改口的内容（如“先设成 10 秒，不对，关掉重试改成 30 秒”、“本来想改 A，算了只改 B”），被推翻的旧方案与旧数值必须彻底剔除，只保留最终生效意图。\n2. 目标倒装归位：若说话人先铺垫现象、最后才说出真正要 AI 执行的动作（如“先排查原因列出来，别改代码”），必须把核心动作提炼到最开头。\n3. 正负护栏显式分离：原文所有限制、禁令与不变边界（如“保持公共 API 不变”、“不要动单测”、“只改错误处理”、“是 30 秒不是 30 分钟”），必须完整保留否定极性并独立列出。\n4. 自适应篇幅（严禁八股套壳与脑补）：\n   - 短指令直出：若原文只是 1～2 句简短操作或中途纠偏（有效内容 ≤ 80 字，无复杂多层背景），直接输出 1～3 行精炼指令，严禁硬套 `### 任务目标`、`### 交付要求` 等标题！\n   - 复杂任务分节：当原文含多维背景与多条约束时，仅按原话实际包含的要素选用 `### 任务目标`、`### 上下文与目标行为`、`### 硬性约束`、`### 交付要求` 组织（未提及的小节直接省略，绝不凑数）。\n5. 原文提及的所有代码类名、方法/函数名（如 `RefreshAsync`）、文件名、配置键、状态码与路径必须全部完整保留并使用反引号包裹，切勿在概括背景或原因时漏掉具体函数名或符号。\n\n示例 1（复杂委派）：\n原文：呃我想改一下登录模块，先把重试设成 3 次吧，哦不对，网关层有重试了，客户端干脆关掉自动重试，只保留 401 刷新 token，超时改成 30 秒不是 30 分钟。你先帮我查下 AuthInterceptor 还有没有隐式重试，列出来给我看，先千万别改代码。\n输出：\n### 任务目标\n排查 `AuthInterceptor` 中是否存在其他隐式重试逻辑，并给出关闭客户端自动重试的改造方案（先输出排查清单与方案，不要直接修改代码）。\n\n### 上下文与目标行为\n- 网关层已具备重试机制，客户端关闭自动重试，仅保留 `401` 状态码刷新 Token 的流程。\n- 客户端超时时间设定为 30 秒（严格区分单位，切勿误设为 30 分钟）。\n\n### 硬性约束\n- 当前阶段只输出排查清单与修改方案，禁止直接改动任何业务代码。\n\n示例 2（短轮次纠偏）：\n原文：呃不对，不要去改 CacheService 的公共 API 签名，外部好多地方调了，你直接在它内部方法里加一层空值兜底就行，单测先别动。\n输出：\n不要修改 `CacheService` 的公共 API 签名（外部存在多处调用）；请仅在其内部方法中补充空值兜底逻辑，且暂不改动现有单元测试。",
+        "effectiveInstructions": "润色要求（AI 任务指令）：\n1. 思维撤回彻底剪枝：说话人中途自我否定或改口的内容（如“先设成 10 秒，不对，关掉重试改成 30 秒”、“本来想改 A，算了只改 B”），被推翻的旧方案与旧数值必须彻底剔除，只保留最终生效意图。\n2. 目标倒装归位：若说话人先铺垫现象、最后才说出真正要 AI 执行的动作（如“先排查原因列出来，别改代码”），必须把核心动作提炼到最开头。\n3. 正负护栏显式分离：原文所有限制、禁令与不变边界（如“保持公共 API 不变”、“不要动单测”、“只改错误处理”、“是 30 秒不是 30 分钟”），必须完整保留否定极性并独立列出。\n4. 自适应篇幅（严禁八股套壳与脑补）：\n   - 短指令直出：若原文只是 1～2 句简短操作或中途纠偏（有效内容 ≤ 80 字，无复杂多层背景），直接输出 1～3 行精炼指令，严禁硬套 `### 任务目标`、`### 交付要求` 等标题！\n   - 复杂任务分节：当原文含多维背景与多条约束时，仅按原话实际包含的要素选用 `### 任务目标`、`### 上下文与目标行为`、`### 硬性约束`、`### 交付要求` 组织（未提及的小节直接省略，绝不凑数）。\n5. 原文提及的所有代码类名、方法/函数名（如 `RefreshAsync`）、文件名、配置键、状态码与路径必须全部完整保留并使用反引号包裹，切勿在概括背景或原因时漏掉具体函数名或符号。\n\n示例 1（复杂委派）：\n原文：呃我想改一下登录模块，先把重试设成 3 次吧，哦不对，网关层有重试了，客户端干脆关掉自动重试，只保留 401 刷新 token，超时改成 30 秒不是 30 分钟。你先帮我查下 AuthInterceptor 还有没有隐式重试，列出来给我看，先千万别改代码。\n输出：\n### 任务目标\n排查 `AuthInterceptor` 中是否存在其他隐式重试逻辑，并给出关闭客户端自动重试的改造方案（先输出排查清单与方案，不要直接修改代码）。\n\n### 上下文与目标行为\n- 网关层已具备重试机制，客户端关闭自动重试，仅保留 `401` 状态码刷新 Token 的流程。\n- 客户端超时时间设定为 30 秒（严格区分单位，切勿误设为 30 分钟）。\n\n### 硬性约束\n- 当前阶段只输出排查清单与修改方案，禁止直接改动任何业务代码。\n\n示例 2（短轮次纠偏）：\n原文：呃不对，不要去改 CacheService 的公共 API 签名，外部好多地方调了，你直接在它内部方法里加一层空值兜底就行，单测先别动。\n输出：\n不要修改 `CacheService` 的公共 API 签名（外部存在多处调用）；请仅在其内部方法中补充空值兜底逻辑，且暂不改动现有单元测试。"
+      },
+      {
+        "id": "natural",
+        "name": "口语顺句",
+        "description": "接碎句、去口头语与改口残片，保留真人语气",
+        "gate": "Verbatim",
+        "gateBadge": "字级保真门禁",
+        "builtIn": true,
+        "enabled": true,
+        "isDefault": true,
+        "customized": false,
+        "canToggle": false,
+        "toggleAria": "在浮窗菜单显示 口语顺句",
+        "defaultInstructions": "润色要求：\n1. 把被停顿切碎的半句话接成通顺完整的句子（删去打断主谓宾或动补关系的错误句号，修正“的/地/得”及多字漏字病句，例如“打的还不错，的可以点点”改为“打得还不错，可以点点”），按语义重新断句；句首用于反驳前文的“不是”后面补上逗号，避免误读成反义。\n2. 彻底删去所有口头语、语气赘词（呃、嗯、啊、呀、呢、吧、嘛、那个、这个、就是、然后呢、对吧、你看）、单字结巴（如“我我”→“我”）、重复句以及说到一半卡壳重来的残片（同一个意思或提问重复多遍时，只保留最通顺完整的那一遍；自我改口时只保留纠正后的内容），并剔除背景音拟声词连读（如“噔噔噔噔…”）与明显的识别乱码残片。\n3. 根据全文主题和上下文修正明显的同音/近音误识别（如“在/再”、专有名词或高频词汇误听）并补全快读漏字；词表里的写法优先；确实无法从上下文判断原意的词保留原样，不要凭空编造。\n4. 保持说话人自然流畅的真实口吻，写成干净利索、可直接发送的文字，不要改成生硬公文腔，也不要添加标题或列表符号。\n\n示例 1：\n原文：呃，我觉得这个，就是那个接口的超时。设成十秒。不对，设成三十秒吧。嗯，对，就这样。\n润色：我觉得这个接口的超时设成三十秒吧。\n\n示例 2：\n原文：噔噔噔噔噔。打的还不错，的可以点点关注呀，点关注呀！我我刚才看了一下，哥，能不能给打给给龙拿了？哥，能不能把龙拿了？没有别的意外了，快打！快打！\n润色：打得还不错，可以点点关注！我刚才看了一下，哥，能不能把龙拿了？没有别的意外了，快打！",
+        "effectiveInstructions": "润色要求：\n1. 把被停顿切碎的半句话接成通顺完整的句子（删去打断主谓宾或动补关系的错误句号，修正“的/地/得”及多字漏字病句，例如“打的还不错，的可以点点”改为“打得还不错，可以点点”），按语义重新断句；句首用于反驳前文的“不是”后面补上逗号，避免误读成反义。\n2. 彻底删去所有口头语、语气赘词（呃、嗯、啊、呀、呢、吧、嘛、那个、这个、就是、然后呢、对吧、你看）、单字结巴（如“我我”→“我”）、重复句以及说到一半卡壳重来的残片（同一个意思或提问重复多遍时，只保留最通顺完整的那一遍；自我改口时只保留纠正后的内容），并剔除背景音拟声词连读（如“噔噔噔噔…”）与明显的识别乱码残片。\n3. 根据全文主题和上下文修正明显的同音/近音误识别（如“在/再”、专有名词或高频词汇误听）并补全快读漏字；词表里的写法优先；确实无法从上下文判断原意的词保留原样，不要凭空编造。\n4. 保持说话人自然流畅的真实口吻，写成干净利索、可直接发送的文字，不要改成生硬公文腔，也不要添加标题或列表符号。\n\n示例 1：\n原文：呃，我觉得这个，就是那个接口的超时。设成十秒。不对，设成三十秒吧。嗯，对，就这样。\n润色：我觉得这个接口的超时设成三十秒吧。\n\n示例 2：\n原文：噔噔噔噔噔。打的还不错，的可以点点关注呀，点关注呀！我我刚才看了一下，哥，能不能给打给给龙拿了？哥，能不能把龙拿了？没有别的意外了，快打！快打！\n润色：打得还不错，可以点点关注！我刚才看了一下，哥，能不能把龙拿了？没有别的意外了，快打！"
+      },
+      {
+        "id": "formal",
+        "name": "得体书面",
+        "description": "邮件、PR 评论、克制书面段落（零公文黑话）",
+        "gate": "FactAnchor",
+        "gateBadge": "事实锚点校验",
+        "builtIn": true,
+        "enabled": true,
+        "isDefault": false,
+        "customized": false,
+        "canToggle": true,
+        "toggleAria": "在浮窗菜单显示 得体书面",
+        "defaultInstructions": "润色要求（得体书面）：\n1. 去除口头语、犹豫停顿与碎句，剪除说话人当场自我否定的半截废话，改写为逻辑连贯、简洁克制的书面段落。\n2. 显式理顺因果、转折与条件关系，修正模糊口语指代，完整保留第一人称立场、生效数字、否定边界与英文/代码专有名词。\n3. 严禁使用“赋能、抓手、闭环、对齐颗粒度、综上所述、特此函告”等公文套话，适合正式邮件、PR 评审意见或跨团队沟通直接发送。",
+        "effectiveInstructions": "润色要求（得体书面）：\n1. 去除口头语、犹豫停顿与碎句，剪除说话人当场自我否定的半截废话，改写为逻辑连贯、简洁克制的书面段落。\n2. 显式理顺因果、转折与条件关系，修正模糊口语指代，完整保留第一人称立场、生效数字、否定边界与英文/代码专有名词。\n3. 严禁使用“赋能、抓手、闭环、对齐颗粒度、综上所述、特此函告”等公文套话，适合正式邮件、PR 评审意见或跨团队沟通直接发送。"
+      },
+      {
+        "id": "todo",
+        "name": "待办与派单",
+        "description": "过滤闲聊废案，提取 - [ ] 行动项、负责人与条件",
+        "gate": "FactAnchor",
+        "gateBadge": "事实锚点校验",
+        "builtIn": true,
+        "enabled": true,
+        "isDefault": false,
+        "customized": false,
+        "canToggle": true,
+        "toggleAria": "在浮窗菜单显示 待办与派单",
+        "defaultInstructions": "润色要求（待办与派单）：\n1. 从口述中剥离纯背景铺垫、寒暄、感叹杂音与已被说话人当场否决的设想，提炼需要执行或跟进核实的行动项，输出 Markdown 任务清单。\n2. 每条严格以 `- [ ] ` 加明确动词开头；合并对同一事项的重复叮嘱。\n3. 原话明确提及了负责人、前置条件（如“等 CI 跑完后”）或时间节点的，在句末括号内保留（如 `（负责人：小王 · 会后）`）；原话未提及负责人或截止时间时，严禁凭空编造。\n4. 若原话包含待确认的具体安排或疑问（如核实休假起止日期、确认方案细节），提炼为 `- [ ] 确认…` 的跟进项；若全篇纯属无任何事项的闲聊感叹，仅输出一行“（原话未包含明确待办事项）”，切勿强凑任务，且严禁在输出中附带“原话提及…”、“结合上下文推断…”等编辑批注。",
+        "effectiveInstructions": "润色要求（待办与派单）：\n1. 从口述中剥离纯背景铺垫、寒暄、感叹杂音与已被说话人当场否决的设想，提炼需要执行或跟进核实的行动项，输出 Markdown 任务清单。\n2. 每条严格以 `- [ ] ` 加明确动词开头；合并对同一事项的重复叮嘱。\n3. 原话明确提及了负责人、前置条件（如“等 CI 跑完后”）或时间节点的，在句末括号内保留（如 `（负责人：小王 · 会后）`）；原话未提及负责人或截止时间时，严禁凭空编造。\n4. 若原话包含待确认的具体安排或疑问（如核实休假起止日期、确认方案细节），提炼为 `- [ ] 确认…` 的跟进项；若全篇纯属无任何事项的闲聊感叹，仅输出一行“（原话未包含明确待办事项）”，切勿强凑任务，且严禁在输出中附带“原话提及…”、“结合上下文推断…”等编辑批注。"
+      },
+      {
+        "id": "report",
+        "name": "汇报与纪要",
+        "description": "结论先行（BLUF），归纳关键决策与下一步",
+        "gate": "FactAnchor",
+        "gateBadge": "事实锚点校验",
+        "builtIn": true,
+        "enabled": true,
+        "isDefault": false,
+        "customized": false,
+        "canToggle": true,
+        "toggleAria": "在浮窗菜单显示 汇报与纪要",
+        "defaultInstructions": "润色要求（汇报与纪要）：\n1. 采用结论先行（BLUF）结构重组流水账口述：首段 `### 核心结论` 用 1～2 句话直接给出当前核心观点、整体状态或拍板决定（仅归纳原话明确说出的信息，原话未点明的具体子类别切勿用常识补全）。\n2. 随后按原文实际内容组织 `### 关键决策与进展`（若为访谈或观点分享也可按 `### 核心要点` 分条归纳，完整保留所有生效指标数值、年限、百分比、组件名与正反条件对比）；仅当原文确实包含后续待办或跟进计划时才输出 `### 下一步行动`，若原文未提及任何待办动作，必须直接省略该小节，严禁输出 `- 无（原文未提及具体待办事项）` 等空占位内容。\n3. 语言客观精炼，自动剔除无关寒暄与口头感叹杂音，不夸大进展，不编造原因与数据，严禁在括号内添加“原文提及…”等编辑批注。",
+        "effectiveInstructions": "润色要求（汇报与纪要）：\n1. 采用结论先行（BLUF）结构重组流水账口述：首段 `### 核心结论` 用 1～2 句话直接给出当前核心观点、整体状态或拍板决定（仅归纳原话明确说出的信息，原话未点明的具体子类别切勿用常识补全）。\n2. 随后按原文实际内容组织 `### 关键决策与进展`（若为访谈或观点分享也可按 `### 核心要点` 分条归纳，完整保留所有生效指标数值、年限、百分比、组件名与正反条件对比）；仅当原文确实包含后续待办或跟进计划时才输出 `### 下一步行动`，若原文未提及任何待办动作，必须直接省略该小节，严禁输出 `- 无（原文未提及具体待办事项）` 等空占位内容。\n3. 语言客观精炼，自动剔除无关寒暄与口头感叹杂音，不夸大进展，不编造原因与数据，严禁在括号内添加“原文提及…”等编辑批注。"
+      }
+    ],
+    "starterTemplates": [
+      {
+        "id": "bug-report",
+        "name": "Bug 缺陷与复现",
+        "description": "提炼复现步骤、预期行为与实际报错",
+        "gate": "FactAnchor",
+        "instructions": "将口述整理为结构化缺陷报告：\n- `### 复现步骤`（按顺序列出触发操作、输入与配置参数）\n- `### 预期行为`\n- `### 实际现象与影响范围`\n完整保留所有生效数值、错误码与代码组件名，未提及的环境信息严禁编造。"
+      },
+      {
+        "id": "spec-ac",
+        "name": "需求规格（Spec/AC）",
+        "description": "提炼解决的问题、非目标边界与验收标准",
+        "gate": "FactAnchor",
+        "instructions": "面向 Spec-Driven AI 研发，将口述整理为轻量规格说明：\n- `### 解决的问题`\n- `### 变更范围与非目标（Out of Scope）`\n- `### 验收标准`（仅基于原话已声明的条件逐条列出，不凭空扩写新功能）。"
+      },
+      {
+        "id": "git-commit",
+        "name": "Commit 说明",
+        "description": "生成简明提交首行与核心改动要点",
+        "gate": "FactAnchor",
+        "instructions": "将口述提炼为规范的代码提交说明：\n- 首行：50 字内简明概括本次改动意图与模块；\n- 空一行后用 `- ` 列出核心变更点与兼容边界（保留精确接口名与数值）。"
+      }
+    ],
+    "presetForm": null,
+    "deletePreset": null
+  },
+  "models": {
+    "tab": "speech",
+    "navBadge": null,
+    "hardware": {
+      "summary": "Apple Silicon · 32 GB 统一内存 · Metal GPU 加速",
+      "residency": "并发常驻预估 15.1 GB / 安全预算 15.4 GB",
+      "budgetPercent": 98,
+      "overBudget": false,
+      "modeNote": "识别、整理与翻译可在安全预算内同时预热，切换零等待",
+      "diskUsed": "尚未下载本地模型，同意后才开始下载",
+      "anyCloud": false,
+      "privacyStatus": "语音识别、整理与翻译均在此设备离线完成，数据不出本机",
+      "isRecommended": false,
+      "isRecommendedDownloading": false,
+      "recommendActionLabel": "下载并启用最佳匹配（14.02 GB）"
+    },
+    "downloads": [],
+    "stages": [
+      {
+        "stage": "speech",
+        "tabTitle": "语音识别",
+        "tabSummary": "Qwen3-ASR 1.7B · 待下载",
+        "busy": false,
+        "title": "语音识别模型",
+        "desc": "决定听写成句与录音文件转录的字准率；可选云端 Qwen-Audio-3.1-ASR（流式+分级热词+原生润色）或本机离线模型",
+        "localOnly": false,
+        "notice": null,
+        "cloudStep": "speech",
+        "cloudRouted": false,
+        "cloudInvalid": false,
+        "cloudOptions": [],
+        "options": [
+          {
+            "id": "qwen3-asr-1.7b-int8",
+            "rank": 1,
+            "name": "Qwen3-ASR 1.7B · 旗舰本地识别",
+            "summary": "Qwen 开源最强本地 ASR（30 语种 + 22 方言），支持长从句语境消歧与中英热词偏置，免费离线",
+            "quality": 3,
+            "speed": 1,
+            "footprint": "磁盘占用 2.40 GB · 运行常驻约 3.0 GB",
+            "fit": "recommended",
+            "fitBadge": "★ 本机最佳匹配",
+            "fitDetail": null,
+            "active": true,
+            "pendingActivation": false,
+            "installed": false,
+            "downloading": false,
+            "downloadPercent": null,
+            "downloadText": null,
+            "error": null,
+            "canSelectImmediate": false,
+            "canDownload": true,
+            "downloadActionLabel": "下载（2.40 GB）",
+            "canDelete": false,
+            "deleteActionLabel": null
+          },
+          {
+            "id": "qwen3-asr-0.6b-int8",
+            "rank": 2,
+            "name": "Qwen3-ASR 0.6B · 均衡高精度识别",
+            "summary": "支持研发术语与口音纠错热词偏置，低内存负载下依然稳健",
+            "quality": 2,
+            "speed": 2,
+            "footprint": "磁盘占用 879 MB · 运行常驻约 1.3 GB",
+            "fit": "supported",
+            "fitBadge": "可流畅运行",
+            "fitDetail": null,
+            "active": false,
+            "pendingActivation": false,
+            "installed": false,
+            "downloading": false,
+            "downloadPercent": null,
+            "downloadText": null,
+            "error": null,
+            "canSelectImmediate": true,
+            "canDownload": true,
+            "downloadActionLabel": "下载并启用（879 MB）",
+            "canDelete": false,
+            "deleteActionLabel": null
+          },
+          {
+            "id": "x-asr-offline-int8",
+            "rank": 3,
+            "name": "X-ASR Offline · 轻快识别",
+            "summary": "非自回归轻量架构，常驻省约 0.6 GB 内存，适合重度后台任务场景降级使用",
+            "quality": 1,
+            "speed": 3,
+            "footprint": "磁盘占用 136 MB · 运行常驻约 0.8 GB",
+            "fit": "supported",
+            "fitBadge": "可流畅运行",
+            "fitDetail": null,
+            "active": false,
+            "pendingActivation": false,
+            "installed": false,
+            "downloading": false,
+            "downloadPercent": null,
+            "downloadText": null,
+            "error": null,
+            "canSelectImmediate": true,
+            "canDownload": true,
+            "downloadActionLabel": "下载并启用（136 MB）",
+            "canDelete": false,
+            "deleteActionLabel": null
+          }
+        ],
+        "localHostSupported": true,
+        "localHostRouted": false,
+        "localHosts": []
+      },
+      {
+        "stage": "cleaner",
+        "tabTitle": "整理与润色",
+        "tabSummary": "Qwen3.5 9B · 待下载",
+        "busy": false,
+        "title": "整理与润色模型",
+        "desc": "接上碎句、去掉口头语并结合词表修正同音误识别；同一时间在本机离线模型与云端模型之间二选一",
+        "localOnly": false,
+        "notice": null,
+        "cloudStep": "clean",
+        "cloudRouted": false,
+        "cloudInvalid": false,
+        "cloudOptions": [],
+        "options": [
+          {
+            "id": "qwen3.6-35b-a3b-cleaner",
+            "rank": 1,
+            "name": "Qwen3.6 35B-A3B · 旗舰全能合一（MoE）",
+            "summary": "每 token 仅激活 3B 参数兼顾高速生成与 35B 级语义理解；与翻译同选时共用单实例、仅占单份磁盘与内存",
+            "quality": 3,
+            "speed": 2,
+            "footprint": "磁盘占用 17.73 GB · 运行常驻约 18.4 GB",
+            "fit": "heavy",
+            "fitBadge": "高负载 · 切换需加载",
+            "fitDetail": "内存占用较高，与另一角色切换时自动释放对端并按需加载",
+            "active": false,
+            "pendingActivation": false,
+            "installed": false,
+            "downloading": false,
+            "downloadPercent": null,
+            "downloadText": null,
+            "error": null,
+            "canSelectImmediate": true,
+            "canDownload": true,
+            "downloadActionLabel": "下载并启用（17.73 GB）",
+            "canDelete": false,
+            "deleteActionLabel": null
+          },
+          {
+            "id": "qwen3.5-9b-q4km",
+            "rank": 2,
+            "name": "Qwen3.5 9B · 旗舰深层润色",
+            "summary": "32 GB 默认推荐：长篇多段口述的跨句逻辑缝合与隐蔽同音技术词还原能力强",
+            "quality": 3,
+            "speed": 1,
+            "footprint": "磁盘占用 5.68 GB · 运行常驻约 6.0 GB",
+            "fit": "recommended",
+            "fitBadge": "★ 本机最佳匹配",
+            "fitDetail": null,
+            "active": true,
+            "pendingActivation": false,
+            "installed": false,
+            "downloading": false,
+            "downloadPercent": null,
+            "downloadText": null,
+            "error": null,
+            "canSelectImmediate": false,
+            "canDownload": true,
+            "downloadActionLabel": "下载（5.68 GB）",
+            "canDelete": false,
+            "deleteActionLabel": null
+          },
+          {
+            "id": "qwen3.5-4b-q4km",
+            "rank": 3,
+            "name": "Qwen3.5 4B · 标准均衡整理",
+            "summary": "准确执行去口头语、自我纠正与全文润色，内存与速度均衡",
+            "quality": 2,
+            "speed": 2,
+            "footprint": "磁盘占用 2.74 GB · 运行常驻约 2.9 GB",
+            "fit": "supported",
+            "fitBadge": "可流畅运行",
+            "fitDetail": null,
+            "active": false,
+            "pendingActivation": false,
+            "installed": false,
+            "downloading": false,
+            "downloadPercent": null,
+            "downloadText": null,
+            "error": null,
+            "canSelectImmediate": true,
+            "canDownload": true,
+            "downloadActionLabel": "下载并启用（2.74 GB）",
+            "canDelete": false,
+            "deleteActionLabel": null
+          },
+          {
+            "id": "qwen3.5-2b-q4km",
+            "rank": 4,
+            "name": "Qwen3.5 2B · 轻快基础整理",
+            "summary": "低内存与 CPU 友好，提供快速断句标点与基础语气词清理",
+            "quality": 1,
+            "speed": 3,
+            "footprint": "磁盘占用 1.28 GB · 运行常驻约 1.6 GB",
+            "fit": "supported",
+            "fitBadge": "可流畅运行",
+            "fitDetail": null,
+            "active": false,
+            "pendingActivation": false,
+            "installed": false,
+            "downloading": false,
+            "downloadPercent": null,
+            "downloadText": null,
+            "error": null,
+            "canSelectImmediate": true,
+            "canDownload": true,
+            "downloadActionLabel": "下载并启用（1.28 GB）",
+            "canDelete": false,
+            "deleteActionLabel": null
+          }
+        ],
+        "localHostSupported": true,
+        "localHostRouted": false,
+        "localHosts": []
+      },
+      {
+        "stage": "translator",
+        "tabTitle": "翻译",
+        "tabSummary": "Index-Translate 9B · 待下载",
+        "busy": false,
+        "title": "翻译模型",
+        "desc": "中英双向翻译与代码结构保留；同一时间在本机离线模型与云端模型之间二选一，绝不静默切换",
+        "localOnly": false,
+        "notice": null,
+        "cloudStep": "translate",
+        "cloudRouted": false,
+        "cloudInvalid": false,
+        "cloudOptions": [],
+        "options": [
+          {
+            "id": "qwen3.6-35b-a3b-translator",
+            "rank": 1,
+            "name": "Qwen3.6 35B-A3B · 旗舰全能合一（MoE）",
+            "summary": "35B 级复杂语境中英互译且每 token 仅激活 3B 参数；与整理同选时共用单实例、切换零等待",
+            "quality": 3,
+            "speed": 2,
+            "footprint": "磁盘占用 17.73 GB · 运行常驻约 18.4 GB",
+            "fit": "heavy",
+            "fitBadge": "高负载 · 切换需加载",
+            "fitDetail": "内存占用较高，与另一角色切换时自动释放对端并按需加载",
+            "active": false,
+            "pendingActivation": false,
+            "installed": false,
+            "downloading": false,
+            "downloadPercent": null,
+            "downloadText": null,
+            "error": null,
+            "canSelectImmediate": true,
+            "canDownload": true,
+            "downloadActionLabel": "下载并启用（17.73 GB）",
+            "canDelete": false,
+            "deleteActionLabel": null
+          },
+          {
+            "id": "index-translate-9b-q4km",
+            "rank": 2,
+            "name": "Index-Translate 9B · 旗舰专精翻译",
+            "summary": "32 GB 默认推荐：基于 Qwen3.5 深度专训，术语遵循、代码版式与长文连贯性全面领先",
+            "quality": 3,
+            "speed": 2,
+            "footprint": "磁盘占用 5.78 GB · 运行常驻约 6.1 GB",
+            "fit": "recommended",
+            "fitBadge": "★ 本机最佳匹配",
+            "fitDetail": null,
+            "active": true,
+            "pendingActivation": false,
+            "installed": false,
+            "downloading": false,
+            "downloadPercent": null,
+            "downloadText": null,
+            "error": null,
+            "canSelectImmediate": false,
+            "canDownload": true,
+            "downloadActionLabel": "下载（5.78 GB）",
+            "canDelete": false,
+            "deleteActionLabel": null
+          },
+          {
+            "id": "hy-mt2-7b-q4km",
+            "rank": 3,
+            "name": "Hy-MT2 7B · 高质量翻译",
+            "summary": "腾讯混元专用翻译模型，技术长句语义准确，代码与结构化格式通过率达 94%",
+            "quality": 3,
+            "speed": 2,
+            "footprint": "磁盘占用 4.62 GB · 运行常驻约 4.9 GB",
+            "fit": "supported",
+            "fitBadge": "可流畅运行",
+            "fitDetail": null,
+            "active": false,
+            "pendingActivation": false,
+            "installed": false,
+            "downloading": false,
+            "downloadPercent": null,
+            "downloadText": null,
+            "error": null,
+            "canSelectImmediate": true,
+            "canDownload": true,
+            "downloadActionLabel": "下载并启用（4.62 GB）",
+            "canDelete": false,
+            "deleteActionLabel": null
+          },
+          {
+            "id": "index-translate-2b-q4km",
+            "rank": 4,
+            "name": "Index-Translate 2B · 轻快高质翻译",
+            "summary": "新一代 2B 专用翻译模型，兼顾 0.1 秒级响应与优于 1.8B 的术语约束能力",
+            "quality": 2,
+            "speed": 3,
+            "footprint": "磁盘占用 1.31 GB · 运行常驻约 1.6 GB",
+            "fit": "supported",
+            "fitBadge": "可流畅运行",
+            "fitDetail": null,
+            "active": false,
+            "pendingActivation": false,
+            "installed": false,
+            "downloading": false,
+            "downloadPercent": null,
+            "downloadText": null,
+            "error": null,
+            "canSelectImmediate": true,
+            "canDownload": true,
+            "downloadActionLabel": "下载并启用（1.31 GB）",
+            "canDelete": false,
+            "deleteActionLabel": null
+          },
+          {
+            "id": "hy-mt2-1.8b-q4km",
+            "rank": 5,
+            "name": "Hy-MT2 1.8B · 极速轻量翻译",
+            "summary": "首字约 0.1 秒，最低内存占用，适合高负载场景手动降级使用",
+            "quality": 2,
+            "speed": 3,
+            "footprint": "磁盘占用 1.13 GB · 运行常驻约 1.4 GB",
+            "fit": "supported",
+            "fitBadge": "可流畅运行",
+            "fitDetail": null,
+            "active": false,
+            "pendingActivation": false,
+            "installed": false,
+            "downloading": false,
+            "downloadPercent": null,
+            "downloadText": null,
+            "error": null,
+            "canSelectImmediate": true,
+            "canDownload": true,
+            "downloadActionLabel": "下载并启用（1.13 GB）",
+            "canDelete": false,
+            "deleteActionLabel": null
+          }
+        ],
+        "localHostSupported": true,
+        "localHostRouted": false,
+        "localHosts": []
+      }
+    ],
+    "storage": {
+      "tabTitle": "本地存储",
+      "tabSummary": "尚未下载",
+      "totalSize": "0 MB",
+      "breakdown": "本机尚未下载任何模型，所有模型均在征得你同意后才会下载",
+      "path": "/models",
+      "items": [],
+      "legacy": {
+        "count": 0,
+        "text": ""
+      }
+    },
+    "form": null,
+    "deleteConfirm": null,
+    "consent": null,
+    "hotHost": null,
+    "localHostRefreshing": false
+  },
+  "about": {
+    "version": "2.0.0",
+    "update": {
+      "status": "尚未检查。",
+      "percent": null,
+      "busy": false,
+      "canCheck": true,
+      "canRestart": false,
+      "canDownload": false
+    },
+    "diagnostics": [
+      {
+        "label": "版本",
+        "value": "2.0.0"
+      },
+      {
+        "label": "系统",
+        "value": "macOS 15.0 Arm64"
+      },
+      {
+        "label": "推理后端",
+        "value": "Metal GPU · 32 GB"
+      },
+      {
+        "label": "界面语言",
+        "value": "en-US"
+      },
+      {
+        "label": "识别模型",
+        "value": "Qwen3-ASR 1.7B"
+      },
+      {
+        "label": "整理模型",
+        "value": "Qwen3.5 9B"
+      },
+      {
+        "label": "翻译模型",
+        "value": "Index-Translate 9B"
+      },
+      {
+        "label": "整理句子",
+        "value": "开"
+      },
+      {
+        "label": "云端识别",
+        "value": "关"
+      },
+      {
+        "label": "云端翻译",
+        "value": "关"
+      },
+      {
+        "label": "云端整理",
+        "value": "关"
+      },
+      {
+        "label": "云端服务端点",
+        "value": "0"
+      },
+      {
+        "label": "API 密钥",
+        "value": "未保存"
+      },
+      {
+        "label": "旧版本模型",
+        "value": "0"
+      }
+    ]
+  },
+  "options": {
+    "animations": true,
+    "theme": "Auto"
+  }
+}

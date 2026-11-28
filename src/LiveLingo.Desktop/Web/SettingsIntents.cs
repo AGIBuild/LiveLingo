@@ -87,6 +87,15 @@ internal sealed class SettingsIntents : IIntentHandler
             case DeleteModelIntent deleteModel: Run(() => _vm.DeleteModelAsync(deleteModel.ModelId)); break;
             case ApplyRecommendedModelsIntent: _vm.ApplyRecommendedModels(); break;
             case RemoveLegacyModelsIntent: Run(() => _vm.RemoveLegacyModelsCommand.ExecuteAsync(null)); break;
+            case RefreshLocalHostsIntent: Run(() => _vm.RefreshLocalHostsAsync()); break;
+            case SelectLocalHostModelIntent selectHostModel: _vm.SelectLocalHostModel(selectHostModel.Stage, selectHostModel.HostId, selectHostModel.ModelKey); break;
+            case ApplyHotLocalHostModelIntent applyHot: _vm.ApplyHotLocalHostModel(applyHot.HostId, applyHot.ModelKey); break;
+            case DownloadLocalHostModelIntent dlHost: Run(() => _vm.DownloadLocalHostModelAsync(dlHost.HostId, dlHost.Stage, dlHost.CatalogModelId)); break;
+            case StartLocalHostServerIntent startHost: Run(() => _vm.StartLocalHostServerAsync(startHost.HostId)); break;
+            case OpenLocalHostAppIntent openHost: _vm.OpenLocalHostApp(openHost.HostId); break;
+            case SaveLocalHostConfigIntent saveHost: Run(() => _vm.SaveLocalHostConfigAsync(saveHost.HostId, saveHost.BaseUrl, saveHost.ApiToken, saveHost.ClearToken)); break;
+            case AddCustomLocalHostIntent addHost: Run(() => _vm.AddCustomLocalHostAsync(addHost.Label, addHost.BaseUrl)); break;
+            case RemoveCustomLocalHostIntent removeHost: Run(() => _vm.RemoveCustomLocalHostAsync(removeHost.HostId)); break;
             case CheckUpdatesIntent:
                 if (_updates is not null)
                     Run(() => _updates.CheckNowAsync());

@@ -1,4 +1,5 @@
 using LiveLingo.Core.Cloud;
+using LiveLingo.Core.LocalHost;
 using LiveLingo.Core.Models;
 
 namespace LiveLingo.Core.Inference;
@@ -10,5 +11,6 @@ public static class ServiceFailure
     /// reached, not configured), as opposed to a failure caused by one unit's content.
     /// </summary>
     public static bool IsUnavailable(Exception ex) =>
-        ex is HttpRequestException or LlamaServerStartException or ModelNotReadyException or CloudNotConfiguredException or CloudSpeechException;
+        ex is HttpRequestException or LlamaServerStartException or ModelNotReadyException
+            or CloudNotConfiguredException or CloudSpeechException or LocalHostUnavailableException;
 }

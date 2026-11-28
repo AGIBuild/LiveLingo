@@ -25,7 +25,7 @@ public sealed class SettingsPageTests(BrowserFixture browsers)
 
         Assert.Single(await page.IntentsAsync(), i => i is ReadyIntent);
         Assert.Equal("zh-CN", await page.Page.EvaluateAsync<string>("document.documentElement.lang"));
-        Assert.Equal(4, await page.Page.Locator("nav button").CountAsync());
+        Assert.Equal(6, await page.Page.Locator("nav button").CountAsync());
         Assert.Equal(0, await page.Page.Locator("#nav-privacy").CountAsync());
         Assert.Equal("page", await page.Page.Locator("#nav-general").GetAttributeAsync("aria-current"));
         Assert.Equal(7, await page.Page.Locator("#panel .srow").CountAsync());
@@ -84,11 +84,11 @@ public sealed class SettingsPageTests(BrowserFixture browsers)
     {
         await using var page = await browsers.OpenSettingsAsync(engine);
 
-        Assert.Equal("Enter", await page.Page.Locator("#commit").InputValueAsync());
-        Assert.Equal("en-US", await page.Page.Locator("#language").InputValueAsync());
-        Assert.Equal("Auto", await page.Page.Locator("#theme").InputValueAsync());
+        Assert.True(await page.Page.Locator("#commit input[value='Enter']").IsCheckedAsync());
+        Assert.True(await page.Page.Locator("#language input[value='en-US']").IsCheckedAsync());
+        Assert.True(await page.Page.Locator("#theme input[value='Auto']").IsCheckedAsync());
         Assert.False(await page.Page.Locator("#motion").IsCheckedAsync());
-        Assert.Equal(S("theme.auto"), (await page.Page.Locator("#theme option:checked").InnerTextAsync()).Trim());
+        Assert.Contains(S("theme.auto"), await page.Page.Locator("#theme .choice-card.on").InnerTextAsync());
         Assert.NotEmpty(await page.Page.Locator("#hotkey").InnerTextAsync());
         Assert.Equal(0, await page.Page.Locator(".err").CountAsync());
     }
@@ -102,7 +102,7 @@ public sealed class SettingsPageTests(BrowserFixture browsers)
         Assert.Equal("dark", await page.Page.EvaluateAsync<string>("document.documentElement.dataset.theme"));
         Assert.Equal("off", await page.Page.EvaluateAsync<string>("document.documentElement.dataset.motion"));
         Assert.True(await page.Page.Locator("#motion").IsCheckedAsync());
-        Assert.Equal("CtrlEnter", await page.Page.Locator("#commit").InputValueAsync());
+        Assert.True(await page.Page.Locator("#commit input[value='CtrlEnter']").IsCheckedAsync());
     }
 
     [Theory]
@@ -134,6 +134,9 @@ public sealed class SettingsPageTests(BrowserFixture browsers)
         Assert.Equal([S("mic.default"), "USB Mic", "Built-in"], (await page.Page.Locator("#mic option").AllInnerTextsAsync()).Select(t => t.Trim()));
         Assert.Equal("USB Mic", await page.Page.Locator("#mic").InputValueAsync());
         Assert.False(await page.Page.Locator("#cleanup").IsCheckedAsync());
+
+        await page.PushAsync("settings-glossary");
+        await page.Page.Locator("#gl-tab-terms").ClickAsync();
         Assert.Equal(2, await page.Page.Locator(".term").CountAsync());
         Assert.Contains("cache penetration", await page.Page.Locator(".term").Nth(1).InnerTextAsync());
         Assert.True(await page.Page.Locator("#term-add").IsDisabledAsync());
@@ -143,7 +146,8 @@ public sealed class SettingsPageTests(BrowserFixture browsers)
     [MemberData(nameof(Engines))]
     public async Task PolishRequirements_SaveOnlyWhenLeavingTheBox(string engine)
     {
-        await using var page = await browsers.OpenSettingsAsync(engine, "settings-voice");
+        await using var page = await browsers.OpenSettingsAsync(engine, "settings-polish");
+        await page.Page.Locator("#polish-advanced > summary").ClickAsync();
         Assert.NotEmpty(await page.Page.Locator("#polish").InputValueAsync());
         await page.ClearIntentsAsync();
         await page.Page.Locator("#polish").FillAsync("Keep my voice. Fix grammar without adding facts.");
@@ -218,12 +222,16 @@ public sealed class SettingsPageTests(BrowserFixture browsers)
         Assert.Equal(0, await page.Page.Locator("#version").CountAsync());
         Assert.Equal(0, await page.Page.Locator("#update-action").CountAsync());
 
-        // Hardware banner + 4 focused category/storage tabs; only one panel renders at a time.
+        // Hardware banner + 4 focused category/storage tabs on a single unwrapped row; only one panel renders at a time.
         Assert.Equal(1, await page.Page.Locator("#models-hw").CountAsync());
         Assert.Equal(1, await page.Page.Locator("#models-best-badge").CountAsync());
         Assert.Equal(4, await page.Page.Locator("#models-tabs [role=tab]").CountAsync());
-        Assert.Equal(1, await page.Page.Locator("#stage-cloud-empty-speech").CountAsync());
-        Assert.Contains("Qwen-Audio-3.1-ASR", await page.Page.Locator("#stage-cloud-empty-speech").InnerTextAsync());
+        var tabTops = await page.Page.Locator("#models-tabs [role=tab]").EvaluateAllAsync<double[]>(
+            "els => els.map(e => Math.round(e.getBoundingClientRect().top))");
+        Assert.Single(tabTops.Distinct());
+        var sourceTops = await page.Page.Locator(".source-seg button").EvaluateAllAsync<double[]>(
+            "els => els.map(e => Math.round(e.getBoundingClientRect().top))");
+        Assert.Single(sourceTops.Distinct());
         Assert.Equal(["#1", "#2", "#3"], await page.Page.Locator("#stage-speech .mcard:not(.cloud) .mrank").AllInnerTextsAsync());
         Assert.Contains("Qwen3-ASR 1.7B", await page.Page.Locator("#model-card-qwen3-asr-1\\.7b-int8").InnerTextAsync());
         Assert.True(await page.Page.Locator("#model-radio-qwen3-asr-1\\.7b-int8").IsCheckedAsync());
@@ -231,12 +239,18 @@ public sealed class SettingsPageTests(BrowserFixture browsers)
         Assert.Equal(0, await page.Page.Locator("#stage-cleaner").CountAsync());
         Assert.Equal(0, await page.Page.Locator("#stage-translator").CountAsync());
 
-        // Switch across purpose categories and verify ranked options, inline cloud onboarding & 32 GB baseline defaults + unified MoE option.
+        // Switching the Speech source segmented control to Cloud shows Qwen-Audio-3.1-ASR onboarding.
+        await page.Page.Locator("#source-cloud-speech").ClickAsync();
+        Assert.Equal(1, await page.Page.Locator("#stage-cloud-empty-speech").CountAsync());
+        Assert.Contains("Qwen-Audio-3.1-ASR", await page.Page.Locator("#stage-cloud-empty-speech").InnerTextAsync());
+
+        // Switch across purpose categories and verify ranked options, source-switched cloud onboarding & 32 GB baseline defaults + unified MoE option.
         await page.Page.Locator("#model-tab-cleaner").ClickAsync();
-        Assert.Equal(1, await page.Page.Locator("#stage-cloud-empty-cleaner").CountAsync());
         Assert.Equal(["#1", "#2", "#3", "#4"], await page.Page.Locator("#stage-cleaner .mcard:not(.cloud) .mrank").AllInnerTextsAsync());
         Assert.Equal(1, await page.Page.Locator("#model-download-qwen3\\.6-35b-a3b-cleaner").CountAsync());
         Assert.True(await page.Page.Locator("#model-radio-qwen3\\.5-9b-q4km").IsCheckedAsync());
+        await page.Page.Locator("#source-cloud-cleaner").ClickAsync();
+        Assert.Equal(1, await page.Page.Locator("#stage-cloud-empty-cleaner").CountAsync());
 
         await page.Page.Locator("#model-tab-cleaner").PressAsync("ArrowRight");
         Assert.Equal(["#1", "#2", "#3", "#4", "#5"], await page.Page.Locator("#stage-translator .mcard:not(.cloud) .mrank").AllInnerTextsAsync());
@@ -296,9 +310,10 @@ public sealed class SettingsPageTests(BrowserFixture browsers)
     [MemberData(nameof(Engines))]
     public async Task HostText_IsNeverInterpretedAsMarkup(string engine)
     {
-        await using var page = await browsers.OpenSettingsAsync(engine, "settings-voice");
+        await using var page = await browsers.OpenSettingsAsync(engine, "settings-glossary");
+        await page.Page.Locator("#gl-tab-terms").ClickAsync();
 
-        await page.PushAsync("settings-voice", s => s["voice"]!["terms"]![0]!["source"] = "<img src=x onerror=\"window.__pwned=1\">");
+        await page.PushAsync("settings-glossary", s => s["voice"]!["terms"]![0]!["source"] = "<img src=x onerror=\"window.__pwned=1\">");
 
         Assert.Equal(0, await page.Page.Locator(".term img").CountAsync());
         Assert.Contains("<img", await page.Page.Locator(".term").First.InnerTextAsync());
@@ -379,12 +394,12 @@ public sealed class SettingsPageTests(BrowserFixture browsers)
     {
         await using var page = await browsers.OpenSettingsAsync(engine);
 
-        await page.Page.Locator("#commit").SelectOptionAsync("CtrlEnter");
-        await page.Page.Locator("#language").SelectOptionAsync("en-US");
-        await page.Page.Locator("#theme").SelectOptionAsync("Dark");
+        await page.Page.Locator("#commit label", new() { HasTextString = S("commit.ctrlEnter") }).ClickAsync();
+        await page.Page.Locator("#language label", new() { HasTextString = "中文" }).ClickAsync();
+        await page.Page.Locator("#theme label", new() { HasTextString = S("theme.dark") }).ClickAsync();
 
         Assert.Equal(
-            [("commitKey", "CtrlEnter"), ("language", "en-US"), ("theme", "Dark")],
+            [("commitKey", "CtrlEnter"), ("language", "zh-CN"), ("theme", "Dark")],
             (await page.IntentsAsync()).OfType<SettingIntent>().Select(s => (s.Key, s.Value)));
     }
 
@@ -399,10 +414,10 @@ public sealed class SettingsPageTests(BrowserFixture browsers)
         Assert.Equal(("rememberChoices", "false"), (remember.Key, remember.Value));
 
         await using var voice = await browsers.OpenSettingsAsync(engine, "settings-voice");
-        Assert.Equal("Clean", await voice.Page.Locator("#output").InputValueAsync());
+        Assert.True(await voice.Page.Locator("#output input[value='Clean']").IsCheckedAsync());
         Assert.False(await voice.Page.Locator("#auto-dictate").IsCheckedAsync());
         Assert.True(await voice.Page.Locator("#preload").IsCheckedAsync());
-        await voice.Page.Locator("#output").SelectOptionAsync("Translate");
+        await voice.Page.Locator("#output label", new() { HasTextString = S("output.translate") }).ClickAsync();
         await voice.Page.Locator("#auto-dictate").ClickAsync();
         await voice.Page.Locator("#preload").ClickAsync();
 
@@ -445,7 +460,7 @@ public sealed class SettingsPageTests(BrowserFixture browsers)
     [MemberData(nameof(Engines))]
     public async Task PolishPresets_SupportStarterTemplatesInspectToggleAndSafeDeleteDialog(string engine)
     {
-        await using var page = await browsers.OpenSettingsAsync(engine, "settings-voice");
+        await using var page = await browsers.OpenSettingsAsync(engine, "settings-polish");
 
         Assert.Equal(5, await page.Page.Locator(".preset-row").CountAsync());
         await page.Page.Locator("#preset-on-formal").ClickAsync();
@@ -475,13 +490,17 @@ public sealed class SettingsPageTests(BrowserFixture browsers)
         await using var page = await browsers.OpenSettingsAsync(engine, "settings-voice");
 
         await page.Page.Locator("#mic").SelectOptionAsync("Built-in");
-        await page.Page.Locator("#direction").SelectOptionAsync("Chinese");
+        await page.Page.Locator("#direction label", new() { HasTextString = S("direction.enZh") }).ClickAsync();
         await page.Page.Locator("#cleanup").ClickAsync();
-        await page.Page.Locator("#builtin-terms").ClickAsync();
 
         Assert.Equal(
-            [("microphone", "Built-in"), ("direction", "Chinese"), ("cleanup", "true"), ("builtInGlossary", "false")],
+            [("microphone", "Built-in"), ("direction", "Chinese"), ("cleanup", "true")],
             (await page.IntentsAsync()).OfType<SettingIntent>().Select(s => (s.Key, s.Value)));
+
+        await page.PushAsync("settings-glossary");
+        await page.ClearIntentsAsync();
+        await page.Page.Locator("#builtin-terms").ClickAsync();
+        Assert.Equal(("builtInGlossary", "false"), ((await page.LastIntentAsync<SettingIntent>()).Key, (await page.LastIntentAsync<SettingIntent>()).Value));
 
         await page.ClearIntentsAsync();
         Assert.True(await page.Page.Locator("#corr-add").IsDisabledAsync());
@@ -558,34 +577,35 @@ public sealed class SettingsPageTests(BrowserFixture browsers)
         Assert.True((await page.LastIntentAsync<ConsentIntent>()).Allow);
 
         // Close modal in snapshot and verify single-radio exclusivity on the Models -> Translation tab:
-        // Cloud Main is checked (●), while local Hy-MT2 1.8B is unchecked ( ) and offers immediate local switch or disk deletion.
+        // Cloud source tab opens automatically because Cloud Main is active (●); switching to Local shows Hy-MT2 1.8B unchecked ( ) with immediate switch or deletion.
         await page.PushAsync("settings-endpoint-switch", s => s["models"]!["consent"] = null);
         await page.ClearIntentsAsync();
 
         Assert.True(await page.Page.Locator("#model-cloud-translate-main").IsCheckedAsync());
         Assert.False(await page.Page.Locator("#model-cloud-translate-other").IsCheckedAsync());
-        Assert.False(await page.Page.Locator("#model-radio-hy-mt2-1\\.8b-q4km").IsCheckedAsync());
         Assert.Equal(1, await page.Page.Locator("#stage-translator input[type=radio]:checked").CountAsync());
-        Assert.Equal(1, await page.Page.Locator("#model-delete-hy-mt2-1\\.8b-q4km").CountAsync());
 
         // Selecting another cloud endpoint asks the host (never checks the radio on its own).
         await page.Page.Locator("#model-cloud-use-translate-other").ClickAsync();
         Assert.Equal(new SelectCloudModelIntent(CloudStep.Translate, "other") { V = 1 }, await page.LastIntentAsync<SelectCloudModelIntent>());
         Assert.False(await page.Page.Locator("#model-cloud-translate-other").IsCheckedAsync());
 
-        // Switching back to local can be done either from the active cloud card ("Switch to local") or by clicking an installed local model.
+        // Switching back to local can be done either from the active cloud card ("Switch to local") or by switching to the Local source tab and clicking an installed model.
         await page.Page.Locator("#model-cloud-local-translate-main").ClickAsync();
         Assert.Equal(new UseLocalStageIntent(CloudStep.Translate) { V = 1 }, await page.LastIntentAsync<UseLocalStageIntent>());
 
-        await page.Page.Locator("#model-use-hy-mt2-1\\.8b-q4km").ClickAsync();
-        Assert.Equal(new SelectModelIntent("hy-mt2-1.8b-q4km") { V = 1 }, await page.LastIntentAsync<SelectModelIntent>());
-
-        // Inline "+ Add cloud service" and "Edit" open the endpoint modal right from the Models page without navigating away.
+        // Inline "+ Add cloud service" and "Edit" open the endpoint modal right from the Cloud source tab without navigating away.
         await page.Page.Locator("#stage-cloud-add-translator").ClickAsync();
         await page.Page.Locator("#stage-cloud-edit-translator-main").ClickAsync();
         Assert.Equal(
             [new OpenEndpointFormIntent(null) { V = 1 }, new OpenEndpointFormIntent("main") { V = 1 }],
             (await page.IntentsAsync()).OfType<OpenEndpointFormIntent>());
+
+        await page.Page.Locator("#source-local-translator").ClickAsync();
+        Assert.False(await page.Page.Locator("#model-radio-hy-mt2-1\\.8b-q4km").IsCheckedAsync());
+        Assert.Equal(1, await page.Page.Locator("#model-delete-hy-mt2-1\\.8b-q4km").CountAsync());
+        await page.Page.Locator("#model-use-hy-mt2-1\\.8b-q4km").ClickAsync();
+        Assert.Equal(new SelectModelIntent("hy-mt2-1.8b-q4km") { V = 1 }, await page.LastIntentAsync<SelectModelIntent>());
     }
 
     // --- the endpoints ----------------------------------------------------------------------------------------------
@@ -797,7 +817,7 @@ public sealed class SettingsPageTests(BrowserFixture browsers)
         await using var page = await browsers.OpenSettingsAsync(engine);
 
         await page.Page.Locator("#hotkey").ClickAsync();
-        await page.Page.Locator("#commit").FocusAsync();
+        await page.Page.Locator("#motion").FocusAsync();
 
         Assert.NotEqual(S("hotkey.prompt"), (await page.Page.Locator("#hotkey").InnerTextAsync()).Trim());
     }
@@ -808,7 +828,8 @@ public sealed class SettingsPageTests(BrowserFixture browsers)
     [MemberData(nameof(Engines))]
     public async Task AddingATerm_SendsItAndEmptiesTheForm(string engine)
     {
-        await using var page = await browsers.OpenSettingsAsync(engine, "settings-voice");
+        await using var page = await browsers.OpenSettingsAsync(engine, "settings-glossary");
+        await page.Page.Locator("#gl-tab-terms").ClickAsync();
 
         await page.Page.Locator("#term-source").FillAsync("幂等键");
         await page.Page.Locator("#term-target").FillAsync("idempotency key");
@@ -824,7 +845,8 @@ public sealed class SettingsPageTests(BrowserFixture browsers)
     [MemberData(nameof(Engines))]
     public async Task EnterAddsTheTerm_ButNotWhileAnInputMethodConfirms(string engine)
     {
-        await using var page = await browsers.OpenSettingsAsync(engine, "settings-voice");
+        await using var page = await browsers.OpenSettingsAsync(engine, "settings-glossary");
+        await page.Page.Locator("#gl-tab-terms").ClickAsync();
         await page.Page.Locator("#term-source").FillAsync("Redis");
 
         await page.Page.EvaluateAsync(@"() => {
@@ -844,7 +866,8 @@ public sealed class SettingsPageTests(BrowserFixture browsers)
     [MemberData(nameof(Engines))]
     public async Task RemovingATerm_SendsItsPosition(string engine)
     {
-        await using var page = await browsers.OpenSettingsAsync(engine, "settings-voice");
+        await using var page = await browsers.OpenSettingsAsync(engine, "settings-glossary");
+        await page.Page.Locator("#gl-tab-terms").ClickAsync();
 
         await page.Page.Locator(".term").Nth(1).GetByRole(AriaRole.Button).ClickAsync();
 
@@ -883,6 +906,21 @@ public sealed class SettingsPageTests(BrowserFixture browsers)
         await using var checking = await browsers.OpenSettingsAsync(engine, "settings-update-checking");
         Assert.Contains("indeterminate", await checking.Page.Locator("#update-progress").GetAttributeAsync("class"));
         Assert.True(await checking.Page.Locator("#update-action").IsDisabledAsync());
+    }
+
+    [Theory]
+    [MemberData(nameof(Engines))]
+    public async Task SettingsSearch_FindsItemsAcrossSectionsAndNavigates(string engine)
+    {
+        await using var page = await browsers.OpenSettingsAsync(engine, "settings-general");
+
+        await page.Page.Locator("#settings-search").FillAsync(S("nav.models"));
+        Assert.True(await page.Page.Locator("#settings-search-results .s-search-hit").CountAsync() >= 1);
+
+        await page.Page.Locator("#settings-search-results .s-search-hit").First.ClickAsync();
+        var nav = await page.LastIntentAsync<OpenSettingsIntent>();
+        Assert.Equal("models", nav.Section);
+        Assert.Equal(0, await page.Page.Locator("#settings-search-results").CountAsync());
     }
 
     [Theory]

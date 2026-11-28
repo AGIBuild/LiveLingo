@@ -2,6 +2,7 @@ using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using LiveLingo.Core.Cloud;
 using LiveLingo.Core.Drafting;
+using LiveLingo.Core.LocalHost;
 using LiveLingo.Core.Models;
 using LiveLingo.Core.Transcription;
 using LiveLingo.Core.Translation;
@@ -98,7 +99,7 @@ public sealed partial class ComposerViewModel
             _pendingImport = path;
             Banner = new BannerState(BannerKind.ModelMissing, MissingSizeLabel());
         }
-        catch (Exception ex) when (ex is CloudNotConfiguredException or CloudSpeechException
+        catch (Exception ex) when (ex is CloudNotConfiguredException or CloudSpeechException or LocalHostUnavailableException
                                    or HttpRequestException or System.Net.WebSockets.WebSocketException)
         {
             if (generation != _draftGeneration)

@@ -4,11 +4,13 @@ using CommunityToolkit.Mvvm.Input;
 using LiveLingo.Core.Cleanup;
 using LiveLingo.Core.Cloud;
 using LiveLingo.Core.Inference;
+using LiveLingo.Core.LocalHost;
 using LiveLingo.Core.Models;
 using LiveLingo.Core.Translation;
 using LiveLingo.Desktop.Composer;
 using LiveLingo.Desktop.Platform;
 using LiveLingo.Desktop.Services.Configuration;
+using LiveLingo.Desktop.Services.LocalHost;
 using LiveLingo.Desktop.Services.Preferences;
 
 namespace LiveLingo.Desktop.Settings;
@@ -95,7 +97,8 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
         RecentDrafts recent,
         IMicrophone microphone,
         ComposerPreferences preferences,
-        ModelSelectionCoordinator? modelCoordinator = null)
+        ModelSelectionCoordinator? modelCoordinator = null,
+        LocalHostCoordinator? localHostCoordinator = null)
     {
         _settings = settings;
         _secrets = secrets;
@@ -107,6 +110,9 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
         ModelCoordinator = modelCoordinator ?? new ModelSelectionCoordinator(
             settings, models, new InProcessModelDownloadCoordinator(models));
         ModelCoordinator.Changed += OnModelsChanged;
+        LocalHostCoordinator = localHostCoordinator;
+        if (LocalHostCoordinator is not null)
+            LocalHostCoordinator.Changed += OnModelsChanged;
 
         var current = settings.CloneCurrent();
         _summonHotkey = current.Hotkeys.Summon;
@@ -499,15 +505,37 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
     // Endpoints whose API key is in the secret store; read when the window opens and kept up to date by the commands below.
     private readonly HashSet<string> _keyed = [];
 
-    // ---- models ----------------------------------------------------------------------------
+    // ---- models & local hosts --------------------------------------------------------------
 
     public ModelSelectionCoordinator ModelCoordinator { get; }
+
+    public LocalHostCoordinator? LocalHostCoordinator { get; }
 
     public HardwareProfile Hardware => ModelCoordinator.Hardware;
 
     public ModelSelection ActiveModels => ModelCoordinator.ActiveSelection;
 
-    /// <summary>Raised when model selection, download progress or disk state changes (possibly on a background thread).</summary>
+    public LocalHostStageBinding SpeechLocalHost => _settings.Current.LocalHost.Speech;
+
+    public LocalHostStageBinding CleanerLocalHost => _settings.Current.LocalHost.Cleaner;
+
+    public LocalHostStageBinding TranslatorLocalHost => _settings.Current.LocalHost.Translator;
+
+    public bool LocalHostSpeech => SpeechLocalHost.IsBound;
+
+    public bool LocalHostClean => CleanerLocalHost.IsBound;
+
+    public bool LocalHostTranslate => TranslatorLocalHost.IsBound;
+
+    public bool AnyLocalHost => LocalHostSpeech || LocalHostClean || LocalHostTranslate;
+
+    public IReadOnlyList<LocalHostInstance> DiscoveredLocalHosts => LocalHostCoordinator?.Hosts ?? [];
+
+    public IReadOnlyList<LocalHostDownloadJob> LocalHostDownloads => LocalHostCoordinator?.ActiveDownloads ?? [];
+
+    public bool IsRefreshingLocalHosts => LocalHostCoordinator?.IsRefreshing == true;
+
+    /// <summary>Raised when model selection, local host discovery, download progress or disk state changes.</summary>
     public event Action? ModelsChanged;
 
     public bool SelectModel(string modelId) => ModelCoordinator.SelectModel(modelId);
@@ -519,6 +547,173 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
     public Task<bool> DeleteModelAsync(string modelId) => ModelCoordinator.DeleteModelAsync(modelId);
 
     public void ApplyRecommendedModels() => ModelCoordinator.ApplyRecommended();
+
+    /// <summary>Explicitly routes <paramref name="stage"/> to a discovered local model host (Bionic, LM Studio, Ollama, or local OpenAI-compatible ASR/LLM server).</summary>
+    public bool SelectLocalHostModel(ModelStage stage, string hostId, string modelKey)
+    {
+        if (stage is not (ModelStage.Speech or ModelStage.Cleaner or ModelStage.Translator)
+            || string.IsNullOrWhiteSpace(hostId)
+            || string.IsNullOrWhiteSpace(modelKey))
+        {
+            return false;
+        }
+
+        var host = LocalHostCoordinator?.FindHost(hostId);
+        if (stage == ModelStage.Speech)
+        {
+            var kind = host?.Kind ?? InferHostKind(hostId);
+            if (!LocalHostRoute.SupportsHttpSpeech(kind))
+                return false;
+        }
+
+        var baseUrl = host?.BaseUri?.ToString() ?? "";
+        if (string.IsNullOrEmpty(baseUrl))
+        {
+            var current = _settings.Current.LocalHost;
+            baseUrl = current.PortOverrides.TryGetValue(hostId, out var overridden)
+                ? overridden
+                : current.CustomHosts.FirstOrDefault(c => string.Equals(c.Id, hostId, StringComparison.OrdinalIgnoreCase))?.BaseUrl ?? "";
+        }
+
+        ModelCoordinator.ClearPendingActivation(stage);
+        var model = _settings.CloneCurrent();
+        var binding = new LocalHostStageBinding { HostId = hostId.Trim(), BaseUrl = baseUrl, ModelKey = modelKey.Trim() };
+        if (stage == ModelStage.Speech)
+        {
+            model.Cloud.SpeechEndpointId = "";
+            model.LocalHost.Speech = binding;
+        }
+        else if (stage == ModelStage.Cleaner)
+        {
+            model.Cloud.CleanerEndpointId = "";
+            model.LocalHost.Cleaner = binding;
+        }
+        else
+        {
+            model.Cloud.TranslatorEndpointId = "";
+            model.LocalHost.Translator = binding;
+        }
+
+        _settings.Replace(model);
+        SyncCloudSnapshot(model.Cloud);
+        ModelsChanged?.Invoke();
+        return true;
+    }
+
+    /// <summary>Binds both cleanup and translation stages to one already-loaded hot model on a shared local host.</summary>
+    public bool ApplyHotLocalHostModel(string hostId, string modelKey)
+    {
+        if (string.IsNullOrWhiteSpace(hostId) || string.IsNullOrWhiteSpace(modelKey))
+            return false;
+
+        var baseUrl = LocalHostCoordinator?.FindHost(hostId)?.BaseUri?.ToString() ?? "";
+        ModelCoordinator.ClearPendingActivation(ModelStage.Cleaner);
+        ModelCoordinator.ClearPendingActivation(ModelStage.Translator);
+
+        var model = _settings.CloneCurrent();
+        var binding = new LocalHostStageBinding { HostId = hostId.Trim(), BaseUrl = baseUrl, ModelKey = modelKey.Trim() };
+        model.Cloud.CleanerEndpointId = "";
+        model.Cloud.TranslatorEndpointId = "";
+        model.LocalHost.Cleaner = binding.DeepClone();
+        model.LocalHost.Translator = binding.DeepClone();
+        _settings.Replace(model);
+        SyncCloudSnapshot(model.Cloud);
+        ModelsChanged?.Invoke();
+        return true;
+    }
+
+    public Task RefreshLocalHostsAsync() =>
+        LocalHostCoordinator?.RefreshAsync(force: true) ?? Task.CompletedTask;
+
+    private static LocalHostKind InferHostKind(string hostId) => hostId.Trim().ToLowerInvariant() switch
+    {
+        LocalHostEnvironmentProbe.BionicHostId => LocalHostKind.Bionic,
+        LocalHostEnvironmentProbe.LmStudioHostId => LocalHostKind.LmStudio,
+        LocalHostEnvironmentProbe.OllamaHostId => LocalHostKind.Ollama,
+        _ => LocalHostKind.OpenAiLocal
+    };
+
+    public Task<bool> DownloadLocalHostModelAsync(string hostId, ModelStage stage, string catalogModelId) =>
+        LocalHostCoordinator?.StartDownloadAsync(hostId, stage, catalogModelId, Hardware) ?? Task.FromResult(false);
+
+    public Task<bool> StartLocalHostServerAsync(string hostId) =>
+        LocalHostCoordinator?.TryStartLocalServerAsync(hostId) ?? Task.FromResult(false);
+
+    public bool OpenLocalHostApp(string hostId) =>
+        LocalHostCoordinator?.TryOpenHostApp(hostId) == true;
+
+    public async Task<bool> SaveLocalHostConfigAsync(string hostId, string baseUrl, string apiToken, bool clearToken)
+    {
+        if (string.IsNullOrWhiteSpace(hostId))
+            return false;
+
+        var trimmedUrl = (baseUrl ?? "").Trim();
+        if (trimmedUrl.Length > 0 && !LocalHostRoute.TryParseLoopbackUri(trimmedUrl, out _))
+            return false;
+
+        var model = _settings.CloneCurrent();
+        if (trimmedUrl.Length > 0)
+            model.LocalHost.PortOverrides[hostId.Trim()] = trimmedUrl.TrimEnd('/');
+        else
+            model.LocalHost.PortOverrides.Remove(hostId.Trim());
+        _settings.Replace(model);
+
+        if (LocalHostCoordinator is not null)
+        {
+            if (clearToken)
+                await LocalHostCoordinator.SaveTokenAsync(hostId.Trim(), "").ConfigureAwait(true);
+            else if (!string.IsNullOrWhiteSpace(apiToken))
+                await LocalHostCoordinator.SaveTokenAsync(hostId.Trim(), apiToken.Trim()).ConfigureAwait(true);
+            else
+                await LocalHostCoordinator.RefreshAsync(force: true).ConfigureAwait(true);
+        }
+        ModelsChanged?.Invoke();
+        return true;
+    }
+
+    public async Task<bool> AddCustomLocalHostAsync(string name, string baseUrl)
+    {
+        if (!LocalHostRoute.TryParseLoopbackUri(baseUrl, out var uri) || uri is null)
+            return false;
+
+        var model = _settings.CloneCurrent();
+        var id = CustomLocalHostEntry.NewId();
+        var display = string.IsNullOrWhiteSpace(name) ? $"Local ({uri.Authority})" : name.Trim();
+        model.LocalHost.CustomHosts.Add(new CustomLocalHostEntry
+        {
+            Id = id,
+            Name = display,
+            BaseUrl = uri.ToString().TrimEnd('/')
+        });
+        _settings.Replace(model);
+        if (LocalHostCoordinator is not null)
+            await LocalHostCoordinator.RefreshAsync(force: true).ConfigureAwait(true);
+        ModelsChanged?.Invoke();
+        return true;
+    }
+
+    public async Task RemoveCustomLocalHostAsync(string hostId)
+    {
+        if (string.IsNullOrWhiteSpace(hostId))
+            return;
+
+        var model = _settings.CloneCurrent();
+        var removed = model.LocalHost.CustomHosts.RemoveAll(c => string.Equals(c.Id, hostId, StringComparison.OrdinalIgnoreCase));
+        if (removed == 0)
+            return;
+
+        if (string.Equals(model.LocalHost.Speech.HostId, hostId, StringComparison.OrdinalIgnoreCase))
+            model.LocalHost.Speech.Clear();
+        if (string.Equals(model.LocalHost.Cleaner.HostId, hostId, StringComparison.OrdinalIgnoreCase))
+            model.LocalHost.Cleaner.Clear();
+        if (string.Equals(model.LocalHost.Translator.HostId, hostId, StringComparison.OrdinalIgnoreCase))
+            model.LocalHost.Translator.Clear();
+        _settings.Replace(model);
+        await _secrets.DeleteSecretAsync(LocalHostSettings.TokenSecretIdFor(hostId)).ConfigureAwait(true);
+        if (LocalHostCoordinator is not null)
+            await LocalHostCoordinator.RefreshAsync(force: true).ConfigureAwait(true);
+        ModelsChanged?.Invoke();
+    }
 
     /// <summary>Models that earlier versions downloaded and this one no longer uses; they are only removed on request.</summary>
     [ObservableProperty]
@@ -532,6 +727,8 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
     public void Dispose()
     {
         ModelCoordinator.Changed -= OnModelsChanged;
+        if (LocalHostCoordinator is not null)
+            LocalHostCoordinator.Changed -= OnModelsChanged;
         if (_ownsCoordinator)
             ModelCoordinator.Dispose();
     }
@@ -788,15 +985,26 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
             _ => ModelStage.Cleaner
         };
         ModelCoordinator.ClearPendingActivation(stage);
-        Mutate(cloud =>
+        var model = _settings.CloneCurrent();
+        switch (step)
         {
-            switch (step)
-            {
-                case CloudStep.Speech: cloud.SpeechEndpointId = endpointId; break;
-                case CloudStep.Translate: cloud.TranslatorEndpointId = endpointId; break;
-                default: cloud.CleanerEndpointId = endpointId; break;
-            }
-        });
+            case CloudStep.Speech:
+                model.Cloud.SpeechEndpointId = endpointId;
+                model.LocalHost.Speech.Clear();
+                break;
+            case CloudStep.Translate:
+                model.Cloud.TranslatorEndpointId = endpointId;
+                model.LocalHost.Translator.Clear();
+                break;
+            default:
+                model.Cloud.CleanerEndpointId = endpointId;
+                model.LocalHost.Cleaner.Clear();
+                break;
+        }
+        _settings.Replace(model);
+        SyncCloudSnapshot(model.Cloud);
+        CloudInvalid = false;
+        ModelsChanged?.Invoke();
         return true;
     }
 
@@ -1063,6 +1271,8 @@ public sealed partial class SettingsViewModel : ObservableObject, IDisposable
         _legacyIds = legacy.Select(model => model.Id).ToList();
         LegacyBytes = legacy.Sum(model => model.SizeBytes);
         LegacyCount = legacy.Count;
+        if (LocalHostCoordinator is not null)
+            await LocalHostCoordinator.RefreshAsync(force: true).ConfigureAwait(true);
         ModelsChanged?.Invoke();
     }
 

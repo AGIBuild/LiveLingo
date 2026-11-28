@@ -1,6 +1,8 @@
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using LiveLingo.Core.Inference;
+using LiveLingo.Core.LocalHost;
 using LiveLingo.Core.Models;
 using LiveLingo.Desktop.Composer;
 using LiveLingo.Desktop.Settings;
@@ -81,6 +83,15 @@ namespace LiveLingo.Desktop.Web;
 [JsonDerivedType(typeof(TogglePresetIntent), "togglePreset")]
 [JsonDerivedType(typeof(DeletePresetIntent), "deletePreset")]
 [JsonDerivedType(typeof(PresetAnswerIntent), "presetAnswer")]
+[JsonDerivedType(typeof(RefreshLocalHostsIntent), "refreshLocalHosts")]
+[JsonDerivedType(typeof(SelectLocalHostModelIntent), "selectLocalHostModel")]
+[JsonDerivedType(typeof(ApplyHotLocalHostModelIntent), "applyHotLocalHostModel")]
+[JsonDerivedType(typeof(DownloadLocalHostModelIntent), "downloadLocalHostModel")]
+[JsonDerivedType(typeof(StartLocalHostServerIntent), "startLocalHostServer")]
+[JsonDerivedType(typeof(OpenLocalHostAppIntent), "openLocalHostApp")]
+[JsonDerivedType(typeof(SaveLocalHostConfigIntent), "saveLocalHostConfig")]
+[JsonDerivedType(typeof(AddCustomLocalHostIntent), "addCustomLocalHost")]
+[JsonDerivedType(typeof(RemoveCustomLocalHostIntent), "removeCustomLocalHost")]
 internal abstract record WebIntent
 {
     public const int Version = 1;
@@ -88,7 +99,7 @@ internal abstract record WebIntent
     /// <summary>A message may carry a whole pasted document; nothing legitimate is larger.</summary>
     public const int MaxBytes = 1 << 20;
 
-    private static readonly string[] SettingsSections = ["general", "voice", "models", "about"];
+    private static readonly string[] SettingsSections = ["general", "voice", "polish", "glossary", "models", "about"];
     private static readonly string[] ModelsTabs = ["speech", "cleaner", "translator", "storage"];
 
     public required int V { get; init; }
@@ -107,6 +118,9 @@ internal abstract record WebIntent
 
     protected static bool IsPresetId(string value) =>
         value.Length is >= 1 and <= 64 && value.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_');
+
+    protected static bool IsHostId(string value) =>
+        value.Length is >= 1 and <= 64 && value.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_' or ':');
 
     protected static bool IsSelectableModelId(string value) => ModelCatalog.FindSelectable(value) is not null;
 
@@ -463,3 +477,57 @@ internal sealed record DeletePresetIntent(string Id) : WebIntent
 }
 
 internal sealed record PresetAnswerIntent(bool Allow) : WebIntent;
+
+internal sealed record RefreshLocalHostsIntent : WebIntent;
+
+internal sealed record SelectLocalHostModelIntent(ModelStage Stage, string HostId, string ModelKey) : WebIntent
+{
+    protected override bool IsValid =>
+        Stage is ModelStage.Speech or ModelStage.Cleaner or ModelStage.Translator
+        && IsHostId(HostId)
+        && ModelKey.Length is >= 1 and <= 256;
+}
+
+internal sealed record ApplyHotLocalHostModelIntent(string HostId, string ModelKey) : WebIntent
+{
+    protected override bool IsValid => IsHostId(HostId) && ModelKey.Length is >= 1 and <= 256;
+}
+
+internal sealed record DownloadLocalHostModelIntent(string HostId, ModelStage Stage, string CatalogModelId) : WebIntent
+{
+    protected override bool IsValid =>
+        IsHostId(HostId)
+        && Stage is ModelStage.Cleaner or ModelStage.Translator
+        && IsSelectableModelId(CatalogModelId);
+}
+
+internal sealed record StartLocalHostServerIntent(string HostId) : WebIntent
+{
+    protected override bool IsValid => IsHostId(HostId);
+}
+
+internal sealed record OpenLocalHostAppIntent(string HostId) : WebIntent
+{
+    protected override bool IsValid => IsHostId(HostId);
+}
+
+internal sealed record SaveLocalHostConfigIntent(string HostId, string BaseUrl, string ApiToken, bool ClearToken) : WebIntent
+{
+    protected override bool IsValid =>
+        IsHostId(HostId)
+        && BaseUrl.Length <= 256
+        && (BaseUrl.Length == 0 || LocalHostRoute.TryParseLoopbackUri(BaseUrl, out _))
+        && ApiToken.Length <= 4_096;
+
+    public override string ToString() => nameof(SaveLocalHostConfigIntent);
+}
+
+internal sealed record AddCustomLocalHostIntent(string Label, string BaseUrl) : WebIntent
+{
+    protected override bool IsValid => Label.Length <= 40 && LocalHostRoute.TryParseLoopbackUri(BaseUrl, out _);
+}
+
+internal sealed record RemoveCustomLocalHostIntent(string HostId) : WebIntent
+{
+    protected override bool IsValid => IsHostId(HostId);
+}

@@ -10,6 +10,7 @@ using LiveLingo.Core.Cloud;
 using LiveLingo.Core.Dictation;
 using LiveLingo.Core.Drafting;
 using LiveLingo.Core.Inference;
+using LiveLingo.Core.LocalHost;
 using LiveLingo.Core.Models;
 using LiveLingo.Core.Transcription;
 using LiveLingo.Core.Translation;
@@ -20,6 +21,7 @@ using LiveLingo.Desktop.Platform.macOS;
 using LiveLingo.Desktop.Platform.Windows;
 using LiveLingo.Desktop.Services.Cloud;
 using LiveLingo.Desktop.Services.Configuration;
+using LiveLingo.Desktop.Services.LocalHost;
 using LiveLingo.Desktop.Services.Localization;
 using LiveLingo.Desktop.Services.Preferences;
 using LiveLingo.Desktop.Services.Update;
@@ -108,10 +110,13 @@ public partial class App : Application
             new JsonPreferencesStore(Path.Combine(UserData.Directory, "preferences.json"), sp.GetService<ILogger<JsonPreferencesStore>>()));
         services.AddSingleton<ComposerPreferences>();
         services.AddSingleton<ModelSelectionCoordinator>();
+        services.AddSingleton<ILocalHostEnvironmentProbe, LocalHostEnvironmentProbe>();
+        services.AddSingleton<LocalHostCoordinator>();
         services.AddSingleton<ModelWarmup>();
 
-        // Registered after AddLiveLingoCore so it replaces the local-only default: roles go to the cloud only when the user enabled them.
+        // Registered after AddLiveLingoCore so they replace the local-only defaults: roles go to cloud or a local host only when enabled.
         services.AddSingleton<ICloudRoutes, SettingsCloudRoutes>();
+        services.AddSingleton<ILocalHostRoutes, SettingsLocalHostRoutes>();
 
         _serviceProvider = services.BuildServiceProvider();
         _serviceProvider.GetRequiredService<CoreOptions>().Models =
@@ -313,7 +318,10 @@ public partial class App : Application
                 cleanInCloud: settings.Cloud.Clean,
                 translateInCloud: settings.Cloud.Translate,
                 speechInCloud: settings.Cloud.Speech,
-                speechNativeClean: speechNativeClean),
+                speechNativeClean: speechNativeClean,
+                cleanOnLocalHost: settings.LocalHost.Clean,
+                translateOnLocalHost: settings.LocalHost.Translate,
+                speechOnLocalHost: settings.LocalHost.HasSpeech),
             services.GetRequiredService<IModelManager>(),
             services.GetRequiredService<IModelDownloadCoordinator>(),
             platform,
@@ -386,7 +394,8 @@ public partial class App : Application
             services.GetRequiredService<ISettingsService>(), services.GetRequiredService<ISecretStore>(),
             services.GetRequiredService<IModelManager>(), _recentDrafts, services.GetRequiredService<IPlatformServices>().Microphone,
             services.GetRequiredService<ComposerPreferences>(),
-            services.GetRequiredService<ModelSelectionCoordinator>());
+            services.GetRequiredService<ModelSelectionCoordinator>(),
+            services.GetRequiredService<LocalHostCoordinator>());
         _settingsWindow = new SettingsWindow(
             vm, new SettingsTexts(services.GetRequiredService<ILocalizationService>()), section,
             _updates, services.GetRequiredService<IPlatformServices>().OpenUrl,
@@ -431,7 +440,9 @@ public partial class App : Application
             cleanInCloud: settings.Cloud.Clean && settings.Composer.CleanupEnabled,
             translateInCloud: settings.Cloud.Translate,
             speechInCloud: settings.Cloud.Speech,
-            speechNativeClean: speechNativeClean));
+            speechNativeClean: speechNativeClean,
+            cleanOnLocalHost: settings.LocalHost.Clean && settings.Composer.CleanupEnabled,
+            translateOnLocalHost: settings.LocalHost.Translate));
         if (previousModels != core.Models)
         {
             var warmup = services.GetRequiredService<ModelWarmup>();

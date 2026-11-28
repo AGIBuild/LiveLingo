@@ -15,8 +15,8 @@ internal sealed class SettingsWindow : Window
     {
         var web = new WebSurface(WebPage.SettingsEntry, logger);
         Title = texts.Title;
-        Width = 980;
-        Height = 700;
+        Width = 1090;
+        Height = 768;
         MinWidth = 800;
         MinHeight = 560;
         CanResize = true;

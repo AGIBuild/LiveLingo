@@ -6,9 +6,31 @@
   const html = LL.html;
 
   // A row: what the setting is on the left, its control on the right.
-  LL.Row = ({ id, title, desc, extra, children }) => html`<div class="srow">
-    <div class="stext"><label for=${id}>${title}</label><p>${desc}</p>${extra}</div>
+  LL.Row = ({ id, rowId, title, desc, extra, stacked, children }) => html`<div id=${rowId} class=${'srow' + (stacked ? ' stacked' : '')}>
+    <div class="stext">${id ? html`<label for=${id}>${title}</label>` : html`<span class="srow-title">${title}</span>`}<p>${desc}</p>${extra}</div>
     <div class="sctl">${children}</div>
+  </div>`;
+
+  // A visual group wrapper: subtle section title above a floating white/dark card.
+  LL.Group = ({ id, title, action, meta, children }) => html`<section class="sgroup" aria-labelledby=${id}>
+    <div class="sgroup-head">
+      <h3 id=${id} class="sgroup-title">${title}</h3>
+      ${meta && html`<span class="sgroup-meta">${meta}</span>`}
+      ${action}
+    </div>
+    <div class="scard">${children}</div>
+  </section>`;
+
+  // Segmented single-select radio control (for 2–3 mutually exclusive choices).
+  LL.SegRadio = ({ id, name, label, value, options, onChange }) => html`<div id=${id} class="seg-radio" role="radiogroup" aria-label=${label}>
+    ${options.map(([v, text]) => html`<label key=${v} class=${'seg-opt' + (v === value ? ' on' : '')}>
+      <input type="radio" name=${name} value=${v} checked=${v === value}
+        onChange=${(e) => {
+          e.target.checked = v === value;
+          if (v !== value) onChange(v);
+        }}/>
+      <span>${text}</span>
+    </label>`)}
   </div>`;
 
   LL.Select = ({ id, value, options, onChange }) => html`<select id=${id} onChange=${(e) => onChange(e.target.value)}>
@@ -16,7 +38,7 @@
   </select>`;
 
   // The box always shows the snapshot: a change the host does not accept (a cloud step waiting for consent) must not stay checked.
-  LL.Switch = ({ id, label, checked, onChange }) => html`<input type="checkbox" role="switch" id=${id} aria-label=${label} checked=${checked}
+  LL.Switch = ({ id, label, checked, disabled, onChange }) => html`<input type="checkbox" role="switch" id=${id} aria-label=${label} checked=${checked} disabled=${disabled}
     onChange=${(e) => {
       e.target.checked = checked;
       onChange(!checked);

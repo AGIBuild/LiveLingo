@@ -33,12 +33,17 @@ internal static class SettingsScenarios
             m.Composer.CleanupEnabled = false;
             m.Composer.Glossary = "Redis\n缓存穿透=cache penetration";
         }),
-        ["settings-polish-custom"] = () => Open("voice", model: m =>
+        ["settings-polish"] = () => Open("polish"),
+        ["settings-glossary"] = () => Open("glossary", model: m =>
+        {
+            m.Composer.Glossary = "Redis\n缓存穿透=cache penetration";
+        }),
+        ["settings-polish-custom"] = () => Open("polish", model: m =>
             m.Composer.PolishPrompt = "保留我的口语风格，修正明显错字，按完整意思分段，不要添加信息。"),
-        ["settings-polish-invalid"] = () => Open("voice", then: f => f.Vm.PolishPrompt = "bad"),
-        ["settings-preset-add"] = () => Open("voice", then: f => f.Vm.OpenPresetForm(null)),
-        ["settings-preset-edit"] = () => Open("voice", then: f => f.Vm.OpenPresetForm("ai-task")),
-        ["settings-preset-delete"] = () => Open("voice", model: m => m.Composer.PolishPresets.Add(new PolishPresetEntry
+        ["settings-polish-invalid"] = () => Open("polish", then: f => f.Vm.PolishPrompt = "bad"),
+        ["settings-preset-add"] = () => Open("polish", then: f => f.Vm.OpenPresetForm(null)),
+        ["settings-preset-edit"] = () => Open("polish", then: f => f.Vm.OpenPresetForm("ai-task")),
+        ["settings-preset-delete"] = () => Open("polish", model: m => m.Composer.PolishPresets.Add(new PolishPresetEntry
         {
             Id = "custom-bug",
             Name = "Bug 缺陷单",

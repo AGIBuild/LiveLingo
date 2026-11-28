@@ -1,4 +1,5 @@
 using LiveLingo.Core.Inference;
+using LiveLingo.Core.LocalHost;
 using LiveLingo.Core.Speech;
 
 namespace LiveLingo.Core.Cloud;
@@ -98,6 +99,34 @@ public sealed record SpeechCloudRoute
             SupportsTieredHotwords = tieredHotwords
         };
     }
+
+    public static SpeechCloudRoute CreateForLocalHost(LocalHostRoute route)
+    {
+        ArgumentNullException.ThrowIfNull(route);
+        var model = route.ModelKey.Trim();
+        var lower = model.ToLowerInvariant();
+        var protocol = lower.Contains("qwen3-asr", StringComparison.Ordinal)
+            || lower.Contains("qwen-audio", StringComparison.Ordinal)
+            || lower.Contains("audio-chat", StringComparison.Ordinal)
+            ? SpeechCloudProtocol.OpenAiChatAudio
+            : SpeechCloudProtocol.OpenAiTranscriptions;
+
+        var endpoint = protocol == SpeechCloudProtocol.OpenAiChatAudio
+            ? route.ResolveEndpoint("/v1/chat/completions")
+            : route.ResolveEndpoint("/v1/audio/transcriptions");
+
+        return new SpeechCloudRoute(protocol, endpoint, model, model, route.BearerToken ?? "")
+        {
+            Name = route.HostDisplayName,
+            IsLocalHost = true,
+            SupportsNativePolish = false,
+            SupportsContextUpdate = false,
+            SupportsTieredHotwords = false
+        };
+    }
+
+    /// <summary>True when this route targets a loopback local model host rather than a remote cloud service.</summary>
+    public bool IsLocalHost { get; private init; }
 
     public static bool SupportsNativePolishForModel(string? model)
     {

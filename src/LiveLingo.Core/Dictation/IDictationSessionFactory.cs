@@ -6,6 +6,13 @@ namespace LiveLingo.Core.Dictation;
 /// <summary>An active voice dictation session consuming 16 kHz mono float frames and updating a <see cref="DraftSession"/>.</summary>
 public interface IDictationSession : IAsyncDisposable
 {
+    /// <summary>Raised when an active remote or local-host speech session fails to recognize an utterance.</summary>
+    event Action<string>? RecognitionFailed
+    {
+        add { }
+        remove { }
+    }
+
     void Start();
     void Push(float[] frame);
     Task StopAsync();

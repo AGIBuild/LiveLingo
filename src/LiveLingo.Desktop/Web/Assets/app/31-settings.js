@@ -1,146 +1,209 @@
-// The settings page: four groups, every change is applied at once (there is no save button). The page only draws the
-// snapshot and reports intents; C# validates and stores.
+// The settings page: six focused domains grouped into three sidebar sections, every change applied at once.
+// The page only draws the snapshot and reports intents; C# validates and stores.
 (function () {
   'use strict';
 
   const html = LL.html;
-  const { Row, Select, Switch, HotkeyField } = LL;
+  const { Row, Group, SegRadio, Select, Switch, HotkeyField, Icon } = LL;
 
-  const SECTIONS = [
-    ['general', 'nav.general'],
-    ['voice', 'nav.voice'],
-    ['models', 'nav.models'],
-    ['about', 'nav.about']
+  const NAV_GROUPS = [
+    {
+      key: 'nav.group.basic',
+      items: [
+        ['general', 'nav.general', 'sliders'],
+        ['voice', 'nav.voice', 'mic']
+      ]
+    },
+    {
+      key: 'nav.group.quality',
+      items: [
+        ['polish', 'nav.polish', 'sparkle'],
+        ['glossary', 'nav.glossary', 'book']
+      ]
+    },
+    {
+      key: 'nav.group.system',
+      items: [
+        ['models', 'nav.models', 'cpu']
+      ]
+    }
   ];
 
+  const BUILTIN_DEV_TERMS = [
+    'Agent', 'Skill', 'Prompt', 'API', 'PR', 'VS Code', 'Cursor', 'Claude Code',
+    'MCP', 'Docker', 'Kubernetes', 'Redis', 'TypeScript', 'CI/CD'
+  ];
+
+  const PRESET_ICON = {
+    'ai-task': 'terminal',
+    natural: 'chat',
+    formal: 'briefcase',
+    todo: 'list-check',
+    report: 'file-text'
+  };
+
   const set = (key) => (value) => LL.send('setting', { key, value });
-
-  // Menu labels follow the interface language, except the names of the languages themselves (as in the composer).
   const choices = (values, labelKeys) => values.map((value, i) => [value, LL.t(labelKeys[i])]);
+  const fmt = (key, ...args) => args.reduce((text, arg, i) => text.split('{' + i + '}').join(arg), LL.t(key));
 
-  const Apps = ({ apps, appChoices }) => html`<section class="apps" aria-labelledby="apps-title">
-    <div class="apps-head"><div><h2 id="apps-title">${LL.t('apps')}</h2><p class="hint">${LL.t('apps.desc')}</p></div>
-      <button type="button" id="apps-clear" class="btn" disabled=${apps.length === 0} onClick=${() => LL.send('clearApps')}>${LL.t('apps.clear')}</button></div>
-    ${apps.length === 0
-      ? html`<p id="apps-empty" class="hint">${LL.t('apps.empty')}</p>`
-      : html`<ul class="app-list">${apps.map((app) => html`<li class="app" key=${app.id}>
+  const PageHead = ({ title, desc, action }) => html`<header class="spage-head">
+    <div><h2>${title}</h2><p>${desc}</p></div>
+    ${action && html`<div class="spage-head-actions">${action}</div>`}
+  </header>`;
+
+  // ==================== 1. GENERAL ====================
+  const ThemeCards = ({ value, onChange }) => {
+    const items = [
+      ['Auto', LL.t('theme.auto'), 'tp-auto'],
+      ['Light', LL.t('theme.light'), 'tp-light'],
+      ['Dark', LL.t('theme.dark'), 'tp-dark']
+    ];
+    return html`<div id="theme" class="theme-cards" role="radiogroup" aria-label=${LL.t('theme')}>
+      ${items.map(([v, label, previewCls]) => html`<label key=${v} class=${'choice-card' + (v === value ? ' on' : '')}>
+        <input type="radio" name="theme" value=${v} checked=${v === value}
+          onChange=${(e) => {
+            e.target.checked = v === value;
+            if (v !== value) onChange(v);
+          }}/>
+        <span class=${'theme-preview ' + previewCls} aria-hidden="true">
+          ${v === 'Auto'
+            ? html`<span class="tp-half-l"><i></i><i></i></span><span class="tp-half-r"><i></i><i></i></span>`
+            : html`<span class="tp-side"></span><span class="tp-main"><i class="tp-bar accent"></i><i class="tp-bar"></i></span>`}
+        </span>
+        <span class="choice-card-top">
+          <span class="choice-card-title">${label}</span>
+          <span class="choice-check" aria-hidden="true"><${Icon} name="check"/></span>
+        </span>
+      </label>`)}
+    </div>`;
+  };
+
+  const appAbbr = (name) => {
+    const clean = (name || '?').trim();
+    if (!clean) return '?';
+    return /[\u4e00-\u9fa5]/.test(clean[0]) ? clean[0] : clean.slice(0, 2);
+  };
+
+  const AppsList = ({ apps, appChoices }) => {
+    if (apps.length === 0) return html`<p id="apps-empty" class="s-empty">${LL.t('apps.empty')}</p>`;
+    return html`<ul class="app-list">${apps.map((app) => html`<li class="app" key=${app.id}>
+      <span class="app-avatar" aria-hidden="true">${appAbbr(app.name)}</span>
+      <div class="app-info">
+        <div class="app-name-row">
           <span class="app-name">${app.name}</span>
           <span class="app-summary">${app.summary}</span>
-          <select class="app-select" id=${'app-mode-' + app.id} aria-label=${app.modeAria} value=${app.choice}
-            onChange=${(e) => LL.send('setAppChoice', { appId: app.id, appName: app.rawName, choice: e.target.value })}>
-            ${appChoices.map((opt) => html`<option key=${opt.value} value=${opt.value} selected=${opt.value === app.choice}>${opt.label}</option>`)}
-          </select>
-          <time>${app.used}</time>
-          <button type="button" class="danger" aria-label=${LL.t('apps.forget') + ' ' + app.name}
-            onClick=${() => LL.send('forgetApp', { appId: app.id })}>${LL.t('apps.forget')}</button>
-        </li>`)}</ul>`}
-  </section>`;
+        </div>
+        <time>${app.used}</time>
+      </div>
+      <div class="app-ctl">
+        <select class="app-select" id=${'app-mode-' + app.id} aria-label=${app.modeAria} value=${app.choice}
+          onChange=${(e) => LL.send('setAppChoice', { appId: app.id, appName: app.rawName, choice: e.target.value })}>
+          ${appChoices.map((opt) => html`<option key=${opt.value} value=${opt.value} selected=${opt.value === app.choice}>${opt.label}</option>`)}
+        </select>
+        <button type="button" class="link danger" aria-label=${LL.t('apps.forget') + ' ' + app.name}
+          onClick=${() => LL.send('forgetApp', { appId: app.id })}>${LL.t('apps.forget')}</button>
+      </div>
+    </li>`)}</ul>`;
+  };
 
-  const General = ({ g }) => html`<div>
-    <${Row} id="hotkey" title=${LL.t('hotkey')} desc=${LL.t('hotkey.desc')}
-      extra=${g.hotkeyInvalid && html`<p class="err" role="alert">${LL.t('hotkey.invalid')}</p>`}>
-      <${HotkeyField} id="hotkey" value=${g.hotkey} onChange=${set('hotkey')}/>
+  const General = ({ g }) => html`<div class="spage">
+    <${PageHead} title=${LL.t('nav.general')} desc=${LL.t('section.general.desc')}/>
+
+    <${Group} id="g-keys" title=${LL.t('group.keys')}>
+      <${Row} id="hotkey" rowId="row-hotkey" title=${LL.t('hotkey')} desc=${LL.t('hotkey.desc')}
+        extra=${g.hotkeyInvalid && html`<p class="err" role="alert">${LL.t('hotkey.invalid')}</p>`}>
+        <${HotkeyField} id="hotkey" value=${g.hotkey} onChange=${set('hotkey')}/>
+      <//>
+      <${Row} rowId="row-commit" title=${LL.t('commit')} desc=${LL.t('commit.desc')}>
+        <${SegRadio} id="commit" name="commitKey" label=${LL.t('commit')} value=${g.commitKey}
+          options=${choices(['Enter', 'CtrlEnter'], ['commit.enter', 'commit.ctrlEnter'])} onChange=${set('commitKey')}/>
+      <//>
     <//>
-    <${Row} id="commit" title=${LL.t('commit')} desc=${LL.t('commit.desc')}>
-      <${Select} id="commit" value=${g.commitKey} options=${choices(['Enter', 'CtrlEnter'], ['commit.enter', 'commit.ctrlEnter'])} onChange=${set('commitKey')}/>
+
+    <${Group} id="g-look" title=${LL.t('group.look')}>
+      <${Row} rowId="row-theme" stacked=${true} title=${LL.t('theme')} desc=${LL.t('theme.desc')}>
+        <${ThemeCards} value=${g.theme} onChange=${set('theme')}/>
+      <//>
+      <${Row} rowId="row-language" title=${LL.t('language')} desc=${LL.t('language.desc')}>
+        <${SegRadio} id="language" name="language" label=${LL.t('language')} value=${g.language}
+          options=${[['zh-CN', '中文'], ['en-US', 'English']]} onChange=${set('language')}/>
+      <//>
+      <${Row} id="motion" rowId="row-motion" title=${LL.t('motion')} desc=${LL.t('motion.desc')}>
+        <${Switch} id="motion" label=${LL.t('motion')} checked=${g.reduceMotion} onChange=${(on) => set('reduceMotion')(String(on))}/>
+      <//>
     <//>
-    <${Row} id="language" title=${LL.t('language')} desc=${LL.t('language.desc')}>
-      <${Select} id="language" value=${g.language} options=${[['zh-CN', '中文'], ['en-US', 'English']]} onChange=${set('language')}/>
+
+    <${Group} id="g-apps" title=${LL.t('group.apps')}
+      action=${html`<button type="button" id="apps-clear" class="link" disabled=${g.apps.length === 0} onClick=${() => LL.send('clearApps')}>${LL.t('apps.clear')}</button>`}>
+      <${Row} id="remember" rowId="row-remember" title=${LL.t('remember')} desc=${LL.t('remember.desc')}>
+        <${Switch} id="remember" label=${LL.t('remember')} checked=${g.rememberChoices} onChange=${(on) => set('rememberChoices')(String(on))}/>
+      <//>
+      <section class="apps" aria-labelledby="g-apps">
+        <${AppsList} apps=${g.apps} appChoices=${g.appChoices}/>
+      </section>
     <//>
-    <${Row} id="theme" title=${LL.t('theme')} desc=${LL.t('theme.desc')}>
-      <${Select} id="theme" value=${g.theme} options=${choices(['Auto', 'Light', 'Dark'], ['theme.auto', 'theme.light', 'theme.dark'])} onChange=${set('theme')}/>
+
+    <${Group} id="g-data" title=${LL.t('group.data')}>
+      <${Row} id="recent-clear" rowId="row-recent" title=${LL.t('recent')} desc=${LL.t('recent.desc')}>
+        <button type="button" id="recent-clear" class="btn compact" onClick=${() => LL.send('clearRecent')}>${LL.t('recent.clear')}</button>
+      <//>
     <//>
-    <${Row} id="motion" title=${LL.t('motion')} desc=${LL.t('motion.desc')}>
-      <${Switch} id="motion" checked=${g.reduceMotion} onChange=${(on) => set('reduceMotion')(String(on))}/>
-    <//>
-    <${Row} id="recent-clear" title=${LL.t('recent')} desc=${LL.t('recent.desc')}>
-      <button type="button" id="recent-clear" class="btn" onClick=${() => LL.send('clearRecent')}>${LL.t('recent.clear')}</button>
-    <//>
-    <${Row} id="remember" title=${LL.t('remember')} desc=${LL.t('remember.desc')}>
-      <${Switch} id="remember" checked=${g.rememberChoices} onChange=${(on) => set('rememberChoices')(String(on))}/>
-    <//>
-    <${Apps} apps=${g.apps} appChoices=${g.appChoices}/>
   </div>`;
 
-  class Terms extends preact.Component {
-    state = { source: '', target: '' };
+  // ==================== 2. VOICE & TRANSLATION ====================
+  const OutputCards = ({ value, cleanupEnabled, onChange }) => {
+    const items = [
+      ['Clean', LL.t('output.clean'), LL.t('output.clean.desc'), !cleanupEnabled],
+      ['Translate', LL.t('output.translate'), LL.t('output.translate.desc'), false],
+      ['Original', LL.t('output.original'), LL.t('output.original.desc'), false]
+    ];
+    return html`<div id="output" class="output-cards" role="radiogroup" aria-label=${LL.t('output')}>
+      ${items.map(([v, label, desc, disabled]) => html`<label key=${v} class=${'choice-card' + (v === value ? ' on' : '') + (disabled ? ' disabled' : '')}>
+        <input type="radio" name="defaultOutput" value=${v} checked=${v === value} disabled=${disabled}
+          onChange=${(e) => {
+            e.target.checked = v === value;
+            if (v !== value && !disabled) onChange(v);
+          }}/>
+        <span class="choice-card-top">
+          <span class="choice-card-title">${label}</span>
+          <span class="choice-check" aria-hidden="true"><${Icon} name="check"/></span>
+        </span>
+        <span class="choice-card-desc">${desc}</span>
+      </label>`)}
+    </div>`;
+  };
 
-    add = () => {
-      const { source, target } = this.state;
-      if (!source.trim()) return;
-      this.setState({ source: '', target: '' });
-      LL.send('addTerm', { source, target });
-    };
+  const Voice = ({ v }) => html`<div class="spage">
+    <${PageHead} title=${LL.t('nav.voice')} desc=${LL.t('section.voice.desc')}/>
 
-    onKeyDown = (e) => {
-      // An input method confirms its candidate with Enter (keyCode 229 in WKWebView); that is not "add".
-      if (e.key === 'Enter' && !e.isComposing && e.keyCode !== 229) {
-        e.preventDefault();
-        this.add();
-      }
-    };
+    <${Group} id="v-input" title=${LL.t('group.input')}>
+      <${Row} id="mic" rowId="row-mic" title=${LL.t('mic')} desc=${LL.t('mic.desc')}>
+        <${Select} id="mic" value=${v.microphone} options=${v.microphones.map((name) => [name, name || LL.t('mic.default')])} onChange=${set('microphone')}/>
+      <//>
+      <${Row} id="auto-dictate" rowId="row-autodictate" title=${LL.t('autoDictate')} desc=${LL.t('autoDictate.desc')}>
+        <${Switch} id="auto-dictate" label=${LL.t('autoDictate')} checked=${v.autoDictate} onChange=${(on) => set('autoDictate')(String(on))}/>
+      <//>
+      <${Row} id="preload" rowId="row-preload" title=${LL.t('preload')} desc=${LL.t('preload.desc')}>
+        <${Switch} id="preload" label=${LL.t('preload')} checked=${v.preloadSpeech} onChange=${(on) => set('preloadSpeech')(String(on))}/>
+      <//>
+    <//>
 
-    render({ terms }, { source, target }) {
-      return html`<section class="terms" aria-labelledby="terms-title">
-        <h2 id="terms-title">${LL.t('terms')}</h2>
-        <div class="term-form">
-          <label>${LL.t('terms.source')}<input id="term-source" value=${source} placeholder=${LL.t('terms.sourceExample')} spellcheck="false"
-            onInput=${(e) => this.setState({ source: e.target.value })} onKeyDown=${this.onKeyDown}/></label>
-          <label>${LL.t('terms.target')}<input id="term-target" value=${target} placeholder=${LL.t('terms.targetExample')} spellcheck="false"
-            onInput=${(e) => this.setState({ target: e.target.value })} onKeyDown=${this.onKeyDown}/></label>
-          <button type="button" id="term-add" class="btn" disabled=${!source.trim()} onClick=${this.add}>${LL.t('terms.add')}</button>
-        </div>
-        <p class="hint">${LL.t('terms.hint')}</p>
-        <ul class="term-list">${terms.map((term) => html`<li class="term" key=${term.i}>
-          <span>${term.source}</span><span class="arrow" aria-hidden="true">→</span><span>${term.target}</span>
-          <button type="button" class="danger" aria-label=${LL.t('terms.remove') + ' ' + term.source}
-            onClick=${() => LL.send('removeTerm', { index: term.i })}>${LL.t('terms.remove')}</button>
-        </li>`)}</ul>
-      </section>`;
-    }
-  }
+    <${Group} id="v-output" title=${LL.t('group.output')}>
+      <${Row} id="cleanup" rowId="row-cleanup" title=${LL.t('cleanup')} desc=${LL.t('cleanup.desc')}>
+        <${Switch} id="cleanup" label=${LL.t('cleanup')} checked=${v.cleanup} onChange=${(on) => set('cleanup')(String(on))}/>
+      <//>
+      <${Row} rowId="row-output" stacked=${true} title=${LL.t('output')} desc=${LL.t('output.desc')}>
+        <${OutputCards} value=${v.defaultOutput} cleanupEnabled=${v.cleanup} onChange=${set('defaultOutput')}/>
+      <//>
+      <${Row} rowId="row-direction" title=${LL.t('direction')} desc=${LL.t('direction.desc')}>
+        <${SegRadio} id="direction" name="direction" label=${LL.t('direction')} value=${v.direction}
+          options=${choices(['English', 'Chinese'], ['direction.zhEn', 'direction.enZh'])} onChange=${set('direction')}/>
+      <//>
+    <//>
+  </div>`;
 
-  class Corrections extends preact.Component {
-    state = { spoken: '', canonical: '' };
-
-    add = () => {
-      const spoken = this.state.spoken.trim();
-      const canonical = this.state.canonical.trim();
-      if (!spoken || !canonical || spoken === canonical) return;
-      this.setState({ spoken: '', canonical: '' });
-      LL.send('addCorrection', { spoken, canonical });
-    };
-
-    onKeyDown = (e) => {
-      if (e.key === 'Enter' && !e.isComposing && e.keyCode !== 229) {
-        e.preventDefault();
-        this.add();
-      }
-    };
-
-    render({ corrections }, { spoken, canonical }) {
-      return html`<section class="corrections" aria-labelledby="corrections-title">
-        <h2 id="corrections-title">${LL.t('corrections')}</h2>
-        <div class="term-form">
-          <label>${LL.t('corrections.spoken')}<input id="corr-spoken" value=${spoken} placeholder=${LL.t('corrections.spokenExample')} spellcheck="false"
-            onInput=${(e) => this.setState({ spoken: e.target.value })} onKeyDown=${this.onKeyDown}/></label>
-          <label>${LL.t('corrections.canonical')}<input id="corr-canonical" value=${canonical} placeholder=${LL.t('corrections.canonicalExample')} spellcheck="false"
-            onInput=${(e) => this.setState({ canonical: e.target.value })} onKeyDown=${this.onKeyDown}/></label>
-          <button type="button" id="corr-add" class="btn" disabled=${!spoken.trim() || !canonical.trim() || spoken.trim() === canonical.trim()} onClick=${this.add}>${LL.t('corrections.add')}</button>
-        </div>
-        <p class="hint">${LL.t('corrections.hint')}</p>
-        <ul class="corr-list">${corrections.map((item) => html`<li class="corr-item" key=${item.i}>
-          <span>${item.spoken}</span><span class="arrow" aria-hidden="true">→</span><span>${item.canonical}</span>
-          <button type="button" class="danger" aria-label=${LL.t('corrections.remove') + ' ' + item.spoken}
-            onClick=${() => LL.send('removeCorrection', { index: item.i })}>${LL.t('corrections.remove')}</button>
-        </li>`)}</ul>
-      </section>`;
-    }
-  }
-
-  // The polish requirements: a text box of its own (a full-width block, not a row), saved when it loses the focus so one
-  // edit is one stored value. Where nothing is customized it shows the built-in text to start from.
-  class Polish extends preact.Component {
+  // ==================== 3. POLISH SCENARIOS ====================
+  class PolishPromptBox extends preact.Component {
     state = { draft: null };
 
     commit = () => {
@@ -155,16 +218,24 @@
     };
 
     render({ p }, { draft }) {
-      return html`<section class="polish" aria-labelledby="polish-title">
-        <div class="polish-head">
-          <h2 id="polish-title">${LL.t('polish')}${!p.isDefault && html` <span class="chip mini">${LL.t('polish.custom')}</span>`}</h2>
-          <button type="button" id="polish-reset" class="btn" disabled=${p.isDefault} onClick=${this.reset}>${LL.t('polish.reset')}</button>
+      const openByDefault = !p.isDefault || p.invalid;
+      return html`<details id="polish-advanced" class="s-disclosure polish" open=${openByDefault || undefined}>
+        <summary>
+          <span id="polish-title">${LL.t('polish.advanced')}</span>
+          <span class="s-disclosure-sub">
+            ${!p.isDefault ? html`<span class="chip mini warn">${LL.t('polish.custom')}</span>` : LL.t('polish.advanced.default')}
+          </span>
+        </summary>
+        <div class="s-disclosure-body">
+          <div class="polish-head">
+            <p class="hint">${LL.t('polish.desc')}</p>
+            <button type="button" id="polish-reset" class="btn compact" disabled=${p.isDefault} onClick=${this.reset}>${LL.t('polish.reset')}</button>
+          </div>
+          <textarea id="polish" rows="7" spellcheck="false" aria-labelledby="polish-title" aria-invalid=${p.invalid}
+            value=${draft ?? p.text} onInput=${(e) => this.setState({ draft: e.target.value })} onBlur=${this.commit}></textarea>
+          ${p.invalid ? html`<p class="err" role="alert">${LL.t('polish.invalid')}</p>` : html`<p class="hint">${LL.t('polish.save')}</p>`}
         </div>
-        <p class="hint">${LL.t('polish.desc')}</p>
-        <textarea id="polish" rows="9" spellcheck="false" aria-labelledby="polish-title" aria-invalid=${p.invalid}
-          value=${draft ?? p.text} onInput=${(e) => this.setState({ draft: e.target.value })} onBlur=${this.commit}></textarea>
-        ${p.invalid ? html`<p class="err" role="alert">${LL.t('polish.invalid')}</p>` : html`<p class="hint">${LL.t('polish.save')}</p>`}
-      </section>`;
+      </details>`;
     }
   }
 
@@ -179,12 +250,7 @@
     constructor(props) {
       super(props);
       const f = props.form;
-      this.state = {
-        name: f.name,
-        description: f.description,
-        gate: f.gate,
-        instructions: f.instructions
-      };
+      this.state = { name: f.name, description: f.description, gate: f.gate, instructions: f.instructions };
     }
 
     componentDidUpdate(before) {
@@ -212,9 +278,7 @@
     };
 
     onKeyDown = (e) => {
-      if (e.key === 'Enter' && e.target?.tagName !== 'TEXTAREA' && (e.isComposing || e.keyCode === 229)) {
-        e.preventDefault();
-      }
+      if (e.key === 'Enter' && e.target?.tagName !== 'TEXTAREA' && (e.isComposing || e.keyCode === 229)) e.preventDefault();
     };
 
     render({ form, starters }, { name, description, gate, instructions }) {
@@ -268,95 +332,175 @@
     </div>
   <//>`;
 
-  const Presets = ({ v }) => html`<section id="presets-section" class="presets" aria-labelledby="presets-title">
-    <div class="presets-head">
-      <div>
-        <h2 id="presets-title">${LL.t('presets')}</h2>
-        <p class="hint">${LL.t('presets.desc')}</p>
-      </div>
-      <button type="button" id="preset-add" class="btn compact primary" onClick=${() => LL.send('openPresetForm', { id: null })}>+ ${LL.t('presets.add')}</button>
-    </div>
-    <ul class="preset-list">${v.presets.map((p) => html`<li id=${'preset-row-' + p.id} class=${'preset-row' + (!p.enabled ? ' disabled' : '')} key=${p.id}>
-      <div class="preset-main">
-        <div class="preset-title-row">
-          <b class="preset-name">${p.name}</b>
-          <span class=${'chip mini' + (p.builtIn ? '' : ' rec')}>${LL.t(p.builtIn ? 'presets.builtIn' : 'presets.custom')}</span>
-          <span class="chip mini">${p.gateBadge}</span>
-          ${p.isDefault && html`<span class="chip mini ok">${LL.t('presets.defaultBadge')}</span>`}
-          ${p.builtIn && p.customized && html`<span class="chip mini warn">${LL.t('presets.tunedBadge')}</span>`}
-        </div>
-        ${p.description && html`<p class="preset-desc">${p.description}</p>`}
-      </div>
-      <div class="preset-actions">
-        <button type="button" id=${'preset-edit-' + p.id} class="btn compact"
-          aria-label=${LL.t(p.builtIn ? 'presets.inspect' : 'presets.edit') + ' ' + p.name}
-          onClick=${() => LL.send('openPresetForm', { id: p.id })}>${LL.t(p.builtIn ? 'presets.inspect' : 'presets.edit')}</button>
-        ${p.builtIn && p.customized && html`<button type="button" id=${'preset-reset-' + p.id} class="link"
-          aria-label=${LL.t('presets.reset') + ' ' + p.name}
-          onClick=${() => LL.send('resetPreset', { id: p.id })}>${LL.t('presets.reset')}</button>`}
-        ${!p.builtIn && html`<button type="button" id=${'preset-del-' + p.id} class="link danger"
-          aria-label=${LL.t('presets.delete') + ' ' + p.name}
-          onClick=${() => LL.send('deletePreset', { id: p.id })}>${LL.t('presets.delete')}</button>`}
-        <input type="checkbox" role="switch" id=${'preset-on-' + p.id} aria-label=${p.toggleAria}
-          checked=${p.enabled} disabled=${!p.canToggle}
-          onChange=${(e) => {
-            e.target.checked = p.enabled;
-            LL.send('togglePreset', { id: p.id, enabled: !p.enabled });
-          }}/>
-      </div>
-    </li>`)}</ul>
-  </section>`;
-
-  const Voice = ({ v }) => {
+  const PolishSection = ({ v }) => {
     const enabledPresetOpts = v.presets.filter((p) => p.enabled).map((p) => [p.id, p.name]);
-    return html`<div>
-      <${Row} id="mic" title=${LL.t('mic')} desc=${LL.t('mic.desc')}>
-        <${Select} id="mic" value=${v.microphone} options=${v.microphones.map((name) => [name, name || LL.t('mic.default')])} onChange=${set('microphone')}/>
+    return html`<div class="spage">
+      <${PageHead} title=${LL.t('nav.polish')} desc=${LL.t('section.polish.desc')}
+        action=${html`<button type="button" id="preset-add" class="btn primary" onClick=${() => LL.send('openPresetForm', { id: null })}>+ ${LL.t('presets.add')}</button>`}/>
+
+      <${Group} id="p-routing" title=${LL.t('group.polishRouting')}>
+        <${Row} id="default-polish" rowId="row-default-polish" title=${LL.t('defaultPolish')} desc=${LL.t('defaultPolish.desc')}>
+          <${Select} id="default-polish" value=${v.defaultPolishMode} options=${enabledPresetOpts} onChange=${set('defaultPolishMode')}/>
+        <//>
+        <${Row} id="smart-host-polish" rowId="row-smart-host" title=${LL.t('smartHostPolish')} desc=${LL.t('smartHostPolish.desc')}>
+          <${Switch} id="smart-host-polish" label=${LL.t('smartHostPolish')} checked=${v.smartHostPolish} onChange=${(on) => set('smartHostPolish')(String(on))}/>
+        <//>
       <//>
-      <${Row} id="cleanup" title=${LL.t('cleanup')} desc=${LL.t('cleanup.desc')}>
-        <${Switch} id="cleanup" checked=${v.cleanup} onChange=${(on) => set('cleanup')(String(on))}/>
-      <//>
-      <${Row} id="direction" title=${LL.t('direction')} desc=${LL.t('direction.desc')}>
-        <${Select} id="direction" value=${v.direction} options=${choices(['English', 'Chinese'], ['direction.zhEn', 'direction.enZh'])} onChange=${set('direction')}/>
-      <//>
-      <${Row} id="output" title=${LL.t('output')} desc=${LL.t('output.desc')}>
-        <${Select} id="output" value=${v.defaultOutput} options=${choices(['Clean', 'Translate', 'Original'], ['output.clean', 'output.translate', 'output.original'])} onChange=${set('defaultOutput')}/>
-      <//>
-      <${Row} id="default-polish" title=${LL.t('defaultPolish')} desc=${LL.t('defaultPolish.desc')}>
-        <${Select} id="default-polish" value=${v.defaultPolishMode} options=${enabledPresetOpts} onChange=${set('defaultPolishMode')}/>
-      <//>
-      <${Row} id="smart-host-polish" title=${LL.t('smartHostPolish')} desc=${LL.t('smartHostPolish.desc')}>
-        <${Switch} id="smart-host-polish" checked=${v.smartHostPolish} onChange=${(on) => set('smartHostPolish')(String(on))}/>
-      <//>
-      <${Row} id="auto-dictate" title=${LL.t('autoDictate')} desc=${LL.t('autoDictate.desc')}>
-        <${Switch} id="auto-dictate" checked=${v.autoDictate} onChange=${(on) => set('autoDictate')(String(on))}/>
-      <//>
-      <${Row} id="preload" title=${LL.t('preload')} desc=${LL.t('preload.desc')}>
-        <${Switch} id="preload" checked=${v.preloadSpeech} onChange=${(on) => set('preloadSpeech')(String(on))}/>
-      <//>
-      <${Row} id="builtin-terms" title=${LL.t('builtInTerms')} desc=${LL.t('builtInTerms.desc')}>
-        <${Switch} id="builtin-terms" checked=${v.builtInGlossary} onChange=${(on) => set('builtInGlossary')(String(on))}/>
-      <//>
-      <${Presets} v=${v}/>
-      <${Polish} p=${{ text: v.polishPrompt, isDefault: v.polishPromptIsDefault, invalid: v.polishPromptInvalid }}/>
-      <${Corrections} corrections=${v.corrections}/>
-      <${Terms} terms=${v.terms}/>
+
+      <section id="presets-section" class="sgroup presets" aria-labelledby="presets-title">
+        <div class="sgroup-head">
+          <h3 id="presets-title" class="sgroup-title">${LL.t('presets')} (${enabledPresetOpts.length} / ${v.presets.length})</h3>
+        </div>
+        <ul class="preset-grid">${v.presets.map((p) => html`<li id=${'preset-row-' + p.id}
+          class=${'preset-row pcard' + (p.isDefault ? ' is-default' : '') + (!p.enabled ? ' disabled' : '')} key=${p.id}>
+          <div class="pcard-head">
+            <div class="pcard-title-wrap">
+              <span class="pcard-ic" aria-hidden="true"><${Icon} name=${PRESET_ICON[p.id] || 'sparkle'}/></span>
+              <div class="preset-main">
+                <b class="preset-name">${p.name}</b>
+                <div class="preset-title-row">
+                  <span class=${'chip mini' + (p.builtIn ? '' : ' rec')}>${LL.t(p.builtIn ? 'presets.builtIn' : 'presets.custom')}</span>
+                  <span class=${'chip mini' + (p.gate === 'FactAnchor' ? ' info' : '')}>${p.gateBadge}</span>
+                  ${p.isDefault && html`<span class="chip mini ok">${LL.t('presets.defaultBadge')}</span>`}
+                  ${p.builtIn && p.customized && html`<span class="chip mini warn">${LL.t('presets.tunedBadge')}</span>`}
+                </div>
+              </div>
+            </div>
+            <input type="checkbox" role="switch" id=${'preset-on-' + p.id} aria-label=${p.toggleAria}
+              checked=${p.enabled} disabled=${!p.canToggle}
+              onChange=${(e) => {
+                e.target.checked = p.enabled;
+                LL.send('togglePreset', { id: p.id, enabled: !p.enabled });
+              }}/>
+          </div>
+          ${p.description && html`<p class="preset-desc">${p.description}</p>`}
+          <div class="pcard-foot">
+            <div class="preset-actions">
+              <button type="button" id=${'preset-edit-' + p.id} class="btn compact"
+                aria-label=${LL.t(p.builtIn ? 'presets.inspect' : 'presets.edit') + ' ' + p.name}
+                onClick=${() => LL.send('openPresetForm', { id: p.id })}>${LL.t(p.builtIn ? 'presets.inspect' : 'presets.edit')}</button>
+              ${p.builtIn && p.customized && html`<button type="button" id=${'preset-reset-' + p.id} class="link"
+                aria-label=${LL.t('presets.reset') + ' ' + p.name}
+                onClick=${() => LL.send('resetPreset', { id: p.id })}>${LL.t('presets.reset')}</button>`}
+              ${!p.builtIn && html`<button type="button" id=${'preset-del-' + p.id} class="link danger"
+                aria-label=${LL.t('presets.delete') + ' ' + p.name}
+                onClick=${() => LL.send('deletePreset', { id: p.id })}>${LL.t('presets.delete')}</button>`}
+            </div>
+          </div>
+        </li>`)}</ul>
+      </section>
+
+      <${PolishPromptBox} p=${{ text: v.polishPrompt, isDefault: v.polishPromptIsDefault, invalid: v.polishPromptInvalid }}/>
       ${v.presetForm && html`<${PresetFormModal} key=${v.presetForm.id ?? 'add'} form=${v.presetForm} starters=${v.starterTemplates}/>`}
       ${v.deletePreset && html`<${DeletePresetDialog} d=${v.deletePreset}/>`}
     </div>`;
   };
 
-  // The page only has the strings; the placeholders ({0}, {1}…) are filled here.
-  const fmt = (key, ...args) => args.reduce((text, arg, i) => text.split('{' + i + '}').join(arg), LL.t(key));
+  // ==================== 4. GLOSSARY & CORRECTIONS ====================
+  class GlossarySection extends preact.Component {
+    state = { tab: 'corrections', spoken: '', canonical: '', source: '', target: '' };
 
+    addCorrection = () => {
+      const spoken = this.state.spoken.trim();
+      const canonical = this.state.canonical.trim();
+      if (!spoken || !canonical || spoken === canonical) return;
+      this.setState({ spoken: '', canonical: '' });
+      LL.send('addCorrection', { spoken, canonical });
+    };
+
+    addTerm = () => {
+      const { source, target } = this.state;
+      if (!source.trim()) return;
+      this.setState({ source: '', target: '' });
+      LL.send('addTerm', { source, target });
+    };
+
+    onCorrKey = (e) => {
+      if (e.key === 'Enter' && !e.isComposing && e.keyCode !== 229) { e.preventDefault(); this.addCorrection(); }
+    };
+
+    onTermKey = (e) => {
+      if (e.key === 'Enter' && !e.isComposing && e.keyCode !== 229) { e.preventDefault(); this.addTerm(); }
+    };
+
+    render({ v }, { tab, spoken, canonical, source, target }) {
+      const isCorr = tab === 'corrections';
+      return html`<div class="spage">
+        <${PageHead} title=${LL.t('nav.glossary')} desc=${LL.t('section.glossary.desc')}/>
+
+        <${Group} id="gl-builtin" title=${LL.t('group.builtinTerms')}>
+          <${Row} id="builtin-terms" rowId="row-builtin-terms" title=${LL.t('builtInTerms')} desc=${LL.t('builtInTerms.desc')}
+            extra=${v.builtInGlossary && html`<div class="builtin-terms-preview" aria-hidden="true">${BUILTIN_DEV_TERMS.map((t) => html`<span class="term-pill" key=${t}>${t}</span>`)}</div>`}>
+            <${Switch} id="builtin-terms" label=${LL.t('builtInTerms')} checked=${v.builtInGlossary} onChange=${(on) => set('builtInGlossary')(String(on))}/>
+          <//>
+        <//>
+
+        <section class="sgroup" aria-labelledby="gl-tabs">
+          <div class="subtabs-bar">
+            <div id="gl-tabs" class="subtab-list" role="tablist" aria-label=${LL.t('nav.glossary')}>
+              <button type="button" role="tab" id="gl-tab-corrections" class="subtab-btn" aria-selected=${String(isCorr)}
+                onClick=${() => this.setState({ tab: 'corrections' })}>
+                <span>${LL.t('glossary.tab.corrections')}</span>
+                <span class="chip mini">${v.corrections.length}</span>
+              </button>
+              <button type="button" role="tab" id="gl-tab-terms" class="subtab-btn" aria-selected=${String(!isCorr)}
+                onClick=${() => this.setState({ tab: 'terms' })}>
+                <span>${LL.t('glossary.tab.terms')}</span>
+                <span class="chip mini">${v.terms.length}</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="scard">
+            ${isCorr ? html`<div class="corrections" role="tabpanel" aria-labelledby="gl-tab-corrections">
+              <div class="inline-add-form">
+                <label>${LL.t('corrections.spoken')}<input id="corr-spoken" value=${spoken} placeholder=${LL.t('corrections.spokenExample')} spellcheck="false"
+                  onInput=${(e) => this.setState({ spoken: e.target.value })} onKeyDown=${this.onCorrKey}/></label>
+                <span class="inline-arrow" aria-hidden="true">⇒</span>
+                <label>${LL.t('corrections.canonical')}<input id="corr-canonical" value=${canonical} placeholder=${LL.t('corrections.canonicalExample')} spellcheck="false"
+                  onInput=${(e) => this.setState({ canonical: e.target.value })} onKeyDown=${this.onCorrKey}/></label>
+                <button type="button" id="corr-add" class="btn primary" disabled=${!spoken.trim() || !canonical.trim() || spoken.trim() === canonical.trim()} onClick=${this.addCorrection}>${LL.t('corrections.add')}</button>
+              </div>
+              <p class="lex-hint">${LL.t('corrections.hint')}</p>
+              <ul class="corr-list">${v.corrections.map((item) => html`<li class="corr-item" key=${item.i}>
+                <span class="lex-from">${item.spoken}</span>
+                <span class="arrow" aria-hidden="true">⇒</span>
+                <span class="lex-to">${item.canonical}</span>
+                <button type="button" class="link danger" aria-label=${LL.t('corrections.remove') + ' ' + item.spoken}
+                  onClick=${() => LL.send('removeCorrection', { index: item.i })}>${LL.t('corrections.remove')}</button>
+              </li>`)}</ul>
+            </div>` : html`<div class="terms" role="tabpanel" aria-labelledby="gl-tab-terms">
+              <div class="inline-add-form">
+                <label>${LL.t('terms.source')}<input id="term-source" value=${source} placeholder=${LL.t('terms.sourceExample')} spellcheck="false"
+                  onInput=${(e) => this.setState({ source: e.target.value })} onKeyDown=${this.onTermKey}/></label>
+                <span class="inline-arrow" aria-hidden="true">→</span>
+                <label>${LL.t('terms.target')}<input id="term-target" value=${target} placeholder=${LL.t('terms.targetExample')} spellcheck="false"
+                  onInput=${(e) => this.setState({ target: e.target.value })} onKeyDown=${this.onTermKey}/></label>
+                <button type="button" id="term-add" class="btn primary" disabled=${!source.trim()} onClick=${this.addTerm}>${LL.t('terms.add')}</button>
+              </div>
+              <p class="lex-hint">${LL.t('terms.hint')}</p>
+              <ul class="term-list">${v.terms.map((term) => html`<li class="term" key=${term.i}>
+                <span class="lex-from">${term.source}</span>
+                <span class="arrow" aria-hidden="true">→</span>
+                <span class="lex-to">${term.target}</span>
+                <span class=${'chip mini' + (term.source === term.target ? ' info' : '')}>${LL.t(term.source === term.target ? 'glossary.keepSame' : 'glossary.translated')}</span>
+                <button type="button" class="link danger" aria-label=${LL.t('terms.remove') + ' ' + term.source}
+                  onClick=${() => LL.send('removeTerm', { index: term.i })}>${LL.t('terms.remove')}</button>
+              </li>`)}</ul>
+            </div>`}
+          </div>
+        </section>
+      </div>`;
+    }
+  }
+
+  // ==================== SHARED MODAL DIALOG ====================
   const FORM_FIELD = { nameMissing: 'ep-name', nameTaken: 'ep-name', urlInvalid: 'ep-url', modelMissing: 'ep-model', keyMissing: 'ep-key' };
 
-  // A modal dialog: keeps the focus inside, closes on Escape and gives the focus back to what opened it.
-  // The child marked data-initial takes the focus first; it is the safe answer.
   class Modal extends preact.Component {
     componentDidMount() {
       this.opener = document.activeElement;
-      this.pane.querySelector('[data-initial]').focus();
+      this.pane.querySelector('[data-initial]')?.focus();
       document.addEventListener('keydown', this.onKeyDown);
     }
 
@@ -373,6 +517,7 @@
         this.props.onClose();
       } else if (e.key === 'Tab') {
         const items = [...this.pane.querySelectorAll('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled)')];
+        if (items.length === 0) return;
         const at = items.indexOf(document.activeElement);
         const next = (at + (e.shiftKey ? -1 : 1) + items.length) % items.length;
         e.preventDefault();
@@ -384,43 +529,14 @@
       return html`<div class="scrim">
         <section class="dialog" role="dialog" aria-modal="true" aria-labelledby=${id + '-title'} ref=${(el) => (this.pane = el)}>
           <header><h2 id=${id + '-title'}>${title}</h2>
-            <button type="button" class="icon-btn" aria-label=${LL.t('closeAria')} onClick=${onClose}><${LL.Icon} name="close"/></button></header>
+            <button type="button" class="icon-btn" aria-label=${LL.t('closeAria')} onClick=${onClose}><${Icon} name="close"/></button></header>
           ${children}
         </section>
       </div>`;
     }
   }
 
-  class Diagnostics extends preact.Component {
-    state = { open: false };
-
-    show = () => this.setState({ open: true });
-
-    hide = () => this.setState({ open: false });
-
-    render({ lines }, { open }) {
-      return html`<${Row} id="diag-open" title=${LL.t('diag')} desc=${LL.t('diag.desc')}>
-        <button type="button" id="diag-open" class="btn" onClick=${this.show}>${LL.t('diag.open')}</button>
-      <//>
-      ${open && html`<${Modal} id="diag" title=${LL.t('diag.title')} returnTo="diag-open" onClose=${this.hide}>
-        <dl id="diag-text" class="diag">${lines.map((line) => html`<div key=${line.label}><dt>${line.label}</dt><dd>${line.value}</dd></div>`)}</dl>
-        <div class="dlg-actions"><button type="button" id="diag-close" class="btn primary" data-initial onClick=${this.hide}>${LL.t('closeAria')}</button></div>
-      <//>`}`;
-    }
-  }
-
-  // The check and download report here; the progress bar is the download's, and a check without a known length
-  // (looking at the feed) only shows that it is busy.
-  const Update = ({ u }) => html`<${Row} id="update-action" title=${LL.t('update')} desc=${LL.t('update.desc')}
-    extra=${html`<p id="update-status" role="status" aria-live="polite">${u.status}</p>
-      ${u.busy && html`<div id="update-progress" class=${'progress' + (u.percent === null ? ' indeterminate' : '')} role="progressbar"
-        aria-valuemin="0" aria-valuemax="100" aria-valuenow=${u.percent === null ? undefined : u.percent}>
-        <span style=${u.percent === null ? undefined : { width: u.percent + '%' }}></span></div>`}`}>
-    ${(u.canCheck || u.busy) && html`<button type="button" id="update-action" class="btn" disabled=${u.busy} onClick=${() => LL.send('checkUpdates')}>${LL.t('update.check')}</button>`}
-    ${u.canRestart && html`<button type="button" id="update-action" class="btn primary" onClick=${() => LL.send('restartToUpdate')}>${LL.t('update.restart')}</button>`}
-    ${u.canDownload && html`<button type="button" id="update-action" class="btn primary" onClick=${() => LL.send('openDownloads')}>${LL.t('update.download')}</button>`}
-  <//>`;
-
+  // ==================== 5. MODELS & SERVICES ====================
   const Stars = ({ label, count }) => {
     const filled = '●'.repeat(count) + '○'.repeat(Math.max(0, 3 - count));
     return html`<span class="mmetric" aria-label=${label + ' ' + count + '/3'}>${label} <span class="mdots" aria-hidden="true">${filled}</span></span>`;
@@ -439,16 +555,11 @@
     };
     return html`<li id=${'model-card-' + opt.id}
       class=${'mcard' + (opt.active ? ' active' : '') + (opt.fit === 'unsupported' ? ' unsupported' : '') + (opt.canSelectImmediate ? ' selectable' : '')}
-      onClick=${(e) => {
-        if (!e.target.closest('button, input, label')) choose();
-      }}>
+      onClick=${(e) => { if (!e.target.closest('button, input, label')) choose(); }}>
       <div class="mcard-top">
         <input type="radio" class="mradio" id=${radioId} name=${'stage-' + stage}
           aria-label=${opt.name} checked=${opt.active} disabled=${!opt.canSelectImmediate && !opt.active}
-          onChange=${(e) => {
-            e.target.checked = opt.active;
-            choose();
-          }}/>
+          onChange=${(e) => { e.target.checked = opt.active; choose(); }}/>
         <div class="mcard-body">
           <div class="mcard-head">
             <span class="mrank">${'#' + opt.rank}</span>
@@ -474,7 +585,7 @@
             aria-label=${LL.t('models.action.cancel') + ' ' + opt.name}
             onClick=${() => LL.send('cancelModelDownload', { modelId: opt.id })}>${LL.t('models.action.cancel')}</button>`}
           ${opt.canDownload && html`<button type="button" id=${'model-download-' + opt.id}
-            class=${'btn compact' + (opt.active ? ' primary' : '')}
+            class=${'btn compact' + (opt.active ? ' primary' : ' outline')}
             aria-label=${opt.downloadActionLabel + ' ' + opt.name}
             onClick=${() => LL.send('downloadModel', { modelId: opt.id })}>${opt.downloadActionLabel}</button>`}
           ${opt.canSelectImmediate && opt.installed && html`<button type="button" id=${'model-use-' + opt.id} class="btn compact"
@@ -499,21 +610,14 @@
   const CloudModelCard = ({ stage, step, ep }) => {
     const radioId = 'model-cloud-' + step + '-' + ep.id;
     const canChoose = ep.usable && !ep.active;
-    const choose = () => {
-      if (canChoose) LL.send('selectCloudModel', { step, endpointId: ep.id });
-    };
+    const choose = () => { if (canChoose) LL.send('selectCloudModel', { step, endpointId: ep.id }); };
     return html`<li id=${'model-cloud-card-' + step + '-' + ep.id}
       class=${'mcard cloud' + (ep.active ? ' active' : '') + (!ep.usable && !ep.active ? ' unsupported' : '') + (canChoose ? ' selectable' : '')}
-      onClick=${(e) => {
-        if (!e.target.closest('button, input, label')) choose();
-      }}>
+      onClick=${(e) => { if (!e.target.closest('button, input, label')) choose(); }}>
       <div class="mcard-top">
         <input type="radio" class="mradio" id=${radioId} name=${'stage-' + stage}
           aria-label=${ep.name + ' · ' + ep.model} checked=${ep.active} disabled=${!canChoose && !ep.active}
-          onChange=${(e) => {
-            e.target.checked = ep.active;
-            choose();
-          }}/>
+          onChange=${(e) => { e.target.checked = ep.active; choose(); }}/>
         <div class="mcard-body">
           <div class="mcard-head">
             <span class="mrank cloud">${LL.t('models.cloud.badge')}</span>
@@ -523,12 +627,8 @@
             ${ep.peerBadge && html`<span class="chip mini">${ep.peerBadge}</span>`}
             ${!ep.usable && html`<span class="chip mini warn">${LL.t('models.cloud.incomplete')}</span>`}
           </div>
-          <p class="mcard-desc">
-            <span>${ep.host} · ${ep.hasKey ? LL.t('cloud.keySaved') : LL.t('cloud.keyMissing')}</span>
-          </p>
-          <p class="mcard-foot">
-            <span>${LL.t(stage === 'speech' ? 'models.cloud.speechFootprint' : 'models.cloud.footprint')}</span>
-          </p>
+          <p class="mcard-desc"><span>${ep.host} · ${ep.hasKey ? LL.t('cloud.keySaved') : LL.t('cloud.keyMissing')}</span></p>
+          <p class="mcard-foot"><span>${LL.t(stage === 'speech' ? 'models.cloud.speechFootprint' : 'models.cloud.footprint')}</span></p>
         </div>
         <div class="mcard-actions">
           ${ep.active && html`<button type="button" id=${'model-cloud-local-' + step + '-' + ep.id} class="btn compact"
@@ -550,42 +650,249 @@
     </li>`;
   };
 
-  const ModelStageSection = ({ group }) => html`<section id=${'stage-' + group.stage} class="mstage"
-    role="tabpanel" aria-labelledby=${'model-tab-' + group.stage}>
-    <div class="mstage-head">
-      <h2 id=${'stage-title-' + group.stage}>${group.title}</h2>
-      <p class="hint">${group.desc}</p>
-    </div>
-    ${group.localOnly && html`<div id="speech-local-only" class="mstage-local-pill" role="note">
-      <span class="chip mini ok">${LL.t('privacy.badge.alwaysLocal')}</span>
-      <span>${LL.t('models.speech.localOnly')}</span>
-    </div>`}
-    ${group.notice && html`<div class="mstage-notice" role="status">
-      <span>${group.notice}</span>
-    </div>`}
-    ${group.cloudStep && html`<div class="msource-group">
-      <div class="msource-head">
-        <h3 class="msource-title">${LL.t(group.stage === 'speech' ? 'models.group.cloud.speechTitle' : 'models.group.cloud.title')}</h3>
-        <div class="msource-links">
-          <button type="button" id=${'stage-cloud-add-' + group.stage} class="link"
-            onClick=${() => LL.send('openEndpointForm', { id: null })}>+ ${LL.t('models.cloud.add')}</button>
+  const hostSuitabilityClass = (s) =>
+    s === 'catalogverified' || s === 'flagshipbilingual' ? 'chip mini rec'
+    : s === 'suboptimalwarning' ? 'chip mini warn'
+    : 'chip mini';
+
+  const stageEnum = (stage) => stage === 'speech' ? 'Speech' : stage === 'translator' ? 'Translator' : 'Cleaner';
+
+  class LocalHostSection extends preact.Component {
+    state = { expandedHosts: {}, addingCustom: false, customName: '', customUrl: 'http://127.0.0.1:8080', tokenDrafts: {}, copiedCmd: null };
+
+    toggleExpand = (hostId) => this.setState((s) => ({
+      expandedHosts: { ...s.expandedHosts, [hostId]: !s.expandedHosts[hostId] }
+    }));
+
+    copyCmd = (cmd) => {
+      if (navigator.clipboard?.writeText) navigator.clipboard.writeText(cmd).catch(() => {});
+      this.setState({ copiedCmd: cmd });
+      setTimeout(() => { if (this.state.copiedCmd === cmd) this.setState({ copiedCmd: null }); }, 1500);
+    };
+
+    submitCustom = (e) => {
+      e.preventDefault();
+      const { customName, customUrl } = this.state;
+      if (!customUrl.trim()) return;
+      LL.send('addCustomLocalHost', { label: customName.trim(), baseUrl: customUrl.trim() });
+      this.setState({ addingCustom: false, customName: '', customUrl: 'http://127.0.0.1:8080' });
+    };
+
+    saveToken = (hostId, address) => {
+      const token = (this.state.tokenDrafts[hostId] || '').trim();
+      if (!token) return;
+      LL.send('saveLocalHostConfig', { hostId, baseUrl: address ? ('http://' + address) : '', apiToken: token, clearToken: false });
+      this.setState((s) => ({ tokenDrafts: { ...s.tokenDrafts, [hostId]: '' } }));
+    };
+
+    render({ stage, hosts, refreshing }, { expandedHosts, addingCustom, customName, customUrl, tokenDrafts, copiedCmd }) {
+      const enumStage = stageEnum(stage);
+      return html`<div class="msource-group lhost-group">
+        <div class="msource-head">
+          <h3 class="msource-title">${LL.t('models.group.localHost.title')}</h3>
+          <div class="msource-links">
+            <button type="button" id=${'stage-lhost-refresh-' + stage} class="link" disabled=${refreshing}
+              onClick=${() => LL.send('refreshLocalHosts')}>${LL.t(refreshing ? 'models.localHost.refreshing' : 'models.localHost.refresh')}</button>
+            <button type="button" id=${'stage-lhost-add-' + stage} class="link"
+              onClick=${() => this.setState({ addingCustom: !addingCustom })}>+ ${LL.t('models.localHost.addCustom')}</button>
+          </div>
         </div>
-      </div>
-      ${group.cloudInvalid && html`<p class="err msource-err" role="alert">${LL.t('cloud.invalid')}</p>`}
-      ${group.cloudOptions.length === 0
-        ? html`<div id=${'stage-cloud-empty-' + group.stage} class="mcloud-empty">
-            <span>${LL.t(group.stage === 'speech' ? 'models.cloud.speechEmpty' : 'models.cloud.empty')}</span>
-            <button type="button" id=${'stage-cloud-empty-add-' + group.stage} class="btn compact"
-              onClick=${() => LL.send('openEndpointForm', { id: null })}>${LL.t('models.cloud.add')}</button>
-          </div>`
-        : html`<ul class="mcard-list">${group.cloudOptions.map((ep) =>
-            html`<${CloudModelCard} key=${ep.id} stage=${group.stage} step=${group.cloudStep} ep=${ep}/>`)}</ul>`}
-    </div>`}
-    ${group.cloudStep && html`<div class="msource-head local">
-      <h3 class="msource-title">${LL.t('models.group.local.title')}</h3>
-    </div>`}
-    <ul class="mcard-list">${group.options.map((opt) => html`<${ModelCard} key=${opt.id} stage=${group.stage} opt=${opt}/>`)}</ul>
-  </section>`;
+        ${addingCustom && html`<form class="lhost-custom-form" onSubmit=${this.submitCustom}>
+          <input id=${'lhost-custom-name-' + stage} value=${customName} maxlength="40" aria-label=${LL.t('models.localHost.customName')} placeholder=${LL.t('models.localHost.customName')}
+            onInput=${(e) => this.setState({ customName: e.target.value })}/>
+          <input id=${'lhost-custom-url-' + stage} type="url" value=${customUrl} aria-label=${LL.t('models.localHost.customUrl')} placeholder=${LL.t('models.localHost.customUrlHint')}
+            onInput=${(e) => this.setState({ customUrl: e.target.value })}/>
+          <button type="submit" id=${'lhost-custom-submit-' + stage} class="btn compact primary">${LL.t('models.localHost.customAdd')}</button>
+        </form>`}
+        ${(!hosts || hosts.length === 0)
+          ? html`<div id=${'stage-lhost-empty-' + stage} class="mcloud-empty">
+              <span>${LL.t(stage === 'speech' ? 'models.localHost.speechEmpty' : 'models.localHost.empty')}</span>
+              <button type="button" class="btn compact" onClick=${() => LL.send('refreshLocalHosts')}>${LL.t('models.localHost.refresh')}</button>
+            </div>`
+          : hosts.map((host) => {
+              const expanded = !!expandedHosts[host.hostId];
+              const visibleModels = expanded ? host.models : host.models.slice(0, 4);
+              const hiddenCount = Math.max(0, host.models.length - visibleModels.length);
+              return html`<div key=${host.hostId} id=${'lhost-box-' + stage + '-' + host.hostId} class="lhost-box">
+                <div class="lhost-head">
+                  <div class="lhost-title">
+                    <b>${host.name}</b>
+                    ${host.address && html`<code class="lhost-addr">${host.address}</code>`}
+                    <span class=${'chip mini ' + (host.status === 'running' ? 'ok' : host.status === 'authrequired' ? 'warn' : '')}>${host.statusBadge}</span>
+                  </div>
+                  <div class="lhost-actions">
+                    ${host.status === 'installednotserving' && host.supportsStartServer && html`<button type="button" class="btn compact primary"
+                      onClick=${() => LL.send('startLocalHostServer', { hostId: host.hostId })}>${LL.t('models.localHost.startServer')}</button>`}
+                    ${host.supportsOpenApp && html`<button type="button" class="btn compact"
+                      onClick=${() => LL.send('openLocalHostApp', { hostId: host.hostId })}>${LL.t('models.localHost.openApp')}</button>`}
+                    ${host.isCustom && html`<button type="button" class="link danger"
+                      onClick=${() => LL.send('removeCustomLocalHost', { hostId: host.hostId })}>${LL.t('models.localHost.remove')}</button>`}
+                  </div>
+                </div>
+                ${host.status === 'authrequired' && html`<div class="lhost-notice">
+                  <p>${LL.t('models.localHost.authPrompt')}</p>
+                  <div class="lhost-token-row">
+                    <input type="password" aria-label=${LL.t('models.localHost.tokenPlaceholder')} value=${tokenDrafts[host.hostId] || ''} placeholder=${LL.t('models.localHost.tokenPlaceholder')}
+                      onInput=${(e) => this.setState({ tokenDrafts: { ...tokenDrafts, [host.hostId]: e.target.value } })}/>
+                    <button type="button" class="btn compact primary" onClick=${() => this.saveToken(host.hostId, host.address)}>${LL.t('models.localHost.saveToken')}</button>
+                  </div>
+                </div>`}
+                ${host.status === 'installednotserving' && html`<p class="hint lhost-hint">${LL.t('models.localHost.notServingHint')}</p>`}
+                ${host.status === 'running' && host.models.length > 0 && html`<ul class="mcard-list">${visibleModels.map((m) => {
+                  const radioId = 'model-lhost-' + stage + '-' + host.hostId + '-' + m.key.replace(/[^a-zA-Z0-9_-]/g, '_');
+                  const choose = () => { if (m.canSelect) LL.send('selectLocalHostModel', { stage: enumStage, hostId: host.hostId, modelKey: m.key }); };
+                  return html`<li key=${m.key} class=${'mcard lhost' + (m.active ? ' active' : '') + (m.canSelect ? ' selectable' : '')}
+                    onClick=${(e) => { if (!e.target.closest('button, input, label')) choose(); }}>
+                    <div class="mcard-top">
+                      <input type="radio" class="mradio" id=${radioId} name=${'stage-' + stage}
+                        aria-label=${host.name + ' · ' + m.name} checked=${m.active} disabled=${!m.canSelect && !m.active}
+                        onChange=${(e) => { e.target.checked = m.active; choose(); }}/>
+                      <div class="mcard-body">
+                        <div class="mcard-head">
+                          <span class="mrank lhost">${LL.t('models.localHost.badge.host')}</span>
+                          <label class="mname" for=${radioId}>${m.name}</label>
+                          <span class=${hostSuitabilityClass(m.suitability)}>${m.suitabilityBadge}</span>
+                          <span class=${'chip mini' + (m.isLoaded ? ' ok' : '')}>${m.loadedBadge}</span>
+                          ${m.parallelBadge && html`<span class="chip mini">${m.parallelBadge}</span>`}
+                          ${m.active && html`<span class="chip mini ok">${LL.t('models.state.activeInstalled')}</span>`}
+                          ${m.peerBadge && html`<span class="chip mini">${m.peerBadge}</span>`}
+                        </div>
+                        ${m.meta && html`<p class="mcard-foot"><span>${m.meta}</span></p>`}
+                        ${m.warningText && html`<p class="mcard-foot"><span class="mfit-note heavy">${m.warningText}</span></p>`}
+                      </div>
+                      <div class="mcard-actions">
+                        ${m.canSelect && html`<button type="button" class="btn compact" onClick=${choose}>${LL.t('models.action.enable')}</button>`}
+                      </div>
+                    </div>
+                  </li>`;
+                })}</ul>`}
+                ${hiddenCount > 0 && html`<button type="button" class="link lhost-more" onClick=${() => this.toggleExpand(host.hostId)}>
+                  ${fmt('models.localHost.showMore', hiddenCount)}</button>`}
+                ${expanded && host.models.length > 4 && html`<button type="button" class="link lhost-more" onClick=${() => this.toggleExpand(host.hostId)}>
+                  ${LL.t('models.localHost.showLess')}</button>`}
+                ${host.status === 'running' && !host.hasSuitableModels && host.recommendations.length > 0 && html`<div class="lhost-missing">
+                  <strong>${LL.t('models.localHost.missingTitle')}</strong>
+                  <p class="hint">${LL.t('models.localHost.missingDesc')}</p>
+                  <ul class="lhost-rec-list">${host.recommendations.map((rec) => html`<li key=${rec.catalogModelId} class="lhost-rec">
+                    <div class="lhost-rec-info">
+                      <b>${rec.name}</b>
+                      <span class="hint">${rec.sizeText}</span>
+                      ${rec.error && html`<span class="err">${rec.error}</span>`}
+                    </div>
+                    <div class="lhost-rec-actions">
+                      ${rec.canDownload && html`<button type="button" class="btn compact primary"
+                        onClick=${() => LL.send('downloadLocalHostModel', { hostId: host.hostId, stage: enumStage, catalogModelId: rec.catalogModelId })}>
+                        ${LL.t('models.localHost.downloadInHost')}</button>`}
+                      ${rec.downloading && html`<span class="chip mini rec">${rec.statusText}</span>`}
+                      <button type="button" class="btn compact" onClick=${() => this.copyCmd(rec.copyCommand)}>
+                        ${copiedCmd === rec.copyCommand ? LL.t('models.localHost.copied') : LL.t('models.localHost.copyCmd')}</button>
+                    </div>
+                  </li>`)}</ul>
+                </div>`}
+              </div>`;
+            })}
+      </div>`;
+    }
+  }
+
+  class ModelStageSection extends preact.Component {
+    constructor(props) {
+      super(props);
+      this.state = { source: this.defaultSource(props.group, props.hasCloudModal) };
+    }
+
+    defaultSource(group, hasCloudModal) {
+      if (group.cloudRouted || group.cloudInvalid || hasCloudModal) return 'cloud';
+      if (group.localHostRouted) return 'host';
+      return 'local';
+    }
+
+    componentDidUpdate(prevProps) {
+      const g = this.props.group;
+      const p = prevProps.group;
+      if (g.stage !== p.stage) {
+        this.setState({ source: this.defaultSource(g, this.props.hasCloudModal) });
+      } else if ((g.cloudRouted && !p.cloudRouted) || (g.cloudInvalid && !p.cloudInvalid) || (this.props.hasCloudModal && !prevProps.hasCloudModal)) {
+        this.setState({ source: 'cloud' });
+      } else if (g.localHostRouted && !p.localHostRouted) {
+        this.setState({ source: 'host' });
+      }
+    }
+
+    render({ group, localHostRefreshing }, { source }) {
+      const compatible = group.options.filter((o) => o.fit !== 'unsupported' || o.active);
+      const unsupported = group.options.filter((o) => o.fit === 'unsupported' && !o.active);
+      const activeSource = group.cloudRouted ? 'cloud' : group.localHostRouted ? 'host' : 'local';
+      const hosts = group.localHosts || [];
+      const runningHosts = hosts.filter((h) => h.status === 'running').length;
+      const cloudCount = (group.cloudOptions || []).length;
+      const showLocal = source === 'local';
+      const showHost = source === 'host' && group.localHostSupported;
+      const showCloud = source === 'cloud' && group.cloudStep;
+
+      return html`<section id=${'stage-' + group.stage} class="mstage" role="tabpanel" aria-labelledby=${'model-tab-' + group.stage}>
+        ${group.localOnly && html`<div id="speech-local-only" class="mstage-local-pill" role="note">
+          <span class="chip mini ok">${LL.t('privacy.badge.alwaysLocal')}</span>
+          <span>${LL.t('models.speech.localOnly')}</span>
+        </div>`}
+        ${group.notice && html`<div class="mstage-notice" role="status"><span>${group.notice}</span></div>`}
+
+        <div class="source-bar">
+          <div class="source-seg" role="group" aria-label=${LL.t('models.source.aria')}>
+            <button type="button" id=${'source-local-' + group.stage} aria-pressed=${String(showLocal)}
+              onClick=${() => this.setState({ source: 'local' })}>
+              <${Icon} name="cpu"/>
+              <span>${LL.t('models.source.local')}</span>
+              <span class="src-count">${compatible.length}</span>
+              ${activeSource === 'local' && html`<span class="src-active-dot" aria-hidden="true"></span>`}
+            </button>
+            ${group.localHostSupported && html`<button type="button" id=${'source-host-' + group.stage} aria-pressed=${String(showHost)}
+              onClick=${() => this.setState({ source: 'host' })}>
+              <${Icon} name="server"/>
+              <span>${LL.t('models.source.host')}</span>
+              <span class="src-count">${runningHosts}</span>
+              ${activeSource === 'host' && html`<span class="src-active-dot" aria-hidden="true"></span>`}
+            </button>`}
+            ${group.cloudStep && html`<button type="button" id=${'source-cloud-' + group.stage} aria-pressed=${String(showCloud)}
+              onClick=${() => this.setState({ source: 'cloud' })}>
+              <${Icon} name="cloud"/>
+              <span>${LL.t('models.source.cloud')}</span>
+              <span class="src-count">${cloudCount}</span>
+              ${activeSource === 'cloud' && html`<span class="src-active-dot" aria-hidden="true"></span>`}
+            </button>`}
+          </div>
+          ${showCloud && html`<button type="button" id=${'stage-cloud-add-' + group.stage} class="btn compact primary"
+            onClick=${() => LL.send('openEndpointForm', { id: null })}>+ ${LL.t('models.cloud.add')}</button>`}
+        </div>
+
+        <p class="mstage-sub">${group.desc} · <b>${LL.t('models.active.label')}：${group.tabSummary}</b></p>
+
+        ${showHost && html`<${LocalHostSection} stage=${group.stage} hosts=${hosts} refreshing=${localHostRefreshing}/>`}
+
+        ${showCloud && html`<div class="msource-group">
+          ${group.cloudInvalid && html`<p class="err msource-err" role="alert">${LL.t('cloud.invalid')}</p>`}
+          ${cloudCount === 0
+            ? html`<div id=${'stage-cloud-empty-' + group.stage} class="mcloud-empty">
+                <span>${LL.t(group.stage === 'speech' ? 'models.cloud.speechEmpty' : 'models.cloud.empty')}</span>
+                <button type="button" id=${'stage-cloud-empty-add-' + group.stage} class="btn compact primary"
+                  onClick=${() => LL.send('openEndpointForm', { id: null })}>${LL.t('models.cloud.add')}</button>
+              </div>`
+            : html`<ul class="mcard-list">${group.cloudOptions.map((ep) =>
+                html`<${CloudModelCard} key=${ep.id} stage=${group.stage} step=${group.cloudStep} ep=${ep}/>`)}</ul>`}
+        </div>`}
+
+        ${showLocal && html`<div class="msource-group">
+          <ul class="mcard-list">${compatible.map((opt) => html`<${ModelCard} key=${opt.id} stage=${group.stage} opt=${opt}/>`)}</ul>
+          ${unsupported.length > 0 && html`<details class="s-disclosure m-unsupported">
+            <summary><span>${fmt('models.unsupported.toggle', unsupported.length)}</span></summary>
+            <div class="s-disclosure-body">
+              <ul class="mcard-list">${unsupported.map((opt) => html`<${ModelCard} key=${opt.id} stage=${group.stage} opt=${opt}/>`)}</ul>
+            </div>
+          </details>`}
+        </div>`}
+      </section>`;
+    }
+  }
 
   const DownloadCenter = ({ downloads }) => {
     if (!downloads || downloads.length === 0) return null;
@@ -618,12 +925,7 @@
     </section>`;
   };
 
-  const ModelStorageSection = ({ s }) => html`<section id="models-storage" class="mstorage"
-    role="tabpanel" aria-labelledby="model-tab-storage">
-    <div class="mstage-head">
-      <h2 id="storage-title">${LL.t('models.storage.title')}</h2>
-      <p class="hint">${LL.t('models.storage.desc')}</p>
-    </div>
+  const ModelStorageSection = ({ s }) => html`<section id="models-storage" class="mstorage" role="tabpanel" aria-labelledby="model-tab-storage">
     <div class="storage-summary">
       <div class="storage-stat">
         <span class="storage-kicker">${LL.t('models.storage.total')}</span>
@@ -641,7 +943,7 @@
       <//>
     </div>`}
     <div class="storage-inventory">
-      <h3 class="storage-subhead">${LL.t('models.storage.listTitle')}</h3>
+      <h3 class="storage-subhead">${LL.t('models.storage.listTitle')} (${s.items.length})</h3>
       ${s.items.length === 0
         ? html`<p id="storage-empty" class="hint storage-empty">${LL.t('models.storage.empty')}</p>`
         : html`<ul class="storage-list">${s.items.map((item) => html`<li id=${'storage-item-' + item.id} class="storage-item" key=${item.id}>
@@ -666,42 +968,43 @@
   </section>`;
 
   const HardwareBanner = ({ hw, onOpenStorage }) => html`<section id="models-hw" class="mhw" aria-labelledby="models-hw-title">
-    <div class="mhw-top">
-      <div class="mhw-info">
-        <h2 id="models-hw-title">${LL.t('models.hw.title')}</h2>
-        <p id="models-hw-summary" class="mhw-summary">${hw.summary}</p>
+    <div class="mhw-col">
+      <div class="mhw-top">
+        <h3 id="models-hw-title" class="sgroup-title">${LL.t('group.hw')}</h3>
+        <div class="mhw-cta">
+          ${hw.isRecommended
+            ? html`<span id="models-best-badge" class="chip mini ok">${LL.t('models.hw.matched')}</span>`
+            : hw.isRecommendedDownloading
+            ? html`<span id="models-best-preparing" class="chip mini rec" role="status">${LL.t('models.hw.preparing')}</span>`
+            : html`<button type="button" id="models-apply-best" class="link accent"
+                onClick=${() => LL.send('applyRecommendedModels')}>${hw.recommendActionLabel}</button>`}
+        </div>
       </div>
-      <div class="mhw-cta">
-        ${hw.isRecommended
-          ? html`<span id="models-best-badge" class="chip rec">${LL.t('models.hw.matched')}</span>`
-          : hw.isRecommendedDownloading
-          ? html`<span id="models-best-preparing" class="chip rec" role="status">${LL.t('models.hw.preparing')}</span>`
-          : html`<button type="button" id="models-apply-best" class="btn primary compact"
-              onClick=${() => LL.send('applyRecommendedModels')}>${hw.recommendActionLabel}</button>`}
-      </div>
-    </div>
-    <div class="mhw-meter">
-      <div class=${'progress' + (hw.overBudget ? ' warn' : '')} role="progressbar" aria-label=${LL.t('models.hw.gaugeAria')}
-        aria-valuemin="0" aria-valuemax="100" aria-valuenow=${hw.budgetPercent}>
-        <span style=${{ width: hw.budgetPercent + '%' }}></span>
-      </div>
-      <div class="mhw-meta-row">
-        <p class="mhw-meta"><span>${hw.residency}</span></p>
-        <button type="button" id="models-disk-link" class="link mhw-disk-btn" onClick=${onOpenStorage}>${hw.diskUsed}</button>
+      <p id="models-hw-summary" class="mhw-summary">${hw.summary}</p>
+      <div class="mhw-bar-row">
+        <div class=${'progress' + (hw.overBudget ? ' warn' : ' ok')} role="progressbar" aria-label=${LL.t('models.hw.gaugeAria')}
+          aria-valuemin="0" aria-valuemax="100" aria-valuenow=${hw.budgetPercent}>
+          <span style=${{ width: hw.budgetPercent + '%' }}></span>
+        </div>
+        <span class="mhw-meta">${hw.residency}</span>
       </div>
       <p class=${'mhw-note' + (hw.overBudget ? ' warn' : '')}>${hw.modeNote}</p>
     </div>
-    <div id="models-privacy-strip" class="mhw-privacy">
-      <div class="mhw-privacy-status">
+
+    <div id="models-privacy-strip" class="mhw-col mhw-privacy-col">
+      <div class="mhw-top">
+        <h3 class="sgroup-title">${LL.t('group.privacy')}</h3>
         <span class=${'chip mini ' + (hw.anyCloud ? 'warn' : 'ok')}>${LL.t(hw.anyCloud ? 'privacy.badge.cloud' : 'privacy.badge.local')}</span>
-        <span>${hw.privacyStatus}</span>
       </div>
-      ${hw.anyCloud && html`<button type="button" id="cloud-disable-all" class="btn compact"
-        onClick=${() => LL.send('disableAllCloud')}>${LL.t('privacy.routing.allLocal')}</button>`}
+      <p class="mhw-note">${hw.privacyStatus}</p>
+      <div class="mhw-privacy-actions">
+        ${hw.anyCloud && html`<button type="button" id="cloud-disable-all" class="btn compact outline"
+          onClick=${() => LL.send('disableAllCloud')}>${LL.t('privacy.routing.allLocal')}</button>`}
+        <button type="button" id="models-disk-link" class="link accent mhw-disk-btn" onClick=${onOpenStorage}>${hw.diskUsed} →</button>
+      </div>
     </div>
   </section>`;
 
-  // Selecting a cloud endpoint for any stage requires explicit user consent; the safe answer is always focused first.
   const answer = (allow) => LL.send('consent', { allow });
 
   const Consent = ({ c }) => html`<${Modal} id="consent" title=${LL.t('consent.' + c.step)}
@@ -719,8 +1022,6 @@
     </div>
   <//>`;
 
-  // The add or edit form. The fields are the page's until they are sent; the key stays in this form only while it is open
-  // (it is kept across a refused submission so a wrong name does not mean typing it again) and never goes into a snapshot.
   class EndpointForm extends preact.Component {
     constructor(props) {
       super(props);
@@ -753,7 +1054,6 @@
       LL.send('saveEndpoint', { label: name, baseUrl: url, model, apiKey: key });
     };
 
-    // An input method confirms its candidate with Enter (keyCode 229 in WKWebView); that is not "submit".
     onKeyDown = (e) => {
       if (e.key === 'Enter' && (e.isComposing || e.keyCode === 229)) e.preventDefault();
     };
@@ -795,7 +1095,6 @@
     }
   }
 
-  // Deleting an endpoint asks first and explains if any active cloud step will return to local models.
   const endpointAnswer = (allow) => LL.send('endpointAnswer', { allow });
 
   const DeleteEndpointDialog = ({ d, stage }) => html`<${Modal} id="endpoint-change" title=${fmt('cloud.delete.title', d.name)}
@@ -806,6 +1105,8 @@
       <button type="button" id="endpoint-confirm" class="btn primary destructive" onClick=${() => endpointAnswer(true)}>${LL.t('cloud.delete.confirm')}</button>
     </div>
   <//>`;
+
+  const STAGE_ICON = { speech: 'mic', cleaner: 'sparkle', translator: 'globe', storage: 'drive' };
 
   class Models extends preact.Component {
     constructor(props) {
@@ -842,6 +1143,7 @@
           title: g.tabTitle,
           summary: g.tabSummary,
           busy: g.busy,
+          tone: g.cloudRouted ? 'warn' : g.localHostRouted ? 'host' : 'ok',
           panelId: 'stage-' + g.stage
         })),
         {
@@ -849,6 +1151,7 @@
           title: m.storage.tabTitle,
           summary: m.storage.tabSummary,
           busy: false,
+          tone: null,
           panelId: 'models-storage'
         }
       ];
@@ -858,8 +1161,18 @@
         ?? m.stages.find((g) => g.cloudStep)?.cloudOptions
         ?? [];
 
-      return html`<div class="models-page">
+      return html`<div class="spage models-page">
+        <${PageHead} title=${LL.t('nav.models')} desc=${LL.t('section.models.desc')}/>
         <${HardwareBanner} hw=${m.hardware} onOpenStorage=${() => this.selectTab('storage')}/>
+        ${m.hotHost && html`<section id="models-hot-host" class="lhost-hot-banner" role="status">
+          <div class="lhost-hot-info">
+            <span class="chip mini host">${LL.t('models.localHost.hotBanner.badge')}</span>
+            <span>${m.hotHost.summary}</span>
+          </div>
+          <button type="button" id="models-hot-host-apply" class="btn compact primary"
+            onClick=${() => LL.send('applyHotLocalHostModel', { hostId: m.hotHost.hostId, modelKey: m.hotHost.modelKey })}>
+            ${LL.t('models.localHost.hotBanner.apply')}</button>
+        </section>`}
         <${DownloadCenter} downloads=${m.downloads}/>
         <div id="models-tabs" class="mtabs" role="tablist" aria-label=${LL.t('models.tabs.aria')}
           onKeyDown=${this.onTabKeyDown(tabs)}>
@@ -868,11 +1181,15 @@
             aria-selected=${String(tab === t.id)} aria-controls=${t.panelId}
             tabIndex=${tab === t.id ? 0 : -1}
             onClick=${() => this.selectTab(t.id)}>
-            <span class="mtab-title">${t.busy && html`<i class="dot" aria-hidden="true"></i>`}${t.title}</span>
+            <span class="mtab-top">
+              <span class="mtab-title"><${Icon} name=${STAGE_ICON[t.id] || 'cpu'}/><span>${t.title}</span></span>
+              ${t.tone && html`<i class=${'s-dot ' + t.tone} aria-hidden="true"></i>`}
+            </span>
             <span class="mtab-sub">${t.summary}</span>
           </button>`)}
         </div>
-        ${activeStage ? html`<${ModelStageSection} key=${activeStage.stage} group=${activeStage}/>`
+        ${activeStage ? html`<${ModelStageSection} key=${activeStage.stage} group=${activeStage} localHostRefreshing=${m.localHostRefreshing}
+            hasCloudModal=${Boolean(m.consent || m.form || m.deleteConfirm)}/>`
           : html`<${ModelStorageSection} s=${m.storage}/>`}
         ${m.consent && html`<${Consent} c=${m.consent}/>`}
         ${m.form && html`<${EndpointForm} form=${m.form} stage=${cloudStage} endpoint=${cloudEndpoints.find((e) => e.id === m.form.id)}/>`}
@@ -881,34 +1198,168 @@
     }
   }
 
-  const About = ({ a }) => html`<div class="about-page">
+  // ==================== 6. ABOUT & DIAGNOSTICS ====================
+  class Diagnostics extends preact.Component {
+    state = { open: false };
+    show = () => this.setState({ open: true });
+    hide = () => this.setState({ open: false });
+
+    render({ lines }, { open }) {
+      return html`<${Row} id="diag-open" title=${LL.t('diag')} desc=${LL.t('diag.desc')}>
+        <button type="button" id="diag-open" class="btn compact outline" onClick=${this.show}>${LL.t('diag.open')}</button>
+      <//>
+      ${open && html`<${Modal} id="diag" title=${LL.t('diag.title')} returnTo="diag-open" onClose=${this.hide}>
+        <dl id="diag-text" class="diag">${lines.map((line) => html`<div key=${line.label}><dt>${line.label}</dt><dd>${line.value}</dd></div>`)}</dl>
+        <div class="dlg-actions"><button type="button" id="diag-close" class="btn primary" data-initial onClick=${this.hide}>${LL.t('closeAria')}</button></div>
+      <//>`}`;
+    }
+  }
+
+  const Update = ({ u }) => html`<${Row} id="update-action" title=${LL.t('update')} desc=${LL.t('update.desc')}
+    extra=${html`<p id="update-status" role="status" aria-live="polite">${u.status}</p>
+      ${u.busy && html`<div id="update-progress" class=${'progress' + (u.percent === null ? ' indeterminate' : '')} role="progressbar"
+        aria-valuemin="0" aria-valuemax="100" aria-valuenow=${u.percent === null ? undefined : u.percent}>
+        <span style=${u.percent === null ? undefined : { width: u.percent + '%' }}></span></div>`}`}>
+    ${(u.canCheck || u.busy) && html`<button type="button" id="update-action" class="btn compact" disabled=${u.busy} onClick=${() => LL.send('checkUpdates')}>${LL.t('update.check')}</button>`}
+    ${u.canRestart && html`<button type="button" id="update-action" class="btn compact primary" onClick=${() => LL.send('restartToUpdate')}>${LL.t('update.restart')}</button>`}
+    ${u.canDownload && html`<button type="button" id="update-action" class="btn compact primary" onClick=${() => LL.send('openDownloads')}>${LL.t('update.download')}</button>`}
+  <//>`;
+
+  const About = ({ a }) => html`<div class="spage about-page">
+    <${PageHead} title=${LL.t('nav.about')} desc=${LL.t('section.about.desc')}/>
     <section class="about-hero" aria-labelledby="about-app-name">
-      <div>
-        <h2 id="about-app-name" class="about-title">${LL.t('appName')}</h2>
-        <p class="hint">${LL.t('about.subtitle')}</p>
+      <div class="about-brand">
+        <span class="about-logo" aria-hidden="true">li</span>
+        <div>
+          <h3 id="about-app-name" class="about-title">${LL.t('appName')}</h3>
+          <p class="hint">${LL.t('about.subtitle')}</p>
+        </div>
       </div>
       <span id="version" class="chip rec">${a.version}</span>
     </section>
-    <${Update} u=${a.update}/>
-    <${Diagnostics} lines=${a.diagnostics}/>
+    <${Group} id="a-update" title=${LL.t('group.update')}>
+      <${Update} u=${a.update}/>
+      <${Diagnostics} lines=${a.diagnostics}/>
+    <//>
   </div>`;
 
-  LL.Settings = () => {
-    const s = LL.state.settings;
-    if (!s) return null;
-    return html`<div class="settings">
-      <nav aria-label=${LL.t('nav.aria')}>${SECTIONS.map(([id, key]) => html`<button type="button" key=${id} id=${'nav-' + id}
-        class=${id === 'about' ? 'nav-about' : undefined}
-        aria-current=${s.section === id ? 'page' : undefined} onClick=${() => LL.send('openSettings', { section: id })}>
-        <span>${LL.t(key)}</span>
-        ${id === 'models' && s.models.navBadge && html`<span id="nav-models-badge" class="nav-badge">${s.models.navBadge}</span>`}
-      </button>`)}</nav>
-      <main id="panel"><div class="panel-body">
-        ${s.section === 'general' && html`<${General} g=${s.general}/>`}
-        ${s.section === 'voice' && html`<${Voice} v=${s.voice}/>`}
-        ${s.section === 'models' && html`<${Models} m=${s.models}/>`}
-        ${s.section === 'about' && html`<${About} a=${s.about}/>`}
-      </div></main>
-    </div>`;
-  };
+  // ==================== ROOT SHELL WITH SIDEBAR & SEARCH ====================
+  const SEARCH_ITEMS = [
+    ['general', 'hotkey', 'hotkey.desc'],
+    ['general', 'commit', 'commit.desc'],
+    ['general', 'theme', 'theme.desc'],
+    ['general', 'language', 'language.desc'],
+    ['general', 'motion', 'motion.desc'],
+    ['general', 'remember', 'remember.desc'],
+    ['general', 'recent', 'recent.desc'],
+    ['voice', 'mic', 'mic.desc'],
+    ['voice', 'autoDictate', 'autoDictate.desc'],
+    ['voice', 'preload', 'preload.desc'],
+    ['voice', 'cleanup', 'cleanup.desc'],
+    ['voice', 'output', 'output.desc'],
+    ['voice', 'direction', 'direction.desc'],
+    ['polish', 'defaultPolish', 'defaultPolish.desc'],
+    ['polish', 'smartHostPolish', 'smartHostPolish.desc'],
+    ['polish', 'presets', 'presets.desc'],
+    ['polish', 'polish', 'polish.desc'],
+    ['glossary', 'builtInTerms', 'builtInTerms.desc'],
+    ['glossary', 'corrections', 'corrections.hint'],
+    ['glossary', 'terms', 'terms.hint'],
+    ['models', 'nav.models', 'section.models.desc'],
+    ['about', 'update', 'update.desc'],
+    ['about', 'diag', 'diag.desc']
+  ];
+
+  class SettingsShell extends preact.Component {
+    state = { query: '' };
+
+    componentDidMount() {
+      document.addEventListener('keydown', this.onGlobalKey);
+    }
+
+    componentWillUnmount() {
+      document.removeEventListener('keydown', this.onGlobalKey);
+    }
+
+    onGlobalKey = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        this.searchEl?.focus();
+        this.searchEl?.select();
+      }
+    };
+
+    jump = (section) => {
+      this.setState({ query: '' });
+      LL.send('openSettings', { section });
+    };
+
+    render(_, { query }) {
+      const s = LL.state.settings;
+      if (!s) return null;
+
+      const enabledPresets = s.voice.presets.filter((p) => p.enabled).length;
+      const lexCount = s.voice.corrections.length + s.voice.terms.length;
+      const q = query.trim().toLowerCase();
+      const hits = q
+        ? SEARCH_ITEMS.filter(([sec, titleKey, descKey]) =>
+            (LL.t(titleKey) + ' ' + LL.t(descKey) + ' ' + LL.t('nav.' + sec)).toLowerCase().includes(q)
+          ).slice(0, 6)
+        : [];
+
+      const navButton = ([id, key, icon]) => html`<button type="button" key=${id} id=${'nav-' + id}
+        class=${'s-nav-btn' + (id === 'about' ? ' nav-about' : '')}
+        aria-current=${s.section === id ? 'page' : undefined}
+        onClick=${() => LL.send('openSettings', { section: id })}>
+        <${Icon} name=${icon}/>
+        <span class="s-nav-label">${LL.t(key)}</span>
+        ${id === 'polish' && html`<span class="s-nav-count">${enabledPresets}</span>`}
+        ${id === 'glossary' && html`<span class="s-nav-count">${lexCount}</span>`}
+        ${id === 'models' && (s.models.navBadge
+          ? html`<span id="nav-models-badge" class="nav-badge">${s.models.navBadge}</span>`
+          : html`<i class=${'s-dot ' + (s.models.hardware.anyCloud ? 'warn' : 'ok')} aria-hidden="true"></i>`)}
+      </button>`;
+
+      return html`<div class="settings">
+        <aside class="s-sidebar">
+          <div class="s-search" role="search">
+            <${Icon} name="search"/>
+            <input id="settings-search" type="search" value=${query}
+              aria-label=${LL.t('search.placeholder')} placeholder=${LL.t('search.placeholder')}
+              autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false"
+              ref=${(el) => (this.searchEl = el)}
+              onInput=${(e) => this.setState({ query: e.target.value })}
+              onKeyDown=${(e) => { if (e.key === 'Escape') { this.setState({ query: '' }); e.target.blur(); } }}/>
+          </div>
+          ${q && html`<div id="settings-search-results" class="s-search-results">
+            ${hits.length === 0
+              ? html`<p class="s-search-empty">${LL.t('search.empty')}</p>`
+              : hits.map(([sec, titleKey]) => html`<button type="button" key=${sec + ':' + titleKey} class="s-search-hit"
+                  onClick=${() => this.jump(sec)}>
+                  <b>${LL.t(titleKey)}</b>
+                  <span>${LL.t('nav.' + sec)}</span>
+                </button>`)}
+          </div>`}
+          <nav aria-label=${LL.t('nav.aria')}>
+            ${NAV_GROUPS.map((g) => html`<div class="s-nav-group" key=${g.key}>
+              <div class="s-nav-group-label" aria-hidden="true">${LL.t(g.key)}</div>
+              ${g.items.map(navButton)}
+            </div>`)}
+            <div class="s-nav-spacer" aria-hidden="true"></div>
+            ${navButton(['about', 'nav.about', 'info'])}
+          </nav>
+        </aside>
+        <main id="panel"><div class="panel-body">
+          ${s.section === 'general' && html`<${General} g=${s.general}/>`}
+          ${s.section === 'voice' && html`<${Voice} v=${s.voice}/>`}
+          ${s.section === 'polish' && html`<${PolishSection} v=${s.voice}/>`}
+          ${s.section === 'glossary' && html`<${GlossarySection} v=${s.voice}/>`}
+          ${s.section === 'models' && html`<${Models} m=${s.models}/>`}
+          ${s.section === 'about' && html`<${About} a=${s.about}/>`}
+        </div></main>
+      </div>`;
+    }
+  }
+
+  LL.Settings = () => html`<${SettingsShell}/>`;
 })();

@@ -249,6 +249,36 @@ public class ComposerVoiceTests
     }
 
     [Fact]
+    public async Task LocalHostUnavailableOnStart_ShowsSpeechFailedBanner()
+    {
+        await using var h = Create();
+        h.Voice.StartFailure = new LiveLingo.Core.LocalHost.LocalHostUnavailableException(
+            LiveLingo.Core.LocalHost.LocalHostFailureKind.HostError,
+            "bionic",
+            "Bionic",
+            "Bionic does not expose an HTTP audio transcription API.");
+
+        await h.Vm.StartListeningAsync();
+
+        Assert.Equal(BannerKind.SpeechFailed, h.Vm.Banner.Kind);
+        Assert.Contains("Bionic", h.Vm.Banner.Detail, StringComparison.Ordinal);
+        Assert.False(h.Vm.IsListening);
+        Assert.False(h.Vm.IsStartingListening);
+    }
+
+    [Fact]
+    public async Task RuntimeRecognitionFailure_ShowsSpeechFailedBanner()
+    {
+        await using var h = Create();
+        await h.Vm.StartListeningAsync();
+
+        h.Voice.RaiseRecognitionFailed("Cloud speech HTTP 400: Invalid 'content'");
+
+        Assert.Equal(BannerKind.SpeechFailed, h.Vm.Banner.Kind);
+        Assert.Contains("HTTP 400", h.Vm.Banner.Detail, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Escape_StopsListeningFirst_AndOnlyThenCloses()
     {
         await using var h = Create();

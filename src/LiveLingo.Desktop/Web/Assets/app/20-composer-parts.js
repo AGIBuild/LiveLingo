@@ -19,7 +19,7 @@
 
   const pickOutput = (item) => {
     if (item.id === 'swap') LL.send('swapLanguage');
-    else if (item.id === 'managePolish') LL.send('openSettings', { section: 'voice' });
+    else if (item.id === 'managePolish') LL.send('openSettings', { section: 'polish' });
     else if (item.id.startsWith('polish:')) LL.send('polishMode', { id: item.id.slice(7) });
     else LL.send('output', { value: item.id });
     LL.closeMenu();
